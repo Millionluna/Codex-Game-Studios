@@ -127,9 +127,14 @@ function NavGroup({
 type AppShellProps = {
   children: ReactNode;
   locale?: Locale;
+  languageSwitcherHref?: string;
 };
 
-export function AppShell({ children, locale = DEFAULT_LOCALE }: AppShellProps) {
+export function AppShell({
+  children,
+  locale = DEFAULT_LOCALE,
+  languageSwitcherHref = "/referral-workspace",
+}: AppShellProps) {
   const copy = getReferralWorkspaceCopy(locale);
   const primaryItems = primaryNavItems.map((item) => ({
     ...item,
@@ -185,7 +190,7 @@ export function AppShell({ children, locale = DEFAULT_LOCALE }: AppShellProps) {
                 return (
                   <Link
                     key={supportedLocale}
-                    href={withLocale("/referral-workspace", supportedLocale)}
+                    href={withLocale(languageSwitcherHref, supportedLocale)}
                     aria-current={isActive ? "page" : undefined}
                     className={`inline-flex min-h-9 items-center rounded-md border px-3 text-sm font-semibold transition ${
                       isActive
