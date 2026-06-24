@@ -259,7 +259,7 @@ const receiveMaterials = [
   {
     id: "share_card",
     label: "Share card",
-    description: "A compact profile card for trusted referral conversations.",
+    description: "A compact profile card for clear referral conversations.",
     preview: "Name, fit, areas, contact path, and access disclaimer.",
   },
   {
@@ -358,9 +358,11 @@ export function getSeedReferralProfiles() {
 }
 
 export function getReferralProfile(profileId = "profile-harbour") {
-  const profile =
-    seedReferralProfiles.find((item) => item.id === profileId) ??
-    seedReferralProfiles[0];
+  const profile = seedReferralProfiles.find((item) => item.id === profileId);
+
+  if (!profile) {
+    throw new Error(`Referral profile not found: ${profileId}`);
+  }
 
   return cloneProfile(profile);
 }
@@ -411,7 +413,7 @@ export function getHealthAudit(profile: ReferralProfile): HealthAudit {
   return {
     profileId: profile.id,
     score,
-    band: getHealthBand(score),
+    band: getScoreBand(score),
     summary:
       "This audit measures referral communication readiness only, not provider quality.",
     signals,
@@ -427,23 +429,50 @@ export function getLockedMaterials(
   direction: ReferralDirection,
   accessState: AccessState,
 ): LockedMaterial[] {
+  const canUse = canUseGuidedMaterials(accessState);
   const materialGroups =
     direction === "both"
       ? [
-          ...buildMaterials("receive", accessState, receiveMaterials),
-          ...buildMaterials("send", accessState, sendMaterials),
+          ...buildMaterials("receive", canUse, receiveMaterials),
+          ...buildMaterials("send", canUse, sendMaterials),
         ]
       : buildMaterials(
           direction,
-          accessState,
+          canUse,
           direction === "receive" ? receiveMaterials : sendMaterials,
         );
 
   return materialGroups;
 }
 
+export function canUseGuidedMaterials(accessState: AccessState) {
+  return (
+    accessState.hasAccessCode &&
+    accessState.status === "approved" &&
+    accessState.dailyQuota > accessState.usedToday
+  );
+}
+
 export function getAgentQueue(hasAccessCode: boolean): AgentQueueItem[] {
-  const status = hasAccessCode ? "ready" : "locked";
+  const canUse = canUseGuidedMaterials({
+    userId: "compat",
+    hasAccessCode,
+    status: hasAccessCode ? "approved" : "free",
+    dailyQuota: hasAccessCode ? 1 : 0,
+    usedToday: 0,
+  });
+
+  return buildAgentQueue(canUse);
+}
+
+export function getAgentQueueForAccess(
+  accessState: AccessState,
+): AgentQueueItem[] {
+  return buildAgentQueue(canUseGuidedMaterials(accessState));
+}
+
+function buildAgentQueue(canUse: boolean): AgentQueueItem[] {
+  const status = canUse ? "ready" : "locked";
 
   return [
     {
@@ -588,16 +617,20 @@ function issueForSignal(assessment: HealthSignalAssessment): HealthIssue {
   const isMissing = scoreState === "missing";
 
   if (signalItem.id === "capacity_status") {
+    const recommendation = isMissing
+      ? "Add a current availability note so referrers know whether to send new enquiries."
+      : "Add current availability detail, such as timing, limits, or next review date.";
+
     return {
-      id: "missing_capacity_status",
+      id: isMissing ? "missing_capacity_status" : "partial_capacity_status",
       label: "Capacity status",
       signalId: signalItem.id,
-      priority: "high",
-      recommendation:
-        "Add a current availability note so referrers know whether to send new enquiries.",
-      title: "Capacity status is missing",
-      guidance:
-        "Add a current availability note so referrers know whether to send new enquiries.",
+      priority: isMissing ? "high" : "warning",
+      recommendation,
+      title: isMissing
+        ? "Capacity status is missing"
+        : "Capacity status needs detail",
+      guidance: recommendation,
     };
   }
 
@@ -608,10 +641,10 @@ function issueForSignal(assessment: HealthSignalAssessment): HealthIssue {
       signalId: signalItem.id,
       priority: isMissing ? "high" : "warning",
       recommendation:
-        "Describe the safest referral entry point, such as a form, email, or warm handover.",
+        "Describe the preferred referral entry point, such as a form, email, or warm handover.",
       title: isMissing ? "Intake method is missing" : "Intake method needs detail",
       guidance:
-        "Describe the safest referral entry point, such as a form, email, or warm handover.",
+        "Describe the preferred referral entry point, such as a form, email, or warm handover.",
     };
   }
 
@@ -624,12 +657,12 @@ function issueForSignal(assessment: HealthSignalAssessment): HealthIssue {
       signalId: signalItem.id,
       priority: isMissing ? "high" : "warning",
       recommendation:
-        "List the information needed before a referral can be safely introduced.",
+        "List the information needed before a referral can be introduced.",
       title: isMissing
         ? "Handover requirements are missing"
         : "Handover requirements need detail",
       guidance:
-        "List the information needed before a referral can be safely introduced.",
+        "List the information needed before a referral can be introduced.",
     };
   }
 
@@ -688,7 +721,7 @@ function healthStatusForScoreState(status: SignalScoreState): HealthStatus {
   return "high";
 }
 
-function getHealthBand(score: number): HealthBand {
+export function getScoreBand(score: number): HealthBand {
   if (score <= 39) {
     return "Not referral-ready";
   }
@@ -790,7 +823,7 @@ function isReferralDirection(value: string): value is ReferralDirection {
 
 function buildMaterials(
   direction: MaterialDirection,
-  accessState: AccessState,
+  canUse: boolean,
   materials: readonly {
     id: string;
     label: string;
@@ -803,9 +836,9 @@ function buildMaterials(
     label: material.label,
     description: material.description,
     direction,
-    locked: !accessState.hasAccessCode,
+    locked: !canUse,
     preview: material.preview,
-    lockReason: accessState.hasAccessCode
+    lockReason: canUse
       ? undefined
       : "Access code required for guided AI materials.",
   }));

@@ -1,9 +1,14 @@
 import { describe, expect, it } from "vitest";
 import {
+  canUseGuidedMaterials,
+  getAccessRequests,
   getAccessState,
   getAgentQueue,
+  getAgentQueueForAccess,
   getHealthAudit,
   getLockedMaterials,
+  getReferralProfile,
+  getScoreBand,
   getSeedReferralProfiles,
   summarizeProfile,
 } from "./referral-profile-workspace";
@@ -12,6 +17,17 @@ describe("referral profile workspace domain", () => {
   it("models individual/organisation and receive/send/both without exposing partner roles", () => {
     const profiles = getSeedReferralProfiles();
 
+    expect(profiles).toHaveLength(3);
+    expect(profiles.map((profile) => profile.id)).toEqual([
+      "profile-harbour",
+      "profile-alex-lee",
+      "profile-carepath",
+    ]);
+    expect(profiles.map((profile) => profile.ownerUserId)).toEqual([
+      "user-approved",
+      "user-free",
+      "user-waitlist",
+    ]);
     expect(profiles.map((profile) => profile.entityType)).toEqual([
       "organisation",
       "individual",
@@ -71,6 +87,31 @@ describe("referral profile workspace domain", () => {
     });
   });
 
+  it("labels partial capacity status as a warning instead of a missing high-priority issue", () => {
+    const baseProfile = getSeedReferralProfiles()[0];
+    const profile = {
+      ...baseProfile,
+      receive: {
+        intakeMethod: "Phone warm handover and secure web form",
+        responseTime: "Usually within the week",
+        capacityStatus: "Full",
+      },
+    };
+    const audit = getHealthAudit(profile);
+    const capacityIssue = audit.issues.find(
+      (issue) => issue.id === "partial_capacity_status",
+    );
+
+    expect(audit.issues.map((issue) => issue.id)).not.toContain(
+      "missing_capacity_status",
+    );
+    expect(capacityIssue).toMatchObject({
+      priority: "warning",
+      label: "Capacity status",
+      title: "Capacity status needs detail",
+    });
+  });
+
   it("locks AI materials without access code and unlocks guided actions with access code", () => {
     const noCode = getAccessState("user-free");
     const withCode = getAccessState("user-approved");
@@ -85,6 +126,17 @@ describe("referral profile workspace domain", () => {
     });
     expect(getLockedMaterials("receive", noCode).every((item) => item.locked)).toBe(true);
     expect(getLockedMaterials("receive", withCode).every((item) => item.locked)).toBe(false);
+  });
+
+  it("uses quota-aware access before unlocking guided materials", () => {
+    const exhaustedAccess = {
+      ...getAccessState("user-approved"),
+      usedToday: 5,
+    };
+
+    expect(canUseGuidedMaterials(exhaustedAccess)).toBe(false);
+    expect(getLockedMaterials("receive", exhaustedAccess).every((item) => item.locked)).toBe(true);
+    expect(getAgentQueueForAccess(exhaustedAccess)[0].status).toBe("locked");
   });
 
   it("shows a restrained module queue instead of claiming autonomous agents", () => {
@@ -102,5 +154,92 @@ describe("referral profile workspace domain", () => {
     expect(unlockedQueue[0].status).toBe("ready");
     expect(queue.every((item) => item.freeState.length > 0)).toBe(true);
     expect(JSON.stringify(queue)).not.toContain("autonomous");
+  });
+
+  it("throws when requesting an unknown referral profile id", () => {
+    expect(getReferralProfile()).toMatchObject({ id: "profile-harbour" });
+    expect(() => getReferralProfile("profile-missing")).toThrow(
+      "Referral profile not found: profile-missing",
+    );
+  });
+
+  it("exposes access requests for the current pilot code types", () => {
+    const requests = getAccessRequests();
+
+    expect(requests).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          requestedCodeType: "Provider Pilot",
+          status: "queued",
+          profileId: "profile-alex-lee",
+        }),
+        expect.objectContaining({
+          requestedCodeType: "Referral Source Pilot",
+          status: "queued",
+          profileId: "profile-carepath",
+        }),
+        expect.objectContaining({
+          requestedCodeType: "Dual Role Pilot",
+          status: "approved",
+          profileId: "profile-harbour",
+        }),
+      ]),
+    );
+  });
+
+  it("keeps score band boundaries stable", () => {
+    expect([39, 40, 69, 70, 84, 85].map(getScoreBand)).toEqual([
+      "Not referral-ready",
+      "Needs work",
+      "Needs work",
+      "Referral-ready soon",
+      "Referral-ready soon",
+      "Strong referral profile",
+    ]);
+  });
+
+  it("returns all receive and send material ids for both-direction profiles", () => {
+    expect(
+      getLockedMaterials("both", getAccessState("user-approved")).map(
+        (item) => item.id,
+      ),
+    ).toEqual([
+      "provider_profile",
+      "bilingual_intro",
+      "share_card",
+      "referral_partner_message",
+      "intake_checklist",
+      "referral_source_profile",
+      "provider_requirement_brief",
+      "handover_template",
+      "consent_reminder",
+      "follow_up_message",
+    ]);
+  });
+
+  it("avoids endorsement and overclaiming language in module text", () => {
+    const moduleText = JSON.stringify({
+      profiles: getSeedReferralProfiles(),
+      accessRequests: getAccessRequests(),
+      materials: getLockedMaterials("both", getAccessState("user-approved")),
+      lockedQueue: getAgentQueue(false),
+      unlockedQueue: getAgentQueue(true),
+      audit: getHealthAudit(getSeedReferralProfiles()[0]),
+    }).toLowerCase();
+
+    [
+      "certified",
+      "approved provider",
+      "verified provider quality",
+      "guaranteed referral",
+      "clinically suitable",
+      "compliant provider",
+      "provider quality endorsement",
+      "trusted referral conversations",
+      "safest",
+      "safely introduced",
+    ].forEach((term) => {
+      expect(moduleText).not.toContain(term);
+    });
   });
 });
