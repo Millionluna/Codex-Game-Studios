@@ -103,7 +103,9 @@ export interface HealthAudit {
 export interface BasicProfileSummary {
   profileId: string;
   title: string;
+  entityType: EntityType;
   entityLabel: string;
+  referralDirection: ReferralDirection;
   directionLabel: string;
   serviceAreaLabel: string;
   languageLabel: string;
@@ -392,7 +394,9 @@ export function summarizeProfile(
   return {
     profileId: profile.id,
     title: profile.name,
+    entityType: profile.entityType,
     entityLabel: profile.entityType === "organisation" ? "Organisation" : "Individual",
+    referralDirection: profile.referralDirection,
     directionLabel: directionLabels[profile.referralDirection],
     serviceAreaLabel: formatList(profile.serviceAreas),
     languageLabel: formatList(profile.languages),

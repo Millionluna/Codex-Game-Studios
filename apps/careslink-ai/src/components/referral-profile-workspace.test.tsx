@@ -41,7 +41,7 @@ import {
 } from "../lib/referral-profile-workspace";
 
 describe("referral profile workspace shared components", () => {
-  it("localizes zh-Hans product UI while preserving submitted profile data", () => {
+  it("localizes zh-Hans generated UI copy while preserving submitted profile data", () => {
     const locale = "zh-Hans";
     const profile = getSeedReferralProfiles()[1];
     const summary = summarizeProfile(profile);
@@ -77,18 +77,20 @@ describe("referral profile workspace shared components", () => {
     );
 
     [
+      "个人",
+      "接收转介",
       "服务范围",
       "语言",
       "转介沟通分数",
+      "沟通资料需要完善",
+      "此审核仅衡量转介沟通准备度",
       "准备度信号",
-      "重点问题",
-      "引导式材料",
-      "智能队列",
-      "访问状态",
-      "引导式助手",
-      "仅预览模式",
-      "访问码",
-      "未提供",
+      "回应时间缺失",
+      "当前可接收情况缺失",
+      "服务商资料",
+      "服务范围、语言、接收方式和可用情况。",
+      "资料助手",
+      "预览基础资料结构和缺失字段。",
       "基于自行提交的资料信息",
       "CaresLink 不评估服务商质量",
     ].forEach((localizedCopy) => {
@@ -100,29 +102,38 @@ describe("referral profile workspace shared components", () => {
       "Northern Sydney",
       "English",
       "Independent care navigator accepting a small number of enquiries.",
-      "Service areas, languages, intake method, and availability.",
-    ].forEach((suppliedProfileCopy) => {
-      expect(markup).toContain(suppliedProfileCopy);
+    ].forEach((submittedProfileCopy) => {
+      expect(markup).toContain(submittedProfileCopy);
     });
 
     [
-      "Referral communication score",
-      "Readiness signals",
-      "Top issues",
+      "Individual",
+      "Receives referrals",
+      "Communication profile",
+      "This audit measures referral communication readiness only, not provider quality.",
+      "Capacity status is missing",
+      "Provider profile",
+      "Profile Agent",
+      "Preview basic profile structure and missing fields.",
+      "Access code required for guided AI materials.",
       "Guided materials",
       "Agent queue",
       "Access status",
       "Guided copilot",
-    ].forEach((englishProductCopy) => {
-      expect(markup).not.toContain(englishProductCopy);
+    ].forEach((englishGeneratedCopy) => {
+      expect(markup).not.toContain(englishGeneratedCopy);
     });
 
     const profileMarkup = renderToStaticMarkup(
       createElement(BasicProfileCard, { summary, locale }),
     );
 
+    expect(profileMarkup).toContain("个人");
+    expect(profileMarkup).toContain("接收转介");
     expect(profileMarkup).toContain("服务范围");
     expect(profileMarkup).toContain("语言");
+    expect(profileMarkup).not.toContain("Individual");
+    expect(profileMarkup).not.toContain("Receives referrals");
     expect(profileMarkup).not.toContain("Service area");
     expect(profileMarkup).not.toContain("Languages");
     expect(profileMarkup).toContain("Alex Lee");

@@ -98,8 +98,14 @@ type TrustBoundaryNoticeProps = {
 
 type CompletionBadgeProps = {
   audit: Pick<HealthAudit, "score" | "band">;
+  locale?: Locale;
   className?: string;
 };
+
+type HealthIssueItem = HealthAudit["issues"][number];
+type IssueCopy = ComponentCopy["topIssues"]["issues"][keyof ComponentCopy["topIssues"]["issues"]];
+type MaterialCopy = ComponentCopy["materialsGrid"]["materials"][keyof ComponentCopy["materialsGrid"]["materials"]];
+type QueueItemCopy = ComponentCopy["agentQueue"]["items"][keyof ComponentCopy["agentQueue"]["items"]];
 
 const signalToneClasses: Record<HealthStatus, string> = {
   good: "border-[#9ed8c9] bg-[#e6f7f2] text-[#0f766e]",
@@ -146,6 +152,54 @@ function formatCountLabel(
   const template = count === 1 ? labels.one : labels.other;
 
   return formatTemplate(template, { count });
+}
+
+function getCopyById<T extends Record<string, TValue>, TValue>(
+  record: T,
+  id: string,
+): TValue | undefined {
+  return Object.prototype.hasOwnProperty.call(record, id)
+    ? record[id as keyof T]
+    : undefined;
+}
+
+function localizedIssueCopy(
+  issue: HealthIssueItem,
+  copy: ComponentCopy["topIssues"],
+): IssueCopy {
+  return (
+    getCopyById(copy.issues, issue.id) ?? {
+      label: issue.label,
+      title: issue.title,
+      guidance: issue.guidance,
+    }
+  );
+}
+
+function localizedMaterialCopy(
+  material: LockedMaterial,
+  copy: ComponentCopy["materialsGrid"],
+): MaterialCopy {
+  return (
+    getCopyById(copy.materials, material.id) ?? {
+      label: material.label,
+      description: material.description,
+      preview: material.preview,
+    }
+  );
+}
+
+function localizedQueueItemCopy(
+  item: AgentQueueItem,
+  copy: ComponentCopy["agentQueue"],
+): QueueItemCopy {
+  return (
+    getCopyById(copy.items, item.id) ?? {
+      label: item.label,
+      freeState: item.freeState,
+      accessCodeState: item.accessCodeState,
+    }
+  );
 }
 
 function accessStatusCopy(
@@ -352,6 +406,8 @@ export function BasicProfileCard({
   className = "",
 }: BasicProfileCardProps) {
   const copy = getReferralWorkspaceCopy(locale).components.basicProfile;
+  const entityLabel = copy.entityLabels[summary.entityType];
+  const directionLabel = copy.directionLabels[summary.referralDirection];
 
   return (
     <Card className={cx("flex h-full min-h-80 flex-col p-5", className)}>
@@ -359,14 +415,14 @@ export function BasicProfileCard({
         <div className="min-w-0">
           <div className="flex items-center gap-2 text-sm font-semibold text-[#0f766e]">
             <EntityIcon label={summary.entityLabel} />
-            <span>{summary.entityLabel}</span>
+            <span>{entityLabel}</span>
           </div>
           <h2 className="mt-3 break-words text-xl font-semibold text-[#17211f]">
             {summary.title}
           </h2>
         </div>
         <StatusBadge className="border-[#b9d7ff] bg-[#edf5ff] text-[#19518d]">
-          {summary.directionLabel}
+          {directionLabel}
         </StatusBadge>
       </div>
 
@@ -388,14 +444,19 @@ export function BasicProfileCard({
       <div className="mt-auto pt-5">
         <div className="flex gap-2 rounded-lg border border-[#dce8e2] bg-[#f8fbfa] p-3 text-sm leading-6 text-[#5d6d68]">
           <Info className="mt-1 size-4 shrink-0 text-[#65736f]" aria-hidden="true" />
-          <p>{summary.footer}</p>
+          <p>{copy.footer}</p>
         </div>
       </div>
     </Card>
   );
 }
 
-export function CompletionBadge({ audit, className = "" }: CompletionBadgeProps) {
+export function CompletionBadge({
+  audit,
+  locale = DEFAULT_LOCALE,
+  className = "",
+}: CompletionBadgeProps) {
+  const copy = getReferralWorkspaceCopy(locale).components.healthScore;
   const BadgeIcon =
     audit.score >= 85 ? CheckCircle2 : audit.score >= 70 ? CircleGauge : AlertTriangle;
 
@@ -409,7 +470,7 @@ export function CompletionBadge({ audit, className = "" }: CompletionBadgeProps)
     >
       <BadgeIcon className="size-4 shrink-0" aria-hidden="true" />
       <span>{clampScore(audit.score)}%</span>
-      <span className="min-w-0 break-words">{audit.band}</span>
+      <span className="min-w-0 break-words">{copy.bandLabels[audit.band]}</span>
     </span>
   );
 }
@@ -419,8 +480,15 @@ export function HealthScorePanel({
   locale = DEFAULT_LOCALE,
   className = "",
 }: HealthScorePanelProps) {
-  const copy = getReferralWorkspaceCopy(locale).components.healthScore;
+  const componentCopy = getReferralWorkspaceCopy(locale).components;
+  const copy = componentCopy.healthScore;
   const score = clampScore(audit.score);
+  const recommendations =
+    audit.issues.length > 0
+      ? audit.issues
+          .slice(0, 3)
+          .map((issue) => localizedIssueCopy(issue, componentCopy.topIssues))
+      : [{ title: copy.defaultRecommendation, guidance: copy.defaultRecommendation }];
 
   return (
     <Card className={cx("flex h-full min-h-80 flex-col p-5", className)}>
@@ -430,9 +498,9 @@ export function HealthScorePanel({
             <CircleGauge className="size-5" aria-hidden="true" />
             {copy.heading}
           </div>
-          <p className="mt-3 text-sm leading-6 text-[#65736f]">{audit.summary}</p>
+          <p className="mt-3 text-sm leading-6 text-[#65736f]">{copy.summary}</p>
         </div>
-        <CompletionBadge audit={audit} />
+        <CompletionBadge audit={audit} locale={locale} />
       </div>
 
       <div className="mt-6">
@@ -450,15 +518,15 @@ export function HealthScorePanel({
       </div>
 
       <div className="mt-5 grid gap-2">
-        {audit.recommendations.slice(0, 3).map((recommendation) => (
-          <div key={recommendation} className="flex gap-2 text-sm leading-6 text-[#40504b]">
+        {recommendations.map((recommendation) => (
+          <div key={recommendation.title} className="flex gap-2 text-sm leading-6 text-[#40504b]">
             <ClipboardList className="mt-1 size-4 shrink-0 text-[#19518d]" aria-hidden="true" />
-            <p>{recommendation}</p>
+            <p>{recommendation.guidance}</p>
           </div>
         ))}
       </div>
 
-      <p className="mt-auto pt-5 text-xs leading-5 text-[#65736f]">{audit.note}</p>
+      <p className="mt-auto pt-5 text-xs leading-5 text-[#65736f]">{copy.note}</p>
     </Card>
   );
 }
@@ -493,18 +561,26 @@ export function HealthSignalsTable({
             </tr>
           </thead>
           <tbody className="divide-y divide-[#eef3f1]">
-            {audit.signals.map((signal) => (
-              <tr key={signal.id} className="align-top">
-                <td className="px-5 py-4 font-semibold text-[#17211f]">{signal.label}</td>
-                <td className="px-5 py-4 leading-6 text-[#40504b]">{signal.detail}</td>
-                <td className="px-5 py-4 text-[#263834]">{signal.points}</td>
-                <td className="px-5 py-4">
-                  <StatusBadge className={signalToneClasses[signal.status]}>
-                    {copy.statusLabels[signal.status]}
-                  </StatusBadge>
-                </td>
-              </tr>
-            ))}
+            {audit.signals.map((signal) => {
+              const signalCopy = copy.signals[signal.id];
+
+              return (
+                <tr key={signal.id} className="align-top">
+                  <td className="px-5 py-4 font-semibold text-[#17211f]">
+                    {signalCopy.label}
+                  </td>
+                  <td className="px-5 py-4 leading-6 text-[#40504b]">
+                    {signalCopy.detail}
+                  </td>
+                  <td className="px-5 py-4 text-[#263834]">{signal.points}</td>
+                  <td className="px-5 py-4">
+                    <StatusBadge className={signalToneClasses[signal.status]}>
+                      {copy.statusLabels[signal.status]}
+                    </StatusBadge>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
@@ -540,22 +616,26 @@ export function TopIssuesPanel({
 
       <div className="mt-5 grid gap-3">
         {issues.length > 0 ? (
-          issues.map((issue) => (
-            <div key={issue.id} className="border-l-2 border-[#dce8e2] bg-[#f8fbfa] p-4">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="break-words text-sm font-semibold text-[#17211f]">
-                    {issue.title}
-                  </p>
-                  <p className="mt-1 text-xs font-semibold text-[#65736f]">{issue.label}</p>
+          issues.map((issue) => {
+            const issueCopy = localizedIssueCopy(issue, copy);
+
+            return (
+              <div key={issue.id} className="border-l-2 border-[#dce8e2] bg-[#f8fbfa] p-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="break-words text-sm font-semibold text-[#17211f]">
+                      {issueCopy.title}
+                    </p>
+                    <p className="mt-1 text-xs font-semibold text-[#65736f]">{issueCopy.label}</p>
+                  </div>
+                  <StatusBadge className={issueToneClasses[issue.priority]}>
+                    {copy.priorityLabels[issue.priority]}
+                  </StatusBadge>
                 </div>
-                <StatusBadge className={issueToneClasses[issue.priority]}>
-                  {copy.priorityLabels[issue.priority]}
-                </StatusBadge>
+                <p className="mt-3 text-sm leading-6 text-[#40504b]">{issueCopy.guidance}</p>
               </div>
-              <p className="mt-3 text-sm leading-6 text-[#40504b]">{issue.guidance}</p>
-            </div>
-          ))
+            );
+          })
         ) : (
           <EmptyState
             icon={CheckCircle2}
@@ -606,6 +686,7 @@ export function LockedMaterialsGrid({
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {materials.map((material) => {
             const locked = !canUseGuided;
+            const materialCopy = localizedMaterialCopy(material, copy);
             const lockedMessage = lockedGuidedMaterialMessage(
               accessState,
               copy,
@@ -621,10 +702,10 @@ export function LockedMaterialsGrid({
                       ) : (
                         <FileText className="size-4 shrink-0 text-[#0f766e]" aria-hidden="true" />
                       )}
-                      <span className="break-words">{material.label}</span>
+                      <span className="break-words">{materialCopy.label}</span>
                     </div>
                     <p className="mt-2 text-sm leading-6 text-[#65736f]">
-                      {material.description}
+                      {materialCopy.description}
                     </p>
                   </div>
                   <StatusBadge className="border-[#b9d7ff] bg-[#edf5ff] text-[#19518d]">
@@ -636,7 +717,7 @@ export function LockedMaterialsGrid({
                   <p className="text-xs font-semibold text-[#65736f]">
                     {workspaceCopy.common.previewOnly}
                   </p>
-                  <p className="mt-2 text-sm leading-6 text-[#263834]">{material.preview}</p>
+                  <p className="mt-2 text-sm leading-6 text-[#263834]">{materialCopy.preview}</p>
                 </div>
 
                 <div className="mt-auto pt-4">
@@ -709,6 +790,8 @@ export function AgentQueuePanel({
       <div className="mt-5 grid gap-3">
         {queue.map((item) => {
           const ready = canUseGuided;
+          const itemCopy = localizedQueueItemCopy(item, copy.agentQueue);
+
           return (
             <div
               key={item.id}
@@ -728,13 +811,13 @@ export function AgentQueuePanel({
               </div>
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <p className="break-words text-sm font-semibold text-[#17211f]">{item.label}</p>
+                  <p className="break-words text-sm font-semibold text-[#17211f]">{itemCopy.label}</p>
                   <StatusBadge className={ready ? signalToneClasses.good : signalToneClasses.warning}>
                     {ready ? copy.agentQueue.readyLabel : lockedBadgeLabel}
                   </StatusBadge>
                 </div>
                 <p className="mt-2 text-sm leading-6 text-[#40504b]">
-                  {ready ? item.accessCodeState : item.freeState}
+                  {ready ? itemCopy.accessCodeState : itemCopy.freeState}
                 </p>
               </div>
             </div>
@@ -822,7 +905,13 @@ export function GuidedCopilotPanel({
   const copy = workspaceCopy.components;
   const canUseGuided = canUseGuidedWorkspace(accessState);
   const activeItem = queue[0];
+  const activeItemCopy = activeItem
+    ? localizedQueueItemCopy(activeItem, copy.agentQueue)
+    : undefined;
   const status = accessStatusCopy(accessState, copy.accessStatus);
+  const directionLabel = summary
+    ? copy.basicProfile.directionLabels[summary.referralDirection]
+    : undefined;
 
   return (
     <Card className={cx("flex h-full min-h-[520px] flex-col overflow-hidden", className)}>
@@ -844,7 +933,7 @@ export function GuidedCopilotPanel({
       <div className="flex-1 space-y-3 bg-[#f8fbfa] p-4">
         <CopilotMessage label={copy.copilot.profileContextLabel} tone="system">
           {summary
-            ? `${summary.title}: ${summary.directionLabel}. ${summary.serviceAreaLabel}.`
+            ? `${summary.title}: ${directionLabel}. ${summary.serviceAreaLabel}.`
             : copy.copilot.noProfileContext}
         </CopilotMessage>
 
@@ -855,7 +944,7 @@ export function GuidedCopilotPanel({
           >
             {`${formatTemplate(copy.copilot.readinessScore, {
               score: clampScore(audit.score),
-            })} ${audit.note}`}
+            })} ${copy.healthScore.note}`}
           </CopilotMessage>
         ) : null}
 
@@ -866,10 +955,10 @@ export function GuidedCopilotPanel({
               : copy.copilot.previewStepLabel
           }
         >
-          {activeItem
+          {activeItemCopy
             ? canUseGuided
-              ? activeItem.accessCodeState
-              : activeItem.freeState
+              ? activeItemCopy.accessCodeState
+              : activeItemCopy.freeState
             : copy.copilot.noQueueItem}
         </CopilotMessage>
 
