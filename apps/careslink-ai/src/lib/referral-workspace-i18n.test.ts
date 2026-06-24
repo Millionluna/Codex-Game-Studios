@@ -138,6 +138,38 @@ describe("referral workspace i18n", () => {
     ]);
   });
 
+  it("provides unsafe summary remediation and access code type labels", () => {
+    const enComponents = getReferralWorkspaceCopy("en").components as {
+      topIssues: {
+        issues: Record<string, { guidance: string }>;
+      };
+      accessStatus: {
+        codeTypeLabels?: Record<string, string>;
+      };
+    };
+    const zhComponents = getReferralWorkspaceCopy("zh-Hans").components as {
+      topIssues: {
+        issues: Record<string, { guidance: string }>;
+      };
+      accessStatus: {
+        codeTypeLabels?: Record<string, string>;
+      };
+    };
+
+    expect(enComponents.topIssues.issues.unsafe_profile_readability?.guidance).toContain(
+      "remove claims that suggest verification, endorsement, outcomes, clinical suitability, or compliance status",
+    );
+    expect(zhComponents.topIssues.issues.unsafe_profile_readability?.guidance).toContain(
+      "移除验证、背书、结果、临床适用性或合规状态声明",
+    );
+    expect(enComponents.accessStatus.codeTypeLabels?.["Dual Role Pilot"]).toBe(
+      "Dual Role Pilot",
+    );
+    expect(zhComponents.accessStatus.codeTypeLabels?.["Dual Role Pilot"]).toBe(
+      "双向角色试点",
+    );
+  });
+
   it("preserves and replaces locale query params in internal links", () => {
     expect(withLocale("/referral-workspace", "zh-Hans")).toBe(
       "/referral-workspace?lang=zh-Hans",

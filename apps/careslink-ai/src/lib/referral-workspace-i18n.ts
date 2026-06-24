@@ -6,6 +6,12 @@ export const DEFAULT_LOCALE: Locale = "en";
 
 type EntityTypeKey = "individual" | "organisation";
 type ReferralDirectionKey = "receive" | "send" | "both";
+type AccessCodeTypeKey =
+  | "Provider Pilot"
+  | "Referral Source Pilot"
+  | "Dual Role Pilot"
+  | "Internal Test"
+  | "Partner Batch";
 type HealthBandKey =
   | "Communication profile not ready"
   | "Communication profile needs work"
@@ -42,7 +48,8 @@ type HealthIssueKey =
   | "missing_handover_requirements"
   | "partial_handover_requirements"
   | "missing_profile_readability"
-  | "partial_profile_readability";
+  | "partial_profile_readability"
+  | "unsafe_profile_readability";
 type MaterialKey =
   | "provider_profile"
   | "bilingual_intro"
@@ -156,6 +163,7 @@ export type ReferralWorkspaceCopy = {
     readonly basicProfile: {
       readonly serviceArea: string;
       readonly languages: string;
+      readonly emptyPlaceholder: string;
       readonly footer: string;
       readonly entityLabels: Record<EntityTypeKey, string>;
       readonly directionLabels: Record<ReferralDirectionKey, string>;
@@ -285,6 +293,7 @@ export type ReferralWorkspaceCopy = {
       readonly usedToday: string;
       readonly remaining: string;
       readonly dailyGuidedQuota: string;
+      readonly codeTypeLabels: Record<AccessCodeTypeKey, string>;
     };
     readonly copilot: {
       readonly heading: string;
@@ -417,6 +426,7 @@ const referralWorkspaceCopy: Record<Locale, ReferralWorkspaceCopy> = {
       basicProfile: {
         serviceArea: "Service area",
         languages: "Languages",
+        emptyPlaceholder: "Not yet provided",
         footer:
           "Built from self-submitted information. Not a provider endorsement.",
         entityLabels: {
@@ -634,6 +644,12 @@ const referralWorkspaceCopy: Record<Locale, ReferralWorkspaceCopy> = {
             guidance:
               "Add clear self-submitted profile summary text for referral communication context.",
           },
+          unsafe_profile_readability: {
+            label: "Profile readability",
+            title: "Profile summary needs review",
+            guidance:
+              "Revise the self-submitted profile summary to remove claims that suggest verification, endorsement, outcomes, clinical suitability, or compliance status.",
+          },
         },
       },
       materialsGrid: {
@@ -798,6 +814,13 @@ const referralWorkspaceCopy: Record<Locale, ReferralWorkspaceCopy> = {
         usedToday: "Used today",
         remaining: "Remaining",
         dailyGuidedQuota: "Daily guided quota",
+        codeTypeLabels: {
+          "Provider Pilot": "Provider Pilot",
+          "Referral Source Pilot": "Referral Source Pilot",
+          "Dual Role Pilot": "Dual Role Pilot",
+          "Internal Test": "Internal Test",
+          "Partner Batch": "Partner Batch",
+        },
       },
       copilot: {
         heading: "Guided copilot",
@@ -920,6 +943,7 @@ const referralWorkspaceCopy: Record<Locale, ReferralWorkspaceCopy> = {
       basicProfile: {
         serviceArea: "服务范围",
         languages: "语言",
+        emptyPlaceholder: "尚未提供",
         footer: "基于自行提交的信息生成。不是服务商背书。",
         entityLabels: {
           individual: "个人",
@@ -1114,6 +1138,12 @@ const referralWorkspaceCopy: Record<Locale, ReferralWorkspaceCopy> = {
             title: "资料摘要需要补充",
             guidance: "补充清晰的自行提交资料摘要，作为转介沟通上下文。",
           },
+          unsafe_profile_readability: {
+            label: "资料可读性",
+            title: "资料摘要需要检查",
+            guidance:
+              "修改自行提交的资料摘要，移除验证、背书、结果、临床适用性或合规状态声明。",
+          },
         },
       },
       materialsGrid: {
@@ -1255,6 +1285,13 @@ const referralWorkspaceCopy: Record<Locale, ReferralWorkspaceCopy> = {
         usedToday: "今日已用",
         remaining: "剩余",
         dailyGuidedQuota: "每日引导配额",
+        codeTypeLabels: {
+          "Provider Pilot": "服务商试点",
+          "Referral Source Pilot": "转介来源试点",
+          "Dual Role Pilot": "双向角色试点",
+          "Internal Test": "内部测试",
+          "Partner Batch": "合作伙伴批次",
+        },
       },
       copilot: {
         heading: "引导式助手",

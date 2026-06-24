@@ -140,4 +140,64 @@ describe("referral profile workspace shared components", () => {
     expect(profileMarkup).toContain("Northern Sydney");
     expect(profileMarkup).toContain("English");
   });
+
+  it("localizes unsafe summary remediation for zh-Hans issue panels", () => {
+    const profile = {
+      ...getSeedReferralProfiles()[0],
+      summary:
+        "We are a certified recommended provider for families comparing care options, with a complete profile that includes broad context for referrers.",
+    };
+    const audit = getHealthAudit(profile);
+
+    const markup = renderToStaticMarkup(
+      createElement(
+        "div",
+        null,
+        createElement(HealthScorePanel, { audit, locale: "zh-Hans" }),
+        createElement(TopIssuesPanel, { audit, locale: "zh-Hans" }),
+      ),
+    );
+
+    expect(markup).toContain(
+      "移除验证、背书、结果、临床适用性或合规状态声明",
+    );
+    expect(markup).not.toContain("补充清晰的自行提交资料摘要");
+    expect(markup).not.toContain(
+      "Add clear self-submitted profile summary text",
+    );
+  });
+
+  it("localizes access code type labels for zh-Hans access status", () => {
+    const accessState = {
+      ...getAccessState("user-approved"),
+      codeType: "Dual Role Pilot" as const,
+    };
+
+    const markup = renderToStaticMarkup(
+      createElement(AccessStatusPanel, { accessState, locale: "zh-Hans" }),
+    );
+
+    expect(markup).toContain("双向角色试点");
+    expect(markup).not.toContain("Dual Role Pilot");
+  });
+
+  it("localizes known empty list placeholders without changing submitted values", () => {
+    const profile = {
+      ...getSeedReferralProfiles()[0],
+      serviceAreas: [],
+      languages: [],
+    };
+    const summary = summarizeProfile(profile);
+
+    expect(summary.serviceAreaLabel).toBe("Not yet provided");
+    expect(summary.languageLabel).toBe("Not yet provided");
+
+    const markup = renderToStaticMarkup(
+      createElement(BasicProfileCard, { summary, locale: "zh-Hans" }),
+    );
+
+    expect(markup).toContain("尚未提供");
+    expect(markup).not.toContain("Not yet provided");
+    expect(markup).toContain(profile.name);
+  });
 });

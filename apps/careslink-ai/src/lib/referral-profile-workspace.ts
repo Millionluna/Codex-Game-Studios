@@ -39,11 +39,14 @@ type HealthSignalId =
   | "handover_requirements"
   | "profile_readability";
 
+export type HealthIssueCopyKey = "unsafe_profile_readability";
+
 type MaterialDirection = Exclude<ReferralDirection, "both">;
 
 interface HealthSignalAssessment {
   signal: HealthSignal;
   scoreState: SignalScoreState;
+  issueCopyKey?: HealthIssueCopyKey;
 }
 
 export interface ReferralProfile {
@@ -83,6 +86,7 @@ export interface HealthIssue {
   label: string;
   signalId: HealthSignalId;
   priority: IssuePriority;
+  copyKey?: HealthIssueCopyKey;
   recommendation: string;
   title: string;
   guidance: string;
@@ -107,7 +111,9 @@ export interface BasicProfileSummary {
   entityLabel: string;
   referralDirection: ReferralDirection;
   directionLabel: string;
+  serviceAreas: string[];
   serviceAreaLabel: string;
+  languages: string[];
   languageLabel: string;
   description: string;
   footer: string;
@@ -398,7 +404,9 @@ export function summarizeProfile(
     entityLabel: profile.entityType === "organisation" ? "Organisation" : "Individual",
     referralDirection: profile.referralDirection,
     directionLabel: directionLabels[profile.referralDirection],
+    serviceAreas: [...profile.serviceAreas],
     serviceAreaLabel: formatList(profile.serviceAreas),
+    languages: [...profile.languages],
     languageLabel: formatList(profile.languages),
     description: getSafeProfileSummaryDescription(profile.summary),
     footer:
@@ -552,6 +560,9 @@ function cloneProfile(profile: ReferralProfile): ReferralProfile {
 
 function buildHealthSignals(profile: ReferralProfile): HealthSignalAssessment[] {
   const readabilityDetail = getReadabilityDetail(profile.summary);
+  const readabilityIssueCopyKey = getUnsafeClaimReason(profile.summary)
+    ? "unsafe_profile_readability"
+    : undefined;
 
   return [
     signal(
@@ -613,6 +624,7 @@ function buildHealthSignals(profile: ReferralProfile): HealthSignalAssessment[] 
       "Profile readability",
       readabilityState(profile.summary),
       readabilityDetail,
+      readabilityIssueCopyKey,
     ),
   ];
 }
@@ -630,7 +642,7 @@ function buildHealthIssues(
 }
 
 function issueForSignal(assessment: HealthSignalAssessment): HealthIssue {
-  const { signal: signalItem, scoreState } = assessment;
+  const { signal: signalItem, scoreState, issueCopyKey } = assessment;
   const isMissing = scoreState === "missing";
 
   if (signalItem.id === "capacity_status") {
@@ -689,6 +701,7 @@ function issueForSignal(assessment: HealthSignalAssessment): HealthIssue {
       label: "Profile readability",
       signalId: signalItem.id,
       priority: isMissing ? "high" : "warning",
+      ...(issueCopyKey ? { copyKey: issueCopyKey } : {}),
       recommendation: signalItem.detail,
       title: isMissing
         ? "Profile summary needs review"
@@ -715,6 +728,7 @@ function signal(
   label: string,
   scoreState: SignalScoreState,
   detail: string,
+  issueCopyKey?: HealthIssueCopyKey,
 ): HealthSignalAssessment {
   return {
     signal: {
@@ -725,6 +739,7 @@ function signal(
       detail,
     },
     scoreState,
+    ...(issueCopyKey ? { issueCopyKey } : {}),
   };
 }
 

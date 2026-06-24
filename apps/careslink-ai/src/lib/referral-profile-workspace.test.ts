@@ -259,6 +259,12 @@ describe("referral profile workspace domain", () => {
       priority: expect.stringMatching(/^(high|warning)$/),
       recommendation: expect.any(String),
     });
+    expect((readabilityIssue as { copyKey?: string } | undefined)?.copyKey).toBe(
+      "unsafe_profile_readability",
+    );
+    expect(readabilityIssue?.guidance).toContain(
+      "remove claims that suggest verification, endorsement, outcomes, clinical suitability, or compliance status",
+    );
     expect(readabilityIssue?.recommendation.toLowerCase()).not.toContain(
       "provider quality assessment",
     );

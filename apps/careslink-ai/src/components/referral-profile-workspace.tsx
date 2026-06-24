@@ -168,7 +168,7 @@ function localizedIssueCopy(
   copy: ComponentCopy["topIssues"],
 ): IssueCopy {
   return (
-    getCopyById(copy.issues, issue.id) ?? {
+    getCopyById(copy.issues, issue.copyKey ?? issue.id) ?? {
       label: issue.label,
       title: issue.title,
       guidance: issue.guidance,
@@ -200,6 +200,27 @@ function localizedQueueItemCopy(
       accessCodeState: item.accessCodeState,
     }
   );
+}
+
+function localizedProfileListValue(
+  value: string,
+  items: readonly string[],
+  copy: ComponentCopy["basicProfile"],
+): string {
+  return items.length > 0 ? value : copy.emptyPlaceholder;
+}
+
+function localizedAccessCodeType(
+  codeType: string | undefined,
+  copy: ComponentCopy["accessStatus"],
+): string | undefined {
+  if (!codeType) {
+    return undefined;
+  }
+
+  const localizedCodeType = getCopyById(copy.codeTypeLabels, codeType);
+
+  return typeof localizedCodeType === "string" ? localizedCodeType : codeType;
 }
 
 function accessStatusCopy(
@@ -309,10 +330,12 @@ function scoreTone(score: number) {
   return "border-[#f0b7b7] bg-[#fff0f0] text-[#a33a3a]";
 }
 
-function EntityIcon({ label }: { label: string }) {
-  const Icon = label.toLowerCase().includes("organisation")
-    ? Building2
-    : UserRound;
+function EntityIcon({
+  entityType,
+}: {
+  entityType: BasicProfileSummary["entityType"];
+}) {
+  const Icon = entityType === "organisation" ? Building2 : UserRound;
 
   return <Icon className="size-5 text-[#0f766e]" aria-hidden="true" />;
 }
@@ -408,13 +431,23 @@ export function BasicProfileCard({
   const copy = getReferralWorkspaceCopy(locale).components.basicProfile;
   const entityLabel = copy.entityLabels[summary.entityType];
   const directionLabel = copy.directionLabels[summary.referralDirection];
+  const serviceAreaLabel = localizedProfileListValue(
+    summary.serviceAreaLabel,
+    summary.serviceAreas,
+    copy,
+  );
+  const languageLabel = localizedProfileListValue(
+    summary.languageLabel,
+    summary.languages,
+    copy,
+  );
 
   return (
     <Card className={cx("flex h-full min-h-80 flex-col p-5", className)}>
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           <div className="flex items-center gap-2 text-sm font-semibold text-[#0f766e]">
-            <EntityIcon label={summary.entityLabel} />
+            <EntityIcon entityType={summary.entityType} />
             <span>{entityLabel}</span>
           </div>
           <h2 className="mt-3 break-words text-xl font-semibold text-[#17211f]">
@@ -432,12 +465,12 @@ export function BasicProfileCard({
         <LabelValue
           icon={MapPin}
           label={copy.serviceArea}
-          value={summary.serviceAreaLabel}
+          value={serviceAreaLabel}
         />
         <LabelValue
           icon={Languages}
           label={copy.languages}
-          value={summary.languageLabel}
+          value={languageLabel}
         />
       </div>
 
@@ -839,6 +872,7 @@ export function AccessStatusPanel({
   const quotaTotal = Math.max(0, accessState.dailyQuota);
   const quotaUsed = Math.min(Math.max(0, accessState.usedToday), quotaTotal);
   const quotaPercent = quotaTotal > 0 ? (quotaUsed / quotaTotal) * 100 : 0;
+  const codeTypeLabel = localizedAccessCodeType(accessState.codeType, copy);
 
   return (
     <Card className={cx("p-5", className)}>
@@ -885,8 +919,8 @@ export function AccessStatusPanel({
             aria-hidden="true"
           />
         </div>
-        {accessState.codeType ? (
-          <p className="mt-3 text-sm leading-6 text-[#40504b]">{accessState.codeType}</p>
+        {codeTypeLabel ? (
+          <p className="mt-3 text-sm leading-6 text-[#40504b]">{codeTypeLabel}</p>
         ) : null}
       </div>
     </Card>
