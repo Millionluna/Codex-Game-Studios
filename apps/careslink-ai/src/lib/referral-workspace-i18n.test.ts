@@ -9,6 +9,25 @@ import {
   withLocale,
 } from "./referral-workspace-i18n";
 
+const mojibakeMarkers = ["�", "绠€", "鍑", "瑙", "鐨", "涓"] as const;
+
+function collectStrings(
+  value: unknown,
+  path: readonly string[] = [],
+): Array<{ path: string; value: string }> {
+  if (typeof value === "string") {
+    return [{ path: path.join("."), value }];
+  }
+
+  if (value && typeof value === "object") {
+    return Object.entries(value as Record<string, unknown>).flatMap(
+      ([key, child]) => collectStrings(child, [...path, key]),
+    );
+  }
+
+  return [];
+}
+
 describe("referral workspace i18n", () => {
   it("defaults to English when no supported locale is provided", () => {
     expect(getLocaleFromSearchParams(undefined)).toBe(DEFAULT_LOCALE);
@@ -16,6 +35,9 @@ describe("referral workspace i18n", () => {
     expect(getLocaleFromSearchParams({ lang: ["zh-Hans"] })).toBe("zh-Hans");
     expect(getLocaleFromSearchParams({ lang: ["fr", "en"] })).toBe(
       DEFAULT_LOCALE,
+    );
+    expect(getLocaleFromSearchParams(new URLSearchParams("lang=zh-Hans"))).toBe(
+      "zh-Hans",
     );
   });
 
@@ -32,7 +54,17 @@ describe("referral workspace i18n", () => {
       const copy = getReferralWorkspaceCopy(locale);
 
       expect(copy.shell.brand).toBe("CaresLink");
+      expect(Object.keys(copy.shell.primaryNav)).toEqual([
+        "workspace",
+        "profile",
+        "health",
+        "materials",
+        "accessCode",
+        "accessRequests",
+      ]);
       expect(copy.shell.primaryNav.workspace.length).toBeGreaterThan(0);
+      expect(copy.shell.primaryNav.accessCode.length).toBeGreaterThan(0);
+      expect(copy.shell.primaryNav.accessRequests.length).toBeGreaterThan(0);
       expect(copy.common.trustBoundary).toContain(
         locale === "zh-Hans" ? "不评估服务商质量" : "does not assess provider quality",
       );
@@ -61,5 +93,48 @@ describe("referral workspace i18n", () => {
     expect(withLocale("/referral-workspace?lang=zh-Hans", "en")).toBe(
       "/referral-workspace?lang=en",
     );
+    expect(withLocale("/referral-workspace#top", "zh-Hans")).toBe(
+      "/referral-workspace?lang=zh-Hans#top",
+    );
+    expect(
+      withLocale(
+        "/referral-workspace/materials?access=code#preview",
+        "zh-Hans",
+      ),
+    ).toBe("/referral-workspace/materials?access=code&lang=zh-Hans#preview");
+  });
+
+  it("keeps every dictionary string populated and readable", () => {
+    for (const locale of SUPPORTED_LOCALES) {
+      const strings = collectStrings(getReferralWorkspaceCopy(locale));
+
+      expect(strings.length).toBeGreaterThan(0);
+
+      for (const { path, value } of strings) {
+        expect(value.trim(), `${locale}.${path}`).not.toBe("");
+      }
+    }
+
+    const zhCopy = getReferralWorkspaceCopy("zh-Hans");
+    const zhStrings = collectStrings({
+      label: getLocaleLabel("zh-Hans"),
+      trustBoundary: zhCopy.common.trustBoundary,
+      subtitle: zhCopy.shell.subtitle,
+      primaryNav: zhCopy.shell.primaryNav,
+      workspaceTitle: zhCopy.workspace.title,
+      profileTitle: zhCopy.profile.title,
+      healthTitle: zhCopy.health.title,
+      materialsTitle: zhCopy.materials.title,
+      accessTitle: zhCopy.access.title,
+      adminTitle: zhCopy.admin.title,
+    });
+
+    for (const { path, value } of zhStrings) {
+      expect(value, `zh-Hans.${path}`).toMatch(/[\u3400-\u9fff]/u);
+
+      for (const marker of mojibakeMarkers) {
+        expect(value, `zh-Hans.${path}`).not.toContain(marker);
+      }
+    }
   });
 });

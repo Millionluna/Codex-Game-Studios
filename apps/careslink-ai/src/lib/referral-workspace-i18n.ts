@@ -32,8 +32,8 @@ export type ReferralWorkspaceCopy = {
       readonly profile: string;
       readonly health: string;
       readonly materials: string;
-      readonly access: string;
-      readonly admin: string;
+      readonly accessCode: string;
+      readonly accessRequests: string;
     };
     readonly legacyNav: {
       readonly dashboard: string;
@@ -122,8 +122,8 @@ const referralWorkspaceCopy: Record<Locale, ReferralWorkspaceCopy> = {
         profile: "Profile",
         health: "Readiness",
         materials: "Materials",
-        access: "Access",
-        admin: "Admin",
+        accessCode: "Access code",
+        accessRequests: "Access requests",
       },
       legacyNav: {
         dashboard: "Dashboard",
@@ -220,8 +220,8 @@ const referralWorkspaceCopy: Record<Locale, ReferralWorkspaceCopy> = {
         profile: "资料",
         health: "准备度",
         materials: "材料",
-        access: "访问权限",
-        admin: "管理",
+        accessCode: "访问码",
+        accessRequests: "访问申请",
       },
       legacyNav: {
         dashboard: "仪表盘",
