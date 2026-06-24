@@ -35,7 +35,7 @@ const legacyNavItems: NavItem[] = [
   { href: "/dashboard", label: "Ops dashboard", icon: LayoutDashboard },
   { href: "/provider-portal", label: "Provider portal", icon: UserRound },
   { href: "/referrals", label: "Referral board", icon: Network },
-  { href: "/providers", label: "Provider directory", icon: Building2 },
+  { href: "/providers", label: "Legacy provider records", icon: Building2 },
 ];
 
 function NavGroup({

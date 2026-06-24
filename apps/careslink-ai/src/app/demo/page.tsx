@@ -30,9 +30,9 @@ const legacyLinks = [
   },
   {
     href: "/providers",
-    label: "Provider directory",
+    label: "Legacy provider records",
     detail:
-      "Legacy directory-style provider record view retained as secondary context.",
+      "Older demo record list kept for internal product review; it is not a public directory or provider endorsement.",
   },
   {
     href: "/referral-source-portal",

@@ -1,4 +1,4 @@
-import { Filter, Search } from "lucide-react";
+import { Archive, Filter, Search, ShieldAlert } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { PageHeader } from "@/components/page-header";
 import { ProviderCard } from "@/components/provider-card";
@@ -9,36 +9,66 @@ export default function ProviderDirectoryPage() {
   return (
     <AppShell>
       <PageHeader
-        eyebrow="服务商目录"
-        title="搜索并分享可信服务商资源"
-        description="目录主要用于内部运营、合伙人分享和未来 SEO。早期不强调收费，重点是帮助服务商获得真实 referral 机会。"
+        eyebrow="Legacy demo records"
+        title="Legacy provider records"
+        description="This older record view is retained for internal product review of the demo flow. It is not a marketplace, public provider directory, or provider endorsement."
       />
 
+      <Card className="mb-5 border-[#f4d28f] bg-[#fffaf0] p-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
+          <ShieldAlert
+            className="mt-0.5 size-5 shrink-0 text-[#925b00]"
+            aria-hidden="true"
+          />
+          <div>
+            <h2 className="text-base font-semibold text-[#17211f]">
+              Legacy demo boundary
+            </h2>
+            <p className="mt-2 text-sm leading-6 text-[#40504b]">
+              These are legacy demo records only. This page is not a public
+              provider directory, provider endorsement, quality assessment,
+              service assessment, compliance assessment, or clinical
+              suitability assessment. CaresLink does not assess provider
+              quality on this surface.
+            </p>
+          </div>
+        </div>
+      </Card>
+
       <Card className="mb-5 p-4">
+        <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-[#40504b]">
+          <Archive className="size-4" aria-hidden="true" />
+          Internal demo record filters
+        </div>
         <div className="grid gap-3 md:grid-cols-[1.4fr_repeat(4,1fr)]">
           <label className="relative">
             <Search className="pointer-events-none absolute left-3 top-3 size-4 text-[#66736f]" />
-            <TextInput className="pl-9" placeholder="搜索服务商、服务类型或区域" />
+            <TextInput
+              className="pl-9"
+              placeholder="Search legacy records, services, or areas"
+            />
           </label>
           <SelectInput defaultValue="all">
-            <option value="all">全部区域</option>
-            <option>悉尼</option>
-            <option>帕拉马塔</option>
-            <option>黑镇</option>
+            <option value="all">All demo areas</option>
+            <option>Sydney</option>
+            <option>Parramatta</option>
+            <option>Blacktown</option>
           </SelectInput>
           <SelectInput defaultValue="all">
-            <option value="all">全部服务</option>
-            <option>支持协调</option>
-            <option>个人护理</option>
-            <option>职业治疗</option>
+            <option value="all">All demo services</option>
+            <option>Support Coordination</option>
+            <option>Personal Care</option>
+            <option>Occupational Therapy</option>
           </SelectInput>
-          <SelectInput defaultValue="approved">
-            <option value="approved">已审核</option>
-            <option>待审核</option>
-            <option>已拒绝</option>
+          <SelectInput defaultValue="all">
+            <option value="all">All internal workflow states</option>
+            <option>Demo review recorded</option>
+            <option>Waiting in demo workflow</option>
+            <option>Excluded from demo workflow</option>
           </SelectInput>
           <button className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-[#cfded8] bg-white px-3 text-sm font-semibold">
-            <Filter className="size-4" /> 更多筛选
+            <Filter className="size-4" aria-hidden="true" />
+            More filters
           </button>
         </div>
       </Card>
