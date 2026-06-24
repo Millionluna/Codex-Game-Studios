@@ -1,80 +1,111 @@
+import type { ReactNode } from "react";
+import type { LucideIcon } from "lucide-react";
 import {
-  Bot,
+  Archive,
   Building2,
-  ClipboardCheck,
-  Home,
+  CircleGauge,
+  ClipboardList,
+  FileText,
+  KeyRound,
   LayoutDashboard,
   Network,
-  PanelLeft,
-  Search,
-  Send,
-  Share2,
-  ShieldCheck,
-  Sparkles,
-  UserPlus,
-  UserRoundCheck,
+  ShieldAlert,
+  UserRound,
 } from "lucide-react";
 import Link from "next/link";
-import type { ReactNode } from "react";
 
-const navItems = [
-  { href: "/", label: "首页", icon: Home },
-  { href: "/demo", label: "谈判 Demo", icon: Sparkles },
-  { href: "/provider-assessment", label: "免费评估", icon: ClipboardCheck },
-  { href: "/dashboard", label: "合伙人工作台", icon: LayoutDashboard },
-  { href: "/admin", label: "平台管理员", icon: ShieldCheck },
-  { href: "/referral-source-portal", label: "发 referral 端", icon: Send },
-  { href: "/provider-portal", label: "接 referral 端", icon: UserRoundCheck },
-  { href: "/hushcare-provider-finder", label: "用户找服务", icon: Search },
-  { href: "/providers/onboarding", label: "网络入驻", icon: UserPlus },
-  { href: "/providers/review", label: "服务商审核", icon: ClipboardCheck },
-  { href: "/ai-profile", label: "AI 资料生成", icon: Bot },
-  { href: "/providers", label: "服务商目录", icon: Building2 },
-  { href: "/referrals/intake", label: "需求录入", icon: Network },
-  { href: "/referrals", label: "Referral 看板", icon: PanelLeft },
-  { href: "/share-cards", label: "分享卡片", icon: Share2 },
+type NavItem = {
+  href: string;
+  label: string;
+  icon: LucideIcon;
+};
+
+const primaryNavItems: NavItem[] = [
+  { href: "/referral-workspace", label: "Workspace", icon: LayoutDashboard },
+  { href: "/referral-workspace/profile", label: "Profile", icon: UserRound },
+  { href: "/referral-workspace/health", label: "Readiness audit", icon: CircleGauge },
+  { href: "/referral-workspace/materials", label: "Materials", icon: FileText },
+  { href: "/referral-workspace/access", label: "Access code", icon: KeyRound },
+  { href: "/admin/access-requests", label: "Access requests", icon: ClipboardList },
 ];
+
+const legacyNavItems: NavItem[] = [
+  { href: "/demo", label: "Legacy demo hub", icon: Archive },
+  { href: "/provider-assessment", label: "Legacy assessment", icon: ClipboardList },
+  { href: "/dashboard", label: "Ops dashboard", icon: LayoutDashboard },
+  { href: "/provider-portal", label: "Provider portal", icon: UserRound },
+  { href: "/referrals", label: "Referral board", icon: Network },
+  { href: "/providers", label: "Provider directory", icon: Building2 },
+];
+
+function NavGroup({
+  label,
+  items,
+}: {
+  label: string;
+  items: NavItem[];
+}) {
+  return (
+    <div className="grid gap-1">
+      <p className="px-3 text-xs font-semibold uppercase tracking-[0.12em] text-[#65736f]">
+        {label}
+      </p>
+      <div className="flex gap-1 overflow-x-auto pb-1 lg:grid lg:overflow-visible lg:pb-0">
+        {items.map((item) => (
+          <Link
+            key={item.href}
+            href={item.href}
+            className="group flex min-h-10 shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-[#40504b] transition hover:bg-[#edf6f3] hover:text-[#0f766e] lg:gap-3"
+          >
+            <item.icon
+              aria-hidden="true"
+              className="size-4 shrink-0 text-[#6f817b] transition group-hover:text-[#0f766e]"
+            />
+            <span className="whitespace-nowrap">{item.label}</span>
+          </Link>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export function AppShell({ children }: { children: ReactNode }) {
   return (
     <div className="min-h-screen overflow-x-hidden bg-[#f7faf8] text-[#17211f]">
-      <div className="grid min-h-screen min-w-0 lg:grid-cols-[280px_1fr]">
+      <div className="grid min-h-screen min-w-0 lg:grid-cols-[292px_1fr]">
         <aside className="min-w-0 border-b border-[#dce8e2] bg-white/95 px-4 py-3 lg:border-b-0 lg:border-r lg:py-4">
-          <Link href="/" className="flex items-center gap-3 rounded-lg px-2 py-2">
-            <span className="flex size-10 items-center justify-center rounded-lg bg-[#0f766e] text-sm font-semibold text-white">
-              CA
+          <Link
+            href="/referral-workspace"
+            className="flex items-center gap-3 rounded-lg px-2 py-2"
+          >
+            <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-[#0f766e] text-sm font-semibold text-white">
+              CL
             </span>
-            <span>
-              <span className="block text-base font-semibold">Careslink AI</span>
-              <span className="text-xs text-[#66736f]">
-                Referral 运营系统
+            <span className="min-w-0">
+              <span className="block truncate text-base font-semibold">
+                CaresLink
+              </span>
+              <span className="text-xs text-[#65736f]">
+                Referral profile workspace
               </span>
             </span>
           </Link>
 
-          <nav className="mt-3 flex max-w-full gap-1 overflow-x-auto pb-2 lg:mt-6 lg:grid lg:overflow-visible lg:pb-0">
-            {navItems.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className="group flex shrink-0 items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium text-[#40504b] transition hover:bg-[#edf6f3] hover:text-[#0f766e] lg:gap-3"
-              >
-                <item.icon
-                  aria-hidden="true"
-                  className="size-4 text-[#6f817b] transition group-hover:text-[#0f766e]"
-                />
-                <span>{item.label}</span>
-              </Link>
-            ))}
+          <nav className="mt-4 grid max-w-full gap-5 lg:mt-6">
+            <NavGroup label="Preview v0.1" items={primaryNavItems} />
+            <NavGroup label="Legacy demos" items={legacyNavItems} />
           </nav>
 
           <div className="mt-8 hidden rounded-lg border border-[#dce8e2] bg-[#f5fbf8] p-4 lg:block">
-            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#0f766e]">
-              试点模式
-            </p>
+            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.12em] text-[#0f766e]">
+              <ShieldAlert className="size-4" aria-hidden="true" />
+              Pilot preview
+            </div>
             <p className="mt-2 text-sm leading-6 text-[#40504b]">
-              先服务一个可信业务合伙人，把服务商网络和真实 referral
-              流程跑通，再复制给更多渠道方。
+              This workspace reviews referral communication completeness from
+              self-submitted profile information. It does not assess provider
+              quality, clinical suitability, compliance status, or service
+              outcomes.
             </p>
           </div>
         </aside>
