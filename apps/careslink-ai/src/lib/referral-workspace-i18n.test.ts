@@ -9,7 +9,21 @@ import {
   withLocale,
 } from "./referral-workspace-i18n";
 
-const mojibakeMarkers = ["�", "绠€", "鍑", "瑙", "鐨", "涓"] as const;
+const mojibakeMarkers = [
+  "�",
+  "绠€",
+  "鍑",
+  "瑙",
+  "鐨",
+  "涓",
+  "杞",
+  "鎺",
+  "璧",
+  "宸",
+  "棰",
+  "鏉",
+  "浠",
+] as const;
 
 function collectStrings(
   value: unknown,
@@ -104,7 +118,7 @@ describe("referral workspace i18n", () => {
     ).toBe("/referral-workspace/materials?access=code&lang=zh-Hans#preview");
   });
 
-  it("keeps every dictionary string populated and readable", () => {
+  it("keeps every dictionary string populated and all zh-Hans copy free of mojibake sentinel glyphs", () => {
     for (const locale of SUPPORTED_LOCALES) {
       const strings = collectStrings(getReferralWorkspaceCopy(locale));
 
@@ -115,23 +129,17 @@ describe("referral workspace i18n", () => {
       }
     }
 
-    const zhCopy = getReferralWorkspaceCopy("zh-Hans");
     const zhStrings = collectStrings({
+      copy: getReferralWorkspaceCopy("zh-Hans"),
       label: getLocaleLabel("zh-Hans"),
-      trustBoundary: zhCopy.common.trustBoundary,
-      subtitle: zhCopy.shell.subtitle,
-      primaryNav: zhCopy.shell.primaryNav,
-      workspaceTitle: zhCopy.workspace.title,
-      profileTitle: zhCopy.profile.title,
-      healthTitle: zhCopy.health.title,
-      materialsTitle: zhCopy.materials.title,
-      accessTitle: zhCopy.access.title,
-      adminTitle: zhCopy.admin.title,
     });
 
-    for (const { path, value } of zhStrings) {
-      expect(value, `zh-Hans.${path}`).toMatch(/[\u3400-\u9fff]/u);
+    expect(
+      zhStrings.map(({ value }) => value).join(" "),
+      "zh-Hans dictionary",
+    ).toMatch(/[\u3400-\u9fff]/u);
 
+    for (const { path, value } of zhStrings) {
       for (const marker of mojibakeMarkers) {
         expect(value, `zh-Hans.${path}`).not.toContain(marker);
       }
