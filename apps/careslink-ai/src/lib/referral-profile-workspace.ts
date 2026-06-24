@@ -1,3 +1,5 @@
+import { getUnsafeClaimReason } from "./referral-profile-safe-copy";
+
 export type EntityType = "individual" | "organisation";
 
 export type ReferralDirection = "receive" | "send" | "both";
@@ -353,6 +355,9 @@ const priorityRank: Record<IssuePriority, number> = {
   warning: 1,
 };
 
+const SUMMARY_NEEDS_REVIEW_DESCRIPTION =
+  "The self-submitted profile summary needs review before it can be displayed.";
+
 export function getSeedReferralProfiles() {
   return seedReferralProfiles.map(cloneProfile);
 }
@@ -391,10 +396,16 @@ export function summarizeProfile(
     directionLabel: directionLabels[profile.referralDirection],
     serviceAreaLabel: formatList(profile.serviceAreas),
     languageLabel: formatList(profile.languages),
-    description: profile.summary,
+    description: getSafeProfileSummaryDescription(profile.summary),
     footer:
       "Built from self-submitted information. Not a provider endorsement.",
   };
+}
+
+function getSafeProfileSummaryDescription(summary: string) {
+  return getUnsafeClaimReason(summary)
+    ? SUMMARY_NEEDS_REVIEW_DESCRIPTION
+    : summary;
 }
 
 export function getHealthAudit(profile: ReferralProfile): HealthAudit {

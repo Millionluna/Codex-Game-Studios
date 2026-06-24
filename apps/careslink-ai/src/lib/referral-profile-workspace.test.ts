@@ -1,4 +1,26 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import { createElement, type ReactNode } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+
+vi.mock("../components/ui", async () => {
+  const React = await import("react");
+
+  return {
+    Card: ({
+      children,
+      className = "",
+    }: {
+      children: ReactNode;
+      className?: string;
+    }) => React.createElement("section", { className }, children),
+  };
+});
+
+import {
+  AgentQueuePanel,
+  GuidedCopilotPanel,
+  LockedMaterialsGrid,
+} from "../components/referral-profile-workspace";
 import {
   canUseGuidedMaterials,
   getAccessRequests,
@@ -52,6 +74,22 @@ describe("referral profile workspace domain", () => {
     expect(summary.directionLabel).toBe("Receives and sends referrals");
     expect(summary.footer).toContain("self-submitted information");
     expect(summary.footer).toContain("Not a provider endorsement");
+  });
+
+  it("replaces unsafe self-submitted summary claims before display", () => {
+    const profile = {
+      ...getSeedReferralProfiles()[0],
+      summary:
+        "We are a certified recommended provider for older adults comparing care options.",
+    };
+    const summary = summarizeProfile(profile);
+    const description = summary.description.toLowerCase();
+
+    expect(description).not.toContain("certified");
+    expect(description).not.toContain("recommended provider");
+    expect(description).toContain("profile summary needs review");
+    expect(description).not.toContain("quality");
+    expect(description).not.toContain("compliance");
   });
 
   it("scores a both-mode profile and keeps receive/send sections separate", () => {
@@ -137,6 +175,48 @@ describe("referral profile workspace domain", () => {
     expect(canUseGuidedMaterials(exhaustedAccess)).toBe(false);
     expect(getLockedMaterials("receive", exhaustedAccess).every((item) => item.locked)).toBe(true);
     expect(getAgentQueueForAccess(exhaustedAccess)[0].status).toBe("locked");
+  });
+
+  it("uses access state as the final material gate when material data is stale", () => {
+    const freeAccess = getAccessState("user-free");
+    const staleUnlockedMaterials = getLockedMaterials(
+      "receive",
+      getAccessState("user-approved"),
+    );
+    const markup = renderToStaticMarkup(
+      createElement(LockedMaterialsGrid, {
+        materials: staleUnlockedMaterials,
+        accessState: freeAccess,
+      }),
+    );
+
+    expect(markup).toContain("Service areas, languages, intake method");
+    expect(markup).toContain("Access code required");
+    expect(markup).not.toContain("Ready for guided drafting");
+  });
+
+  it("uses access state as the final queue and copilot gate when queue data is stale", () => {
+    const freeAccess = getAccessState("user-free");
+    const staleReadyQueue = getAgentQueueForAccess(getAccessState("user-approved"));
+    const queueMarkup = renderToStaticMarkup(
+      createElement(AgentQueuePanel, {
+        queue: staleReadyQueue,
+        accessState: freeAccess,
+      }),
+    );
+    const copilotMarkup = renderToStaticMarkup(
+      createElement(GuidedCopilotPanel, {
+        queue: staleReadyQueue,
+        accessState: freeAccess,
+      }),
+    );
+
+    expect(queueMarkup).toContain("Preview basic profile structure");
+    expect(queueMarkup).toContain("Access code");
+    expect(queueMarkup).not.toContain("Guide profile wording");
+    expect(copilotMarkup).toContain("Preview mode only");
+    expect(copilotMarkup).not.toContain("Drafting prompt ready");
+    expect(copilotMarkup).not.toContain("Guide profile wording");
   });
 
   it("shows a restrained module queue instead of claiming autonomous agents", () => {

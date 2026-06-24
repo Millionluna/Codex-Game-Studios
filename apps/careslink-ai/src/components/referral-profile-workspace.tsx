@@ -17,16 +17,17 @@ import {
   Send,
   UserRound,
 } from "lucide-react";
-import { Card } from "@/components/ui";
-import type {
-  AccessState,
-  AgentQueueItem,
-  BasicProfileSummary,
-  HealthAudit,
-  HealthStatus,
-  LockedMaterial,
-} from "@/lib/referral-profile-workspace";
-import { REQUIRED_REFERRAL_PROFILE_BOUNDARY } from "@/lib/referral-profile-safe-copy";
+import { Card } from "./ui";
+import {
+  canUseGuidedMaterials,
+  type AccessState,
+  type AgentQueueItem,
+  type BasicProfileSummary,
+  type HealthAudit,
+  type HealthStatus,
+  type LockedMaterial,
+} from "../lib/referral-profile-workspace";
+import { REQUIRED_REFERRAL_PROFILE_BOUNDARY } from "../lib/referral-profile-safe-copy";
 
 type IconComponent = ComponentType<SVGProps<SVGSVGElement>>;
 
@@ -116,11 +117,7 @@ function clampScore(score: number) {
 }
 
 function canUseGuidedWorkspace(accessState: AccessState) {
-  return (
-    accessState.hasAccessCode &&
-    accessState.status === "approved" &&
-    accessState.dailyQuota > accessState.usedToday
-  );
+  return canUseGuidedMaterials(accessState);
 }
 
 function getRemainingQuota(accessState: AccessState) {
@@ -155,8 +152,20 @@ function accessStatusCopy(accessState: AccessState) {
   return {
     label: "Free preview",
     detail: "Preview materials are visible. Guided drafting requires an access code.",
-    tone: "high" as const,
+    tone: "warning" as const,
   };
+}
+
+function lockedGuidedMaterialMessage(accessState: AccessState) {
+  if (accessState.hasAccessCode && accessState.status === "approved") {
+    return "Daily guided quota used. Preview remains visible.";
+  }
+
+  if (accessState.status === "waitlist") {
+    return "Access request queued. Preview remains visible until an access code is active.";
+  }
+
+  return "Access code required for guided materials.";
 }
 
 function scoreTone(score: number) {
@@ -302,6 +311,9 @@ export function BasicProfileCard({ summary, className = "" }: BasicProfileCardPr
 }
 
 export function CompletionBadge({ audit, className = "" }: CompletionBadgeProps) {
+  const BadgeIcon =
+    audit.score >= 85 ? CheckCircle2 : audit.score >= 70 ? CircleGauge : AlertTriangle;
+
   return (
     <span
       className={cx(
@@ -310,7 +322,7 @@ export function CompletionBadge({ audit, className = "" }: CompletionBadgeProps)
         className,
       )}
     >
-      <CheckCircle2 className="size-4 shrink-0" aria-hidden="true" />
+      <BadgeIcon className="size-4 shrink-0" aria-hidden="true" />
       <span>{clampScore(audit.score)}%</span>
       <span className="min-w-0 break-words">{audit.band}</span>
     </span>
@@ -431,7 +443,7 @@ export function TopIssuesPanel({
       <div className="mt-5 grid gap-3">
         {issues.length > 0 ? (
           issues.map((issue) => (
-            <div key={issue.id} className="rounded-lg border border-[#dce8e2] p-4">
+            <div key={issue.id} className="border-l-2 border-[#dce8e2] bg-[#f8fbfa] p-4">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0">
                   <p className="break-words text-sm font-semibold text-[#17211f]">
@@ -490,55 +502,60 @@ export function LockedMaterialsGrid({
 
       {materials.length > 0 ? (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {materials.map((material) => (
-            <Card key={material.id} className="flex min-h-64 flex-col p-4">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2 text-sm font-semibold text-[#17211f]">
-                    {material.locked ? (
-                      <FileLock2 className="size-4 shrink-0 text-[#925b00]" aria-hidden="true" />
-                    ) : (
-                      <FileText className="size-4 shrink-0 text-[#0f766e]" aria-hidden="true" />
-                    )}
-                    <span className="break-words">{material.label}</span>
+          {materials.map((material) => {
+            const locked = !canUseGuided;
+            const lockedMessage = lockedGuidedMaterialMessage(accessState);
+
+            return (
+              <Card key={material.id} className="flex min-h-64 flex-col p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 text-sm font-semibold text-[#17211f]">
+                      {locked ? (
+                        <FileLock2 className="size-4 shrink-0 text-[#925b00]" aria-hidden="true" />
+                      ) : (
+                        <FileText className="size-4 shrink-0 text-[#0f766e]" aria-hidden="true" />
+                      )}
+                      <span className="break-words">{material.label}</span>
+                    </div>
+                    <p className="mt-2 text-sm leading-6 text-[#65736f]">
+                      {material.description}
+                    </p>
                   </div>
-                  <p className="mt-2 text-sm leading-6 text-[#65736f]">
-                    {material.description}
-                  </p>
+                  <StatusBadge className="border-[#b9d7ff] bg-[#edf5ff] text-[#19518d]">
+                    {directionLabels[material.direction]}
+                  </StatusBadge>
                 </div>
-                <StatusBadge className="border-[#b9d7ff] bg-[#edf5ff] text-[#19518d]">
-                  {directionLabels[material.direction]}
-                </StatusBadge>
-              </div>
 
-              <div className="mt-4 rounded-lg border border-[#dce8e2] bg-[#f8fbfa] p-3">
-                <p className="text-xs font-semibold text-[#65736f]">Preview</p>
-                <p className="mt-2 text-sm leading-6 text-[#263834]">{material.preview}</p>
-              </div>
-
-              <div className="mt-auto pt-4">
-                <div
-                  className={cx(
-                    "flex min-h-12 items-start gap-2 rounded-lg border p-3 text-sm leading-6",
-                    material.locked
-                      ? "border-[#f4d28f] bg-[#fff7df] text-[#925b00]"
-                      : "border-[#9ed8c9] bg-[#e6f7f2] text-[#0f766e]",
-                  )}
-                >
-                  {material.locked ? (
-                    <LockKeyhole className="mt-1 size-4 shrink-0" aria-hidden="true" />
-                  ) : (
-                    <CheckCircle2 className="mt-1 size-4 shrink-0" aria-hidden="true" />
-                  )}
-                  <p>
-                    {material.locked
-                      ? material.lockReason ?? "Access code required for guided materials."
-                      : "Ready for guided drafting from submitted profile details."}
-                  </p>
+                <div className="mt-4 rounded-lg border border-[#dce8e2] bg-[#f8fbfa] p-3">
+                  <p className="text-xs font-semibold text-[#65736f]">Preview</p>
+                  <p className="mt-2 text-sm leading-6 text-[#263834]">{material.preview}</p>
                 </div>
-              </div>
-            </Card>
-          ))}
+
+                <div className="mt-auto pt-4">
+                  <div
+                    className={cx(
+                      "flex min-h-12 items-start gap-2 rounded-lg border p-3 text-sm leading-6",
+                      locked
+                        ? "border-[#f4d28f] bg-[#fff7df] text-[#925b00]"
+                        : "border-[#9ed8c9] bg-[#e6f7f2] text-[#0f766e]",
+                    )}
+                  >
+                    {locked ? (
+                      <LockKeyhole className="mt-1 size-4 shrink-0" aria-hidden="true" />
+                    ) : (
+                      <CheckCircle2 className="mt-1 size-4 shrink-0" aria-hidden="true" />
+                    )}
+                    <p>
+                      {locked
+                        ? lockedMessage
+                        : "Ready for guided drafting from submitted profile details."}
+                    </p>
+                  </div>
+                </div>
+              </Card>
+            );
+          })}
         </div>
       ) : (
         <EmptyState
@@ -577,7 +594,7 @@ export function AgentQueuePanel({
 
       <div className="mt-5 grid gap-3">
         {queue.map((item) => {
-          const ready = item.status === "ready" && canUseGuided;
+          const ready = canUseGuided;
           return (
             <div
               key={item.id}
@@ -677,7 +694,7 @@ export function GuidedCopilotPanel({
   className = "",
 }: GuidedCopilotPanelProps) {
   const canUseGuided = canUseGuidedWorkspace(accessState);
-  const activeItem = queue.find((item) => item.status === (canUseGuided ? "ready" : "locked")) ?? queue[0];
+  const activeItem = queue[0];
   const status = accessStatusCopy(accessState);
 
   return (
