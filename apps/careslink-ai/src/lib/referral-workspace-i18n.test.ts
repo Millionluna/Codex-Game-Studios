@@ -73,9 +73,22 @@ describe("referral workspace i18n", () => {
         "accessCode",
         "accessRequests",
       ]);
+      expect(Object.keys(copy.shell.legacyNav)).toEqual([
+        "groupHeading",
+        "demoHub",
+        "assessment",
+        "dashboard",
+        "referrals",
+        "providers",
+        "referralSourcePortal",
+        "providerPortal",
+      ]);
       expect(copy.shell.primaryNav.workspace.length).toBeGreaterThan(0);
       expect(copy.shell.primaryNav.accessCode.length).toBeGreaterThan(0);
       expect(copy.shell.primaryNav.accessRequests.length).toBeGreaterThan(0);
+      expect(copy.shell.legacyNav.groupHeading.length).toBeGreaterThan(0);
+      expect(copy.shell.legacyNav.demoHub.length).toBeGreaterThan(0);
+      expect(copy.shell.legacyNav.assessment.length).toBeGreaterThan(0);
       expect(copy.common.trustBoundary).toContain(
         locale === "zh-Hans" ? "不评估服务商质量" : "does not assess provider quality",
       );

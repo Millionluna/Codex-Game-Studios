@@ -36,6 +36,9 @@ export type ReferralWorkspaceCopy = {
       readonly accessRequests: string;
     };
     readonly legacyNav: {
+      readonly groupHeading: string;
+      readonly demoHub: string;
+      readonly assessment: string;
       readonly dashboard: string;
       readonly referrals: string;
       readonly providers: string;
@@ -126,6 +129,9 @@ const referralWorkspaceCopy: Record<Locale, ReferralWorkspaceCopy> = {
         accessRequests: "Access requests",
       },
       legacyNav: {
+        groupHeading: "Legacy demos",
+        demoHub: "Legacy demo hub",
+        assessment: "Legacy assessment",
         dashboard: "Dashboard",
         referrals: "Referrals",
         providers: "Providers",
@@ -224,6 +230,9 @@ const referralWorkspaceCopy: Record<Locale, ReferralWorkspaceCopy> = {
         accessRequests: "访问申请",
       },
       legacyNav: {
+        groupHeading: "旧版演示",
+        demoHub: "旧版演示中心",
+        assessment: "旧版评估",
         dashboard: "仪表盘",
         referrals: "转介",
         providers: "服务商",

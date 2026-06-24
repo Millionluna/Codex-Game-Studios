@@ -31,6 +31,8 @@ type PrimaryNavLabel =
   | "accessRequests";
 
 type LegacyNavLabel =
+  | "demoHub"
+  | "assessment"
   | "dashboard"
   | "referrals"
   | "providers"
@@ -45,8 +47,7 @@ type PrimaryNavItem = {
 
 type LegacyNavItem = {
   href: string;
-  labelKey?: LegacyNavLabel;
-  fallbackLabel?: string;
+  labelKey: LegacyNavLabel;
   icon: LucideIcon;
 };
 
@@ -78,10 +79,10 @@ const primaryNavItems: PrimaryNavItem[] = [
 ];
 
 const legacyNavItems: LegacyNavItem[] = [
-  { href: "/demo", fallbackLabel: "Legacy demo hub", icon: Archive },
+  { href: "/demo", labelKey: "demoHub", icon: Archive },
   {
     href: "/provider-assessment",
-    fallbackLabel: "Legacy assessment",
+    labelKey: "assessment",
     icon: ClipboardList,
   },
   { href: "/dashboard", labelKey: "dashboard", icon: LayoutDashboard },
@@ -136,9 +137,7 @@ export function AppShell({ children, locale = DEFAULT_LOCALE }: AppShellProps) {
   }));
   const legacyItems = legacyNavItems.map((item) => ({
     ...item,
-    label: item.labelKey
-      ? copy.shell.legacyNav[item.labelKey]
-      : (item.fallbackLabel ?? ""),
+    label: copy.shell.legacyNav[item.labelKey],
   }));
 
   return (
@@ -168,7 +167,11 @@ export function AppShell({ children, locale = DEFAULT_LOCALE }: AppShellProps) {
               items={primaryItems}
               locale={locale}
             />
-            <NavGroup label="Legacy demos" items={legacyItems} locale={locale} />
+            <NavGroup
+              label={copy.shell.legacyNav.groupHeading}
+              items={legacyItems}
+              locale={locale}
+            />
           </nav>
 
           <div className="mt-5 grid gap-2 rounded-lg border border-[#dce8e2] bg-[#f8fbfa] p-3">
