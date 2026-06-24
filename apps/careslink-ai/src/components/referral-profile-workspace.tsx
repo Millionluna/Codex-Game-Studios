@@ -210,6 +210,15 @@ function localizedProfileListValue(
   return items.length > 0 ? value : copy.emptyPlaceholder;
 }
 
+function localizedProfileDescription(
+  summary: BasicProfileSummary,
+  copy: ComponentCopy["basicProfile"],
+): string {
+  return summary.descriptionNeedsReview
+    ? copy.descriptionNeedsReview
+    : summary.description;
+}
+
 function localizedAccessCodeType(
   codeType: string | undefined,
   copy: ComponentCopy["accessStatus"],
@@ -441,6 +450,7 @@ export function BasicProfileCard({
     summary.languages,
     copy,
   );
+  const description = localizedProfileDescription(summary, copy);
 
   return (
     <Card className={cx("flex h-full min-h-80 flex-col p-5", className)}>
@@ -459,7 +469,7 @@ export function BasicProfileCard({
         </StatusBadge>
       </div>
 
-      <p className="mt-4 text-sm leading-6 text-[#40504b]">{summary.description}</p>
+      <p className="mt-4 text-sm leading-6 text-[#40504b]">{description}</p>
 
       <div className="mt-5 grid gap-3 sm:grid-cols-2">
         <LabelValue
@@ -946,6 +956,13 @@ export function GuidedCopilotPanel({
   const directionLabel = summary
     ? copy.basicProfile.directionLabels[summary.referralDirection]
     : undefined;
+  const serviceAreaLabel = summary
+    ? localizedProfileListValue(
+        summary.serviceAreaLabel,
+        summary.serviceAreas,
+        copy.basicProfile,
+      )
+    : undefined;
 
   return (
     <Card className={cx("flex h-full min-h-[520px] flex-col overflow-hidden", className)}>
@@ -967,7 +984,7 @@ export function GuidedCopilotPanel({
       <div className="flex-1 space-y-3 bg-[#f8fbfa] p-4">
         <CopilotMessage label={copy.copilot.profileContextLabel} tone="system">
           {summary
-            ? `${summary.title}: ${directionLabel}. ${summary.serviceAreaLabel}.`
+            ? `${summary.title}: ${directionLabel}. ${serviceAreaLabel}.`
             : copy.copilot.noProfileContext}
         </CopilotMessage>
 

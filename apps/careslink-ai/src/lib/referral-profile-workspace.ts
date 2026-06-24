@@ -116,6 +116,7 @@ export interface BasicProfileSummary {
   languages: string[];
   languageLabel: string;
   description: string;
+  descriptionNeedsReview: boolean;
   footer: string;
 }
 
@@ -397,6 +398,8 @@ export function getAccessState(userId: string): AccessState {
 export function summarizeProfile(
   profile: ReferralProfile,
 ): BasicProfileSummary {
+  const descriptionNeedsReview = getUnsafeClaimReason(profile.summary) !== null;
+
   return {
     profileId: profile.id,
     title: profile.name,
@@ -408,16 +411,13 @@ export function summarizeProfile(
     serviceAreaLabel: formatList(profile.serviceAreas),
     languages: [...profile.languages],
     languageLabel: formatList(profile.languages),
-    description: getSafeProfileSummaryDescription(profile.summary),
+    description: descriptionNeedsReview
+      ? SUMMARY_NEEDS_REVIEW_DESCRIPTION
+      : profile.summary,
+    descriptionNeedsReview,
     footer:
       "Built from self-submitted information. Not a provider endorsement.",
   };
-}
-
-function getSafeProfileSummaryDescription(summary: string) {
-  return getUnsafeClaimReason(summary)
-    ? SUMMARY_NEEDS_REVIEW_DESCRIPTION
-    : summary;
 }
 
 export function getHealthAudit(profile: ReferralProfile): HealthAudit {

@@ -164,6 +164,7 @@ export type ReferralWorkspaceCopy = {
       readonly serviceArea: string;
       readonly languages: string;
       readonly emptyPlaceholder: string;
+      readonly descriptionNeedsReview: string;
       readonly footer: string;
       readonly entityLabels: Record<EntityTypeKey, string>;
       readonly directionLabels: Record<ReferralDirectionKey, string>;
@@ -427,6 +428,8 @@ const referralWorkspaceCopy: Record<Locale, ReferralWorkspaceCopy> = {
         serviceArea: "Service area",
         languages: "Languages",
         emptyPlaceholder: "Not yet provided",
+        descriptionNeedsReview:
+          "The self-submitted profile summary needs review before it can be displayed.",
         footer:
           "Built from self-submitted information. Not a provider endorsement.",
         entityLabels: {
@@ -944,6 +947,7 @@ const referralWorkspaceCopy: Record<Locale, ReferralWorkspaceCopy> = {
         serviceArea: "服务范围",
         languages: "语言",
         emptyPlaceholder: "尚未提供",
+        descriptionNeedsReview: "自行提交的资料摘要需要审核后才能显示。",
         footer: "基于自行提交的信息生成。不是服务商背书。",
         entityLabels: {
           individual: "个人",

@@ -200,4 +200,51 @@ describe("referral profile workspace shared components", () => {
     expect(markup).not.toContain("Not yet provided");
     expect(markup).toContain(profile.name);
   });
+
+  it("localizes generated unsafe summary placeholders in zh-Hans profile cards", () => {
+    const profile = {
+      ...getSeedReferralProfiles()[0],
+      summary:
+        "We are a certified recommended provider for older adults comparing care options.",
+    };
+    const summary = summarizeProfile(profile);
+
+    expect(summary.description).toBe(
+      "The self-submitted profile summary needs review before it can be displayed.",
+    );
+
+    const markup = renderToStaticMarkup(
+      createElement(BasicProfileCard, { summary, locale: "zh-Hans" }),
+    );
+
+    expect(markup).toContain("自行提交的资料摘要需要审核后才能显示。");
+    expect(markup).not.toContain(
+      "The self-submitted profile summary needs review before it can be displayed.",
+    );
+    expect(markup).not.toContain("certified");
+    expect(markup).not.toContain("recommended provider");
+  });
+
+  it("localizes known empty service area placeholders in zh-Hans copilot context", () => {
+    const profile = {
+      ...getSeedReferralProfiles()[0],
+      serviceAreas: [],
+    };
+    const summary = summarizeProfile(profile);
+    const accessState = getAccessState(profile.ownerUserId);
+
+    expect(summary.serviceAreaLabel).toBe("Not yet provided");
+
+    const markup = renderToStaticMarkup(
+      createElement(GuidedCopilotPanel, {
+        accessState,
+        queue: getAgentQueueForAccess(accessState),
+        summary,
+        locale: "zh-Hans",
+      }),
+    );
+
+    expect(markup).toContain(`${profile.name}: 接收并发送转介. 尚未提供.`);
+    expect(markup).not.toContain("Not yet provided");
+  });
 });

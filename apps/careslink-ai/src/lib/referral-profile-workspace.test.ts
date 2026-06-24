@@ -108,6 +108,7 @@ describe("referral profile workspace domain", () => {
     const summary = summarizeProfile(profile);
     const description = summary.description.toLowerCase();
 
+    expect(summary.descriptionNeedsReview).toBe(true);
     expect(description).not.toContain("certified");
     expect(description).not.toContain("recommended provider");
     expect(description).toContain("profile summary needs review");
