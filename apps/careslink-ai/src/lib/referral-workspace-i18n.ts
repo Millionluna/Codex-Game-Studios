@@ -118,6 +118,16 @@ export type ReferralWorkspaceCopy = {
     readonly accessRequests: string;
     readonly routeBlockTitle: string;
     readonly routeBlockDescription: string;
+    readonly plannedRoutesTitle: string;
+    readonly plannedRoutesDescription: string;
+    readonly adminAccessQueue: string;
+    readonly routes: Record<
+      "profile" | "health" | "materials" | "access",
+      {
+        readonly label: string;
+        readonly detail: string;
+      }
+    >;
   };
   readonly profile: {
     readonly eyebrow: string;
@@ -129,6 +139,47 @@ export type ReferralWorkspaceCopy = {
     readonly sendSection: string;
     readonly roleMatrixTitle: string;
     readonly noPersistence: string;
+    readonly builderExample: string;
+    readonly builderDescription: string;
+    readonly formLabel: string;
+    readonly relevantToProfile: string;
+    readonly notUsedForDirection: string;
+    readonly relevant: string;
+    readonly notUsed: string;
+    readonly identityDescription: string;
+    readonly footprintDescription: string;
+    readonly receiveDescription: string;
+    readonly sendDescription: string;
+    readonly previewBoundaryTitle: string;
+    readonly previewBoundaryDescription: string;
+    readonly roleMatrixDescription: string;
+    readonly directionHelp: Record<ReferralDirectionKey, string>;
+    readonly fields: {
+      readonly entityType: string;
+      readonly profileName: string;
+      readonly referralDirection: string;
+      readonly lastUpdated: string;
+      readonly profileSummary: string;
+      readonly serviceAreas: string;
+      readonly languages: string;
+      readonly referralFitNotes: string;
+      readonly intakeMethod: string;
+      readonly responseTime: string;
+      readonly capacityStatus: string;
+      readonly handoverRequirements: string;
+      readonly followUpCadence: string;
+      readonly consentReminder: string;
+    };
+    readonly tableColumns: {
+      readonly profile: string;
+      readonly entityType: string;
+      readonly referralDirection: string;
+      readonly receiveSide: string;
+      readonly sendSide: string;
+    };
+    readonly receiveDetailsMissing: string;
+    readonly receiveNotUsed: string;
+    readonly sendNotUsed: string;
   };
   readonly health: {
     readonly eyebrow: string;
@@ -136,6 +187,31 @@ export type ReferralWorkspaceCopy = {
     readonly description: string;
     readonly scoreMeaningTitle: string;
     readonly scoreMeaning: string;
+    readonly profileBuilder: string;
+    readonly materialsPreview: string;
+    readonly metrics: {
+      readonly signalsReviewed: {
+        readonly label: string;
+        readonly detail: string;
+      };
+      readonly openIssues: {
+        readonly label: string;
+        readonly detail: string;
+      };
+      readonly highPriority: {
+        readonly label: string;
+        readonly detail: string;
+      };
+    };
+    readonly nextStepFlowTitle: string;
+    readonly nextStepFlowDescription: string;
+    readonly nextSteps: Record<
+      "profile" | "materials" | "access",
+      {
+        readonly label: string;
+        readonly detail: string;
+      }
+    >;
   };
   readonly materials: {
     readonly eyebrow: string;
@@ -144,6 +220,30 @@ export type ReferralWorkspaceCopy = {
     readonly freeMode: string;
     readonly accessMode: string;
     readonly noAiCall: string;
+    readonly currentModeTitle: string;
+    readonly accessCodeGuidedPreview: string;
+    readonly freePreviewWithoutCode: string;
+    readonly accessModeDetail: string;
+    readonly freeModeDetail: string;
+    readonly userApproved: string;
+    readonly userFree: string;
+    readonly accessCode: string;
+    readonly activeForDemo: string;
+    readonly notPresent: string;
+    readonly guidedQuota: string;
+    readonly usedDailyQuota: string;
+    readonly remainingToday: string;
+    readonly viewFreePreview: string;
+    readonly accessRequestPreview: string;
+    readonly tryAccessCodeDemo: string;
+    readonly readinessAudit: string;
+    readonly freePreview: string;
+    readonly accessDemo: string;
+    readonly access: string;
+    readonly deterministicPreviewTitle: string;
+    readonly guidedReviewBoundary: string;
+    readonly freePreviewBoundary: string;
+    readonly accessStateBoundary: string;
   };
   readonly access: {
     readonly eyebrow: string;
@@ -152,12 +252,94 @@ export type ReferralWorkspaceCopy = {
     readonly disabledSubmit: string;
     readonly costControlTitle: string;
     readonly costControl: string;
+    readonly materialsDemo: string;
+    readonly adminQueue: string;
+    readonly costControlItems: readonly string[];
+    readonly applicationFieldsTitle: string;
+    readonly applicationFieldsDescription: string;
+    readonly previewOnlyNoSubmit: string;
+    readonly formLabel: string;
+    readonly fields: {
+      readonly profile: string;
+      readonly entityType: string;
+      readonly referralDirection: string;
+      readonly requestedCodeType: string;
+      readonly sourceInvite: string;
+      readonly expectedDailyQuota: string;
+      readonly reason: string;
+      readonly abuseCostControlNote: string;
+    };
+    readonly fieldValues: {
+      readonly sourceInvite: string;
+      readonly expectedDailyQuota: string;
+      readonly reason: string;
+      readonly abuseCostControlNote: string;
+    };
+    readonly previewRequestStateTitle: string;
+    readonly previewRequestStateDescription: string;
+    readonly disabledButton: string;
+    readonly viewAccessCodeMaterialsDemo: string;
+    readonly openAdminQueue: string;
+    readonly previewDestinationsTitle: string;
+    readonly previewDestinationsDescription: string;
+    readonly freeMaterials: string;
+    readonly accessCodeDemo: string;
   };
   readonly admin: {
     readonly eyebrow: string;
     readonly title: string;
     readonly description: string;
     readonly boundary: string;
+    readonly accessPreview: string;
+    readonly workspace: string;
+    readonly metrics: {
+      readonly queued: {
+        readonly label: string;
+        readonly detail: string;
+      };
+      readonly accessActive: {
+        readonly label: string;
+        readonly detail: string;
+      };
+      readonly declined: {
+        readonly label: string;
+        readonly detail: string;
+      };
+      readonly directionMix: {
+        readonly label: string;
+      };
+    };
+    readonly noRequestsInQueue: string;
+    readonly requestCount: {
+      readonly one: string;
+      readonly other: string;
+    };
+    readonly statusLabels: Record<"queued" | "approved" | "declined", string>;
+    readonly directionLabels: Record<ReferralDirectionKey, string>;
+    readonly directionSummaryLabels: Record<ReferralDirectionKey, string>;
+    readonly boundaryTitle: string;
+    readonly requestQueueTitle: string;
+    readonly requestQueueDescription: string;
+    readonly requestFrom: string;
+    readonly fields: {
+      readonly userId: string;
+      readonly requestedCodeType: string;
+      readonly referralDirection: string;
+      readonly requestedTime: string;
+      readonly noteOrReason: string;
+    };
+    readonly reviewAffordancesTitle: string;
+    readonly reviewAffordancesDescription: string;
+    readonly previewActionTitle: string;
+    readonly previewActions: {
+      readonly approve: string;
+      readonly waitlist: string;
+      readonly decline: string;
+    };
+    readonly requestedCodeTypesTitle: string;
+    readonly noRequestedCodeTypes: string;
+    readonly reviewFocusTitle: string;
+    readonly reviewFocusItems: readonly string[];
   };
   readonly components: {
     readonly basicProfile: {
@@ -369,6 +551,28 @@ const referralWorkspaceCopy: Record<Locale, ReferralWorkspaceCopy> = {
       routeBlockTitle: "Workspace route unavailable",
       routeBlockDescription:
         "This pilot route is intentionally limited while the referral profile workflow is being prepared.",
+      plannedRoutesTitle: "Planned workspace routes",
+      plannedRoutesDescription:
+        "These links show the intended navigation for profile editing, readiness review, guided material previews, access-code entry, and pilot access administration.",
+      adminAccessQueue: "Admin access queue",
+      routes: {
+        profile: {
+          label: "Profile",
+          detail: "Edit self-submitted referral communication fields.",
+        },
+        health: {
+          label: "Readiness",
+          detail: "Review completeness signals and priority gaps.",
+        },
+        materials: {
+          label: "Materials",
+          detail: "Preview share cards, handover copy, and intake prompts.",
+        },
+        access: {
+          label: "Access",
+          detail: "Request or enter an access code for guided drafting.",
+        },
+      },
     },
     profile: {
       eyebrow: "Profile basics",
@@ -382,6 +586,62 @@ const referralWorkspaceCopy: Record<Locale, ReferralWorkspaceCopy> = {
       roleMatrixTitle: "Referral role matrix",
       noPersistence:
         "Changes shown here are preview-only and are not persisted to a live provider record.",
+      builderExample: "Builder example",
+      builderDescription:
+        "Seeded Harbour data is shown as a first-version profile builder. Fields are read-only in this slice and do not persist changes.",
+      formLabel: "Read-only referral profile builder",
+      relevantToProfile: "Relevant to this profile",
+      notUsedForDirection: "Not used for this direction",
+      relevant: "Relevant",
+      notUsed: "Not used",
+      identityDescription:
+        "Set who the profile represents, how it participates in referrals, and the self-submitted summary referrers can read.",
+      footprintDescription:
+        "Capture where the profile is relevant, the languages submitted, and the referral fit notes used for communication readiness.",
+      receiveDescription:
+        "Receive-side details stay separate from send-side handover information.",
+      sendDescription:
+        "Send-side details describe what should travel with an outgoing referral and how follow-up is handled.",
+      previewBoundaryTitle: "Preview and non-live boundary",
+      previewBoundaryDescription:
+        "This page uses seeded profile data only. It does not save edits, issue access codes, or perform real account actions.",
+      roleMatrixDescription:
+        "The seed set shows how individual and organisation profiles can receive referrals, send referrals, or do both while keeping each side of the profile distinct.",
+      directionHelp: {
+        receive:
+          "Receive-side profiles explain how referrers can introduce a person and what helps intake.",
+        send:
+          "Send-side profiles explain what information travels with a referral handover.",
+        both:
+          "Both-direction profiles keep receive and send details separate for each referral conversation.",
+      },
+      fields: {
+        entityType: "Entity type",
+        profileName: "Profile name",
+        referralDirection: "Referral direction",
+        lastUpdated: "Last updated",
+        profileSummary: "Profile summary",
+        serviceAreas: "Service areas",
+        languages: "Languages",
+        referralFitNotes: "Referral fit notes",
+        intakeMethod: "Intake method",
+        responseTime: "Response time",
+        capacityStatus: "Capacity status",
+        handoverRequirements: "Handover requirements",
+        followUpCadence: "Follow-up cadence",
+        consentReminder: "Consent reminder",
+      },
+      tableColumns: {
+        profile: "Profile",
+        entityType: "Entity type",
+        referralDirection: "Referral direction",
+        receiveSide: "Receive side",
+        sendSide: "Send side",
+      },
+      receiveDetailsMissing: "Receive details not yet provided.",
+      receiveNotUsed:
+        "Receive fields are separate and not used for this direction.",
+      sendNotUsed: "Send fields are separate and not used for this direction.",
     },
     health: {
       eyebrow: "Readiness health",
@@ -391,6 +651,43 @@ const referralWorkspaceCopy: Record<Locale, ReferralWorkspaceCopy> = {
       scoreMeaningTitle: "What the score means",
       scoreMeaning:
         "The score reflects communication completeness and clarity only. It is not a provider quality assessment, clinical assessment, compliance assessment, or outcome prediction.",
+      profileBuilder: "Profile builder",
+      materialsPreview: "Materials preview",
+      metrics: {
+        signalsReviewed: {
+          label: "Signals reviewed",
+          detail: "Profile fields checked for communication completeness.",
+        },
+        openIssues: {
+          label: "Open issues",
+          detail: "Gaps sorted by priority for this profile.",
+        },
+        highPriority: {
+          label: "High priority",
+          detail:
+            "Items to address before relying on the profile for referral conversations.",
+        },
+      },
+      nextStepFlowTitle: "Next-step flow",
+      nextStepFlowDescription:
+        "Use the audit to choose what to update, then review preview materials and the access request screen.",
+      nextSteps: {
+        profile: {
+          label: "Profile builder",
+          detail:
+            "Review the self-submitted fields that affect referral communication readiness.",
+        },
+        materials: {
+          label: "Materials preview",
+          detail:
+            "Preview profile copy, share cards, and intake prompts from the current fields.",
+        },
+        access: {
+          label: "Access request",
+          detail:
+            "View the pilot access request state. Submission and guided drafting are not live here.",
+        },
+      },
     },
     materials: {
       eyebrow: "Referral materials",
@@ -403,6 +700,35 @@ const referralWorkspaceCopy: Record<Locale, ReferralWorkspaceCopy> = {
         "Access code mode unlocks guided drafting within quota and pilot limits.",
       noAiCall:
         "No AI call is made in preview-only mode, and no live referral action is sent.",
+      currentModeTitle: "Current materials mode",
+      accessCodeGuidedPreview: "Access-code guided preview",
+      freePreviewWithoutCode: "Free preview without an access code",
+      accessModeDetail:
+        "This demo route uses the approved access state so guided drafting steps, unlocked materials, and quota state are visible.",
+      freeModeDetail:
+        "This route shows the default free state: material previews are visible, while guided drafting remains gated behind an access code.",
+      userApproved: "user-approved",
+      userFree: "user-free",
+      accessCode: "Access code",
+      activeForDemo: "Active for demo",
+      notPresent: "Not present",
+      guidedQuota: "Guided quota",
+      usedDailyQuota: "{used} used / {total} daily",
+      remainingToday: "Remaining today",
+      viewFreePreview: "View free preview",
+      accessRequestPreview: "Access request preview",
+      tryAccessCodeDemo: "Try access-code demo",
+      readinessAudit: "Readiness audit",
+      freePreview: "Free preview",
+      accessDemo: "Access demo",
+      access: "Access",
+      deterministicPreviewTitle: "Deterministic UI preview",
+      guidedReviewBoundary:
+        "Guided steps are visible for access-code review, but users still review and control any future drafted material.",
+      freePreviewBoundary:
+        "Free preview keeps material requirements visible while showing exactly where access-code gating applies.",
+      accessStateBoundary:
+        "Access state does not signal endorsement, certification, clinical review, compliance approval, or any guaranteed referral outcome.",
     },
     access: {
       eyebrow: "Access controls",
@@ -414,6 +740,47 @@ const referralWorkspaceCopy: Record<Locale, ReferralWorkspaceCopy> = {
       costControlTitle: "Cost control",
       costControl:
         "Access gating keeps AI-assisted drafting behind explicit pilot approval and daily usage limits.",
+      materialsDemo: "Materials demo",
+      adminQueue: "Admin queue",
+      costControlItems: [
+        "Control AI cost with a small daily guided drafting quota.",
+        "Reduce abuse, multi-account scraping, and automated extraction of pilot materials.",
+        "Keep the first pilot invite-based until review and support flows are ready for broader access.",
+      ],
+      applicationFieldsTitle: "Application fields",
+      applicationFieldsDescription:
+        "These disabled fields show what the first access-code request could collect for pilot review. They are seeded preview values, not submitted form data.",
+      previewOnlyNoSubmit: "Preview only: no submit",
+      formLabel: "Access code application preview",
+      fields: {
+        profile: "Profile",
+        entityType: "Entity type",
+        referralDirection: "Referral direction",
+        requestedCodeType: "Requested code type",
+        sourceInvite: "Source/invite",
+        expectedDailyQuota: "Expected daily quota",
+        reason: "Reason",
+        abuseCostControlNote: "Abuse and cost control note",
+      },
+      fieldValues: {
+        sourceInvite: "Invite from referral workspace pilot",
+        expectedDailyQuota: "{count} guided drafting actions per day",
+        reason:
+          "Prepare guided referral communication materials from submitted profile details while keeping preview content clearly separate from live generation.",
+        abuseCostControlNote:
+          "Access codes limit guided drafting quota, reduce automated scraping or multi-account abuse, and keep the v0.1 pilot invite-based.",
+      },
+      previewRequestStateTitle: "Preview request state",
+      previewRequestStateDescription:
+        "This page does not create an access request, send email, call OpenAI, or enqueue an admin review. It only previews the first version of the application surface.",
+      disabledButton: "Preview only - request not submitted",
+      viewAccessCodeMaterialsDemo: "View access-code materials demo",
+      openAdminQueue: "Open admin queue",
+      previewDestinationsTitle: "Preview destinations",
+      previewDestinationsDescription:
+        "Use these links to compare the no-code materials preview, the access-code materials demo, and the seeded admin queue without changing live access state.",
+      freeMaterials: "Free materials",
+      accessCodeDemo: "Access-code demo",
     },
     admin: {
       eyebrow: "Pilot admin",
@@ -422,6 +789,76 @@ const referralWorkspaceCopy: Record<Locale, ReferralWorkspaceCopy> = {
         "Review queued access requests, code types, and profile context for the pilot workspace.",
       boundary:
         "Admin review manages pilot access only. CaresLink does not assess provider quality, clinical suitability, compliance status, or service outcomes, and does not provide professional advice.",
+      accessPreview: "Access preview",
+      workspace: "Workspace",
+      metrics: {
+        queued: {
+          label: "Queued",
+          detail: "Requests waiting for access review.",
+        },
+        accessActive: {
+          label: "Access active",
+          detail: "Mock records with access currently active.",
+        },
+        declined: {
+          label: "Declined",
+          detail: "Requests not granted access in the mock queue.",
+        },
+        directionMix: {
+          label: "Direction mix",
+        },
+      },
+      noRequestsInQueue: "No requests in queue.",
+      requestCount: {
+        one: "{count} request",
+        other: "{count} requests",
+      },
+      statusLabels: {
+        queued: "Queued",
+        approved: "Access active",
+        declined: "Declined",
+      },
+      directionLabels: {
+        receive: "Receive referrals",
+        send: "Send referrals",
+        both: "Receive and send referrals",
+      },
+      directionSummaryLabels: {
+        receive: "Receive",
+        send: "Send",
+        both: "Both",
+      },
+      boundaryTitle: "Access review boundary",
+      requestQueueTitle: "Request queue",
+      requestQueueDescription:
+        "Review submitted profile context before any future access decision is applied outside this mock.",
+      requestFrom: "Request {requestId} from {userId}",
+      fields: {
+        userId: "User ID",
+        requestedCodeType: "Requested code type",
+        referralDirection: "Referral direction",
+        requestedTime: "Requested time",
+        noteOrReason: "Note or reason",
+      },
+      reviewAffordancesTitle: "Read-only review affordances",
+      reviewAffordancesDescription:
+        "Disabled preview controls only. No access code, quota change, or notification is produced here.",
+      previewActionTitle:
+        "Preview only. This mock does not change access, quota, codes, or notifications.",
+      previewActions: {
+        approve: "Preview approve",
+        waitlist: "Preview waitlist",
+        decline: "Preview decline",
+      },
+      requestedCodeTypesTitle: "Requested code types",
+      noRequestedCodeTypes: "No requested code types in this queue.",
+      reviewFocusTitle: "Review focus",
+      reviewFocusItems: [
+        "Confirm the requested pilot code type and referral direction.",
+        "Check invite source and expected quota use before access.",
+        "Watch for repeated requests, duplicate users, or multi-account misuse patterns.",
+        "Keep provider quality, outcomes, clinical suitability, and compliance judgments outside this access queue.",
+      ],
     },
     components: {
       basicProfile: {
@@ -895,6 +1332,28 @@ const referralWorkspaceCopy: Record<Locale, ReferralWorkspaceCopy> = {
       routeBlockTitle: "工作区路径暂不可用",
       routeBlockDescription:
         "在转介资料流程准备期间，此试点路径会保持受限。",
+      plannedRoutesTitle: "计划中的工作区路径",
+      plannedRoutesDescription:
+        "这些链接展示资料编辑、准备度审核、引导式材料预览、访问码输入和试点访问管理的预期导航。",
+      adminAccessQueue: "管理访问队列",
+      routes: {
+        profile: {
+          label: "资料",
+          detail: "编辑自行提交的转介沟通字段。",
+        },
+        health: {
+          label: "准备度",
+          detail: "查看完整度信号和优先缺口。",
+        },
+        materials: {
+          label: "材料",
+          detail: "预览分享卡、交接文案和接收提示。",
+        },
+        access: {
+          label: "访问",
+          detail: "申请或输入访问码以使用引导式起草。",
+        },
+      },
     },
     profile: {
       eyebrow: "资料基础",
@@ -907,6 +1366,58 @@ const referralWorkspaceCopy: Record<Locale, ReferralWorkspaceCopy> = {
       sendSection: "发送转介",
       roleMatrixTitle: "转介角色矩阵",
       noPersistence: "此处显示的更改仅供预览，不会保存到实时服务商记录。",
+      builderExample: "构建器示例",
+      builderDescription:
+        "此处使用 Harbour 种子数据展示第一版资料构建器。本切片中的字段为只读，且不会保存更改。",
+      formLabel: "只读转介资料构建器",
+      relevantToProfile: "与此资料相关",
+      notUsedForDirection: "此方向不使用",
+      relevant: "相关",
+      notUsed: "不使用",
+      identityDescription:
+        "设置资料代表的主体、参与转介的方式，以及转介方可阅读的自行提交摘要。",
+      footprintDescription:
+        "记录资料适用地区、提交的语言，以及用于沟通准备度的转介适配说明。",
+      receiveDescription: "接收侧详情与发送侧交接信息保持分开。",
+      sendDescription:
+        "发送侧详情说明外发转介时应携带的信息以及后续跟进方式。",
+      previewBoundaryTitle: "预览和非实时边界",
+      previewBoundaryDescription:
+        "此页面仅使用种子资料数据。它不会保存编辑、发放访问码或执行真实账户操作。",
+      roleMatrixDescription:
+        "种子集合展示个人和机构资料如何接收转介、发送转介或同时执行两者，并保持资料两侧互相区分。",
+      directionHelp: {
+        receive:
+          "接收侧资料说明转介方如何介绍个人，以及哪些信息有助于接收。",
+        send: "发送侧资料说明转介交接时应携带哪些信息。",
+        both: "双向资料会为每一次转介沟通分别保留接收和发送详情。",
+      },
+      fields: {
+        entityType: "主体类型",
+        profileName: "资料名称",
+        referralDirection: "转介方向",
+        lastUpdated: "最后更新",
+        profileSummary: "资料摘要",
+        serviceAreas: "服务范围",
+        languages: "语言",
+        referralFitNotes: "转介适配说明",
+        intakeMethod: "接收方式",
+        responseTime: "回应时间",
+        capacityStatus: "可接收情况",
+        handoverRequirements: "交接要求",
+        followUpCadence: "跟进节奏",
+        consentReminder: "同意提醒",
+      },
+      tableColumns: {
+        profile: "资料",
+        entityType: "主体类型",
+        referralDirection: "转介方向",
+        receiveSide: "接收侧",
+        sendSide: "发送侧",
+      },
+      receiveDetailsMissing: "尚未提供接收详情。",
+      receiveNotUsed: "接收字段单独保留，此方向不使用。",
+      sendNotUsed: "发送字段单独保留，此方向不使用。",
     },
     health: {
       eyebrow: "准备度健康",
@@ -916,6 +1427,40 @@ const referralWorkspaceCopy: Record<Locale, ReferralWorkspaceCopy> = {
       scoreMeaningTitle: "分数含义",
       scoreMeaning:
         "该分数仅反映沟通完整度和清晰度，不是服务商质量评估、临床评估、合规评估或结果预测。",
+      profileBuilder: "资料构建器",
+      materialsPreview: "材料预览",
+      metrics: {
+        signalsReviewed: {
+          label: "已检查信号",
+          detail: "检查资料字段的沟通完整度。",
+        },
+        openIssues: {
+          label: "未解决问题",
+          detail: "按优先级排序的此资料缺口。",
+        },
+        highPriority: {
+          label: "高优先级",
+          detail: "在依赖该资料进行转介沟通前需要处理的项目。",
+        },
+      },
+      nextStepFlowTitle: "下一步流程",
+      nextStepFlowDescription:
+        "使用审核结果选择需要更新的内容，然后查看预览材料和访问申请页面。",
+      nextSteps: {
+        profile: {
+          label: "资料构建器",
+          detail: "查看影响转介沟通准备度的自行提交字段。",
+        },
+        materials: {
+          label: "材料预览",
+          detail: "根据当前字段预览资料文案、分享卡和接收提示。",
+        },
+        access: {
+          label: "访问申请",
+          detail:
+            "查看试点访问申请状态。此处不会进行实时提交或引导式起草。",
+        },
+      },
     },
     materials: {
       eyebrow: "转介材料",
@@ -925,6 +1470,35 @@ const referralWorkspaceCopy: Record<Locale, ReferralWorkspaceCopy> = {
       freeMode: "免费模式显示结构和锁定预览，不调用 AI 起草操作。",
       accessMode: "访问码模式会在配额和试点限制内解锁引导式起草。",
       noAiCall: "仅预览模式不会调用 AI，也不会发送实时转介操作。",
+      currentModeTitle: "当前材料模式",
+      accessCodeGuidedPreview: "访问码引导预览",
+      freePreviewWithoutCode: "无访问码免费预览",
+      accessModeDetail:
+        "此演示路径使用已批准的访问状态，因此可以看到引导式起草步骤、解锁材料和配额状态。",
+      freeModeDetail:
+        "此路径显示默认免费状态：材料预览可见，而引导式起草仍受访问码限制。",
+      userApproved: "已批准用户",
+      userFree: "免费用户",
+      accessCode: "访问码",
+      activeForDemo: "演示中已启用",
+      notPresent: "未提供",
+      guidedQuota: "引导配额",
+      usedDailyQuota: "已用 {used} / 每日 {total}",
+      remainingToday: "今日剩余",
+      viewFreePreview: "查看免费预览",
+      accessRequestPreview: "访问申请预览",
+      tryAccessCodeDemo: "试用访问码演示",
+      readinessAudit: "准备度审核",
+      freePreview: "免费预览",
+      accessDemo: "访问演示",
+      access: "访问",
+      deterministicPreviewTitle: "确定性界面预览",
+      guidedReviewBoundary:
+        "访问码审核可见引导步骤，但未来起草的任何材料仍由用户审核和控制。",
+      freePreviewBoundary:
+        "免费预览会显示材料要求，并明确展示访问码限制的位置。",
+      accessStateBoundary:
+        "访问状态不表示背书、认证、临床审核、合规批准或任何转介结果保证。",
     },
     access: {
       eyebrow: "访问控制",
@@ -934,6 +1508,47 @@ const referralWorkspaceCopy: Record<Locale, ReferralWorkspaceCopy> = {
       costControlTitle: "成本控制",
       costControl:
         "访问门槛会将 AI 辅助起草限制在明确的试点批准和每日使用限制之内。",
+      materialsDemo: "材料演示",
+      adminQueue: "管理队列",
+      costControlItems: [
+        "通过较小的每日引导式起草配额控制 AI 成本。",
+        "减少滥用、多账户抓取和自动化提取试点材料。",
+        "在审核和支持流程准备好之前，保持第一阶段试点为邀请制。",
+      ],
+      applicationFieldsTitle: "申请字段",
+      applicationFieldsDescription:
+        "这些禁用字段展示第一版访问码申请可能为试点审核收集的内容。它们是种子预览值，不是已提交表单数据。",
+      previewOnlyNoSubmit: "仅预览：不提交",
+      formLabel: "访问码申请预览",
+      fields: {
+        profile: "资料",
+        entityType: "主体类型",
+        referralDirection: "转介方向",
+        requestedCodeType: "申请的代码类型",
+        sourceInvite: "来源/邀请",
+        expectedDailyQuota: "预计每日配额",
+        reason: "原因",
+        abuseCostControlNote: "滥用和成本控制说明",
+      },
+      fieldValues: {
+        sourceInvite: "来自转介工作区试点的邀请",
+        expectedDailyQuota: "每日 {count} 次引导式起草操作",
+        reason:
+          "根据已提交的资料详情准备引导式转介沟通材料，同时让预览内容与实时生成保持清晰区分。",
+        abuseCostControlNote:
+          "访问码会限制引导式起草配额，减少自动抓取或多账户滥用，并保持 v0.1 试点为邀请制。",
+      },
+      previewRequestStateTitle: "预览申请状态",
+      previewRequestStateDescription:
+        "此页面不会创建访问申请、发送电子邮件、调用 OpenAI 或加入管理审核队列。它只预览第一版申请界面。",
+      disabledButton: "仅预览 - 申请未提交",
+      viewAccessCodeMaterialsDemo: "查看访问码材料演示",
+      openAdminQueue: "打开管理队列",
+      previewDestinationsTitle: "预览目标",
+      previewDestinationsDescription:
+        "使用这些链接比较无代码材料预览、访问码材料演示和种子管理队列，而不改变实时访问状态。",
+      freeMaterials: "免费材料",
+      accessCodeDemo: "访问码演示",
     },
     admin: {
       eyebrow: "试点管理",
@@ -941,6 +1556,76 @@ const referralWorkspaceCopy: Record<Locale, ReferralWorkspaceCopy> = {
       description: "查看试点工作区中的访问申请、代码类型和资料上下文。",
       boundary:
         "管理审核仅用于试点访问控制。CaresLink 不评估服务商质量、临床适用性、合规状态或服务结果，也不提供专业建议。",
+      accessPreview: "访问预览",
+      workspace: "工作区",
+      metrics: {
+        queued: {
+          label: "排队中",
+          detail: "等待访问审核的申请。",
+        },
+        accessActive: {
+          label: "访问已启用",
+          detail: "当前已启用访问的模拟记录。",
+        },
+        declined: {
+          label: "已拒绝",
+          detail: "模拟队列中未授予访问权限的申请。",
+        },
+        directionMix: {
+          label: "方向组合",
+        },
+      },
+      noRequestsInQueue: "队列中没有申请。",
+      requestCount: {
+        one: "{count} 个申请",
+        other: "{count} 个申请",
+      },
+      statusLabels: {
+        queued: "排队中",
+        approved: "访问已启用",
+        declined: "已拒绝",
+      },
+      directionLabels: {
+        receive: "接收转介",
+        send: "发送转介",
+        both: "接收并发送转介",
+      },
+      directionSummaryLabels: {
+        receive: "接收",
+        send: "发送",
+        both: "双向",
+      },
+      boundaryTitle: "访问审核边界",
+      requestQueueTitle: "申请队列",
+      requestQueueDescription:
+        "在未来于此模拟之外应用任何访问决定前，先查看已提交的资料上下文。",
+      requestFrom: "申请 {requestId}，来自 {userId}",
+      fields: {
+        userId: "用户 ID",
+        requestedCodeType: "申请的代码类型",
+        referralDirection: "转介方向",
+        requestedTime: "申请时间",
+        noteOrReason: "说明或原因",
+      },
+      reviewAffordancesTitle: "只读审核控件",
+      reviewAffordancesDescription:
+        "仅提供禁用的预览控件。此处不会生成访问码、改变配额或发送通知。",
+      previewActionTitle:
+        "仅预览。此模拟不会改变访问、配额、代码或通知。",
+      previewActions: {
+        approve: "预览批准",
+        waitlist: "预览排队",
+        decline: "预览拒绝",
+      },
+      requestedCodeTypesTitle: "申请的代码类型",
+      noRequestedCodeTypes: "此队列中没有申请的代码类型。",
+      reviewFocusTitle: "审核重点",
+      reviewFocusItems: [
+        "确认申请的试点代码类型和转介方向。",
+        "访问前检查邀请来源和预计配额使用。",
+        "留意重复申请、重复用户或多账户滥用模式。",
+        "不要在此访问队列中判断服务商质量、结果、临床适用性或合规性。",
+      ],
     },
     components: {
       basicProfile: {

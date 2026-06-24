@@ -32,50 +32,38 @@ import {
   type ReferralDirection,
   type ReferralProfile,
 } from "@/lib/referral-profile-workspace";
+import {
+  getLocaleFromSearchParams,
+  getReferralWorkspaceCopy,
+  withLocale,
+  type Locale,
+  type ReferralWorkspaceCopy,
+} from "@/lib/referral-workspace-i18n";
 
 type IconComponent = ComponentType<SVGProps<SVGSVGElement>>;
-
-const entityTypeLabels: Record<EntityType, string> = {
-  individual: "Individual",
-  organisation: "Organisation",
+type ProfilePageCopy = ReferralWorkspaceCopy["profile"];
+type ComponentCopy = ReferralWorkspaceCopy["components"];
+type ReferralWorkspaceSearchParams = {
+  [key: string]: string | string[] | undefined;
 };
 
-const directionLabels: Record<ReferralDirection, string> = {
-  receive: "Receives referrals",
-  send: "Sends referrals",
-  both: "Receives and sends referrals",
+type ReferralProfilePageProps = {
+  searchParams?: Promise<ReferralWorkspaceSearchParams>;
 };
-
-const directionHelp: Record<ReferralDirection, string> = {
-  receive:
-    "Receive-side profiles explain how referrers can introduce a person and what helps intake.",
-  send:
-    "Send-side profiles explain what information travels with a referral handover.",
-  both:
-    "Both-direction profiles keep receive and send details separate for each referral conversation.",
-};
-
-const entityOptions = [
-  { value: "individual", label: "Individual" },
-  { value: "organisation", label: "Organisation" },
-];
-
-const directionOptions = [
-  { value: "receive", label: "Receives referrals" },
-  { value: "send", label: "Sends referrals" },
-  { value: "both", label: "Receives and sends referrals" },
-];
 
 function cx(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(" ");
 }
 
-function formatList(items: string[] | undefined) {
-  return items && items.length > 0 ? items.join(", ") : "Not yet provided";
+function formatList(items: string[] | undefined, emptyPlaceholder: string) {
+  return items && items.length > 0 ? items.join(", ") : emptyPlaceholder;
 }
 
-function formatMultilineList(items: string[] | undefined) {
-  return items && items.length > 0 ? items.join("\n") : "Not yet provided";
+function formatMultilineList(
+  items: string[] | undefined,
+  emptyPlaceholder: string,
+) {
+  return items && items.length > 0 ? items.join("\n") : emptyPlaceholder;
 }
 
 function isReceiveRelevant(direction: ReferralDirection) {
@@ -84,6 +72,32 @@ function isReceiveRelevant(direction: ReferralDirection) {
 
 function isSendRelevant(direction: ReferralDirection) {
   return direction === "send" || direction === "both";
+}
+
+function getEntityOptions(copy: ComponentCopy["basicProfile"]) {
+  return [
+    { value: "individual", label: copy.entityLabels.individual },
+    { value: "organisation", label: copy.entityLabels.organisation },
+  ];
+}
+
+function getDirectionOptions(copy: ComponentCopy["basicProfile"]) {
+  return [
+    { value: "receive", label: copy.directionLabels.receive },
+    { value: "send", label: copy.directionLabels.send },
+    { value: "both", label: copy.directionLabels.both },
+  ];
+}
+
+function getLocalizedSummaryDescription(
+  profile: ReferralProfile,
+  copy: ComponentCopy["basicProfile"],
+) {
+  const summary = summarizeProfile(profile);
+
+  return summary.descriptionNeedsReview
+    ? copy.descriptionNeedsReview
+    : summary.description;
 }
 
 function EntityIcon({ entityType }: { entityType: EntityType }) {
@@ -117,10 +131,16 @@ function StatusPill({
   );
 }
 
-function RelevanceBadge({ relevant }: { relevant: boolean }) {
+function RelevanceBadge({
+  relevant,
+  copy,
+}: {
+  relevant: boolean;
+  copy: ProfilePageCopy;
+}) {
   return (
     <StatusPill tone={relevant ? "active" : "inactive"}>
-      {relevant ? "Relevant to this profile" : "Not used for this direction"}
+      {relevant ? copy.relevantToProfile : copy.notUsedForDirection}
     </StatusPill>
   );
 }
@@ -245,10 +265,25 @@ function ReadOnlySelectField({
   );
 }
 
-function ProfileBuilderPanel({ profile }: { profile: ReferralProfile }) {
+function ProfileBuilderPanel({
+  profile,
+  locale,
+  copy,
+}: {
+  profile: ReferralProfile;
+  locale: Locale;
+  copy: ReferralWorkspaceCopy;
+}) {
   const receiveRelevant = isReceiveRelevant(profile.referralDirection);
   const sendRelevant = isSendRelevant(profile.referralDirection);
-  const summaryDescription = summarizeProfile(profile).description;
+  const profileCopy = copy.profile;
+  const componentCopy = copy.components.basicProfile;
+  const summaryDescription = getLocalizedSummaryDescription(
+    profile,
+    componentCopy,
+  );
+  const entityOptions = getEntityOptions(componentCopy);
+  const directionOptions = getDirectionOptions(componentCopy);
 
   return (
     <Card className="p-5">
@@ -256,41 +291,46 @@ function ProfileBuilderPanel({ profile }: { profile: ReferralProfile }) {
         <div className="min-w-0">
           <div className="flex items-center gap-2 text-sm font-semibold text-[#0f766e]">
             <EntityIcon entityType={profile.entityType} />
-            Builder example
+            {profileCopy.builderExample}
           </div>
           <h2 className="mt-2 break-words text-xl font-semibold text-[#17211f]">
             {profile.name}
           </h2>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-[#65736f]">
-            Seeded Harbour data is shown as a first-version profile builder.
-            Fields are read-only in this slice and do not persist changes.
+            {profileCopy.builderDescription}
           </p>
         </div>
-        <StatusPill tone="neutral">Preview only</StatusPill>
+        <StatusPill tone="neutral">{copy.common.previewOnly}</StatusPill>
       </div>
 
-      <div role="form" aria-label="Read-only referral profile builder" className="mt-6 grid gap-6">
+      <div role="form" aria-label={profileCopy.formLabel} className="mt-6 grid gap-6">
         <BuilderSection
           icon={UserRound}
-          title="Identity and profile type"
-          description="Set who the profile represents, how it participates in referrals, and the self-submitted summary referrers can read."
+          title={profileCopy.identitySection}
+          description={profileCopy.identityDescription}
         >
           <div className="grid gap-4 md:grid-cols-2">
             <ReadOnlySelectField
-              label="Entity type"
+              label={profileCopy.fields.entityType}
               value={profile.entityType}
               options={entityOptions}
             />
-            <ReadOnlyTextField label="Profile name" value={profile.name} />
+            <ReadOnlyTextField
+              label={profileCopy.fields.profileName}
+              value={profile.name}
+            />
             <ReadOnlySelectField
-              label="Referral direction"
+              label={profileCopy.fields.referralDirection}
               value={profile.referralDirection}
               options={directionOptions}
             />
-            <ReadOnlyTextField label="Last updated" value={profile.updatedAt} />
+            <ReadOnlyTextField
+              label={profileCopy.fields.lastUpdated}
+              value={profile.updatedAt}
+            />
             <div className="md:col-span-2">
               <ReadOnlyTextAreaField
-                label="Profile summary"
+                label={profileCopy.fields.profileSummary}
                 value={summaryDescription}
               />
             </div>
@@ -299,23 +339,32 @@ function ProfileBuilderPanel({ profile }: { profile: ReferralProfile }) {
 
         <BuilderSection
           icon={MapPin}
-          title="Referral footprint"
-          description="Capture where the profile is relevant, the languages submitted, and the referral fit notes used for communication readiness."
+          title={profileCopy.footprintSection}
+          description={profileCopy.footprintDescription}
         >
           <div className="grid gap-4 lg:grid-cols-3">
             <ReadOnlyTextAreaField
-              label="Service areas"
-              value={formatMultilineList(profile.serviceAreas)}
+              label={profileCopy.fields.serviceAreas}
+              value={formatMultilineList(
+                profile.serviceAreas,
+                componentCopy.emptyPlaceholder,
+              )}
               className="min-h-28"
             />
             <ReadOnlyTextAreaField
-              label="Languages"
-              value={formatMultilineList(profile.languages)}
+              label={profileCopy.fields.languages}
+              value={formatMultilineList(
+                profile.languages,
+                componentCopy.emptyPlaceholder,
+              )}
               className="min-h-28"
             />
             <ReadOnlyTextAreaField
-              label="Referral fit notes"
-              value={formatMultilineList(profile.bestFit)}
+              label={profileCopy.fields.referralFitNotes}
+              value={formatMultilineList(
+                profile.bestFit,
+                componentCopy.emptyPlaceholder,
+              )}
               className="min-h-28"
             />
           </div>
@@ -323,45 +372,60 @@ function ProfileBuilderPanel({ profile }: { profile: ReferralProfile }) {
 
         <BuilderSection
           icon={ClipboardList}
-          title="Receive-referral fields"
-          description="Receive-side details stay separate from send-side handover information."
-          action={<RelevanceBadge relevant={receiveRelevant} />}
+          title={profileCopy.receiveSection}
+          description={profileCopy.receiveDescription}
+          action={<RelevanceBadge relevant={receiveRelevant} copy={profileCopy} />}
         >
           <div className="grid gap-4 lg:grid-cols-3">
             <ReadOnlyTextField
-              label="Intake method"
-              value={profile.receive?.intakeMethod ?? "Not yet provided"}
+              label={profileCopy.fields.intakeMethod}
+              value={
+                profile.receive?.intakeMethod ?? componentCopy.emptyPlaceholder
+              }
             />
             <ReadOnlyTextField
-              label="Response time"
-              value={profile.receive?.responseTime ?? "Not yet provided"}
+              label={profileCopy.fields.responseTime}
+              value={
+                profile.receive?.responseTime ?? componentCopy.emptyPlaceholder
+              }
             />
             <ReadOnlyTextField
-              label="Capacity status"
-              value={profile.receive?.capacityStatus ?? "Not yet provided"}
+              label={profileCopy.fields.capacityStatus}
+              value={
+                profile.receive?.capacityStatus ?? componentCopy.emptyPlaceholder
+              }
             />
           </div>
         </BuilderSection>
 
         <BuilderSection
           icon={Send}
-          title="Send-referral fields"
-          description="Send-side details describe what should travel with an outgoing referral and how follow-up is handled."
-          action={<RelevanceBadge relevant={sendRelevant} />}
+          title={profileCopy.sendSection}
+          description={profileCopy.sendDescription}
+          action={<RelevanceBadge relevant={sendRelevant} copy={profileCopy} />}
         >
           <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
             <ReadOnlyTextAreaField
-              label="Handover requirements"
-              value={formatMultilineList(profile.send?.handoverRequirements)}
+              label={profileCopy.fields.handoverRequirements}
+              value={formatMultilineList(
+                profile.send?.handoverRequirements,
+                componentCopy.emptyPlaceholder,
+              )}
             />
             <div className="grid gap-4">
               <ReadOnlyTextField
-                label="Follow-up cadence"
-                value={profile.send?.followUpCadence ?? "Not yet provided"}
+                label={profileCopy.fields.followUpCadence}
+                value={
+                  profile.send?.followUpCadence ??
+                  componentCopy.emptyPlaceholder
+                }
               />
               <ReadOnlyTextField
-                label="Consent reminder"
-                value={profile.send?.consentReminder ?? "Not yet provided"}
+                label={profileCopy.fields.consentReminder}
+                value={
+                  profile.send?.consentReminder ??
+                  componentCopy.emptyPlaceholder
+                }
               />
             </div>
           </div>
@@ -369,20 +433,19 @@ function ProfileBuilderPanel({ profile }: { profile: ReferralProfile }) {
 
         <BuilderSection
           icon={Eye}
-          title="Preview and non-live boundary"
-          description="This page uses seeded profile data only. It does not save edits, issue access codes, or perform real account actions."
+          title={profileCopy.previewBoundaryTitle}
+          description={profileCopy.previewBoundaryDescription}
         >
           <div className="flex flex-wrap items-start justify-between gap-4 rounded-lg border border-[#dce8e2] bg-[#f8fbfa] p-4">
             <div className="flex max-w-3xl gap-3 text-sm leading-6 text-[#40504b]">
               <Info className="mt-1 size-5 shrink-0 text-[#0f766e]" aria-hidden="true" />
-              <p>
-                Referral profile information is self-submitted and used here
-                for referral communication readiness only. It is not a provider
-                quality, service outcome, clinical, or compliance assessment.
-              </p>
+              <p>{copy.common.trustBoundary}</p>
             </div>
-            <ButtonLink href="/referral-workspace/health" variant="secondary">
-              Continue to readiness audit
+            <ButtonLink
+              href={withLocale("/referral-workspace/health", locale)}
+              variant="secondary"
+            >
+              {copy.common.continueToReadiness}
             </ButtonLink>
           </div>
         </BuilderSection>
@@ -394,32 +457,41 @@ function ProfileBuilderPanel({ profile }: { profile: ReferralProfile }) {
 function RoleState({
   relevant,
   detail,
+  copy,
 }: {
   relevant: boolean;
   detail: string;
+  copy: ProfilePageCopy;
 }) {
   return (
     <div className="grid gap-2">
       <StatusPill tone={relevant ? "active" : "inactive"}>
-        {relevant ? "Relevant" : "Not used"}
+        {relevant ? copy.relevant : copy.notUsed}
       </StatusPill>
       <p className="text-xs leading-5 text-[#65736f]">{detail}</p>
     </div>
   );
 }
 
-function RoleMatrix({ profiles }: { profiles: ReferralProfile[] }) {
+function RoleMatrix({
+  profiles,
+  copy,
+}: {
+  profiles: ReferralProfile[];
+  copy: ReferralWorkspaceCopy;
+}) {
+  const profileCopy = copy.profile;
+  const componentCopy = copy.components.basicProfile;
+
   return (
     <Card className="mt-6 overflow-hidden">
       <div className="border-b border-[#dce8e2] p-5">
         <div className="flex items-center gap-2 text-sm font-semibold text-[#0f766e]">
           <Languages className="size-5" aria-hidden="true" />
-          Profile type and referral role examples
+          {profileCopy.roleMatrixTitle}
         </div>
         <p className="mt-2 max-w-3xl text-sm leading-6 text-[#65736f]">
-          The seed set shows how individual and organisation profiles can
-          receive referrals, send referrals, or do both while keeping each side
-          of the profile distinct.
+          {profileCopy.roleMatrixDescription}
         </p>
       </div>
 
@@ -427,18 +499,29 @@ function RoleMatrix({ profiles }: { profiles: ReferralProfile[] }) {
         <table className="min-w-[820px] divide-y divide-[#dce8e2] text-left text-sm">
           <thead className="bg-[#f8fbfa] text-xs font-semibold text-[#65736f]">
             <tr>
-              <th className="px-5 py-3">Profile</th>
-              <th className="px-5 py-3">Entity type</th>
-              <th className="px-5 py-3">Referral direction</th>
-              <th className="px-5 py-3">Receive side</th>
-              <th className="px-5 py-3">Send side</th>
+              <th className="px-5 py-3">{profileCopy.tableColumns.profile}</th>
+              <th className="px-5 py-3">
+                {profileCopy.tableColumns.entityType}
+              </th>
+              <th className="px-5 py-3">
+                {profileCopy.tableColumns.referralDirection}
+              </th>
+              <th className="px-5 py-3">
+                {profileCopy.tableColumns.receiveSide}
+              </th>
+              <th className="px-5 py-3">
+                {profileCopy.tableColumns.sendSide}
+              </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-[#eef3f1]">
             {profiles.map((profile) => {
               const receiveRelevant = isReceiveRelevant(profile.referralDirection);
               const sendRelevant = isSendRelevant(profile.referralDirection);
-              const summaryDescription = summarizeProfile(profile).description;
+              const summaryDescription = getLocalizedSummaryDescription(
+                profile,
+                componentCopy,
+              );
 
               return (
                 <tr key={profile.id} className="align-top">
@@ -456,35 +539,43 @@ function RoleMatrix({ profiles }: { profiles: ReferralProfile[] }) {
                     </div>
                   </td>
                   <td className="px-5 py-4">
-                    <StatusPill>{entityTypeLabels[profile.entityType]}</StatusPill>
+                    <StatusPill>
+                      {componentCopy.entityLabels[profile.entityType]}
+                    </StatusPill>
                   </td>
                   <td className="px-5 py-4">
                     <div className="grid gap-2">
                       <StatusPill tone="neutral">
-                        {directionLabels[profile.referralDirection]}
+                        {componentCopy.directionLabels[profile.referralDirection]}
                       </StatusPill>
                       <p className="max-w-64 text-xs leading-5 text-[#65736f]">
-                        {directionHelp[profile.referralDirection]}
+                        {profileCopy.directionHelp[profile.referralDirection]}
                       </p>
                     </div>
                   </td>
                   <td className="px-5 py-4">
                     <RoleState
                       relevant={receiveRelevant}
+                      copy={profileCopy}
                       detail={
                         receiveRelevant
-                          ? profile.receive?.intakeMethod ?? "Receive details not yet provided."
-                          : "Receive fields are separate and not used for this direction."
+                          ? profile.receive?.intakeMethod ??
+                            profileCopy.receiveDetailsMissing
+                          : profileCopy.receiveNotUsed
                       }
                     />
                   </td>
                   <td className="px-5 py-4">
                     <RoleState
                       relevant={sendRelevant}
+                      copy={profileCopy}
                       detail={
                         sendRelevant
-                          ? formatList(profile.send?.handoverRequirements)
-                          : "Send fields are separate and not used for this direction."
+                          ? formatList(
+                              profile.send?.handoverRequirements,
+                              componentCopy.emptyPlaceholder,
+                            )
+                          : profileCopy.sendNotUsed
                       }
                     />
                   </td>
@@ -498,23 +589,34 @@ function RoleMatrix({ profiles }: { profiles: ReferralProfile[] }) {
   );
 }
 
-export default function ReferralProfilePage() {
+export default async function ReferralProfilePage({
+  searchParams,
+}: ReferralProfilePageProps) {
+  const params = await searchParams;
+  const locale = getLocaleFromSearchParams(params);
+  const copy = getReferralWorkspaceCopy(locale);
   const primaryProfile = getReferralProfile("profile-harbour");
   const profiles = getSeedReferralProfiles();
 
   return (
-    <AppShell>
+    <AppShell
+      locale={locale}
+      languageSwitcherHref="/referral-workspace/profile"
+    >
       <PageHeader
-        eyebrow="Profile builder preview"
-        title="Referral profile builder"
-        description="A read-only first version of the provider and referral profile builder, using seeded data for identity, direction, receive-side fields, and send-side fields."
+        eyebrow={copy.profile.eyebrow}
+        title={copy.profile.title}
+        description={copy.profile.description}
         actions={
           <>
-            <ButtonLink href="/referral-workspace/health">
-              Continue to readiness audit <ArrowRight className="size-4" />
+            <ButtonLink href={withLocale("/referral-workspace/health", locale)}>
+              {copy.common.continueToReadiness} <ArrowRight className="size-4" />
             </ButtonLink>
-            <ButtonLink href="/referral-workspace" variant="secondary">
-              Workspace
+            <ButtonLink
+              href={withLocale("/referral-workspace", locale)}
+              variant="secondary"
+            >
+              {copy.shell.primaryNav.workspace}
             </ButtonLink>
           </>
         }
@@ -525,25 +627,30 @@ export default function ReferralProfilePage() {
           <Eye className="mt-1 size-5 shrink-0 text-[#0f766e]" aria-hidden="true" />
           <div>
             <p className="text-sm font-semibold text-[#17211f]">
-              Preview-only builder
+              {copy.common.previewOnly}
             </p>
             <p className="mt-1 max-w-4xl text-sm leading-6 text-[#40504b]">
-              Controls are intentionally read-only or disabled. This route does
-              not persist edits, create access codes, check authentication, or
-              perform live referral actions.
+              {copy.profile.noPersistence}
             </p>
           </div>
         </div>
       </Card>
 
       <section className="grid gap-5 xl:grid-cols-[360px_minmax(0,1fr)]">
-        <BasicProfileCard summary={summarizeProfile(primaryProfile)} />
-        <ProfileBuilderPanel profile={primaryProfile} />
+        <BasicProfileCard
+          summary={summarizeProfile(primaryProfile)}
+          locale={locale}
+        />
+        <ProfileBuilderPanel
+          profile={primaryProfile}
+          locale={locale}
+          copy={copy}
+        />
       </section>
 
-      <RoleMatrix profiles={profiles} />
+      <RoleMatrix profiles={profiles} copy={copy} />
 
-      <TrustBoundaryNotice className="mt-6" />
+      <TrustBoundaryNotice className="mt-6" locale={locale} />
     </AppShell>
   );
 }

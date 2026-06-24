@@ -18,6 +18,13 @@ import {
   getReferralProfile,
   type AccessRequest,
 } from "@/lib/referral-profile-workspace";
+import {
+  getLocaleFromSearchParams,
+  getReferralWorkspaceCopy,
+  withLocale,
+  type Locale,
+  type ReferralWorkspaceCopy,
+} from "@/lib/referral-workspace-i18n";
 
 const statusClasses: Record<AccessRequest["status"], string> = {
   queued: "border-[#f4d28f] bg-[#fff7df] text-[#925b00]",
@@ -25,45 +32,49 @@ const statusClasses: Record<AccessRequest["status"], string> = {
   declined: "border-[#c8d5cf] bg-[#eef3f1] text-[#40504b]",
 };
 
-const statusLabels: Record<AccessRequest["status"], string> = {
-  queued: "Queued",
-  approved: "Access active",
-  declined: "Declined",
-};
-
-const directionLabels: Record<AccessRequest["referralDirection"], string> = {
-  receive: "Receive referrals",
-  send: "Send referrals",
-  both: "Receive and send referrals",
-};
-
-const directionSummaryLabels: Record<AccessRequest["referralDirection"], string> = {
-  receive: "Receive",
-  send: "Send",
-  both: "Both",
-};
-
 const previewActions: {
-  label: string;
+  key: keyof ReferralWorkspaceCopy["admin"]["previewActions"];
   icon: LucideIcon;
 }[] = [
-  { label: "Preview approve", icon: CheckCircle2 },
-  { label: "Preview waitlist", icon: Hourglass },
-  { label: "Preview decline", icon: XCircle },
+  { key: "approve", icon: CheckCircle2 },
+  { key: "waitlist", icon: Hourglass },
+  { key: "decline", icon: XCircle },
 ];
 
-const requestedAtFormatter = new Intl.DateTimeFormat("en-AU", {
-  dateStyle: "medium",
-  timeStyle: "short",
-  timeZone: "Australia/Sydney",
-});
+type ReferralWorkspaceSearchParams = {
+  [key: string]: string | string[] | undefined;
+};
 
-function formatRequestedAt(value: string) {
+type AccessRequestsPageProps = {
+  searchParams?: Promise<ReferralWorkspaceSearchParams>;
+};
+
+function formatTemplate(
+  template: string,
+  values: Record<string, string | number>,
+) {
+  return Object.entries(values).reduce(
+    (formatted, [key, value]) =>
+      formatted.replaceAll(`{${key}}`, String(value)),
+    template,
+  );
+}
+
+function formatRequestedAt(value: string, locale: Locale) {
   const requestedAt = new Date(value);
 
   if (Number.isNaN(requestedAt.getTime())) {
     return value;
   }
+
+  const requestedAtFormatter = new Intl.DateTimeFormat(
+    locale === "zh-Hans" ? "zh-CN" : "en-AU",
+    {
+      dateStyle: "medium",
+      timeStyle: "short",
+      timeZone: "Australia/Sydney",
+    },
+  );
 
   return requestedAtFormatter.format(requestedAt);
 }
@@ -79,16 +90,38 @@ function formatCountSummary(values: string[]) {
     .join(", ");
 }
 
-function pluralize(value: number, singular: string, plural = `${singular}s`) {
-  return `${value} ${value === 1 ? singular : plural}`;
+function formatCount(
+  value: number,
+  labels: ReferralWorkspaceCopy["admin"]["requestCount"],
+) {
+  return formatTemplate(value === 1 ? labels.one : labels.other, {
+    count: value,
+  });
 }
 
-function StatusBadge({ status }: { status: AccessRequest["status"] }) {
+function localizedCodeType(
+  codeType: string,
+  copy: ReferralWorkspaceCopy,
+) {
+  const labels = copy.components.accessStatus.codeTypeLabels;
+
+  return Object.prototype.hasOwnProperty.call(labels, codeType)
+    ? labels[codeType as keyof typeof labels]
+    : codeType;
+}
+
+function StatusBadge({
+  status,
+  copy,
+}: {
+  status: AccessRequest["status"];
+  copy: ReferralWorkspaceCopy["admin"];
+}) {
   return (
     <span
       className={`inline-flex min-h-8 items-center rounded-md border px-2.5 py-1 text-xs font-semibold ${statusClasses[status]}`}
     >
-      {statusLabels[status]}
+      {copy.statusLabels[status]}
     </span>
   );
 }
@@ -113,16 +146,18 @@ function RequestField({
 function PreviewActionButton({
   icon: Icon,
   label,
+  title,
 }: {
   icon: LucideIcon;
   label: string;
+  title: string;
 }) {
   return (
     <button
       type="button"
       disabled
       className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-[#cfded8] bg-white px-3 text-sm font-semibold text-[#40504b] opacity-75"
-      title="Preview only. This mock does not change access, quota, codes, or notifications."
+      title={title}
     >
       <Icon className="size-4" aria-hidden="true" />
       {label}
@@ -130,8 +165,17 @@ function PreviewActionButton({
   );
 }
 
-function RequestCard({ request }: { request: AccessRequest }) {
+function RequestCard({
+  request,
+  locale,
+  copy,
+}: {
+  request: AccessRequest;
+  locale: Locale;
+  copy: ReferralWorkspaceCopy;
+}) {
   const profile = getReferralProfile(request.profileId);
+  const adminCopy = copy.admin;
 
   return (
     <Card className="p-5">
@@ -142,30 +186,35 @@ function RequestCard({ request }: { request: AccessRequest }) {
             <span className="break-words">{profile.name}</span>
           </div>
           <p className="mt-2 text-sm leading-6 text-[#65736f]">
-            Request {request.id} from {request.userId}
+            {formatTemplate(adminCopy.requestFrom, {
+              requestId: request.id,
+              userId: request.userId,
+            })}
           </p>
         </div>
-        <StatusBadge status={request.status} />
+        <StatusBadge status={request.status} copy={adminCopy} />
       </div>
 
       <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-        <RequestField label="User ID" value={request.userId} />
+        <RequestField label={adminCopy.fields.userId} value={request.userId} />
         <RequestField
-          label="Requested code type"
-          value={request.requestedCodeType}
+          label={adminCopy.fields.requestedCodeType}
+          value={localizedCodeType(request.requestedCodeType, copy)}
         />
         <RequestField
-          label="Referral direction"
-          value={directionLabels[request.referralDirection]}
+          label={adminCopy.fields.referralDirection}
+          value={adminCopy.directionLabels[request.referralDirection]}
         />
         <RequestField
-          label="Requested time"
-          value={formatRequestedAt(request.requestedAt)}
+          label={adminCopy.fields.requestedTime}
+          value={formatRequestedAt(request.requestedAt, locale)}
         />
       </div>
 
       <div className="mt-4 rounded-lg border border-[#dce8e2] bg-white p-4">
-        <p className="text-xs font-semibold text-[#65736f]">Note or reason</p>
+        <p className="text-xs font-semibold text-[#65736f]">
+          {adminCopy.fields.noteOrReason}
+        </p>
         <p className="mt-2 text-sm leading-6 text-[#40504b]">{request.note}</p>
       </div>
 
@@ -174,19 +223,19 @@ function RequestCard({ request }: { request: AccessRequest }) {
           <div>
             <div className="flex items-center gap-2 text-sm font-semibold text-[#17211f]">
               <Eye className="size-4 text-[#0f766e]" aria-hidden="true" />
-              Read-only review affordances
+              {adminCopy.reviewAffordancesTitle}
             </div>
             <p className="mt-1 text-sm leading-6 text-[#65736f]">
-              Disabled preview controls only. No access code, quota change, or
-              notification is produced here.
+              {adminCopy.reviewAffordancesDescription}
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
             {previewActions.map((action) => (
               <PreviewActionButton
-                key={action.label}
+                key={action.key}
                 icon={action.icon}
-                label={action.label}
+                label={adminCopy.previewActions[action.key]}
+                title={adminCopy.previewActionTitle}
               />
             ))}
           </div>
@@ -196,7 +245,12 @@ function RequestCard({ request }: { request: AccessRequest }) {
   );
 }
 
-export default function AccessRequestsPage() {
+export default async function AccessRequestsPage({
+  searchParams,
+}: AccessRequestsPageProps) {
+  const params = await searchParams;
+  const locale = getLocaleFromSearchParams(params);
+  const copy = getReferralWorkspaceCopy(locale);
   const requests = getAccessRequests();
   const queuedCount = requests.filter(
     (request) => request.status === "queued",
@@ -208,52 +262,60 @@ export default function AccessRequestsPage() {
     (request) => request.status === "declined",
   ).length;
   const codeTypeSummary = formatCountSummary(
-    requests.map((request) => request.requestedCodeType),
+    requests.map((request) => localizedCodeType(request.requestedCodeType, copy)),
   );
   const directionSummary = formatCountSummary(
     requests.map(
-      (request) => directionSummaryLabels[request.referralDirection],
+      (request) => copy.admin.directionSummaryLabels[request.referralDirection],
     ),
   );
 
   return (
-    <AppShell>
+    <AppShell
+      locale={locale}
+      languageSwitcherHref="/admin/access-requests"
+    >
       <PageHeader
-        eyebrow="Read-only admin"
-        title="Access request queue"
-        description="An MVP admin queue for reviewing pilot access-code requests. Review actions, code generation, quota changes, and notifications are not live in this slice."
+        eyebrow={copy.admin.eyebrow}
+        title={copy.admin.title}
+        description={copy.admin.description}
         actions={
           <>
-            <ButtonLink href="/referral-workspace/access" variant="secondary">
-              Access preview
+            <ButtonLink
+              href={withLocale("/referral-workspace/access", locale)}
+              variant="secondary"
+            >
+              {copy.admin.accessPreview}
             </ButtonLink>
-            <ButtonLink href="/referral-workspace">Workspace</ButtonLink>
+            <ButtonLink href={withLocale("/referral-workspace", locale)}>
+              {copy.admin.workspace}
+            </ButtonLink>
           </>
         }
       />
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <MetricCard
-          label="Queued"
+          label={copy.admin.metrics.queued.label}
           value={String(queuedCount)}
-          detail="Requests waiting for access review."
+          detail={copy.admin.metrics.queued.detail}
           tone="amber"
         />
         <MetricCard
-          label="Access active"
+          label={copy.admin.metrics.accessActive.label}
           value={String(accessActiveCount)}
-          detail="Mock records with access currently active."
+          detail={copy.admin.metrics.accessActive.detail}
         />
         <MetricCard
-          label="Declined"
+          label={copy.admin.metrics.declined.label}
           value={String(declinedCount)}
-          detail="Requests not granted access in the mock queue."
+          detail={copy.admin.metrics.declined.detail}
           tone="slate"
         />
         <MetricCard
-          label="Direction mix"
-          value={pluralize(requests.length, "request")}
-          detail={directionSummary || "No requests in queue."}
+          label={copy.admin.metrics.directionMix.label}
+          value={formatCount(requests.length, copy.admin.requestCount)}
+          detail={directionSummary || copy.admin.noRequestsInQueue}
           tone="blue"
         />
       </div>
@@ -266,14 +328,10 @@ export default function AccessRequestsPage() {
           />
           <div>
             <p className="text-sm font-semibold text-[#17211f]">
-              Access review boundary
+              {copy.admin.boundaryTitle}
             </p>
             <p className="mt-1 text-sm leading-6 text-[#40504b]">
-              Admin review controls access-code usage, AI cost exposure, daily
-              quota, invite source, and repeated or multi-account misuse. Queue
-              status describes access workflow only; it does not describe
-              provider quality, service outcomes, clinical suitability, or
-              compliance status.
+              {copy.admin.boundary}
             </p>
           </div>
         </div>
@@ -285,20 +343,24 @@ export default function AccessRequestsPage() {
             <div>
               <div className="flex items-center gap-2 text-sm font-semibold text-[#0f766e]">
                 <ClipboardList className="size-5" aria-hidden="true" />
-                Request queue
+                {copy.admin.requestQueueTitle}
               </div>
               <p className="mt-2 text-sm leading-6 text-[#65736f]">
-                Review submitted profile context before any future access
-                decision is applied outside this mock.
+                {copy.admin.requestQueueDescription}
               </p>
             </div>
             <span className="inline-flex min-h-8 items-center rounded-md border border-[#dce8e2] bg-white px-2.5 py-1 text-xs font-semibold text-[#40504b]">
-              {pluralize(requests.length, "request")}
+              {formatCount(requests.length, copy.admin.requestCount)}
             </span>
           </div>
 
           {requests.map((request) => (
-            <RequestCard key={request.id} request={request} />
+            <RequestCard
+              key={request.id}
+              request={request}
+              locale={locale}
+              copy={copy}
+            />
           ))}
         </section>
 
@@ -306,29 +368,22 @@ export default function AccessRequestsPage() {
           <Card className="p-5">
             <div className="flex items-center gap-2 text-sm font-semibold text-[#0f766e]">
               <KeyRound className="size-5" aria-hidden="true" />
-              Requested code types
+              {copy.admin.requestedCodeTypesTitle}
             </div>
             <p className="mt-3 text-sm leading-6 text-[#40504b]">
-              {codeTypeSummary || "No requested code types in this queue."}
+              {codeTypeSummary || copy.admin.noRequestedCodeTypes}
             </p>
           </Card>
 
           <Card className="p-5">
             <div className="flex items-center gap-2 text-sm font-semibold text-[#0f766e]">
               <SlidersHorizontal className="size-5" aria-hidden="true" />
-              Review focus
+              {copy.admin.reviewFocusTitle}
             </div>
             <ul className="mt-4 grid gap-2 text-sm leading-6 text-[#40504b]">
-              <li>Confirm the requested pilot code type and referral direction.</li>
-              <li>Check invite source and expected quota use before access.</li>
-              <li>
-                Watch for repeated requests, duplicate users, or multi-account
-                misuse patterns.
-              </li>
-              <li>
-                Keep provider quality, outcomes, clinical suitability, and
-                compliance judgments outside this access queue.
-              </li>
+              {copy.admin.reviewFocusItems.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
             </ul>
           </Card>
         </aside>

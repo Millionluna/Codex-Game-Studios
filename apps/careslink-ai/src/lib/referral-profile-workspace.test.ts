@@ -188,9 +188,10 @@ describe("referral profile workspace domain", () => {
       const { default: ReferralProfilePage } = await import(
         "../app/referral-workspace/profile/page"
       );
-      const markup = renderToStaticMarkup(
-        createElement(ReferralProfilePage),
-      ).toLowerCase();
+      const element = await ReferralProfilePage({
+        searchParams: Promise.resolve({}),
+      });
+      const markup = renderToStaticMarkup(element).toLowerCase();
 
       expect(markup).not.toContain("certified");
       expect(markup).not.toContain("recommended provider");

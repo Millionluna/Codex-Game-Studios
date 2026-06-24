@@ -25,8 +25,16 @@ import {
   getReferralProfile,
   summarizeProfile,
 } from "@/lib/referral-profile-workspace";
+import {
+  getLocaleFromSearchParams,
+  getReferralWorkspaceCopy,
+  withLocale,
+  type Locale,
+  type ReferralWorkspaceCopy,
+} from "@/lib/referral-workspace-i18n";
 
 type MaterialsSearchParams = {
+  [key: string]: string | string[] | undefined;
   access?: string | string[];
 };
 
@@ -35,6 +43,17 @@ type ReferralMaterialsPageProps = {
 };
 
 type AccessState = ReturnType<typeof getAccessState>;
+
+function formatTemplate(
+  template: string,
+  values: Record<string, string | number>,
+) {
+  return Object.entries(values).reduce(
+    (formatted, [key, value]) =>
+      formatted.replaceAll(`{${key}}`, String(value)),
+    template,
+  );
+}
 
 function firstParam(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value;
@@ -47,9 +66,13 @@ function hasDemoAccessCode(searchParams: MaterialsSearchParams | undefined) {
 function ModeStatusCard({
   accessState,
   hasDemoAccess,
+  locale,
+  copy,
 }: {
   accessState: AccessState;
   hasDemoAccess: boolean;
+  locale: Locale;
+  copy: ReferralWorkspaceCopy["materials"];
 }) {
   const remainingQuota = Math.max(
     0,
@@ -66,17 +89,15 @@ function ModeStatusCard({
             ) : (
               <LockKeyhole className="size-5" aria-hidden="true" />
             )}
-            Current materials mode
+            {copy.currentModeTitle}
           </div>
           <h2 className="mt-3 text-xl font-semibold text-[#17211f]">
             {hasDemoAccess
-              ? "Access-code guided preview"
-              : "Free preview without an access code"}
+              ? copy.accessCodeGuidedPreview
+              : copy.freePreviewWithoutCode}
           </h2>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-[#65736f]">
-            {hasDemoAccess
-              ? "This demo route uses the approved access state so guided drafting steps, unlocked materials, and quota state are visible."
-              : "This route shows the default free state: material previews are visible, while guided drafting remains gated behind an access code."}
+            {hasDemoAccess ? copy.accessModeDetail : copy.freeModeDetail}
           </p>
         </div>
         <span
@@ -86,25 +107,28 @@ function ModeStatusCard({
               : "border-[#f4d28f] bg-[#fff7df] text-[#925b00]"
           }`}
         >
-          {hasDemoAccess ? "user-approved" : "user-free"}
+          {hasDemoAccess ? copy.userApproved : copy.userFree}
         </span>
       </div>
 
       <div className="mt-5 grid gap-3 md:grid-cols-3">
         <div className="rounded-lg border border-[#dce8e2] bg-[#f8fbfa] p-3">
-          <p className="text-xs font-semibold text-[#65736f]">Access code</p>
+          <p className="text-xs font-semibold text-[#65736f]">{copy.accessCode}</p>
           <p className="mt-1 text-sm font-semibold text-[#17211f]">
-            {accessState.hasAccessCode ? "Active for demo" : "Not present"}
+            {accessState.hasAccessCode ? copy.activeForDemo : copy.notPresent}
           </p>
         </div>
         <div className="rounded-lg border border-[#dce8e2] bg-[#f8fbfa] p-3">
-          <p className="text-xs font-semibold text-[#65736f]">Guided quota</p>
+          <p className="text-xs font-semibold text-[#65736f]">{copy.guidedQuota}</p>
           <p className="mt-1 text-sm font-semibold text-[#17211f]">
-            {accessState.usedToday} used / {accessState.dailyQuota} daily
+            {formatTemplate(copy.usedDailyQuota, {
+              used: accessState.usedToday,
+              total: accessState.dailyQuota,
+            })}
           </p>
         </div>
         <div className="rounded-lg border border-[#dce8e2] bg-[#f8fbfa] p-3">
-          <p className="text-xs font-semibold text-[#65736f]">Remaining today</p>
+          <p className="text-xs font-semibold text-[#65736f]">{copy.remainingToday}</p>
           <p className="mt-1 text-sm font-semibold text-[#17211f]">
             {remainingQuota}
           </p>
@@ -114,23 +138,30 @@ function ModeStatusCard({
       <div className="mt-5 flex flex-wrap gap-3">
         {hasDemoAccess ? (
           <>
-            <ButtonLink href="/referral-workspace/materials" variant="secondary">
-              View free preview
+            <ButtonLink
+              href={withLocale("/referral-workspace/materials", locale)}
+              variant="secondary"
+            >
+              {copy.viewFreePreview}
             </ButtonLink>
-            <ButtonLink href="/referral-workspace/access">
-              Access request preview
+            <ButtonLink href={withLocale("/referral-workspace/access", locale)}>
+              {copy.accessRequestPreview}
             </ButtonLink>
           </>
         ) : (
           <>
-            <ButtonLink href="/referral-workspace/access">
-              Request access <ArrowRight className="size-4" />
+            <ButtonLink href={withLocale("/referral-workspace/access", locale)}>
+              {getReferralWorkspaceCopy(locale).workspace.requestAccess}{" "}
+              <ArrowRight className="size-4" />
             </ButtonLink>
             <ButtonLink
-              href="/referral-workspace/materials?access=code"
+              href={withLocale(
+                "/referral-workspace/materials?access=code",
+                locale,
+              )}
               variant="secondary"
             >
-              Try access-code demo
+              {copy.tryAccessCodeDemo}
             </ButtonLink>
           </>
         )}
@@ -141,14 +172,16 @@ function ModeStatusCard({
 
 function DeterministicPreviewNotice({
   hasDemoAccess,
+  copy,
 }: {
   hasDemoAccess: boolean;
+  copy: ReferralWorkspaceCopy["materials"];
 }) {
   return (
     <Card className="p-5">
       <div className="flex items-center gap-2 text-sm font-semibold text-[#0f766e]">
         <ShieldCheck className="size-5" aria-hidden="true" />
-        Deterministic UI preview
+        {copy.deterministicPreviewTitle}
       </div>
       <div className="mt-4 grid gap-3">
         <div className="flex gap-3 rounded-lg border border-[#dce8e2] bg-[#f8fbfa] p-3">
@@ -157,9 +190,7 @@ function DeterministicPreviewNotice({
             aria-hidden="true"
           />
           <p className="text-sm leading-6 text-[#40504b]">
-            No OpenAI API call, generation, submission, or live drafting action
-            is running in this slice. The text shown here is seeded,
-            deterministic interface content.
+            {copy.noAiCall}
           </p>
         </div>
         <div className="flex gap-3 rounded-lg border border-[#dce8e2] bg-[#f8fbfa] p-3">
@@ -169,8 +200,8 @@ function DeterministicPreviewNotice({
           />
           <p className="text-sm leading-6 text-[#40504b]">
             {hasDemoAccess
-              ? "Guided steps are visible for access-code review, but users still review and control any future drafted material."
-              : "Free preview keeps material requirements visible while showing exactly where access-code gating applies."}
+              ? copy.guidedReviewBoundary
+              : copy.freePreviewBoundary}
           </p>
         </div>
         <div className="flex gap-3 rounded-lg border border-[#dce8e2] bg-[#f8fbfa] p-3">
@@ -179,8 +210,7 @@ function DeterministicPreviewNotice({
             aria-hidden="true"
           />
           <p className="text-sm leading-6 text-[#40504b]">
-            Access state does not signal endorsement, certification, clinical
-            review, compliance approval, or any guaranteed referral outcome.
+            {copy.accessStateBoundary}
           </p>
         </div>
       </div>
@@ -191,8 +221,10 @@ function DeterministicPreviewNotice({
 export default async function ReferralMaterialsPage({
   searchParams,
 }: ReferralMaterialsPageProps) {
-  const resolvedSearchParams = await searchParams;
-  const hasDemoAccess = hasDemoAccessCode(resolvedSearchParams);
+  const params = await searchParams;
+  const locale = getLocaleFromSearchParams(params);
+  const copy = getReferralWorkspaceCopy(locale);
+  const hasDemoAccess = hasDemoAccessCode(params);
   const profile = getReferralProfile("profile-alex-lee");
   const accessState = getAccessState(
     hasDemoAccess ? "user-approved" : "user-free",
@@ -201,36 +233,49 @@ export default async function ReferralMaterialsPage({
   const audit = getHealthAudit(profile);
   const queue = getAgentQueueForAccess(accessState);
   const materials = getLockedMaterials(profile.referralDirection, accessState);
+  const languageSwitcherHref = hasDemoAccess
+    ? "/referral-workspace/materials?access=code"
+    : "/referral-workspace/materials";
 
   return (
-    <AppShell>
+    <AppShell
+      locale={locale}
+      languageSwitcherHref={languageSwitcherHref}
+    >
       <PageHeader
-        eyebrow={hasDemoAccess ? "Materials demo access" : "Materials free preview"}
-        title="Guided referral materials"
-        description={
-          hasDemoAccess
-            ? "Access-code demo mode shows guided drafting availability, unlocked materials, and quota state without running live generation."
-            : "Free mode shows material previews, gated guided drafting, and a clear path to the access-code application preview."
-        }
+        eyebrow={copy.materials.eyebrow}
+        title={copy.materials.title}
+        description={`${copy.materials.description} ${
+          hasDemoAccess ? copy.materials.accessMode : copy.materials.freeMode
+        }`}
         actions={
           <>
-            <ButtonLink href="/referral-workspace/health" variant="secondary">
-              Readiness audit
+            <ButtonLink
+              href={withLocale("/referral-workspace/health", locale)}
+              variant="secondary"
+            >
+              {copy.materials.readinessAudit}
             </ButtonLink>
             {hasDemoAccess ? (
-              <ButtonLink href="/referral-workspace/materials" variant="secondary">
-                Free preview
+              <ButtonLink
+                href={withLocale("/referral-workspace/materials", locale)}
+                variant="secondary"
+              >
+                {copy.materials.freePreview}
               </ButtonLink>
             ) : (
               <ButtonLink
-                href="/referral-workspace/materials?access=code"
+                href={withLocale(
+                  "/referral-workspace/materials?access=code",
+                  locale,
+                )}
                 variant="secondary"
               >
-                Access demo
+                {copy.materials.accessDemo}
               </ButtonLink>
             )}
-            <ButtonLink href="/referral-workspace/access">
-              Access <ArrowRight className="size-4" />
+            <ButtonLink href={withLocale("/referral-workspace/access", locale)}>
+              {copy.materials.access} <ArrowRight className="size-4" />
             </ButtonLink>
           </>
         }
@@ -240,28 +285,42 @@ export default async function ReferralMaterialsPage({
         <ModeStatusCard
           accessState={accessState}
           hasDemoAccess={hasDemoAccess}
+          locale={locale}
+          copy={copy.materials}
         />
-        <DeterministicPreviewNotice hasDemoAccess={hasDemoAccess} />
+        <DeterministicPreviewNotice
+          hasDemoAccess={hasDemoAccess}
+          copy={copy.materials}
+        />
       </div>
 
       <div className="mt-6 grid gap-5 xl:grid-cols-[minmax(0,1fr)_420px]">
         <div className="grid gap-5">
-          <AccessStatusPanel accessState={accessState} />
-          <AgentQueuePanel queue={queue} accessState={accessState} />
+          <AccessStatusPanel accessState={accessState} locale={locale} />
+          <AgentQueuePanel
+            queue={queue}
+            accessState={accessState}
+            locale={locale}
+          />
         </div>
         <GuidedCopilotPanel
           accessState={accessState}
           queue={queue}
           summary={summary}
           audit={audit}
+          locale={locale}
         />
       </div>
 
       <section className="mt-6">
-        <LockedMaterialsGrid materials={materials} accessState={accessState} />
+        <LockedMaterialsGrid
+          materials={materials}
+          accessState={accessState}
+          locale={locale}
+        />
       </section>
 
-      <TrustBoundaryNotice className="mt-6" />
+      <TrustBoundaryNotice className="mt-6" locale={locale} />
     </AppShell>
   );
 }
