@@ -547,6 +547,8 @@ function cloneProfile(profile: ReferralProfile): ReferralProfile {
 }
 
 function buildHealthSignals(profile: ReferralProfile): HealthSignalAssessment[] {
+  const readabilityDetail = getReadabilityDetail(profile.summary);
+
   return [
     signal(
       "entity_type",
@@ -606,7 +608,7 @@ function buildHealthSignals(profile: ReferralProfile): HealthSignalAssessment[] 
       "profile_readability",
       "Profile readability",
       readabilityState(profile.summary),
-      "Keeps the public profile clear without implying provider quality.",
+      readabilityDetail,
     ),
   ];
 }
@@ -674,6 +676,20 @@ function issueForSignal(assessment: HealthSignalAssessment): HealthIssue {
         : "Handover requirements need detail",
       guidance:
         "List the information needed before a referral can be introduced.",
+    };
+  }
+
+  if (signalItem.id === "profile_readability") {
+    return {
+      id: isMissing ? "missing_profile_readability" : "partial_profile_readability",
+      label: "Profile readability",
+      signalId: signalItem.id,
+      priority: isMissing ? "high" : "warning",
+      recommendation: signalItem.detail,
+      title: isMissing
+        ? "Profile summary needs review"
+        : "Profile summary needs detail",
+      guidance: signalItem.detail,
     };
   }
 
@@ -813,6 +829,10 @@ function responseTimeState(value: string | undefined): SignalScoreState {
 function readabilityState(summary: string): SignalScoreState {
   const text = summary.trim();
 
+  if (getUnsafeClaimReason(text)) {
+    return "missing";
+  }
+
   if (text.length >= 120) {
     return "complete";
   }
@@ -822,6 +842,14 @@ function readabilityState(summary: string): SignalScoreState {
   }
 
   return "missing";
+}
+
+function getReadabilityDetail(summary: string) {
+  if (getUnsafeClaimReason(summary)) {
+    return "Revise the self-submitted profile summary to remove claims that suggest verification, endorsement, outcomes, clinical suitability, or compliance status.";
+  }
+
+  return "Add clear self-submitted profile summary text for referral communication context.";
 }
 
 function isEntityType(value: string): value is EntityType {

@@ -248,6 +248,7 @@ function ReadOnlySelectField({
 function ProfileBuilderPanel({ profile }: { profile: ReferralProfile }) {
   const receiveRelevant = isReceiveRelevant(profile.referralDirection);
   const sendRelevant = isSendRelevant(profile.referralDirection);
+  const summaryDescription = summarizeProfile(profile).description;
 
   return (
     <Card className="p-5">
@@ -290,7 +291,7 @@ function ProfileBuilderPanel({ profile }: { profile: ReferralProfile }) {
             <div className="md:col-span-2">
               <ReadOnlyTextAreaField
                 label="Profile summary"
-                value={profile.summary}
+                value={summaryDescription}
               />
             </div>
           </div>
@@ -437,6 +438,7 @@ function RoleMatrix({ profiles }: { profiles: ReferralProfile[] }) {
             {profiles.map((profile) => {
               const receiveRelevant = isReceiveRelevant(profile.referralDirection);
               const sendRelevant = isSendRelevant(profile.referralDirection);
+              const summaryDescription = summarizeProfile(profile).description;
 
               return (
                 <tr key={profile.id} className="align-top">
@@ -448,7 +450,7 @@ function RoleMatrix({ profiles }: { profiles: ReferralProfile[] }) {
                           {profile.name}
                         </p>
                         <p className="mt-1 max-w-72 text-xs leading-5 text-[#65736f]">
-                          {profile.summary}
+                          {summaryDescription}
                         </p>
                       </div>
                     </div>

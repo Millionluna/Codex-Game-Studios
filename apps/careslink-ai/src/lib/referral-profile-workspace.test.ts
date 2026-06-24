@@ -6,6 +6,13 @@ vi.mock("../components/ui", async () => {
   const React = await import("react");
 
   return {
+    ButtonLink: ({
+      href,
+      children,
+    }: {
+      href: string;
+      children: ReactNode;
+    }) => React.createElement("a", { href }, children),
     Card: ({
       children,
       className = "",
@@ -13,6 +20,17 @@ vi.mock("../components/ui", async () => {
       children: ReactNode;
       className?: string;
     }) => React.createElement("section", { className }, children),
+    FieldLabel: ({ children }: { children: ReactNode }) =>
+      React.createElement("label", null, children),
+    SelectInput: ({
+      children,
+      ...props
+    }: React.SelectHTMLAttributes<HTMLSelectElement>) =>
+      React.createElement("select", props, children),
+    TextArea: (props: React.TextareaHTMLAttributes<HTMLTextAreaElement>) =>
+      React.createElement("textarea", props),
+    TextInput: (props: React.InputHTMLAttributes<HTMLInputElement>) =>
+      React.createElement("input", props),
   };
 });
 
@@ -108,6 +126,80 @@ describe("referral profile workspace domain", () => {
     expect(markup).toContain("profile summary needs review");
   });
 
+  it("renders the profile page without unsafe self-submitted summary claims", async () => {
+    const unsafeSummary =
+      "We are a certified recommended provider for older adults comparing care options.";
+
+    vi.resetModules();
+    vi.doMock("@/components/app-shell", async () => {
+      const React = await import("react");
+
+      return {
+        AppShell: ({ children }: { children: ReactNode }) =>
+          React.createElement("main", null, children),
+      };
+    });
+    vi.doMock("@/components/page-header", async () => {
+      const React = await import("react");
+
+      return {
+        PageHeader: ({
+          title,
+          description,
+          actions,
+        }: {
+          title: string;
+          description?: string;
+          actions?: ReactNode;
+        }) =>
+          React.createElement(
+            "header",
+            null,
+            React.createElement("h1", null, title),
+            description ? React.createElement("p", null, description) : null,
+            actions,
+          ),
+      };
+    });
+    vi.doMock("@/components/referral-profile-workspace", async () =>
+      import("../components/referral-profile-workspace")
+    );
+    vi.doMock("@/components/ui", async () => import("../components/ui"));
+    vi.doMock("@/lib/referral-profile-workspace", async () => {
+      const actual = await import("./referral-profile-workspace");
+      const unsafeProfile = {
+        ...actual.getSeedReferralProfiles()[0],
+        summary: unsafeSummary,
+      };
+
+      return {
+        ...actual,
+        getReferralProfile: () => unsafeProfile,
+        getSeedReferralProfiles: () => [unsafeProfile],
+      };
+    });
+
+    try {
+      const { default: ReferralProfilePage } = await import(
+        "../app/referral-workspace/profile/page"
+      );
+      const markup = renderToStaticMarkup(
+        createElement(ReferralProfilePage),
+      ).toLowerCase();
+
+      expect(markup).not.toContain("certified");
+      expect(markup).not.toContain("recommended provider");
+      expect(markup).toContain("profile summary needs review");
+    } finally {
+      vi.doUnmock("@/components/app-shell");
+      vi.doUnmock("@/components/page-header");
+      vi.doUnmock("@/components/referral-profile-workspace");
+      vi.doUnmock("@/components/ui");
+      vi.doUnmock("@/lib/referral-profile-workspace");
+      vi.resetModules();
+    }
+  });
+
   it("scores a both-mode profile and keeps receive/send sections separate", () => {
     const profile = getSeedReferralProfiles()[0];
     const audit = getHealthAudit(profile);
@@ -139,6 +231,36 @@ describe("referral profile workspace domain", () => {
       label: expect.any(String),
       recommendation: expect.any(String),
     });
+  });
+
+  it("flags unsafe long summary copy instead of awarding full readability points", () => {
+    const profile = {
+      ...getSeedReferralProfiles()[0],
+      summary:
+        "We are a certified recommended provider for older adults comparing care options, with a complete profile that includes broad context for referrers and families.",
+    };
+    const audit = getHealthAudit(profile);
+    const readabilitySignal = audit.signals.find(
+      (signal) => signal.id === "profile_readability",
+    );
+    const readabilityIssue = audit.issues.find(
+      (issue) => issue.signalId === "profile_readability",
+    );
+
+    expect(readabilitySignal).toMatchObject({
+      status: expect.not.stringMatching(/^good$/),
+    });
+    expect(readabilitySignal?.points).toBeLessThan(10);
+    expect(readabilityIssue).toMatchObject({
+      priority: expect.stringMatching(/^(high|warning)$/),
+      recommendation: expect.any(String),
+    });
+    expect(readabilityIssue?.recommendation.toLowerCase()).not.toContain(
+      "provider quality assessment",
+    );
+    expect(readabilityIssue?.recommendation.toLowerCase()).not.toContain(
+      "compliance assessment",
+    );
   });
 
   it("labels partial capacity status as a warning instead of a missing high-priority issue", () => {
