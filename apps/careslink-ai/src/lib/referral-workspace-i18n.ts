@@ -95,6 +95,117 @@ export type ReferralWorkspaceCopy = {
     readonly description: string;
     readonly boundary: string;
   };
+  readonly components: {
+    readonly healthScore: {
+      readonly heading: string;
+    };
+    readonly healthSignals: {
+      readonly heading: string;
+      readonly description: string;
+      readonly columns: {
+        readonly signal: string;
+        readonly detail: string;
+        readonly points: string;
+        readonly status: string;
+      };
+      readonly statusLabels: {
+        readonly good: string;
+        readonly warning: string;
+        readonly high: string;
+      };
+    };
+    readonly topIssues: {
+      readonly heading: string;
+      readonly description: string;
+      readonly countLabel: {
+        readonly one: string;
+        readonly other: string;
+      };
+      readonly priorityLabels: {
+        readonly high: string;
+        readonly warning: string;
+      };
+      readonly emptyTitle: string;
+      readonly emptyDetail: string;
+    };
+    readonly materialsGrid: {
+      readonly heading: string;
+      readonly description: string;
+      readonly guidedAvailable: string;
+      readonly readyMessage: string;
+      readonly noMaterialsTitle: string;
+      readonly noMaterialsDetail: string;
+      readonly directionLabels: {
+        readonly receive: string;
+        readonly send: string;
+      };
+      readonly lockedStatusLabels: {
+        readonly quotaUsed: string;
+        readonly waitlist: string;
+        readonly accessRequired: string;
+      };
+      readonly lockedMessages: {
+        readonly quotaUsed: string;
+        readonly waitlist: string;
+        readonly accessRequired: string;
+      };
+    };
+    readonly agentQueue: {
+      readonly heading: string;
+      readonly description: string;
+      readonly readyLabel: string;
+      readonly lockedBadgeLabels: {
+        readonly quotaUsed: string;
+        readonly queued: string;
+        readonly accessCode: string;
+      };
+    };
+    readonly accessStatus: {
+      readonly heading: string;
+      readonly states: {
+        readonly active: {
+          readonly label: string;
+          readonly detail: string;
+        };
+        readonly quotaUsed: {
+          readonly label: string;
+          readonly detail: string;
+        };
+        readonly waitlist: {
+          readonly label: string;
+          readonly detail: string;
+        };
+        readonly free: {
+          readonly label: string;
+          readonly detail: string;
+        };
+      };
+      readonly accessCodeLabel: string;
+      readonly present: string;
+      readonly notPresent: string;
+      readonly usedToday: string;
+      readonly remaining: string;
+      readonly dailyGuidedQuota: string;
+    };
+    readonly copilot: {
+      readonly heading: string;
+      readonly description: string;
+      readonly profileContextLabel: string;
+      readonly readinessContextLabel: string;
+      readonly guidedStepLabel: string;
+      readonly previewStepLabel: string;
+      readonly accessBoundaryLabel: string;
+      readonly noProfileContext: string;
+      readonly readinessScore: string;
+      readonly noQueueItem: string;
+      readonly draftingPromptReady: string;
+      readonly boundaryMessages: {
+        readonly quotaUsed: string;
+        readonly waitlist: string;
+        readonly accessRequired: string;
+      };
+    };
+  };
 };
 
 const localeLabels: Record<Locale, string> = {
@@ -203,6 +314,133 @@ const referralWorkspaceCopy: Record<Locale, ReferralWorkspaceCopy> = {
       boundary:
         "Admin review manages pilot access only. CaresLink does not assess provider quality, clinical suitability, compliance status, or service outcomes, and does not provide professional advice.",
     },
+    components: {
+      healthScore: {
+        heading: "Referral communication score",
+      },
+      healthSignals: {
+        heading: "Readiness signals",
+        description:
+          "Field-level signals for referral communication completeness.",
+        columns: {
+          signal: "Signal",
+          detail: "Detail",
+          points: "Points",
+          status: "Status",
+        },
+        statusLabels: {
+          good: "Complete",
+          warning: "Needs detail",
+          high: "Missing",
+        },
+      },
+      topIssues: {
+        heading: "Top issues",
+        description:
+          "Prioritized gaps in the referral communication profile.",
+        countLabel: {
+          one: "1 item",
+          other: "{count} items",
+        },
+        priorityLabels: {
+          high: "High priority",
+          warning: "Needs detail",
+        },
+        emptyTitle: "No priority issues",
+        emptyDetail:
+          "This audit did not find priority communication gaps in the current profile.",
+      },
+      materialsGrid: {
+        heading: "Guided materials",
+        description:
+          "Preview text remains visible when guided drafting is locked.",
+        guidedAvailable: "Guided drafting available",
+        readyMessage:
+          "Ready for guided drafting from submitted profile details.",
+        noMaterialsTitle: "No materials configured",
+        noMaterialsDetail:
+          "Materials appear here when a receive or send direction is available for the profile.",
+        directionLabels: {
+          receive: "Receive",
+          send: "Send",
+        },
+        lockedStatusLabels: {
+          quotaUsed: "Quota used today",
+          waitlist: "Access request queued",
+          accessRequired: "Access code required",
+        },
+        lockedMessages: {
+          quotaUsed: "Daily guided quota used. Preview remains visible.",
+          waitlist:
+            "Access request queued. Preview remains visible while the request is pending.",
+          accessRequired: "Access code required for guided materials.",
+        },
+      },
+      agentQueue: {
+        heading: "Agent queue",
+        description:
+          "Guided steps are based on submitted profile fields and access state.",
+        readyLabel: "Ready",
+        lockedBadgeLabels: {
+          quotaUsed: "Quota used",
+          queued: "Queued",
+          accessCode: "Access code",
+        },
+      },
+      accessStatus: {
+        heading: "Access status",
+        states: {
+          active: {
+            label: "Access code active",
+            detail:
+              "Guided materials are available while daily quota remains.",
+          },
+          quotaUsed: {
+            label: "Quota used today",
+            detail:
+              "Preview materials remain visible. Guided drafting unlocks again with available quota.",
+          },
+          waitlist: {
+            label: "Access request queued",
+            detail:
+              "Preview materials remain visible until an access code is active.",
+          },
+          free: {
+            label: "Free preview",
+            detail:
+              "Preview materials are visible. Guided drafting requires an access code.",
+          },
+        },
+        accessCodeLabel: "Access code",
+        present: "Present",
+        notPresent: "Not present",
+        usedToday: "Used today",
+        remaining: "Remaining",
+        dailyGuidedQuota: "Daily guided quota",
+      },
+      copilot: {
+        heading: "Guided copilot",
+        description: "Right-side workspace for profile drafting prompts.",
+        profileContextLabel: "Profile context",
+        readinessContextLabel: "Readiness context",
+        guidedStepLabel: "Guided step",
+        previewStepLabel: "Preview step",
+        accessBoundaryLabel: "Access boundary",
+        noProfileContext: "Select a profile to show submitted referral context.",
+        readinessScore: "Current score is {score} out of 100.",
+        noQueueItem:
+          "Queue items appear here when a guided workflow is configured.",
+        draftingPromptReady: "Drafting prompt ready",
+        boundaryMessages: {
+          quotaUsed:
+            "Daily guided quota used. Preview materials remain visible.",
+          waitlist:
+            "Access request queued. Preview materials remain visible while the request is pending.",
+          accessRequired:
+            "Access code required before guided drafting is available. Preview materials remain visible.",
+        },
+      },
+    },
   },
   "zh-Hans": {
     common: {
@@ -296,6 +534,121 @@ const referralWorkspaceCopy: Record<Locale, ReferralWorkspaceCopy> = {
       description: "查看试点工作区中的访问申请、代码类型和资料上下文。",
       boundary:
         "管理审核仅用于试点访问控制。CaresLink 不评估服务商质量、临床适用性、合规状态或服务结果，也不提供专业建议。",
+    },
+    components: {
+      healthScore: {
+        heading: "转介沟通分数",
+      },
+      healthSignals: {
+        heading: "准备度信号",
+        description: "字段级信号用于查看转介沟通资料的完整度。",
+        columns: {
+          signal: "信号",
+          detail: "详情",
+          points: "分数",
+          status: "状态",
+        },
+        statusLabels: {
+          good: "完整",
+          warning: "需要补充",
+          high: "缺失",
+        },
+      },
+      topIssues: {
+        heading: "重点问题",
+        description: "转介沟通资料中的优先缺口。",
+        countLabel: {
+          one: "{count} 项",
+          other: "{count} 项",
+        },
+        priorityLabels: {
+          high: "高优先级",
+          warning: "需要补充",
+        },
+        emptyTitle: "暂无重点问题",
+        emptyDetail: "当前资料审核未发现重点沟通缺口。",
+      },
+      materialsGrid: {
+        heading: "引导式材料",
+        description: "引导式起草锁定时，预览文字仍可查看。",
+        guidedAvailable: "可使用引导式起草",
+        readyMessage: "可根据已提交的资料详情进行引导式起草。",
+        noMaterialsTitle: "未配置材料",
+        noMaterialsDetail:
+          "当资料包含接收或发送方向时，材料会显示在这里。",
+        directionLabels: {
+          receive: "接收",
+          send: "发送",
+        },
+        lockedStatusLabels: {
+          quotaUsed: "今日配额已用完",
+          waitlist: "访问申请排队中",
+          accessRequired: "需要访问码",
+        },
+        lockedMessages: {
+          quotaUsed: "今日引导式配额已用完。预览仍可查看。",
+          waitlist: "访问申请排队中。申请待处理期间预览仍可查看。",
+          accessRequired: "需要访问码才能使用引导式材料。",
+        },
+      },
+      agentQueue: {
+        heading: "智能队列",
+        description: "引导步骤基于已提交的资料字段和访问状态。",
+        readyLabel: "就绪",
+        lockedBadgeLabels: {
+          quotaUsed: "配额已用完",
+          queued: "排队中",
+          accessCode: "访问码",
+        },
+      },
+      accessStatus: {
+        heading: "访问状态",
+        states: {
+          active: {
+            label: "访问码已启用",
+            detail: "每日配额仍可用时，引导式材料可用。",
+          },
+          quotaUsed: {
+            label: "今日配额已用完",
+            detail:
+              "预览材料仍可查看。配额可用后将再次解锁引导式起草。",
+          },
+          waitlist: {
+            label: "访问申请排队中",
+            detail: "访问码启用前，预览材料仍可查看。",
+          },
+          free: {
+            label: "免费预览",
+            detail: "预览材料可查看。引导式起草需要访问码。",
+          },
+        },
+        accessCodeLabel: "访问码",
+        present: "已提供",
+        notPresent: "未提供",
+        usedToday: "今日已用",
+        remaining: "剩余",
+        dailyGuidedQuota: "每日引导配额",
+      },
+      copilot: {
+        heading: "引导式助手",
+        description: "用于资料起草提示的右侧工作区。",
+        profileContextLabel: "资料上下文",
+        readinessContextLabel: "准备度上下文",
+        guidedStepLabel: "引导步骤",
+        previewStepLabel: "预览步骤",
+        accessBoundaryLabel: "访问边界",
+        noProfileContext: "选择资料后会显示已提交的转介上下文。",
+        readinessScore: "当前分数为 {score}/100。",
+        noQueueItem: "配置引导流程后，队列项会显示在这里。",
+        draftingPromptReady: "起草提示已就绪",
+        boundaryMessages: {
+          quotaUsed: "今日引导式配额已用完。预览材料仍可查看。",
+          waitlist:
+            "访问申请排队中。申请待处理期间预览材料仍可查看。",
+          accessRequired:
+            "需要访问码才能使用引导式起草。预览材料仍可查看。",
+        },
+      },
     },
   },
 };

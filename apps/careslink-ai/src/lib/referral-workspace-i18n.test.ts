@@ -83,6 +83,15 @@ describe("referral workspace i18n", () => {
         "referralSourcePortal",
         "providerPortal",
       ]);
+      expect(Object.keys(copy.components)).toEqual([
+        "healthScore",
+        "healthSignals",
+        "topIssues",
+        "materialsGrid",
+        "agentQueue",
+        "accessStatus",
+        "copilot",
+      ]);
       expect(copy.shell.primaryNav.workspace.length).toBeGreaterThan(0);
       expect(copy.shell.primaryNav.accessCode.length).toBeGreaterThan(0);
       expect(copy.shell.primaryNav.accessRequests.length).toBeGreaterThan(0);
@@ -97,6 +106,15 @@ describe("referral workspace i18n", () => {
       );
       expect(copy.common.previewOnly.length).toBeGreaterThan(0);
       expect(copy.admin.boundary.length).toBeGreaterThan(0);
+      expect(copy.components.healthScore.heading.length).toBeGreaterThan(0);
+      expect(copy.components.healthSignals.statusLabels.good.length).toBeGreaterThan(0);
+      expect(copy.components.topIssues.priorityLabels.high.length).toBeGreaterThan(0);
+      expect(copy.components.materialsGrid.lockedMessages.accessRequired).toContain(
+        locale === "zh-Hans" ? "访问码" : "Access code",
+      );
+      expect(copy.components.agentQueue.lockedBadgeLabels.accessCode.length).toBeGreaterThan(0);
+      expect(copy.components.accessStatus.states.free.label.length).toBeGreaterThan(0);
+      expect(copy.components.copilot.boundaryMessages.accessRequired.length).toBeGreaterThan(0);
     }
   });
 

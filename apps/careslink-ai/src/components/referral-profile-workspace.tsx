@@ -27,9 +27,15 @@ import {
   type HealthStatus,
   type LockedMaterial,
 } from "../lib/referral-profile-workspace";
-import { REQUIRED_REFERRAL_PROFILE_BOUNDARY } from "../lib/referral-profile-safe-copy";
+import {
+  DEFAULT_LOCALE,
+  getReferralWorkspaceCopy,
+  type Locale,
+  type ReferralWorkspaceCopy,
+} from "@/lib/referral-workspace-i18n";
 
 type IconComponent = ComponentType<SVGProps<SVGSVGElement>>;
+type ComponentCopy = ReferralWorkspaceCopy["components"];
 
 type BasicProfileCardProps = {
   summary: BasicProfileSummary;
@@ -38,34 +44,40 @@ type BasicProfileCardProps = {
 
 type HealthScorePanelProps = {
   audit: HealthAudit;
+  locale?: Locale;
   className?: string;
 };
 
 type HealthSignalsTableProps = {
   audit: HealthAudit;
+  locale?: Locale;
   className?: string;
 };
 
 type TopIssuesPanelProps = {
   audit: HealthAudit;
   limit?: number;
+  locale?: Locale;
   className?: string;
 };
 
 type LockedMaterialsGridProps = {
   materials: LockedMaterial[];
   accessState: AccessState;
+  locale?: Locale;
   className?: string;
 };
 
 type AgentQueuePanelProps = {
   queue: AgentQueueItem[];
   accessState: AccessState;
+  locale?: Locale;
   className?: string;
 };
 
 type AccessStatusPanelProps = {
   accessState: AccessState;
+  locale?: Locale;
   className?: string;
 };
 
@@ -74,10 +86,12 @@ type GuidedCopilotPanelProps = {
   queue: AgentQueueItem[];
   summary?: BasicProfileSummary;
   audit?: HealthAudit;
+  locale?: Locale;
   className?: string;
 };
 
 type TrustBoundaryNoticeProps = {
+  locale?: Locale;
   className?: string;
 };
 
@@ -92,20 +106,9 @@ const signalToneClasses: Record<HealthStatus, string> = {
   high: "border-[#f0b7b7] bg-[#fff0f0] text-[#a33a3a]",
 };
 
-const signalLabels: Record<HealthStatus, string> = {
-  good: "Complete",
-  warning: "Needs detail",
-  high: "Missing",
-};
-
 const issueToneClasses = {
   high: "border-[#f0b7b7] bg-[#fff0f0] text-[#a33a3a]",
   warning: "border-[#f4d28f] bg-[#fff7df] text-[#925b00]",
-};
-
-const directionLabels: Record<LockedMaterial["direction"], string> = {
-  receive: "Receive",
-  send: "Send",
 };
 
 function cx(...classes: Array<string | false | null | undefined>) {
@@ -124,84 +127,115 @@ function getRemainingQuota(accessState: AccessState) {
   return Math.max(0, accessState.dailyQuota - accessState.usedToday);
 }
 
-function accessStatusCopy(accessState: AccessState) {
+function formatTemplate(
+  template: string,
+  values: Record<string, string | number>,
+) {
+  return Object.entries(values).reduce(
+    (formatted, [key, value]) =>
+      formatted.replaceAll(`{${key}}`, String(value)),
+    template,
+  );
+}
+
+function formatCountLabel(
+  count: number,
+  labels: ComponentCopy["topIssues"]["countLabel"],
+) {
+  const template = count === 1 ? labels.one : labels.other;
+
+  return formatTemplate(template, { count });
+}
+
+function accessStatusCopy(
+  accessState: AccessState,
+  copy: ComponentCopy["accessStatus"],
+) {
   if (canUseGuidedWorkspace(accessState)) {
     return {
-      label: "Access code active",
-      detail: "Guided materials are available while daily quota remains.",
+      ...copy.states.active,
       tone: "good" as const,
     };
   }
 
   if (accessState.hasAccessCode && accessState.status === "approved") {
     return {
-      label: "Quota used today",
-      detail: "Preview materials remain visible. Guided drafting unlocks again with available quota.",
+      ...copy.states.quotaUsed,
       tone: "warning" as const,
     };
   }
 
   if (accessState.status === "waitlist") {
     return {
-      label: "Access request queued",
-      detail: "Preview materials remain visible until an access code is active.",
+      ...copy.states.waitlist,
       tone: "warning" as const,
     };
   }
 
   return {
-    label: "Free preview",
-    detail: "Preview materials are visible. Guided drafting requires an access code.",
+    ...copy.states.free,
     tone: "warning" as const,
   };
 }
 
-function lockedGuidedMaterialMessage(accessState: AccessState) {
+function lockedGuidedMaterialMessage(
+  accessState: AccessState,
+  copy: ComponentCopy["materialsGrid"],
+) {
   if (accessState.hasAccessCode && accessState.status === "approved") {
-    return "Daily guided quota used. Preview remains visible.";
+    return copy.lockedMessages.quotaUsed;
   }
 
   if (accessState.status === "waitlist") {
-    return "Access request queued. Preview remains visible while the request is pending.";
+    return copy.lockedMessages.waitlist;
   }
 
-  return "Access code required for guided materials.";
+  return copy.lockedMessages.accessRequired;
 }
 
-function lockedGuidedStatusLabel(accessState: AccessState) {
+function lockedGuidedStatusLabel(
+  accessState: AccessState,
+  copy: ComponentCopy["materialsGrid"],
+) {
   if (accessState.hasAccessCode && accessState.status === "approved") {
-    return "Quota used today";
+    return copy.lockedStatusLabels.quotaUsed;
   }
 
   if (accessState.status === "waitlist") {
-    return "Access request queued";
+    return copy.lockedStatusLabels.waitlist;
   }
 
-  return "Access code required";
+  return copy.lockedStatusLabels.accessRequired;
 }
 
-function lockedQueueBadgeLabel(accessState: AccessState) {
+function lockedQueueBadgeLabel(
+  accessState: AccessState,
+  copy: ComponentCopy["agentQueue"],
+) {
   if (accessState.hasAccessCode && accessState.status === "approved") {
-    return "Quota used";
+    return copy.lockedBadgeLabels.quotaUsed;
   }
 
   if (accessState.status === "waitlist") {
-    return "Queued";
+    return copy.lockedBadgeLabels.queued;
   }
 
-  return "Access code";
+  return copy.lockedBadgeLabels.accessCode;
 }
 
-function copilotBoundaryMessage(accessState: AccessState) {
+function copilotBoundaryMessage(
+  accessState: AccessState,
+  copy: ComponentCopy["copilot"],
+) {
   if (accessState.hasAccessCode && accessState.status === "approved") {
-    return "Daily guided quota used. Preview materials remain visible.";
+    return copy.boundaryMessages.quotaUsed;
   }
 
   if (accessState.status === "waitlist") {
-    return "Access request queued. Preview materials remain visible while the request is pending.";
+    return copy.boundaryMessages.waitlist;
   }
 
-  return "Access code required before guided drafting is available. Preview materials remain visible.";
+  return copy.boundaryMessages.accessRequired;
 }
 
 function scoreTone(score: number) {
@@ -365,7 +399,12 @@ export function CompletionBadge({ audit, className = "" }: CompletionBadgeProps)
   );
 }
 
-export function HealthScorePanel({ audit, className = "" }: HealthScorePanelProps) {
+export function HealthScorePanel({
+  audit,
+  locale = DEFAULT_LOCALE,
+  className = "",
+}: HealthScorePanelProps) {
+  const copy = getReferralWorkspaceCopy(locale).components.healthScore;
   const score = clampScore(audit.score);
 
   return (
@@ -374,7 +413,7 @@ export function HealthScorePanel({ audit, className = "" }: HealthScorePanelProp
         <div>
           <div className="flex items-center gap-2 text-sm font-semibold text-[#0f766e]">
             <CircleGauge className="size-5" aria-hidden="true" />
-            Referral communication score
+            {copy.heading}
           </div>
           <p className="mt-3 text-sm leading-6 text-[#65736f]">{audit.summary}</p>
         </div>
@@ -409,16 +448,22 @@ export function HealthScorePanel({ audit, className = "" }: HealthScorePanelProp
   );
 }
 
-export function HealthSignalsTable({ audit, className = "" }: HealthSignalsTableProps) {
+export function HealthSignalsTable({
+  audit,
+  locale = DEFAULT_LOCALE,
+  className = "",
+}: HealthSignalsTableProps) {
+  const copy = getReferralWorkspaceCopy(locale).components.healthSignals;
+
   return (
     <Card className={cx("overflow-hidden", className)}>
       <div className="border-b border-[#dce8e2] p-5">
         <div className="flex items-center gap-2 text-sm font-semibold text-[#0f766e]">
           <ClipboardList className="size-5" aria-hidden="true" />
-          Readiness signals
+          {copy.heading}
         </div>
         <p className="mt-2 text-sm leading-6 text-[#65736f]">
-          Field-level signals for referral communication completeness.
+          {copy.description}
         </p>
       </div>
 
@@ -426,10 +471,10 @@ export function HealthSignalsTable({ audit, className = "" }: HealthSignalsTable
         <table className="min-w-[720px] divide-y divide-[#dce8e2] text-left text-sm">
           <thead className="bg-[#f8fbfa] text-xs font-semibold text-[#65736f]">
             <tr>
-              <th className="px-5 py-3">Signal</th>
-              <th className="px-5 py-3">Detail</th>
-              <th className="w-28 px-5 py-3">Points</th>
-              <th className="w-36 px-5 py-3">Status</th>
+              <th className="px-5 py-3">{copy.columns.signal}</th>
+              <th className="px-5 py-3">{copy.columns.detail}</th>
+              <th className="w-28 px-5 py-3">{copy.columns.points}</th>
+              <th className="w-36 px-5 py-3">{copy.columns.status}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-[#eef3f1]">
@@ -440,7 +485,7 @@ export function HealthSignalsTable({ audit, className = "" }: HealthSignalsTable
                 <td className="px-5 py-4 text-[#263834]">{signal.points}</td>
                 <td className="px-5 py-4">
                   <StatusBadge className={signalToneClasses[signal.status]}>
-                    {signalLabels[signal.status]}
+                    {copy.statusLabels[signal.status]}
                   </StatusBadge>
                 </td>
               </tr>
@@ -455,8 +500,10 @@ export function HealthSignalsTable({ audit, className = "" }: HealthSignalsTable
 export function TopIssuesPanel({
   audit,
   limit = 4,
+  locale = DEFAULT_LOCALE,
   className = "",
 }: TopIssuesPanelProps) {
+  const copy = getReferralWorkspaceCopy(locale).components.topIssues;
   const issues = audit.issues.slice(0, limit);
 
   return (
@@ -465,14 +512,14 @@ export function TopIssuesPanel({
         <div>
           <div className="flex items-center gap-2 text-sm font-semibold text-[#0f766e]">
             <AlertTriangle className="size-5" aria-hidden="true" />
-            Top issues
+            {copy.heading}
           </div>
           <p className="mt-2 text-sm leading-6 text-[#65736f]">
-            Prioritized gaps in the referral communication profile.
+            {copy.description}
           </p>
         </div>
         <StatusBadge className="border-[#dce8e2] bg-[#f8fbfa] text-[#40504b]">
-          {issues.length === 1 ? "1 item" : `${issues.length} items`}
+          {formatCountLabel(issues.length, copy.countLabel)}
         </StatusBadge>
       </div>
 
@@ -488,7 +535,7 @@ export function TopIssuesPanel({
                   <p className="mt-1 text-xs font-semibold text-[#65736f]">{issue.label}</p>
                 </div>
                 <StatusBadge className={issueToneClasses[issue.priority]}>
-                  {issue.priority === "high" ? "High priority" : "Needs detail"}
+                  {copy.priorityLabels[issue.priority]}
                 </StatusBadge>
               </div>
               <p className="mt-3 text-sm leading-6 text-[#40504b]">{issue.guidance}</p>
@@ -497,8 +544,8 @@ export function TopIssuesPanel({
         ) : (
           <EmptyState
             icon={CheckCircle2}
-            title="No priority issues"
-            detail="This audit did not find priority communication gaps in the current profile."
+            title={copy.emptyTitle}
+            detail={copy.emptyDetail}
           />
         )}
       </div>
@@ -509,10 +556,13 @@ export function TopIssuesPanel({
 export function LockedMaterialsGrid({
   materials,
   accessState,
+  locale = DEFAULT_LOCALE,
   className = "",
 }: LockedMaterialsGridProps) {
+  const workspaceCopy = getReferralWorkspaceCopy(locale);
+  const copy = workspaceCopy.components.materialsGrid;
   const canUseGuided = canUseGuidedWorkspace(accessState);
-  const lockedStatusLabel = lockedGuidedStatusLabel(accessState);
+  const lockedStatusLabel = lockedGuidedStatusLabel(accessState, copy);
 
   return (
     <div className={cx("grid gap-4", className)}>
@@ -520,10 +570,10 @@ export function LockedMaterialsGrid({
         <div>
           <div className="flex items-center gap-2 text-sm font-semibold text-[#0f766e]">
             <FileText className="size-5" aria-hidden="true" />
-            Guided materials
+            {copy.heading}
           </div>
           <p className="mt-2 text-sm leading-6 text-[#65736f]">
-            Preview text remains visible when guided drafting is locked.
+            {copy.description}
           </p>
         </div>
         <StatusBadge
@@ -533,7 +583,7 @@ export function LockedMaterialsGrid({
               : "border-[#f4d28f] bg-[#fff7df] text-[#925b00]"
           }
         >
-          {canUseGuided ? "Guided drafting available" : lockedStatusLabel}
+          {canUseGuided ? copy.guidedAvailable : lockedStatusLabel}
         </StatusBadge>
       </div>
 
@@ -541,7 +591,10 @@ export function LockedMaterialsGrid({
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {materials.map((material) => {
             const locked = !canUseGuided;
-            const lockedMessage = lockedGuidedMaterialMessage(accessState);
+            const lockedMessage = lockedGuidedMaterialMessage(
+              accessState,
+              copy,
+            );
 
             return (
               <Card key={material.id} className="flex min-h-64 flex-col p-4">
@@ -560,12 +613,14 @@ export function LockedMaterialsGrid({
                     </p>
                   </div>
                   <StatusBadge className="border-[#b9d7ff] bg-[#edf5ff] text-[#19518d]">
-                    {directionLabels[material.direction]}
+                    {copy.directionLabels[material.direction]}
                   </StatusBadge>
                 </div>
 
                 <div className="mt-4 rounded-lg border border-[#dce8e2] bg-[#f8fbfa] p-3">
-                  <p className="text-xs font-semibold text-[#65736f]">Preview</p>
+                  <p className="text-xs font-semibold text-[#65736f]">
+                    {workspaceCopy.common.previewOnly}
+                  </p>
                   <p className="mt-2 text-sm leading-6 text-[#263834]">{material.preview}</p>
                 </div>
 
@@ -586,7 +641,7 @@ export function LockedMaterialsGrid({
                     <p>
                       {locked
                         ? lockedMessage
-                        : "Ready for guided drafting from submitted profile details."}
+                        : copy.readyMessage}
                     </p>
                   </div>
                 </div>
@@ -597,8 +652,8 @@ export function LockedMaterialsGrid({
       ) : (
         <EmptyState
           icon={FileText}
-          title="No materials configured"
-          detail="Materials appear here when a receive or send direction is available for the profile."
+          title={copy.noMaterialsTitle}
+          detail={copy.noMaterialsDetail}
         />
       )}
     </div>
@@ -608,11 +663,16 @@ export function LockedMaterialsGrid({
 export function AgentQueuePanel({
   queue,
   accessState,
+  locale = DEFAULT_LOCALE,
   className = "",
 }: AgentQueuePanelProps) {
+  const copy = getReferralWorkspaceCopy(locale).components;
   const canUseGuided = canUseGuidedWorkspace(accessState);
-  const status = accessStatusCopy(accessState);
-  const lockedBadgeLabel = lockedQueueBadgeLabel(accessState);
+  const status = accessStatusCopy(accessState, copy.accessStatus);
+  const lockedBadgeLabel = lockedQueueBadgeLabel(
+    accessState,
+    copy.agentQueue,
+  );
 
   return (
     <Card className={cx("p-5", className)}>
@@ -620,14 +680,14 @@ export function AgentQueuePanel({
         <div>
           <div className="flex items-center gap-2 text-sm font-semibold text-[#0f766e]">
             <Bot className="size-5" aria-hidden="true" />
-            Agent queue
+            {copy.agentQueue.heading}
           </div>
           <p className="mt-2 text-sm leading-6 text-[#65736f]">
-            Guided steps are based on submitted profile fields and access state.
+            {copy.agentQueue.description}
           </p>
         </div>
         <StatusBadge className={canUseGuided ? signalToneClasses.good : signalToneClasses.warning}>
-          {canUseGuided ? "Ready" : status.label}
+          {canUseGuided ? copy.agentQueue.readyLabel : status.label}
         </StatusBadge>
       </div>
 
@@ -655,7 +715,7 @@ export function AgentQueuePanel({
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <p className="break-words text-sm font-semibold text-[#17211f]">{item.label}</p>
                   <StatusBadge className={ready ? signalToneClasses.good : signalToneClasses.warning}>
-                    {ready ? "Ready" : lockedBadgeLabel}
+                    {ready ? copy.agentQueue.readyLabel : lockedBadgeLabel}
                   </StatusBadge>
                 </div>
                 <p className="mt-2 text-sm leading-6 text-[#40504b]">
@@ -672,9 +732,11 @@ export function AgentQueuePanel({
 
 export function AccessStatusPanel({
   accessState,
+  locale = DEFAULT_LOCALE,
   className = "",
 }: AccessStatusPanelProps) {
-  const status = accessStatusCopy(accessState);
+  const copy = getReferralWorkspaceCopy(locale).components.accessStatus;
+  const status = accessStatusCopy(accessState, copy);
   const remainingQuota = getRemainingQuota(accessState);
   const quotaTotal = Math.max(0, accessState.dailyQuota);
   const quotaUsed = Math.min(Math.max(0, accessState.usedToday), quotaTotal);
@@ -686,7 +748,7 @@ export function AccessStatusPanel({
         <div>
           <div className="flex items-center gap-2 text-sm font-semibold text-[#0f766e]">
             <KeyRound className="size-5" aria-hidden="true" />
-            Access status
+            {copy.heading}
           </div>
           <p className="mt-2 text-sm leading-6 text-[#65736f]">{status.detail}</p>
         </div>
@@ -696,16 +758,24 @@ export function AccessStatusPanel({
       <div className="mt-5 grid gap-3 sm:grid-cols-3">
         <LabelValue
           icon={KeyRound}
-          label="Access code"
-          value={accessState.hasAccessCode ? "Present" : "Not present"}
+          label={copy.accessCodeLabel}
+          value={accessState.hasAccessCode ? copy.present : copy.notPresent}
         />
-        <LabelValue icon={ClipboardList} label="Used today" value={`${quotaUsed}`} />
-        <LabelValue icon={CheckCircle2} label="Remaining" value={`${remainingQuota}`} />
+        <LabelValue
+          icon={ClipboardList}
+          label={copy.usedToday}
+          value={`${quotaUsed}`}
+        />
+        <LabelValue
+          icon={CheckCircle2}
+          label={copy.remaining}
+          value={`${remainingQuota}`}
+        />
       </div>
 
       <div className="mt-5">
         <div className="flex items-center justify-between gap-3 text-xs font-semibold text-[#65736f]">
-          <span>Daily guided quota</span>
+          <span>{copy.dailyGuidedQuota}</span>
           <span>
             {quotaUsed} / {quotaTotal}
           </span>
@@ -730,11 +800,14 @@ export function GuidedCopilotPanel({
   queue,
   summary,
   audit,
+  locale = DEFAULT_LOCALE,
   className = "",
 }: GuidedCopilotPanelProps) {
+  const workspaceCopy = getReferralWorkspaceCopy(locale);
+  const copy = workspaceCopy.components;
   const canUseGuided = canUseGuidedWorkspace(accessState);
   const activeItem = queue[0];
-  const status = accessStatusCopy(accessState);
+  const status = accessStatusCopy(accessState, copy.accessStatus);
 
   return (
     <Card className={cx("flex h-full min-h-[520px] flex-col overflow-hidden", className)}>
@@ -743,10 +816,10 @@ export function GuidedCopilotPanel({
           <div>
             <div className="flex items-center gap-2 text-sm font-semibold text-[#0f766e]">
               <MessageSquareText className="size-5" aria-hidden="true" />
-              Guided copilot
+              {copy.copilot.heading}
             </div>
             <p className="mt-2 text-sm leading-6 text-[#65736f]">
-              Right-side workspace for profile drafting prompts.
+              {copy.copilot.description}
             </p>
           </div>
           <StatusBadge className={signalToneClasses[status.tone]}>{status.label}</StatusBadge>
@@ -754,29 +827,40 @@ export function GuidedCopilotPanel({
       </div>
 
       <div className="flex-1 space-y-3 bg-[#f8fbfa] p-4">
-        <CopilotMessage label="Profile context" tone="system">
+        <CopilotMessage label={copy.copilot.profileContextLabel} tone="system">
           {summary
             ? `${summary.title}: ${summary.directionLabel}. ${summary.serviceAreaLabel}.`
-            : "Select a profile to show submitted referral context."}
+            : copy.copilot.noProfileContext}
         </CopilotMessage>
 
         {audit ? (
-          <CopilotMessage label="Readiness context" tone="system">
-            {`Current score is ${clampScore(audit.score)} out of 100. ${audit.note}`}
+          <CopilotMessage
+            label={copy.copilot.readinessContextLabel}
+            tone="system"
+          >
+            {`${formatTemplate(copy.copilot.readinessScore, {
+              score: clampScore(audit.score),
+            })} ${audit.note}`}
           </CopilotMessage>
         ) : null}
 
-        <CopilotMessage label={canUseGuided ? "Guided step" : "Preview step"}>
+        <CopilotMessage
+          label={
+            canUseGuided
+              ? copy.copilot.guidedStepLabel
+              : copy.copilot.previewStepLabel
+          }
+        >
           {activeItem
             ? canUseGuided
               ? activeItem.accessCodeState
               : activeItem.freeState
-            : "Queue items appear here when a guided workflow is configured."}
+            : copy.copilot.noQueueItem}
         </CopilotMessage>
 
         {!canUseGuided ? (
-          <CopilotMessage label="Access boundary">
-            {copilotBoundaryMessage(accessState)}
+          <CopilotMessage label={copy.copilot.accessBoundaryLabel}>
+            {copilotBoundaryMessage(accessState, copy.copilot)}
           </CopilotMessage>
         ) : null}
       </div>
@@ -785,7 +869,9 @@ export function GuidedCopilotPanel({
         <div className="flex min-h-11 items-center gap-3 rounded-lg border border-[#cfded8] bg-[#f8fbfa] px-3 text-sm text-[#65736f]">
           <MessageSquareText className="size-4 shrink-0" aria-hidden="true" />
           <span className="min-w-0 flex-1">
-            {canUseGuided ? "Drafting prompt ready" : "Preview mode only"}
+            {canUseGuided
+              ? copy.copilot.draftingPromptReady
+              : workspaceCopy.common.previewOnly}
           </span>
           <Send className="size-4 shrink-0 text-[#91a09b]" aria-hidden="true" />
         </div>
@@ -794,7 +880,12 @@ export function GuidedCopilotPanel({
   );
 }
 
-export function TrustBoundaryNotice({ className = "" }: TrustBoundaryNoticeProps) {
+export function TrustBoundaryNotice({
+  locale = DEFAULT_LOCALE,
+  className = "",
+}: TrustBoundaryNoticeProps) {
+  const copy = getReferralWorkspaceCopy(locale);
+
   return (
     <div
       className={cx(
@@ -804,7 +895,7 @@ export function TrustBoundaryNotice({ className = "" }: TrustBoundaryNoticeProps
       role="note"
     >
       <Info className="mt-1 size-5 shrink-0 text-[#0f766e]" aria-hidden="true" />
-      <p>{REQUIRED_REFERRAL_PROFILE_BOUNDARY}</p>
+      <p>{copy.common.trustBoundary}</p>
     </div>
   );
 }

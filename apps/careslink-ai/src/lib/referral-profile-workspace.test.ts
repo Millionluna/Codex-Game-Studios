@@ -34,6 +34,10 @@ vi.mock("../components/ui", async () => {
   };
 });
 
+vi.mock("@/lib/referral-workspace-i18n", async () =>
+  import("./referral-workspace-i18n"),
+);
+
 import {
   AgentQueuePanel,
   BasicProfileCard,
