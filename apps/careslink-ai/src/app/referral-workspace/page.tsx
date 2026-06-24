@@ -7,6 +7,7 @@ import {
   BasicProfileCard,
   GuidedCopilotPanel,
   HealthScorePanel,
+  HealthSignalsTable,
   LockedMaterialsGrid,
   TopIssuesPanel,
   TrustBoundaryNotice,
@@ -91,6 +92,21 @@ export default function ReferralWorkspacePage() {
         </div>
       </section>
 
+      <div className="mt-6 grid gap-5 xl:grid-cols-[minmax(0,1fr)_420px]">
+        <TopIssuesPanel audit={audit} />
+        <AgentQueuePanel queue={queue} accessState={accessState} />
+      </div>
+
+      <section className="mt-6">
+        <LockedMaterialsGrid materials={materials} accessState={accessState} />
+      </section>
+
+      <section className="mt-6">
+        <HealthSignalsTable audit={audit} />
+      </section>
+
+      <TrustBoundaryNotice className="mt-6" />
+
       <Card className="mt-6 p-5">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
@@ -127,17 +143,6 @@ export default function ReferralWorkspacePage() {
           ))}
         </div>
       </Card>
-
-      <div className="mt-6 grid gap-5 xl:grid-cols-[minmax(0,1fr)_420px]">
-        <TopIssuesPanel audit={audit} />
-        <AgentQueuePanel queue={queue} accessState={accessState} />
-      </div>
-
-      <section className="mt-6">
-        <LockedMaterialsGrid materials={materials} accessState={accessState} />
-      </section>
-
-      <TrustBoundaryNotice className="mt-6" />
     </AppShell>
   );
 }

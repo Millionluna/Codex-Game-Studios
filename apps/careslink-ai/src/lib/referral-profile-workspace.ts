@@ -14,10 +14,10 @@ export type AccessCodeType =
 export type HealthStatus = "good" | "warning" | "high";
 
 export type HealthBand =
-  | "Not referral-ready"
-  | "Needs work"
-  | "Referral-ready soon"
-  | "Strong referral profile";
+  | "Communication profile not ready"
+  | "Communication profile needs work"
+  | "Communication profile nearly ready"
+  | "Strong communication profile";
 
 type AccessStatus = "free" | "approved" | "waitlist";
 
@@ -330,7 +330,7 @@ const accessRequests: AccessRequest[] = [
     referralDirection: "both",
     status: "approved",
     requestedAt: "2026-06-23T14:30:00+10:00",
-    note: "Approved for receive and send workflow testing.",
+    note: "Access active for receive and send workflow testing.",
   },
   {
     id: "request-user-waitlist",
@@ -504,7 +504,7 @@ function buildAgentQueue(canUse: boolean): AgentQueueItem[] {
       id: "share-card",
       label: "Share Card Agent",
       freeState: "Preview locked share-card material.",
-      accessCodeState: "Prepare a concise share card from approved fields.",
+      accessCodeState: "Prepare a concise share card from submitted profile fields.",
       status,
     },
     {
@@ -734,18 +734,18 @@ function healthStatusForScoreState(status: SignalScoreState): HealthStatus {
 
 export function getScoreBand(score: number): HealthBand {
   if (score <= 39) {
-    return "Not referral-ready";
+    return "Communication profile not ready";
   }
 
   if (score <= 69) {
-    return "Needs work";
+    return "Communication profile needs work";
   }
 
   if (score <= 84) {
-    return "Referral-ready soon";
+    return "Communication profile nearly ready";
   }
 
-  return "Strong referral profile";
+  return "Strong communication profile";
 }
 
 function getDirectionTabs(direction: ReferralDirection) {

@@ -114,7 +114,7 @@ describe("referral profile workspace domain", () => {
 
     expect(audit.score).toBeGreaterThanOrEqual(70);
     expect(audit.score).toBeLessThanOrEqual(100);
-    expect(audit.band).toBe("Referral-ready soon");
+    expect(audit.band).toBe("Communication profile nearly ready");
     expect(audit.profileId).toBe("profile-harbour");
     expect(audit.summary).toContain("referral communication readiness");
     expect(Array.isArray(audit.recommendations)).toBe(true);
@@ -305,6 +305,15 @@ describe("referral profile workspace domain", () => {
     expect(JSON.stringify(queue)).not.toContain("autonomous");
   });
 
+  it("uses submitted-field queue copy without approval or endorsement wording", () => {
+    const unlockedQueueText = JSON.stringify(getAgentQueue(true)).toLowerCase();
+
+    expect(unlockedQueueText).toContain("submitted profile fields");
+    expect(unlockedQueueText).not.toContain("approved fields");
+    expect(unlockedQueueText).not.toContain("field approval");
+    expect(unlockedQueueText).not.toContain("provider endorsement");
+  });
+
   it("throws when requesting an unknown referral profile id", () => {
     expect(getReferralProfile()).toMatchObject({ id: "profile-harbour" });
     expect(() => getReferralProfile("profile-missing")).toThrow(
@@ -338,12 +347,12 @@ describe("referral profile workspace domain", () => {
 
   it("keeps score band boundaries stable", () => {
     expect([39, 40, 69, 70, 84, 85].map(getScoreBand)).toEqual([
-      "Not referral-ready",
-      "Needs work",
-      "Needs work",
-      "Referral-ready soon",
-      "Referral-ready soon",
-      "Strong referral profile",
+      "Communication profile not ready",
+      "Communication profile needs work",
+      "Communication profile needs work",
+      "Communication profile nearly ready",
+      "Communication profile nearly ready",
+      "Strong communication profile",
     ]);
   });
 
