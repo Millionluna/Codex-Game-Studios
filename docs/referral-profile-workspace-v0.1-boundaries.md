@@ -33,3 +33,7 @@
 ## Trust Boundary
 
 CaresLink should continue to describe this product as a referral communication readiness and profile-completeness workspace. It should not claim to certify providers, approve provider quality, guarantee referrals or services, assess clinical suitability, assess compliance status, or provide legal, clinical, medical, compliance, financial, or professional advice.
+
+## Multilingual Boundary
+
+The v0.1 workspace supports English and Simplified Chinese UI copy. User-submitted profile fields remain in the submitted language until a later AI generation or translation plan adds explicit language-aware drafting behind the access gate. Trust-boundary copy must remain available in every supported UI language.
