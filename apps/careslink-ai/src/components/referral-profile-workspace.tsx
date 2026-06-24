@@ -39,6 +39,7 @@ type ComponentCopy = ReferralWorkspaceCopy["components"];
 
 type BasicProfileCardProps = {
   summary: BasicProfileSummary;
+  locale?: Locale;
   className?: string;
 };
 
@@ -345,7 +346,13 @@ function CopilotMessage({
   );
 }
 
-export function BasicProfileCard({ summary, className = "" }: BasicProfileCardProps) {
+export function BasicProfileCard({
+  summary,
+  locale = DEFAULT_LOCALE,
+  className = "",
+}: BasicProfileCardProps) {
+  const copy = getReferralWorkspaceCopy(locale).components.basicProfile;
+
   return (
     <Card className={cx("flex h-full min-h-80 flex-col p-5", className)}>
       <div className="flex items-start justify-between gap-4">
@@ -366,8 +373,16 @@ export function BasicProfileCard({ summary, className = "" }: BasicProfileCardPr
       <p className="mt-4 text-sm leading-6 text-[#40504b]">{summary.description}</p>
 
       <div className="mt-5 grid gap-3 sm:grid-cols-2">
-        <LabelValue icon={MapPin} label="Service area" value={summary.serviceAreaLabel} />
-        <LabelValue icon={Languages} label="Languages" value={summary.languageLabel} />
+        <LabelValue
+          icon={MapPin}
+          label={copy.serviceArea}
+          value={summary.serviceAreaLabel}
+        />
+        <LabelValue
+          icon={Languages}
+          label={copy.languages}
+          value={summary.languageLabel}
+        />
       </div>
 
       <div className="mt-auto pt-5">

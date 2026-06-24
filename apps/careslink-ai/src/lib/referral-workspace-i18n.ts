@@ -96,6 +96,10 @@ export type ReferralWorkspaceCopy = {
     readonly boundary: string;
   };
   readonly components: {
+    readonly basicProfile: {
+      readonly serviceArea: string;
+      readonly languages: string;
+    };
     readonly healthScore: {
       readonly heading: string;
     };
@@ -220,7 +224,7 @@ const referralWorkspaceCopy: Record<Locale, ReferralWorkspaceCopy> = {
       selfSubmitted: "Based on self-submitted profile information",
       continueToReadiness: "Continue to readiness review",
       trustBoundary:
-        "CaresLink does not assess provider quality, clinical suitability, compliance status, or service outcomes, and does not provide legal, clinical, medical, compliance, financial, or other professional advice.",
+        "Based on self-submitted profile information. CaresLink does not assess provider quality, clinical suitability, compliance status, or service outcomes, and does not provide legal, clinical, medical, compliance, financial, or other professional advice.",
       nonLiveActions:
         "Pilot actions are non-live previews. No referral, endorsement, compliance review, or professional recommendation is created.",
     },
@@ -315,6 +319,10 @@ const referralWorkspaceCopy: Record<Locale, ReferralWorkspaceCopy> = {
         "Admin review manages pilot access only. CaresLink does not assess provider quality, clinical suitability, compliance status, or service outcomes, and does not provide professional advice.",
     },
     components: {
+      basicProfile: {
+        serviceArea: "Service area",
+        languages: "Languages",
+      },
       healthScore: {
         heading: "Referral communication score",
       },
@@ -448,7 +456,7 @@ const referralWorkspaceCopy: Record<Locale, ReferralWorkspaceCopy> = {
       selfSubmitted: "基于自行提交的资料信息",
       continueToReadiness: "继续查看准备度",
       trustBoundary:
-        "CaresLink 不评估服务商质量、临床适用性、合规状态或服务结果，也不提供法律、临床、医疗、合规、财务或其他专业建议。",
+        "资料信息基于自行提交的资料信息。CaresLink 不评估服务商质量、临床适用性、合规状态或服务结果，也不提供法律、临床、医疗、合规、财务或其他专业建议。",
       nonLiveActions:
         "试点操作仅为非实时预览，不会创建转介、背书、合规审查或专业建议。",
     },
@@ -536,6 +544,10 @@ const referralWorkspaceCopy: Record<Locale, ReferralWorkspaceCopy> = {
         "管理审核仅用于试点访问控制。CaresLink 不评估服务商质量、临床适用性、合规状态或服务结果，也不提供专业建议。",
     },
     components: {
+      basicProfile: {
+        serviceArea: "服务范围",
+        languages: "语言",
+      },
       healthScore: {
         heading: "转介沟通分数",
       },

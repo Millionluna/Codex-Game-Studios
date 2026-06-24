@@ -84,6 +84,7 @@ describe("referral workspace i18n", () => {
         "providerPortal",
       ]);
       expect(Object.keys(copy.components)).toEqual([
+        "basicProfile",
         "healthScore",
         "healthSignals",
         "topIssues",
@@ -98,14 +99,26 @@ describe("referral workspace i18n", () => {
       expect(copy.shell.legacyNav.groupHeading.length).toBeGreaterThan(0);
       expect(copy.shell.legacyNav.demoHub.length).toBeGreaterThan(0);
       expect(copy.shell.legacyNav.assessment.length).toBeGreaterThan(0);
+      expect(copy.common.trustBoundary).toContain(copy.common.selfSubmitted);
       expect(copy.common.trustBoundary).toContain(
         locale === "zh-Hans" ? "不评估服务商质量" : "does not assess provider quality",
+      );
+      expect(copy.common.trustBoundary).toContain(
+        locale === "zh-Hans" ? "临床适用性" : "clinical suitability",
+      );
+      expect(copy.common.trustBoundary).toContain(
+        locale === "zh-Hans" ? "合规状态" : "compliance status",
+      );
+      expect(copy.common.trustBoundary).toContain(
+        locale === "zh-Hans" ? "服务结果" : "service outcomes",
       );
       expect(copy.common.trustBoundary).toContain(
         locale === "zh-Hans" ? "专业建议" : "professional advice",
       );
       expect(copy.common.previewOnly.length).toBeGreaterThan(0);
       expect(copy.admin.boundary.length).toBeGreaterThan(0);
+      expect(copy.components.basicProfile.serviceArea.length).toBeGreaterThan(0);
+      expect(copy.components.basicProfile.languages.length).toBeGreaterThan(0);
       expect(copy.components.healthScore.heading.length).toBeGreaterThan(0);
       expect(copy.components.healthSignals.statusLabels.good.length).toBeGreaterThan(0);
       expect(copy.components.topIssues.priorityLabels.high.length).toBeGreaterThan(0);

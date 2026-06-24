@@ -23,6 +23,7 @@ vi.mock("@/lib/referral-workspace-i18n", async () =>
 import {
   AccessStatusPanel,
   AgentQueuePanel,
+  BasicProfileCard,
   GuidedCopilotPanel,
   HealthScorePanel,
   HealthSignalsTable,
@@ -40,7 +41,7 @@ import {
 } from "../lib/referral-profile-workspace";
 
 describe("referral profile workspace shared components", () => {
-  it("localizes zh-Hans product UI while preserving submitted workspace data", () => {
+  it("localizes zh-Hans product UI while preserving submitted profile data", () => {
     const locale = "zh-Hans";
     const profile = getSeedReferralProfiles()[1];
     const summary = summarizeProfile(profile);
@@ -53,6 +54,7 @@ describe("referral profile workspace shared components", () => {
       createElement(
         "div",
         null,
+        createElement(BasicProfileCard, { summary, locale }),
         createElement(HealthScorePanel, { audit, locale }),
         createElement(HealthSignalsTable, { audit, locale }),
         createElement(TopIssuesPanel, { audit, locale }),
@@ -75,6 +77,8 @@ describe("referral profile workspace shared components", () => {
     );
 
     [
+      "服务范围",
+      "语言",
       "转介沟通分数",
       "准备度信号",
       "重点问题",
@@ -85,6 +89,7 @@ describe("referral profile workspace shared components", () => {
       "仅预览模式",
       "访问码",
       "未提供",
+      "基于自行提交的资料信息",
       "CaresLink 不评估服务商质量",
     ].forEach((localizedCopy) => {
       expect(markup).toContain(localizedCopy);
@@ -92,13 +97,12 @@ describe("referral profile workspace shared components", () => {
 
     [
       "Alex Lee",
-      "Service area",
-      "Provider profile",
-      "Profile Agent",
-      "Capacity status is missing",
-      "This audit measures referral communication readiness only, not provider quality.",
-    ].forEach((submittedCopy) => {
-      expect(markup).toContain(submittedCopy);
+      "Northern Sydney",
+      "English",
+      "Independent care navigator accepting a small number of enquiries.",
+      "Service areas, languages, intake method, and availability.",
+    ].forEach((suppliedProfileCopy) => {
+      expect(markup).toContain(suppliedProfileCopy);
     });
 
     [
@@ -112,5 +116,17 @@ describe("referral profile workspace shared components", () => {
     ].forEach((englishProductCopy) => {
       expect(markup).not.toContain(englishProductCopy);
     });
+
+    const profileMarkup = renderToStaticMarkup(
+      createElement(BasicProfileCard, { summary, locale }),
+    );
+
+    expect(profileMarkup).toContain("服务范围");
+    expect(profileMarkup).toContain("语言");
+    expect(profileMarkup).not.toContain("Service area");
+    expect(profileMarkup).not.toContain("Languages");
+    expect(profileMarkup).toContain("Alex Lee");
+    expect(profileMarkup).toContain("Northern Sydney");
+    expect(profileMarkup).toContain("English");
   });
 });
