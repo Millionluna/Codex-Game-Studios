@@ -162,10 +162,46 @@ function lockedGuidedMaterialMessage(accessState: AccessState) {
   }
 
   if (accessState.status === "waitlist") {
-    return "Access request queued. Preview remains visible until an access code is active.";
+    return "Access request queued. Preview remains visible while the request is pending.";
   }
 
   return "Access code required for guided materials.";
+}
+
+function lockedGuidedStatusLabel(accessState: AccessState) {
+  if (accessState.hasAccessCode && accessState.status === "approved") {
+    return "Quota used today";
+  }
+
+  if (accessState.status === "waitlist") {
+    return "Access request queued";
+  }
+
+  return "Access code required";
+}
+
+function lockedQueueBadgeLabel(accessState: AccessState) {
+  if (accessState.hasAccessCode && accessState.status === "approved") {
+    return "Quota used";
+  }
+
+  if (accessState.status === "waitlist") {
+    return "Queued";
+  }
+
+  return "Access code";
+}
+
+function copilotBoundaryMessage(accessState: AccessState) {
+  if (accessState.hasAccessCode && accessState.status === "approved") {
+    return "Daily guided quota used. Preview materials remain visible.";
+  }
+
+  if (accessState.status === "waitlist") {
+    return "Access request queued. Preview materials remain visible while the request is pending.";
+  }
+
+  return "Access code required before guided drafting is available. Preview materials remain visible.";
 }
 
 function scoreTone(score: number) {
@@ -476,6 +512,7 @@ export function LockedMaterialsGrid({
   className = "",
 }: LockedMaterialsGridProps) {
   const canUseGuided = canUseGuidedWorkspace(accessState);
+  const lockedStatusLabel = lockedGuidedStatusLabel(accessState);
 
   return (
     <div className={cx("grid gap-4", className)}>
@@ -496,7 +533,7 @@ export function LockedMaterialsGrid({
               : "border-[#f4d28f] bg-[#fff7df] text-[#925b00]"
           }
         >
-          {canUseGuided ? "Guided drafting available" : "Access code required"}
+          {canUseGuided ? "Guided drafting available" : lockedStatusLabel}
         </StatusBadge>
       </div>
 
@@ -574,6 +611,8 @@ export function AgentQueuePanel({
   className = "",
 }: AgentQueuePanelProps) {
   const canUseGuided = canUseGuidedWorkspace(accessState);
+  const status = accessStatusCopy(accessState);
+  const lockedBadgeLabel = lockedQueueBadgeLabel(accessState);
 
   return (
     <Card className={cx("p-5", className)}>
@@ -588,7 +627,7 @@ export function AgentQueuePanel({
           </p>
         </div>
         <StatusBadge className={canUseGuided ? signalToneClasses.good : signalToneClasses.warning}>
-          {canUseGuided ? "Ready" : "Locked"}
+          {canUseGuided ? "Ready" : status.label}
         </StatusBadge>
       </div>
 
@@ -616,7 +655,7 @@ export function AgentQueuePanel({
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <p className="break-words text-sm font-semibold text-[#17211f]">{item.label}</p>
                   <StatusBadge className={ready ? signalToneClasses.good : signalToneClasses.warning}>
-                    {ready ? "Ready" : "Access code"}
+                    {ready ? "Ready" : lockedBadgeLabel}
                   </StatusBadge>
                 </div>
                 <p className="mt-2 text-sm leading-6 text-[#40504b]">
@@ -737,7 +776,7 @@ export function GuidedCopilotPanel({
 
         {!canUseGuided ? (
           <CopilotMessage label="Access boundary">
-            Access code required before guided drafting is available. Preview materials remain visible.
+            {copilotBoundaryMessage(accessState)}
           </CopilotMessage>
         ) : null}
       </div>

@@ -18,6 +18,7 @@ vi.mock("../components/ui", async () => {
 
 import {
   AgentQueuePanel,
+  BasicProfileCard,
   GuidedCopilotPanel,
   LockedMaterialsGrid,
 } from "../components/referral-profile-workspace";
@@ -90,6 +91,21 @@ describe("referral profile workspace domain", () => {
     expect(description).toContain("profile summary needs review");
     expect(description).not.toContain("quality");
     expect(description).not.toContain("compliance");
+  });
+
+  it("renders the basic profile card without unsafe self-submitted summary claims", () => {
+    const profile = {
+      ...getSeedReferralProfiles()[0],
+      summary:
+        "We are a certified recommended provider for older adults comparing care options.",
+    };
+    const markup = renderToStaticMarkup(
+      createElement(BasicProfileCard, { summary: summarizeProfile(profile) }),
+    ).toLowerCase();
+
+    expect(markup).not.toContain("certified");
+    expect(markup).not.toContain("recommended provider");
+    expect(markup).toContain("profile summary needs review");
   });
 
   it("scores a both-mode profile and keeps receive/send sections separate", () => {
@@ -195,6 +211,29 @@ describe("referral profile workspace domain", () => {
     expect(markup).not.toContain("Ready for guided drafting");
   });
 
+  it("uses quota-used material copy when stale unlocked materials are gated by exhausted quota", () => {
+    const quotaExhaustedAccess = {
+      ...getAccessState("user-approved"),
+      usedToday: 5,
+    };
+    const staleUnlockedMaterials = getLockedMaterials(
+      "receive",
+      getAccessState("user-approved"),
+    );
+    const markup = renderToStaticMarkup(
+      createElement(LockedMaterialsGrid, {
+        materials: staleUnlockedMaterials,
+        accessState: quotaExhaustedAccess,
+      }),
+    );
+
+    expect(markup).toContain("Service areas, languages, intake method");
+    expect(markup).toContain("quota used");
+    expect(markup).not.toContain("Guided drafting available");
+    expect(markup).not.toContain("Ready for guided drafting");
+    expect(markup).not.toContain("Access code");
+  });
+
   it("uses access state as the final queue and copilot gate when queue data is stale", () => {
     const freeAccess = getAccessState("user-free");
     const staleReadyQueue = getAgentQueueForAccess(getAccessState("user-approved"));
@@ -215,6 +254,36 @@ describe("referral profile workspace domain", () => {
     expect(queueMarkup).toContain("Access code");
     expect(queueMarkup).not.toContain("Guide profile wording");
     expect(copilotMarkup).toContain("Preview mode only");
+    expect(copilotMarkup).not.toContain("Drafting prompt ready");
+    expect(copilotMarkup).not.toContain("Guide profile wording");
+  });
+
+  it("uses quota-used queue and copilot copy when stale ready queue is gated by exhausted quota", () => {
+    const quotaExhaustedAccess = {
+      ...getAccessState("user-approved"),
+      usedToday: 5,
+    };
+    const staleReadyQueue = getAgentQueueForAccess(getAccessState("user-approved"));
+    const queueMarkup = renderToStaticMarkup(
+      createElement(AgentQueuePanel, {
+        queue: staleReadyQueue,
+        accessState: quotaExhaustedAccess,
+      }),
+    );
+    const copilotMarkup = renderToStaticMarkup(
+      createElement(GuidedCopilotPanel, {
+        queue: staleReadyQueue,
+        accessState: quotaExhaustedAccess,
+      }),
+    );
+
+    expect(queueMarkup).toContain("Preview basic profile structure");
+    expect(queueMarkup).toContain("Quota used");
+    expect(queueMarkup).not.toContain("Access code");
+    expect(queueMarkup).not.toContain("Guide profile wording");
+    expect(copilotMarkup).toContain("Preview mode only");
+    expect(copilotMarkup).toContain("quota used");
+    expect(copilotMarkup).not.toContain("Access code");
     expect(copilotMarkup).not.toContain("Drafting prompt ready");
     expect(copilotMarkup).not.toContain("Guide profile wording");
   });
