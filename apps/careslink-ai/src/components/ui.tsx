@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { HTMLAttributes, ReactNode } from "react";
 import type { ProviderStatus, ReferralStatus } from "@/lib/types";
 import { displayProviderStatus, displayReferralStatus } from "@/lib/display";
 
@@ -30,8 +30,8 @@ export function ButtonLink({
 }) {
   const className =
     variant === "primary"
-      ? "inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#0f766e] px-4 text-sm font-semibold text-white transition hover:bg-[#0b5f59]"
-      : "inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-[#cfded8] bg-white px-4 text-sm font-semibold text-[#263834] transition hover:bg-[#f0f7f4]";
+      ? "taito-primary px-4"
+      : "taito-secondary px-4";
 
   return (
     <a href={href} className={className}>
@@ -43,13 +43,14 @@ export function ButtonLink({
 export function Card({
   children,
   className = "",
-}: {
+  ...props
+}: HTMLAttributes<HTMLElement> & {
   children: ReactNode;
-  className?: string;
 }) {
   return (
     <section
-      className={`rounded-lg border border-[#dce8e2] bg-white shadow-sm shadow-[#dce8e2]/40 ${className}`}
+      {...props}
+      className={`surface-card ${className}`}
     >
       {children}
     </section>
@@ -122,7 +123,7 @@ export function TextInput({
   return (
     <input
       {...props}
-      className={`h-10 rounded-lg border border-[#cfded8] bg-white px-3 text-sm text-[#17211f] outline-none transition placeholder:text-[#91a09b] focus:border-[#0f766e] focus:ring-2 focus:ring-[#b8e6de] ${className}`}
+      className={`h-11 rounded-lg border border-[#d8d0c1] bg-white px-3 text-sm text-foreground outline-none transition placeholder:text-[#8b857b] focus:border-[#181715] focus:ring-2 focus:ring-[#d9eee9] ${className}`}
     />
   );
 }
@@ -134,7 +135,7 @@ export function SelectInput({
   return (
     <select
       {...props}
-      className={`h-10 rounded-lg border border-[#cfded8] bg-white px-3 text-sm text-[#17211f] outline-none transition focus:border-[#0f766e] focus:ring-2 focus:ring-[#b8e6de] ${className}`}
+      className={`h-11 rounded-lg border border-[#d8d0c1] bg-white px-3 text-sm text-foreground outline-none transition focus:border-[#181715] focus:ring-2 focus:ring-[#d9eee9] ${className}`}
     />
   );
 }
@@ -146,7 +147,7 @@ export function TextArea({
   return (
     <textarea
       {...props}
-      className={`min-h-28 rounded-lg border border-[#cfded8] bg-white px-3 py-2 text-sm text-[#17211f] outline-none transition placeholder:text-[#91a09b] focus:border-[#0f766e] focus:ring-2 focus:ring-[#b8e6de] ${className}`}
+      className={`min-h-28 rounded-lg border border-[#d8d0c1] bg-white px-3 py-2 text-sm text-foreground outline-none transition placeholder:text-[#8b857b] focus:border-[#181715] focus:ring-2 focus:ring-[#d9eee9] ${className}`}
     />
   );
 }

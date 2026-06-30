@@ -10,16 +10,16 @@ import {
 } from "./referral-workspace-i18n";
 
 const mojibakeMarkers = [
-  "�",
-  "绠€",
-  "浣撲",
-  "涓嶈",
-  "璧勬",
-  "宸ヤ",
-  "鍑嗗",
-  "瑙勭",
-  "鐨勮",
-  "杞",
+  "\uFFFD",
+  "\u7BA0\u20AC",
+  "\u6D63\u64B2",
+  "\u6D93\u5D76",
+  "\u9435\u52F6",
+  "\u5B80\u641E",
+  "\u95B8\u621D",
+  "\u941F\u6B0F",
+  "\u95BB\u3125",
+  "\u93C9\u70C6",
 ] as const;
 
 function collectStrings(
@@ -70,8 +70,11 @@ describe("referral workspace i18n", () => {
         "profile",
         "health",
         "materials",
+        "referralPack",
+        "outreach",
         "accessCode",
         "accessRequests",
+        "materialUsage",
       ]);
       expect(Object.keys(copy.shell.legacyNav)).toEqual([
         "groupHeading",
@@ -207,6 +210,97 @@ describe("referral workspace i18n", () => {
     for (const { path, value } of zhStrings) {
       for (const marker of mojibakeMarkers) {
         expect(value, `zh-Hans.${path}`).not.toContain(marker);
+      }
+    }
+  });
+
+  it("keeps Simplified Chinese materials copy natural for provider-facing pages", () => {
+    const copy = getReferralWorkspaceCopy("zh-Hans");
+    const zhCopy = collectStrings(copy)
+      .map(({ value }) => value)
+      .join(" ");
+    const materialsCopy = collectStrings(copy.materials)
+      .map(({ value }) => value)
+      .join(" ");
+    const authGateCopy = [
+      copy.auth.gate.description,
+      copy.auth.register.description,
+    ].join(" ");
+
+    expect(materialsCopy).toContain("创建资料包草稿");
+    expect(materialsCopy).toContain("服务商资料");
+    expect(materialsCopy).toContain("转介消息");
+    expect(materialsCopy).toContain("资料包草稿已生成，等待复核");
+    expect(materialsCopy).toContain("可放入 Referral Pack 的转介沟通草稿");
+    expect(zhCopy).toContain("Referral Pack 工作台");
+    expect(zhCopy).toContain("工作区访问");
+    expect(zhCopy).toContain("仅用于一般商业资料和运营支持");
+    expect(authGateCopy).toContain("服务商资料、访问申请和引导式材料状态");
+
+    for (const mixedTerm of [
+      "优化 profile 文案",
+      "provider 资料",
+      "Provider 需要审核",
+      "生成 profile 改写",
+      "Profile 改写已生成",
+      "profile 改写草稿",
+      "provider 审核",
+      "Provider 资料、access request",
+    ]) {
+      expect(`${materialsCopy} ${authGateCopy}`).not.toContain(mixedTerm);
+    }
+  });
+
+  it("keeps provider-facing workspace copy free of internal vendor and assurance terms", () => {
+    const blockedTerms = [
+      "openai",
+      "real ai",
+      "provider 资料",
+      "profile 文案",
+      "access request",
+      "demo account",
+      "demo access",
+      "approved provider",
+      "verified",
+      "compliant",
+      "certified",
+      "endorsed",
+      "guaranteed",
+    ] as const;
+    const providerFacingCopy = SUPPORTED_LOCALES.flatMap((locale) => {
+      const copy = getReferralWorkspaceCopy(locale);
+
+      return collectStrings({
+        common: copy.common,
+        shell: {
+          brand: copy.shell.brand,
+          subtitle: copy.shell.subtitle,
+          language: copy.shell.language,
+          pilotPreview: copy.shell.pilotPreview,
+          pilotBoundary: copy.shell.pilotBoundary,
+          primaryNav: {
+            workspace: copy.shell.primaryNav.workspace,
+            profile: copy.shell.primaryNav.profile,
+            health: copy.shell.primaryNav.health,
+            materials: copy.shell.primaryNav.materials,
+            accessCode: copy.shell.primaryNav.accessCode,
+          },
+        },
+        workspace: copy.workspace,
+        profile: copy.profile,
+        health: copy.health,
+        materials: copy.materials,
+        access: copy.access,
+        auth: copy.auth,
+        components: copy.components,
+      }).map(({ path, value }) => ({ locale, path, value }));
+    });
+
+    for (const { locale, path, value } of providerFacingCopy) {
+      const normalizedValue = value.toLowerCase();
+
+      for (const blockedTerm of blockedTerms) {
+        expect(normalizedValue, `${locale}.${path}`).not.toContain(blockedTerm);
       }
     }
   });

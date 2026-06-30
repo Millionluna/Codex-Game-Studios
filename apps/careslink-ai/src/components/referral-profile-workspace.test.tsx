@@ -28,6 +28,7 @@ import {
   HealthScorePanel,
   HealthSignalsTable,
   LockedMaterialsGrid,
+  ReferralRoleChecklistPanel,
   TopIssuesPanel,
   TrustBoundaryNotice,
 } from "./referral-profile-workspace";
@@ -41,6 +42,27 @@ import {
 } from "../lib/referral-profile-workspace";
 
 describe("referral profile workspace shared components", () => {
+  it("renders a provider-facing referral role checklist without matrix or seed wording", () => {
+    const profile = getSeedReferralProfiles()[1];
+    const summary = summarizeProfile(profile);
+
+    const markup = renderToStaticMarkup(
+      createElement(ReferralRoleChecklistPanel, {
+        summary,
+        locale: "zh-Hans",
+      }),
+    );
+
+    expect(markup).toContain("你的转介角色");
+    expect(markup).toContain("我主要接收转介");
+    expect(markup).toContain("接收转介需要补充");
+    expect(markup).toContain("服务区域");
+    expect(markup).not.toContain("转介角色矩阵");
+    expect(markup).not.toContain("种子集合");
+    expect(markup).not.toContain("相关");
+    expect(markup).not.toContain("不使用");
+  });
+
   it("localizes zh-Hans generated UI copy while preserving submitted profile data", () => {
     const locale = "zh-Hans";
     const profile = getSeedReferralProfiles()[1];

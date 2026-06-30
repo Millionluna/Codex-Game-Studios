@@ -5,15 +5,26 @@ import {
   ClipboardList,
   Eye,
   Info,
-  Languages,
   MapPin,
   Send,
+  Sparkles,
   UserRound,
 } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
-import { PageHeader } from "@/components/page-header";
+import { ProviderDraftHandoffPersister } from "@/components/provider-draft-handoff-persister";
+import {
+  ReferralWorkspaceAdminGate,
+  ReferralWorkspaceLoginGate,
+} from "@/components/referral-workspace-auth-gate";
+import {
+  WorkspaceGrid,
+  WorkspaceMainPanel,
+  WorkspaceRightRail,
+  WorkspaceSection,
+} from "@/components/workspace-layout";
 import {
   BasicProfileCard,
+  ReferralRoleChecklistPanel,
   TrustBoundaryNotice,
 } from "@/components/referral-profile-workspace";
 import {
@@ -25,13 +36,29 @@ import {
   TextInput,
 } from "@/components/ui";
 import {
-  getReferralProfile,
-  getSeedReferralProfiles,
+  getReferralProfileForWorkspaceAccount,
+  getHealthAudit,
   summarizeProfile,
   type EntityType,
   type ReferralDirection,
   type ReferralProfile,
 } from "@/lib/referral-profile-workspace";
+import { mapPublicProviderDraftToProfile } from "@/lib/public-provider-profile-generator";
+import {
+  claimResolvedProviderDraftForOwner,
+  getProviderDraftStore,
+  resolveProviderDraft,
+  resolveProviderDraftForOwner,
+} from "@/lib/provider-draft-store";
+import {
+  withWorkspaceAccount,
+} from "@/lib/referral-workspace-auth";
+import { getWorkspaceAccessGateWithServerSession } from "@/lib/referral-workspace-session";
+import {
+  getProviderGeneratorHandoffContext,
+  withAuthHandoffParams,
+  withProviderGeneratorHandoff,
+} from "@/lib/referral-workspace-handoff";
 import {
   getLocaleFromSearchParams,
   getReferralWorkspaceCopy,
@@ -51,12 +78,92 @@ type ReferralProfilePageProps = {
   searchParams?: Promise<ReferralWorkspaceSearchParams>;
 };
 
-function cx(...classes: Array<string | false | null | undefined>) {
-  return classes.filter(Boolean).join(" ");
+function getProfilePolishCopy(locale: Locale) {
+  if (locale === "zh-Hans") {
+    return {
+      qualityTitle: "资料包来源质量",
+      qualityDescription:
+        "这些资料会进入 Referral Pack。先检查完整度、缺失字段和转介阻碍，再用于发送。",
+      completeness: (score: number) => `资料完整度 ${score}%`,
+      submittedTitle: "服务商自填资料",
+      submittedDescription:
+        "这些字段来自服务商资料草稿。CaresLink 不评估服务商质量、适用性、合规状态或服务结果。",
+      missingFields: "缺失字段",
+      generatedTitle: "AI 生成草稿文案",
+      generatedDescription:
+        "资料改写结果只作为服务商审核用的草稿文案，不是验证、背书或专业建议流程。",
+      reviewTitle: "需要服务商复核",
+      reviewDescription:
+        "把缺失字段和转介阻碍作为复核清单，确认后再分享资料或生成材料。",
+      promptsTitle: "转介阻碍提示",
+      fallbackPrompt:
+        "分享前请确认服务范围、语言、接收方式和当前接单能力清晰可读。",
+      reviewReadiness: "查看转介阻碍",
+      improveWording: "创建资料包草稿",
+      importedTitle: "已导入服务商资料草稿",
+      importedDescription: (draftId: string, source?: string) =>
+        `这份草稿来自 CaresLink 服务商资料生成器。草稿 ID：${draftId}${
+          source ? `；来源：${source}` : ""
+        }。请在工作区内继续补全和审核资料。`,
+      importedBadge: "草稿承接",
+    };
+  }
+
+  return {
+    qualityTitle: "Referral Pack source quality",
+    qualityDescription:
+      "These details power the Referral Pack. Check completeness, missing fields, and referral blockers before sending.",
+    completeness: (score: number) => `Profile completeness ${score}%`,
+    submittedTitle: "Provider-submitted information",
+    submittedDescription:
+      "These fields come from the provider profile draft. CaresLink does not assess provider quality, suitability, compliance, or outcomes.",
+    missingFields: "Missing fields",
+    generatedTitle: "AI-generated draft wording",
+    generatedDescription:
+      "Profile rewrite output is draft wording for provider review only. It is not a verification, endorsement, or advice workflow.",
+    reviewTitle: "Needs provider review",
+    reviewDescription:
+      "Use missing fields and referral blockers as a review checklist before sharing the profile or generating materials.",
+    promptsTitle: "Referral blocker prompts",
+    fallbackPrompt:
+      "Keep service area, language, intake path, and current capacity clear before sharing.",
+    reviewReadiness: "Review referral blockers",
+    improveWording: "Create pack drafts",
+    importedTitle: "Imported provider profile draft",
+    importedDescription: (draftId: string, source?: string) =>
+      `This draft came from the CaresLink provider profile generator. Draft ID: ${draftId}${
+        source ? ` - Source: ${source}` : ""
+      }. Complete and review the details here before publishing or using generated materials.`,
+    importedBadge: "Draft handoff",
+  };
 }
 
-function formatList(items: string[] | undefined, emptyPlaceholder: string) {
-  return items && items.length > 0 ? items.join(", ") : emptyPlaceholder;
+function getProfileWorkspaceActions(locale: Locale) {
+  return locale === "zh-Hans"
+    ? {
+        completeProfile: "完善资料",
+        viewReadiness: "查看转介阻碍",
+        workspaceBack: "返回工作台",
+        previewTitle: "工作区边界",
+        sideTitle: "资料包来源",
+        sideDescription: "当前服务商资料、下一步和边界说明。",
+        actionsTitle: "主要操作",
+        actionsDescription: "继续补全资料或检查转介阻碍。",
+      }
+    : {
+        completeProfile: "Complete profile",
+        viewReadiness: "View referral blockers",
+        workspaceBack: "Back to workspace",
+        previewTitle: "Workspace boundary",
+        sideTitle: "Pack source overview",
+        sideDescription: "Current provider profile, next steps, and boundary notes.",
+        actionsTitle: "Primary actions",
+        actionsDescription: "Continue profile completion or check referral blockers.",
+      };
+}
+
+function cx(...classes: Array<string | false | null | undefined>) {
+  return classes.filter(Boolean).join(" ");
 }
 
 function formatMultilineList(
@@ -103,7 +210,7 @@ function getLocalizedSummaryDescription(
 function EntityIcon({ entityType }: { entityType: EntityType }) {
   const Icon = entityType === "organisation" ? Building2 : UserRound;
 
-  return <Icon className="size-5 text-[#0f766e]" aria-hidden="true" />;
+  return <Icon className="size-5 text-[#181715]" aria-hidden="true" />;
 }
 
 function StatusPill({
@@ -114,9 +221,9 @@ function StatusPill({
   tone?: "neutral" | "active" | "inactive";
 }) {
   const tones = {
-    neutral: "border-[#dce8e2] bg-[#f8fbfa] text-[#40504b]",
-    active: "border-[#9ed8c9] bg-[#e6f7f2] text-[#0f766e]",
-    inactive: "border-[#cfded8] bg-white text-[#65736f]",
+    neutral: "border-[#ded6c8] bg-[#fbfaf7] text-[#635f57]",
+    active: "border-[#c9d8cf] bg-[#f3f8f4] text-[#334a3e]",
+    inactive: "border-[#ded6c8] bg-white text-[#7c766d]",
   };
 
   return (
@@ -159,11 +266,11 @@ function SectionHeader({
   return (
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div className="min-w-0">
-        <div className="flex items-center gap-2 text-sm font-semibold text-[#0f766e]">
-          <Icon className="size-5 shrink-0" aria-hidden="true" />
+        <div className="flex items-center gap-2 text-sm font-semibold text-[#181715]">
+          <Icon className="size-5 shrink-0 text-[#635f57]" aria-hidden="true" />
           <h2 className="text-sm font-semibold">{title}</h2>
         </div>
-        <p className="mt-2 max-w-3xl text-sm leading-6 text-[#65736f]">
+        <p className="mt-2 max-w-3xl text-sm leading-6 text-[#635f57]">
           {description}
         </p>
       </div>
@@ -186,7 +293,7 @@ function BuilderSection({
   children: ReactNode;
 }) {
   return (
-    <section className="border-t border-[#dce8e2] pt-5 first:border-t-0 first:pt-0">
+    <section className="border-t border-[#e3ddd2] pt-5 first:border-t-0 first:pt-0">
       <SectionHeader
         icon={icon}
         title={title}
@@ -211,7 +318,7 @@ function ReadOnlyTextField({
       <TextInput
         readOnly
         value={value}
-        className="cursor-default bg-[#f8fbfa]"
+        className="cursor-default bg-[#fbfaf7] text-[#181715]"
       />
     </FieldLabel>
   );
@@ -232,7 +339,10 @@ function ReadOnlyTextAreaField({
       <TextArea
         readOnly
         value={value}
-        className={cx("min-h-32 cursor-default resize-none bg-[#f8fbfa]", className)}
+        className={cx(
+          "min-h-32 cursor-default resize-none bg-[#fbfaf7] text-[#181715]",
+          className,
+        )}
       />
     </FieldLabel>
   );
@@ -253,7 +363,7 @@ function ReadOnlySelectField({
       <SelectInput
         disabled
         value={value}
-        className="cursor-default bg-[#f8fbfa] disabled:opacity-100"
+        className="cursor-default bg-[#fbfaf7] text-[#181715] disabled:opacity-100"
       >
         {options.map((option) => (
           <option key={option.value} value={option.value}>
@@ -267,11 +377,11 @@ function ReadOnlySelectField({
 
 function ProfileBuilderPanel({
   profile,
-  locale,
+  readinessHref,
   copy,
 }: {
   profile: ReferralProfile;
-  locale: Locale;
+  readinessHref: string;
   copy: ReferralWorkspaceCopy;
 }) {
   const receiveRelevant = isReceiveRelevant(profile.referralDirection);
@@ -286,17 +396,17 @@ function ProfileBuilderPanel({
   const directionOptions = getDirectionOptions(componentCopy);
 
   return (
-    <Card className="p-5">
+    <Card className="p-5 shadow-[var(--shadow-md)] lg:p-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0">
-          <div className="flex items-center gap-2 text-sm font-semibold text-[#0f766e]">
+          <div className="flex items-center gap-2 text-sm font-semibold text-[#181715]">
             <EntityIcon entityType={profile.entityType} />
             {profileCopy.builderExample}
           </div>
-          <h2 className="mt-2 break-words text-xl font-semibold text-[#17211f]">
+          <h2 className="mt-2 break-words text-2xl font-semibold text-[#181715]">
             {profile.name}
           </h2>
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-[#65736f]">
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-[#635f57]">
             {profileCopy.builderDescription}
           </p>
         </div>
@@ -436,13 +546,13 @@ function ProfileBuilderPanel({
           title={profileCopy.previewBoundaryTitle}
           description={profileCopy.previewBoundaryDescription}
         >
-          <div className="flex flex-wrap items-start justify-between gap-4 rounded-lg border border-[#dce8e2] bg-[#f8fbfa] p-4">
-            <div className="flex max-w-3xl gap-3 text-sm leading-6 text-[#40504b]">
-              <Info className="mt-1 size-5 shrink-0 text-[#0f766e]" aria-hidden="true" />
+          <div className="flex flex-wrap items-start justify-between gap-4 rounded-lg border border-[#e3ddd2] bg-[#fbfaf7] p-4">
+            <div className="flex max-w-3xl gap-3 text-sm leading-6 text-[#3f3b34]">
+              <Info className="mt-1 size-5 shrink-0 text-[#635f57]" aria-hidden="true" />
               <p>{copy.common.trustBoundary}</p>
             </div>
             <ButtonLink
-              href={withLocale("/referral-workspace/health", locale)}
+              href={readinessHref}
               variant="secondary"
             >
               {copy.common.continueToReadiness}
@@ -454,136 +564,146 @@ function ProfileBuilderPanel({
   );
 }
 
-function RoleState({
-  relevant,
-  detail,
-  copy,
+function ProfileQualityPanel({
+  profile,
+  readinessHref,
+  materialsHref,
+  locale,
 }: {
-  relevant: boolean;
-  detail: string;
-  copy: ProfilePageCopy;
+  profile: ReferralProfile;
+  readinessHref: string;
+  materialsHref: string;
+  locale: Locale;
 }) {
+  const polishCopy = getProfilePolishCopy(locale);
+  const audit = getHealthAudit(profile);
+  const missingSignals = audit.signals.filter(
+    (signal) => signal.status !== "good",
+  );
+  const topPrompts = audit.issues.slice(0, 3);
+
   return (
-    <div className="grid gap-2">
-      <StatusPill tone={relevant ? "active" : "inactive"}>
-        {relevant ? copy.relevant : copy.notUsed}
-      </StatusPill>
-      <p className="text-xs leading-5 text-[#65736f]">{detail}</p>
-    </div>
+    <Card className="mt-6 p-5 shadow-[var(--shadow-md)] lg:p-6">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 text-sm font-semibold text-[#181715]">
+            <ClipboardList className="size-5 text-[#635f57]" aria-hidden="true" />
+            {polishCopy.qualityTitle}
+          </div>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-[#635f57]">
+            {polishCopy.qualityDescription}
+          </p>
+        </div>
+        <StatusPill tone={audit.score >= 70 ? "active" : "neutral"}>
+          {polishCopy.completeness(audit.score)}
+        </StatusPill>
+      </div>
+
+      <div className="mt-5 grid gap-4 lg:grid-cols-3">
+        <div className="rounded-lg border border-[#e3ddd2] bg-[#fbfaf7] p-4">
+          <p className="text-sm font-semibold text-[#181715]">
+            {polishCopy.submittedTitle}
+          </p>
+          <p className="mt-2 text-sm leading-6 text-[#3f3b34]">
+            {polishCopy.submittedDescription}
+          </p>
+        </div>
+        <div className="rounded-lg border border-[#e3ddd2] bg-[#fbfaf7] p-4">
+          <p className="text-sm font-semibold text-[#181715]">
+            {polishCopy.generatedTitle}
+          </p>
+          <p className="mt-2 text-sm leading-6 text-[#3f3b34]">
+            {polishCopy.generatedDescription}
+          </p>
+        </div>
+        <div className="rounded-lg border border-[#e3ddd2] bg-[#fbfaf7] p-4">
+          <p className="text-sm font-semibold text-[#181715]">
+            {polishCopy.reviewTitle}
+          </p>
+          <p className="mt-2 text-sm leading-6 text-[#3f3b34]">
+            {polishCopy.reviewDescription}
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-5 grid gap-4 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
+        <div className="rounded-lg border border-[#e3ddd2] bg-white p-4">
+          <p className="text-sm font-semibold text-[#181715]">
+            {polishCopy.missingFields}
+          </p>
+          <div className="mt-3 grid gap-2">
+            {(missingSignals.length ? missingSignals : audit.signals.slice(0, 2))
+              .slice(0, 4)
+              .map((signal) => (
+                <div
+                  key={signal.id}
+                  className="rounded-md border border-[#e3ddd2] bg-[#fbfaf7] px-3 py-2 text-sm text-[#3f3b34]"
+                >
+                  {signal.label}
+                </div>
+              ))}
+          </div>
+        </div>
+
+        <div className="rounded-lg border border-[#e3ddd2] bg-white p-4">
+          <div className="flex items-center gap-2 text-sm font-semibold text-[#181715]">
+            <Sparkles className="size-5 text-[#635f57]" aria-hidden="true" />
+            {polishCopy.promptsTitle}
+          </div>
+          <div className="mt-3 grid gap-2">
+            {(topPrompts.length
+              ? topPrompts.map((issue) => issue.guidance)
+              : [polishCopy.fallbackPrompt]
+            ).map((prompt) => (
+              <p
+                key={prompt}
+                className="rounded-md border border-[#e3ddd2] bg-[#fbfaf7] px-3 py-2 text-sm leading-6 text-[#3f3b34]"
+              >
+                {prompt}
+              </p>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-5 flex flex-wrap gap-3">
+        <ButtonLink href={readinessHref} variant="secondary">
+          {polishCopy.reviewReadiness}
+        </ButtonLink>
+        <ButtonLink href={materialsHref}>{polishCopy.improveWording}</ButtonLink>
+      </div>
+    </Card>
   );
 }
 
-function RoleMatrix({
-  profiles,
-  copy,
+function ImportedDraftBanner({
+  draftId,
+  source,
+  locale,
 }: {
-  profiles: ReferralProfile[];
-  copy: ReferralWorkspaceCopy;
+  draftId: string;
+  source?: string;
+  locale: Locale;
 }) {
-  const profileCopy = copy.profile;
-  const componentCopy = copy.components.basicProfile;
+  const polishCopy = getProfilePolishCopy(locale);
 
   return (
-    <Card className="mt-6 overflow-hidden">
-      <div className="border-b border-[#dce8e2] p-5">
-        <div className="flex items-center gap-2 text-sm font-semibold text-[#0f766e]">
-          <Languages className="size-5" aria-hidden="true" />
-          {profileCopy.roleMatrixTitle}
+    <Card className="mb-6 border-[#d8d0c1] bg-[#fbfaf7] p-5">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex gap-3">
+          <Info className="mt-1 size-5 shrink-0 text-[#635f57]" aria-hidden="true" />
+          <div>
+            <p className="text-sm font-semibold text-[#181715]">
+              {polishCopy.importedTitle}
+            </p>
+            <p className="mt-1 text-sm leading-6 text-[#3f3b34]">
+              {polishCopy.importedDescription(draftId, source)}
+            </p>
+          </div>
         </div>
-        <p className="mt-2 max-w-3xl text-sm leading-6 text-[#65736f]">
-          {profileCopy.roleMatrixDescription}
-        </p>
-      </div>
-
-      <div className="overflow-x-auto">
-        <table className="min-w-[820px] divide-y divide-[#dce8e2] text-left text-sm">
-          <thead className="bg-[#f8fbfa] text-xs font-semibold text-[#65736f]">
-            <tr>
-              <th className="px-5 py-3">{profileCopy.tableColumns.profile}</th>
-              <th className="px-5 py-3">
-                {profileCopy.tableColumns.entityType}
-              </th>
-              <th className="px-5 py-3">
-                {profileCopy.tableColumns.referralDirection}
-              </th>
-              <th className="px-5 py-3">
-                {profileCopy.tableColumns.receiveSide}
-              </th>
-              <th className="px-5 py-3">
-                {profileCopy.tableColumns.sendSide}
-              </th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-[#eef3f1]">
-            {profiles.map((profile) => {
-              const receiveRelevant = isReceiveRelevant(profile.referralDirection);
-              const sendRelevant = isSendRelevant(profile.referralDirection);
-              const summaryDescription = getLocalizedSummaryDescription(
-                profile,
-                componentCopy,
-              );
-
-              return (
-                <tr key={profile.id} className="align-top">
-                  <td className="px-5 py-4">
-                    <div className="flex gap-3">
-                      <EntityIcon entityType={profile.entityType} />
-                      <div className="min-w-0">
-                        <p className="break-words font-semibold text-[#17211f]">
-                          {profile.name}
-                        </p>
-                        <p className="mt-1 max-w-72 text-xs leading-5 text-[#65736f]">
-                          {summaryDescription}
-                        </p>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-5 py-4">
-                    <StatusPill>
-                      {componentCopy.entityLabels[profile.entityType]}
-                    </StatusPill>
-                  </td>
-                  <td className="px-5 py-4">
-                    <div className="grid gap-2">
-                      <StatusPill tone="neutral">
-                        {componentCopy.directionLabels[profile.referralDirection]}
-                      </StatusPill>
-                      <p className="max-w-64 text-xs leading-5 text-[#65736f]">
-                        {profileCopy.directionHelp[profile.referralDirection]}
-                      </p>
-                    </div>
-                  </td>
-                  <td className="px-5 py-4">
-                    <RoleState
-                      relevant={receiveRelevant}
-                      copy={profileCopy}
-                      detail={
-                        receiveRelevant
-                          ? profile.receive?.intakeMethod ??
-                            profileCopy.receiveDetailsMissing
-                          : profileCopy.receiveNotUsed
-                      }
-                    />
-                  </td>
-                  <td className="px-5 py-4">
-                    <RoleState
-                      relevant={sendRelevant}
-                      copy={profileCopy}
-                      detail={
-                        sendRelevant
-                          ? formatList(
-                              profile.send?.handoverRequirements,
-                              componentCopy.emptyPlaceholder,
-                            )
-                          : profileCopy.sendNotUsed
-                      }
-                    />
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+        <span className="inline-flex min-h-7 items-center rounded-md border border-[#ded6c8] bg-white px-2 py-1 text-xs font-semibold text-[#635f57]">
+          {polishCopy.importedBadge}
+        </span>
       </div>
     </Card>
   );
@@ -595,62 +715,208 @@ export default async function ReferralProfilePage({
   const params = await searchParams;
   const locale = getLocaleFromSearchParams(params);
   const copy = getReferralWorkspaceCopy(locale);
-  const primaryProfile = getReferralProfile("profile-harbour");
-  const profiles = getSeedReferralProfiles();
+  const gate = await getWorkspaceAccessGateWithServerSession(params);
+  const handoff = getProviderGeneratorHandoffContext(params);
+  const localDraftPersister = (
+    <ProviderDraftHandoffPersister
+      source={handoff.source}
+      draftId={handoff.draftId}
+      draftPayload={handoff.draftPayload}
+    />
+  );
+
+  if (gate.status === "signed_out") {
+    return (
+      <>
+        {localDraftPersister}
+        <ReferralWorkspaceLoginGate
+          copy={copy}
+          locale={locale}
+          languageSwitcherHref={withProviderGeneratorHandoff(
+            "/referral-workspace/profile",
+            handoff,
+          )}
+          loginHref={withAuthHandoffParams("/auth/login", params)}
+          registerHref={withAuthHandoffParams("/auth/register", params)}
+        />
+      </>
+    );
+  }
+
+  if (gate.account.role === "admin") {
+    return (
+      <>
+        {localDraftPersister}
+        <ReferralWorkspaceAdminGate
+          copy={copy}
+          locale={locale}
+          accountId={gate.account.id}
+        />
+      </>
+    );
+  }
+
+  const accountId = gate.account.id;
+  const draftId = handoff.draftId;
+  const providerDraftStore = getProviderDraftStore();
+  const rawResolvedDraft = draftId
+    ? await resolveProviderDraft({
+        draftId,
+        draftPayload: handoff.draftPayload,
+        ownerUserId: accountId,
+        store: providerDraftStore,
+      })
+    : await resolveProviderDraftForOwner({
+        ownerUserId: accountId,
+        store: providerDraftStore,
+      });
+  const resolvedDraft = await claimResolvedProviderDraftForOwner({
+    ownerUserId: accountId,
+    resolution: rawResolvedDraft,
+    store: providerDraftStore,
+  });
+  const withHandoff = (href: string) =>
+    withProviderGeneratorHandoff(href, handoff);
+  const signedInHref = (href: string) => {
+    const localizedHref = withLocale(withHandoff(href), locale);
+
+    return gate.source === "demo"
+      ? withWorkspaceAccount(localizedHref, accountId)
+      : localizedHref;
+  };
+  const primaryProfile = resolvedDraft
+    ? mapPublicProviderDraftToProfile(resolvedDraft.draft, accountId)
+    : getReferralProfileForWorkspaceAccount({
+        ownerUserId: gate.account.id,
+        name: gate.account.name,
+      });
+  const primarySummary = summarizeProfile(primaryProfile);
+  const workspaceActions = getProfileWorkspaceActions(locale);
 
   return (
     <AppShell
       locale={locale}
-      languageSwitcherHref="/referral-workspace/profile"
+      languageSwitcherHref={withWorkspaceAccount(
+        withHandoff("/referral-workspace/profile"),
+        gate.source === "demo" ? accountId : undefined,
+      )}
+      workspaceAccountId={gate.source === "demo" ? accountId : undefined}
+      workspaceRole={gate.account.role}
+      workspaceSessionSource={gate.source}
     >
-      <PageHeader
-        eyebrow={copy.profile.eyebrow}
-        title={copy.profile.title}
-        description={copy.profile.description}
-        actions={
-          <>
-            <ButtonLink href={withLocale("/referral-workspace/health", locale)}>
-              {copy.common.continueToReadiness} <ArrowRight className="size-4" />
-            </ButtonLink>
-            <ButtonLink
-              href={withLocale("/referral-workspace", locale)}
-              variant="secondary"
-            >
-              {copy.shell.primaryNav.workspace}
-            </ButtonLink>
-          </>
-        }
-      />
-
-      <Card className="mb-6 p-5">
-        <div className="flex items-start gap-3">
-          <Eye className="mt-1 size-5 shrink-0 text-[#0f766e]" aria-hidden="true" />
-          <div>
-            <p className="text-sm font-semibold text-[#17211f]">
-              {copy.common.previewOnly}
+      {localDraftPersister}
+      <header className="mb-4 border-b border-[#ded6c8] pb-4">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <div className="min-w-0">
+            <p className="text-xs font-semibold text-[#0f766e]">
+              {copy.profile.eyebrow}
             </p>
-            <p className="mt-1 max-w-4xl text-sm leading-6 text-[#40504b]">
-              {copy.profile.noPersistence}
+            <h1 className="mt-2 text-2xl font-semibold tracking-normal text-[#181715] sm:text-3xl">
+              {copy.profile.title}
+            </h1>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-[#40504b]">
+              {copy.profile.description}
             </p>
           </div>
+          <div className="flex flex-wrap gap-2">
+            <ButtonLink href={signedInHref("/referral-workspace/profile")}>
+              {workspaceActions.completeProfile}
+            </ButtonLink>
+            <ButtonLink
+              href={signedInHref("/referral-workspace/health")}
+              variant="secondary"
+            >
+              {workspaceActions.viewReadiness}
+              <ArrowRight className="size-4" />
+            </ButtonLink>
+          </div>
         </div>
-      </Card>
+      </header>
 
-      <section className="grid gap-5 xl:grid-cols-[360px_minmax(0,1fr)]">
-        <BasicProfileCard
-          summary={summarizeProfile(primaryProfile)}
-          locale={locale}
-        />
-        <ProfileBuilderPanel
-          profile={primaryProfile}
-          locale={locale}
-          copy={copy}
-        />
-      </section>
+      <WorkspaceGrid
+        main={
+          <WorkspaceMainPanel>
+            <WorkspaceSection title={workspaceActions.previewTitle}>
+              <div className="flex items-start gap-3">
+                <Eye className="mt-1 size-5 shrink-0 text-[#635f57]" aria-hidden="true" />
+                <div>
+                  <p className="text-sm font-semibold text-[#181715]">
+                    {copy.common.previewOnly}
+                  </p>
+                  <p className="mt-1 max-w-4xl text-sm leading-6 text-[#3f3b34]">
+                    {copy.profile.noPersistence}
+                  </p>
+                </div>
+              </div>
+            </WorkspaceSection>
 
-      <RoleMatrix profiles={profiles} copy={copy} />
+            {draftId ? (
+              <ImportedDraftBanner
+                draftId={draftId}
+                source={handoff.source}
+                locale={locale}
+              />
+            ) : null}
 
-      <TrustBoundaryNotice className="mt-6" locale={locale} />
+            <ProfileBuilderPanel
+              profile={primaryProfile}
+              readinessHref={signedInHref("/referral-workspace/health")}
+              copy={copy}
+            />
+
+            <ReferralRoleChecklistPanel
+              summary={primarySummary}
+              locale={locale}
+              className="mt-6"
+            />
+
+            <ProfileQualityPanel
+              profile={primaryProfile}
+              readinessHref={signedInHref("/referral-workspace/health")}
+              materialsHref={signedInHref("/referral-workspace/materials")}
+              locale={locale}
+            />
+          </WorkspaceMainPanel>
+        }
+        rightRail={
+          <WorkspaceRightRail>
+            <WorkspaceSection
+              title={workspaceActions.sideTitle}
+              description={workspaceActions.sideDescription}
+            >
+              <BasicProfileCard
+                summary={primarySummary}
+                locale={locale}
+              />
+            </WorkspaceSection>
+            <WorkspaceSection
+              title={workspaceActions.actionsTitle}
+              description={workspaceActions.actionsDescription}
+            >
+              <div className="grid gap-2">
+                <ButtonLink href={signedInHref("/referral-workspace/profile")}>
+                  {workspaceActions.completeProfile}
+                </ButtonLink>
+                <ButtonLink
+                  href={signedInHref("/referral-workspace/health")}
+                  variant="secondary"
+                >
+                  {workspaceActions.viewReadiness}
+                </ButtonLink>
+                <ButtonLink
+                  href={signedInHref("/referral-workspace")}
+                  variant="secondary"
+                >
+                  {workspaceActions.workspaceBack}
+                </ButtonLink>
+              </div>
+            </WorkspaceSection>
+            <WorkspaceSection title={workspaceActions.previewTitle}>
+              <TrustBoundaryNotice className="border-0 bg-transparent p-0" locale={locale} />
+            </WorkspaceSection>
+          </WorkspaceRightRail>
+        }
+      />
     </AppShell>
   );
 }

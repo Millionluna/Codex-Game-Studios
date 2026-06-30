@@ -1,0 +1,318 @@
+import {
+  CircleGauge,
+  FileText,
+  KeyRound,
+  ShieldAlert,
+  UserPlus,
+  UserRound,
+} from "lucide-react";
+import { AppShell } from "@/components/app-shell";
+import { AuthSubmitButton } from "@/components/auth-submit-button";
+import { ButtonLink, FieldLabel, TextInput } from "@/components/ui";
+import {
+  getProviderGeneratorHandoffContext,
+  getSafeNextHrefWithHandoff,
+  withAuthHandoffParams,
+} from "@/lib/referral-workspace-handoff";
+import {
+  getLocaleFromSearchParams,
+  withLocale,
+  type Locale,
+} from "@/lib/referral-workspace-i18n";
+import { registerWithSupabaseAction } from "../actions";
+
+type AuthSearchParams = {
+  readonly [key: string]: string | string[] | undefined;
+};
+
+type RegisterPageProps = {
+  searchParams?: Promise<AuthSearchParams>;
+};
+
+export default async function RegisterPage({ searchParams }: RegisterPageProps) {
+  const params = await searchParams;
+  const locale = getLocaleFromSearchParams(params);
+  const copy = getAuthPageCopy(locale);
+  const handoff = getProviderGeneratorHandoffContext(params);
+  const nextHref = getSafeNextHrefWithHandoff(params);
+  const loginHref = withAuthHandoffParams("/auth/login", params);
+  const message = getAuthMessage(params);
+
+  return (
+    <AppShell
+      locale={locale}
+      languageSwitcherHref={withAuthHandoffParams("/auth/register", params)}
+    >
+      <section className="mx-auto grid max-w-7xl gap-6 py-4 lg:grid-cols-[minmax(0,0.98fr)_minmax(360px,0.72fr)] lg:items-start">
+        <div className="surface-card p-5 shadow-[var(--shadow-md)] sm:p-7 lg:p-8">
+          <div className="flex items-center gap-2 text-sm font-semibold text-[#0f766e]">
+            <UserPlus className="size-5" aria-hidden="true" />
+            {copy.formHeading}
+          </div>
+          <h1 className="hero-title mt-5 max-w-4xl">{copy.title}</h1>
+          <p className="mt-5 max-w-2xl text-base leading-7 text-[#635f57]">
+            {copy.description}
+          </p>
+
+          {message ? <AuthMessage message={message} /> : null}
+
+          <form action={registerWithSupabaseAction} className="mt-7 grid gap-4">
+            <HiddenAuthInputs
+              source={handoff.source}
+              draftId={handoff.draftId}
+              nextHref={nextHref}
+              locale={locale}
+            />
+            <FieldLabel>
+              <span>{copy.name}</span>
+              <TextInput
+                name="name"
+                type="text"
+                autoComplete="name"
+                required
+                placeholder={copy.namePlaceholder}
+              />
+            </FieldLabel>
+            <FieldLabel>
+              <span>{copy.email}</span>
+              <TextInput
+                name="email"
+                type="email"
+                autoComplete="email"
+                required
+                placeholder="provider@example.com"
+              />
+            </FieldLabel>
+            <FieldLabel>
+              <span>{copy.password}</span>
+              <TextInput
+                name="password"
+                type="password"
+                autoComplete="new-password"
+                required
+                minLength={6}
+              />
+            </FieldLabel>
+            <div className="flex flex-wrap items-center justify-end gap-3">
+              <ButtonLink href={withLocale(loginHref, locale)} variant="secondary">
+                {copy.loginCta}
+              </ButtonLink>
+            </div>
+            <AuthSubmitButton
+              pendingLabel={copy.pending}
+              className="taito-primary w-full px-4"
+            >
+              {copy.submit}
+            </AuthSubmitButton>
+          </form>
+        </div>
+
+        <CaresLinkWorkspaceMockup locale={locale} />
+
+        <TrustBoundaryStrip copy={copy} />
+      </section>
+    </AppShell>
+  );
+}
+
+function HiddenAuthInputs({
+  source,
+  draftId,
+  nextHref,
+  locale,
+}: {
+  source?: string;
+  draftId?: string;
+  nextHref: string;
+  locale: Locale;
+}) {
+  return (
+    <>
+      {source ? <input name="source" type="hidden" value={source} /> : null}
+      {draftId ? <input name="draftId" type="hidden" value={draftId} /> : null}
+      <input name="next" type="hidden" value={nextHref} />
+      <input name="lang" type="hidden" value={locale} />
+    </>
+  );
+}
+
+function AuthMessage({ message }: { message: string }) {
+  return (
+    <div className="mt-5 rounded-lg border border-[#ead091] bg-[#fff8e5] p-3 text-sm leading-6 text-[#5f4300]">
+      {message}
+    </div>
+  );
+}
+
+function CaresLinkWorkspaceMockup({ locale }: { locale: Locale }) {
+  const copy = getAuthPageCopy(locale);
+  const icons = [UserRound, CircleGauge, FileText, KeyRound];
+
+  return (
+    <aside className="taito-product-shell p-4 sm:p-5">
+      <div className="rounded-xl border border-[#ded6c8] bg-white p-4">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-xs font-semibold text-[#0f766e]">
+              {copy.mockup.kicker}
+            </p>
+            <h2 className="mt-1 text-xl font-semibold text-[#181715]">
+              {copy.mockup.title}
+            </h2>
+          </div>
+          <span className="rounded-md border border-[#ded6c8] bg-[#faf7f0] px-2.5 py-1 text-xs font-semibold text-[#4d4942]">
+            {copy.mockup.status}
+          </span>
+        </div>
+
+        <div className="mt-5 grid grid-cols-2 gap-2">
+          {copy.mockup.tabs.map((tab, index) => {
+            const Icon = icons[index];
+
+            return (
+              <div
+                key={tab}
+                className="flex items-center gap-2 rounded-lg border border-[#ded6c8] bg-[#fbfaf7] px-3 py-2 text-sm font-semibold text-[#24211d]"
+              >
+                <Icon className="size-4 text-[#0f766e]" aria-hidden="true" />
+                {tab}
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="mt-5 grid gap-3">
+          {copy.mockup.rows.map((row) => (
+            <div
+              key={row.label}
+              className="rounded-lg border border-[#ded6c8] bg-white p-3"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <p className="text-sm font-semibold text-[#181715]">
+                  {row.label}
+                </p>
+                <span className="rounded-md bg-[#e6f7f2] px-2 py-1 text-xs font-semibold text-[#0f766e]">
+                  {row.meta}
+                </span>
+              </div>
+              <p className="mt-2 text-sm leading-6 text-[#635f57]">
+                {row.detail}
+              </p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </aside>
+  );
+}
+
+function TrustBoundaryStrip({ copy }: { copy: AuthPageCopy }) {
+  return (
+    <aside className="surface-card flex flex-col gap-3 p-4 sm:flex-row sm:items-start lg:col-span-2">
+      <div className="flex items-center gap-2 text-sm font-semibold text-[#181715] sm:w-56 sm:shrink-0">
+        <ShieldAlert className="size-5 text-[#0f766e]" aria-hidden="true" />
+        {copy.boundaryHeading}
+      </div>
+      <p className="text-sm leading-6 text-[#5d574f]">{copy.boundary}</p>
+    </aside>
+  );
+}
+
+function getAuthMessage(params: AuthSearchParams | undefined) {
+  const value = params?.error;
+
+  if (Array.isArray(value)) {
+    return value[0];
+  }
+
+  return typeof value === "string" ? value : undefined;
+}
+
+type AuthPageCopy = ReturnType<typeof getAuthPageCopy>;
+
+function getAuthPageCopy(locale: Locale) {
+  if (locale === "zh-Hans") {
+    return {
+      formHeading: "创建账户",
+      title: "保存草稿，并开始准备 Referral Pack。",
+      description:
+        "创建账户以保存服务商资料、认领草稿，并继续准备可发送的资料包和跟进记录。",
+      name: "姓名或联系人",
+      namePlaceholder: "服务商负责人",
+      email: "邮箱",
+      password: "密码",
+      pending: "正在创建账户...",
+      submit: "创建账户并进入工作区",
+      loginCta: "已有账户",
+      boundaryHeading: "使用边界",
+      boundary:
+        "仅用于一般商业资料和运营支持。CaresLink 不提供市场撮合、预约、服务商背书或推荐，也不提供临床、法律、照护、监管或合规建议。",
+      mockup: {
+        kicker: "服务商工作区",
+        title: "Referral Pack 工作台",
+        status: "等待认领",
+        tabs: ["材料包", "跟进", "阻碍", "访问"],
+        rows: [
+          {
+            label: "认领服务商资料",
+            meta: "来源",
+            detail: "保存从公开生成器带入的服务商自填资料。",
+          },
+          {
+            label: "准备可发送材料包",
+            meta: "待补充",
+            detail: "把资料和草稿整理成可复核、可复制的转介沟通材料。",
+          },
+          {
+            label: "记录发送和跟进",
+            meta: "跟进",
+            detail: "记录发给了谁、是否回应，以及下次跟进时间。",
+          },
+        ],
+      },
+    };
+  }
+
+  return {
+    formHeading: "Create account",
+    title: "Save the draft and prepare your Referral Pack.",
+    description:
+      "Create an account to save the provider profile, claim the draft, and prepare sendable material with follow-up records.",
+    name: "Name or contact person",
+    namePlaceholder: "Provider owner",
+    email: "Email",
+    password: "Password",
+    pending: "Creating account...",
+    submit: "Create account and enter workspace",
+    loginCta: "Already have an account",
+    boundaryHeading: "Use boundary",
+    boundary:
+      "General business profile and operational support only. No marketplace, booking, provider endorsement or recommendation, and no clinical, legal, care, regulatory/compliance advice.",
+    mockup: {
+      kicker: "Provider workspace access",
+      title: "Referral Pack workspace",
+      status: "Awaiting claim",
+      tabs: ["Pack", "Outreach", "Blockers", "Access"],
+      rows: [
+        {
+          label: "Claim provider draft",
+          meta: "Source",
+          detail:
+            "Save the provider profile draft handed off from the public generator.",
+        },
+        {
+          label: "Prepare sendable pack",
+          meta: "Needs input",
+          detail:
+            "Turn the profile and saved drafts into reviewable referral communication.",
+        },
+        {
+          label: "Record sends and follow-ups",
+          meta: "Outreach",
+          detail:
+            "Track who received the pack, reply status, and next follow-up.",
+        },
+      ],
+    },
+  };
+}

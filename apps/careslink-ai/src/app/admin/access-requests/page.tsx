@@ -10,14 +10,27 @@ import {
   UserRound,
   XCircle,
 } from "lucide-react";
+import { reviewAccessRequestAction } from "./actions";
 import { AppShell } from "@/components/app-shell";
 import { PageHeader } from "@/components/page-header";
+import {
+  ReferralWorkspaceAdminGate,
+  ReferralWorkspaceLoginGate,
+} from "@/components/referral-workspace-auth-gate";
 import { ButtonLink, Card, MetricCard } from "@/components/ui";
+import {
+  getAccessControlStore,
+  type AccessControlRequestRecord,
+} from "../../../lib/access-control-store";
 import {
   getAccessRequests,
   getReferralProfile,
   type AccessRequest,
 } from "@/lib/referral-profile-workspace";
+import {
+  withWorkspaceAccount,
+} from "@/lib/referral-workspace-auth";
+import { getWorkspaceAccessGateWithServerSession } from "@/lib/referral-workspace-session";
 import {
   getLocaleFromSearchParams,
   getReferralWorkspaceCopy,
@@ -47,6 +60,18 @@ type ReferralWorkspaceSearchParams = {
 
 type AccessRequestsPageProps = {
   searchParams?: Promise<ReferralWorkspaceSearchParams>;
+};
+
+type AccessRequestView = {
+  id: string;
+  userId: string;
+  profileName: string;
+  requestedCodeType: AccessRequest["requestedCodeType"];
+  referralDirection: AccessRequest["referralDirection"];
+  status: AccessRequest["status"];
+  requestedAt: string;
+  note: string;
+  source: "seed" | "stored";
 };
 
 function formatTemplate(
@@ -114,7 +139,7 @@ function StatusBadge({
   status,
   copy,
 }: {
-  status: AccessRequest["status"];
+  status: AccessRequestView["status"];
   copy: ReferralWorkspaceCopy["admin"];
 }) {
   return (
@@ -165,17 +190,49 @@ function PreviewActionButton({
   );
 }
 
+function ReviewActionButton({
+  requestId,
+  decision,
+  icon: Icon,
+  label,
+  locale,
+}: {
+  requestId: string;
+  decision: "approve" | "decline";
+  icon: LucideIcon;
+  label: string;
+  locale: Locale;
+}) {
+  return (
+    <form action={reviewAccessRequestAction}>
+      <input type="hidden" name="requestId" value={requestId} />
+      <input type="hidden" name="decision" value={decision} />
+      <input type="hidden" name="lang" value={locale} />
+      <button
+        type="submit"
+        className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-[#cfded8] bg-white px-3 text-sm font-semibold text-[#263834] transition hover:bg-[#f0f7f4]"
+      >
+        <Icon className="size-4" aria-hidden="true" />
+        {label}
+      </button>
+    </form>
+  );
+}
+
 function RequestCard({
   request,
   locale,
   copy,
+  canReview,
 }: {
-  request: AccessRequest;
+  request: AccessRequestView;
   locale: Locale;
   copy: ReferralWorkspaceCopy;
+  canReview: boolean;
 }) {
-  const profile = getReferralProfile(request.profileId);
   const adminCopy = copy.admin;
+  const canReviewRequest =
+    canReview && request.source === "stored" && request.status === "queued";
 
   return (
     <Card className="p-5">
@@ -183,7 +240,7 @@ function RequestCard({
         <div className="min-w-0">
           <div className="flex items-center gap-2 text-sm font-semibold text-[#0f766e]">
             <UserRound className="size-5 shrink-0" aria-hidden="true" />
-            <span className="break-words">{profile.name}</span>
+            <span className="break-words">{request.profileName}</span>
           </div>
           <p className="mt-2 text-sm leading-6 text-[#65736f]">
             {formatTemplate(adminCopy.requestFrom, {
@@ -230,18 +287,80 @@ function RequestCard({
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            {previewActions.map((action) => (
-              <PreviewActionButton
-                key={action.key}
-                icon={action.icon}
-                label={adminCopy.previewActions[action.key]}
-                title={adminCopy.previewActionTitle}
-              />
-            ))}
+            {canReviewRequest ? (
+              <>
+                <ReviewActionButton
+                  requestId={request.id}
+                  decision="approve"
+                  icon={CheckCircle2}
+                  label={adminCopy.reviewActions.approve}
+                  locale={locale}
+                />
+                <PreviewActionButton
+                  icon={Hourglass}
+                  label={adminCopy.reviewActions.waitlist}
+                  title={adminCopy.previewActionTitle}
+                />
+                <ReviewActionButton
+                  requestId={request.id}
+                  decision="decline"
+                  icon={XCircle}
+                  label={adminCopy.reviewActions.decline}
+                  locale={locale}
+                />
+              </>
+            ) : (
+              previewActions.map((action) => (
+                <PreviewActionButton
+                  key={action.key}
+                  icon={action.icon}
+                  label={adminCopy.previewActions[action.key]}
+                  title={adminCopy.previewActionTitle}
+                />
+              ))
+            )}
           </div>
         </div>
       </div>
     </Card>
+  );
+}
+
+function mapSeedAccessRequestToView(request: AccessRequest): AccessRequestView {
+  const profile = getReferralProfile(request.profileId);
+
+  return {
+    id: request.id,
+    userId: request.userId,
+    profileName: profile.name,
+    requestedCodeType: request.requestedCodeType,
+    referralDirection: request.referralDirection,
+    status: request.status,
+    requestedAt: request.requestedAt,
+    note: request.note,
+    source: "seed",
+  };
+}
+
+function mapStoredAccessRequestToView(
+  request: AccessControlRequestRecord,
+): AccessRequestView {
+  return {
+    id: request.id,
+    userId: request.userId,
+    profileName: request.profileName,
+    requestedCodeType: request.requestedCodeType,
+    referralDirection: request.referralDirection,
+    status: request.status,
+    requestedAt: request.createdAt,
+    note: request.reason,
+    source: "stored",
+  };
+}
+
+function isSupabaseAuthUserId(value: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+    value,
   );
 }
 
@@ -251,7 +370,44 @@ export default async function AccessRequestsPage({
   const params = await searchParams;
   const locale = getLocaleFromSearchParams(params);
   const copy = getReferralWorkspaceCopy(locale);
-  const requests = getAccessRequests();
+  const gate = await getWorkspaceAccessGateWithServerSession(params);
+
+  if (gate.status === "signed_out") {
+    return (
+      <ReferralWorkspaceLoginGate
+        copy={copy}
+        locale={locale}
+        languageSwitcherHref="/admin/access-requests"
+      />
+    );
+  }
+
+  if (!gate.canViewAdmin) {
+    return (
+      <ReferralWorkspaceAdminGate
+        copy={copy}
+        locale={locale}
+        accountId={gate.account.id}
+      />
+    );
+  }
+
+  const accountId = gate.account.id;
+  const canReviewStoredRequests =
+    gate.account.role === "admin" && isSupabaseAuthUserId(accountId);
+  const signedInHref = (href: string) => {
+    const localizedHref = withLocale(href, locale);
+
+    return gate.source === "demo"
+      ? withWorkspaceAccount(localizedHref, accountId)
+      : localizedHref;
+  };
+  const accessControlStore = getAccessControlStore();
+  const storedRequests = await accessControlStore.listAccessRequests();
+  const requests =
+    storedRequests.length > 0 || !accountId.startsWith("user-")
+      ? storedRequests.map(mapStoredAccessRequestToView)
+      : getAccessRequests().map(mapSeedAccessRequestToView);
   const queuedCount = requests.filter(
     (request) => request.status === "queued",
   ).length;
@@ -273,7 +429,13 @@ export default async function AccessRequestsPage({
   return (
     <AppShell
       locale={locale}
-      languageSwitcherHref="/admin/access-requests"
+      languageSwitcherHref={withWorkspaceAccount(
+        "/admin/access-requests",
+        gate.source === "demo" ? accountId : undefined,
+      )}
+      workspaceAccountId={gate.source === "demo" ? accountId : undefined}
+      workspaceRole={gate.account.role}
+      workspaceSessionSource={gate.source}
     >
       <PageHeader
         eyebrow={copy.admin.eyebrow}
@@ -282,12 +444,12 @@ export default async function AccessRequestsPage({
         actions={
           <>
             <ButtonLink
-              href={withLocale("/referral-workspace/access", locale)}
+              href={signedInHref("/referral-workspace/access")}
               variant="secondary"
             >
               {copy.admin.accessPreview}
             </ButtonLink>
-            <ButtonLink href={withLocale("/referral-workspace", locale)}>
+            <ButtonLink href={signedInHref("/referral-workspace")}>
               {copy.admin.workspace}
             </ButtonLink>
           </>
@@ -360,6 +522,7 @@ export default async function AccessRequestsPage({
               request={request}
               locale={locale}
               copy={copy}
+              canReview={canReviewStoredRequests}
             />
           ))}
         </section>

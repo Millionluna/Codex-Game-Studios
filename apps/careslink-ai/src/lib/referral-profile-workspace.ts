@@ -115,6 +115,13 @@ export interface BasicProfileSummary {
   serviceAreaLabel: string;
   languages: string[];
   languageLabel: string;
+  bestFit: string[];
+  intakeMethod?: string;
+  responseTime?: string;
+  capacityStatus?: string;
+  handoverRequirements: string[];
+  followUpCadence?: string;
+  consentReminder?: string;
   description: string;
   descriptionNeedsReview: boolean;
   footer: string;
@@ -381,6 +388,37 @@ export function getReferralProfile(profileId = "profile-harbour") {
   return cloneProfile(profile);
 }
 
+export function getReferralProfileForWorkspaceAccount({
+  ownerUserId,
+  name,
+}: {
+  ownerUserId: string;
+  name: string;
+}): ReferralProfile {
+  const profileName = name.trim() || "Provider profile";
+
+  return {
+    id: `workspace-account-${ownerUserId}`,
+    ownerUserId,
+    name: profileName,
+    entityType: "organisation",
+    referralDirection: "receive",
+    submittedBy: "self",
+    summary:
+      "Profile details need to be completed before sharing referral materials.",
+    serviceAreas: [],
+    languages: [],
+    bestFit: [],
+    receive: {
+      intakeMethod: "",
+      responseTime: "",
+      capacityStatus: "",
+    },
+    send: undefined,
+    updatedAt: "Not completed",
+  };
+}
+
 export function getAccessState(userId: string): AccessState {
   const accessState =
     accessStates[userId] ??
@@ -411,6 +449,13 @@ export function summarizeProfile(
     serviceAreaLabel: formatList(profile.serviceAreas),
     languages: [...profile.languages],
     languageLabel: formatList(profile.languages),
+    bestFit: [...profile.bestFit],
+    intakeMethod: profile.receive?.intakeMethod,
+    responseTime: profile.receive?.responseTime,
+    capacityStatus: profile.receive?.capacityStatus,
+    handoverRequirements: [...(profile.send?.handoverRequirements ?? [])],
+    followUpCadence: profile.send?.followUpCadence,
+    consentReminder: profile.send?.consentReminder,
     description: descriptionNeedsReview
       ? SUMMARY_NEEDS_REVIEW_DESCRIPTION
       : profile.summary,

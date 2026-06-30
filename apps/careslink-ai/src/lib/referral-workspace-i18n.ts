@@ -96,8 +96,11 @@ export type ReferralWorkspaceCopy = {
       readonly profile: string;
       readonly health: string;
       readonly materials: string;
+      readonly referralPack: string;
+      readonly outreach: string;
       readonly accessCode: string;
       readonly accessRequests: string;
+      readonly materialUsage: string;
     };
     readonly legacyNav: {
       readonly groupHeading: string;
@@ -244,6 +247,187 @@ export type ReferralWorkspaceCopy = {
     readonly guidedReviewBoundary: string;
     readonly freePreviewBoundary: string;
     readonly accessStateBoundary: string;
+    readonly profileRewriteGenerator: {
+      readonly title: string;
+      readonly description: string;
+      readonly profileLabel: string;
+      readonly generate: string;
+      readonly generating: string;
+      readonly successTitle: string;
+      readonly boundary: string;
+      readonly disabledReasons: {
+        readonly verified_session_required: string;
+        readonly claimed_draft_required: string;
+        readonly access_required: string;
+      };
+      readonly fieldLabels: {
+        readonly professionalEnglishDescription: string;
+        readonly shortEnglishSummary: string;
+        readonly chineseCommunityIntro: string;
+        readonly referralPartnerSummary: string;
+        readonly profileImprovementNotes: string;
+        readonly disclaimer: string;
+      };
+      readonly errors: {
+        readonly loginRequired: string;
+        readonly accessRequired: string;
+        readonly quotaExhausted: string;
+        readonly rateLimited: string;
+        readonly generic: string;
+      };
+    };
+    readonly shareCardGenerator: {
+      readonly title: string;
+      readonly description: string;
+      readonly profileLabel: string;
+      readonly generate: string;
+      readonly generating: string;
+      readonly successTitle: string;
+      readonly boundary: string;
+      readonly disabledReasons: {
+        readonly verified_session_required: string;
+        readonly claimed_draft_required: string;
+        readonly access_required: string;
+      };
+      readonly fieldLabels: {
+        readonly headline: string;
+        readonly subheadline: string;
+        readonly serviceArea: string;
+        readonly languages: string;
+        readonly referralFit: string;
+        readonly intakePath: string;
+        readonly disclaimer: string;
+      };
+      readonly errors: {
+        readonly loginRequired: string;
+        readonly accessRequired: string;
+        readonly quotaExhausted: string;
+        readonly rateLimited: string;
+        readonly generic: string;
+      };
+    };
+    readonly referralMessageGenerator: {
+      readonly title: string;
+      readonly description: string;
+      readonly profileLabel: string;
+      readonly generate: string;
+      readonly generating: string;
+      readonly successTitle: string;
+      readonly boundary: string;
+      readonly disabledReasons: {
+        readonly verified_session_required: string;
+        readonly claimed_draft_required: string;
+        readonly access_required: string;
+      };
+      readonly fieldLabels: {
+        readonly subjectLine: string;
+        readonly opening: string;
+        readonly providerSummary: string;
+        readonly referralFit: string;
+        readonly handoverRequest: string;
+        readonly nextStep: string;
+        readonly disclaimer: string;
+      };
+      readonly errors: {
+        readonly loginRequired: string;
+        readonly accessRequired: string;
+        readonly quotaExhausted: string;
+        readonly rateLimited: string;
+        readonly generic: string;
+      };
+    };
+    readonly bilingualIntroGenerator: {
+      readonly title: string;
+      readonly description: string;
+      readonly profileLabel: string;
+      readonly generate: string;
+      readonly generating: string;
+      readonly successTitle: string;
+      readonly boundary: string;
+      readonly disabledReasons: {
+        readonly verified_session_required: string;
+        readonly claimed_draft_required: string;
+        readonly access_required: string;
+      };
+      readonly fieldLabels: {
+        readonly englishIntro: string;
+        readonly communityLanguageIntro: string;
+        readonly language: string;
+        readonly sharingContext: string;
+        readonly disclaimer: string;
+      };
+      readonly errors: {
+        readonly loginRequired: string;
+        readonly accessRequired: string;
+        readonly quotaExhausted: string;
+        readonly rateLimited: string;
+        readonly generic: string;
+      };
+    };
+    readonly handoverChecklistGenerator: {
+      readonly title: string;
+      readonly description: string;
+      readonly profileLabel: string;
+      readonly generate: string;
+      readonly generating: string;
+      readonly successTitle: string;
+      readonly boundary: string;
+      readonly disabledReasons: {
+        readonly verified_session_required: string;
+        readonly claimed_draft_required: string;
+        readonly access_required: string;
+      };
+      readonly fieldLabels: {
+        readonly checklistTitle: string;
+        readonly consentCheck: string;
+        readonly clientContext: string;
+        readonly supportNeed: string;
+        readonly handoverDetails: string;
+        readonly nextStep: string;
+        readonly disclaimer: string;
+      };
+      readonly errors: {
+        readonly loginRequired: string;
+        readonly accessRequired: string;
+        readonly quotaExhausted: string;
+        readonly rateLimited: string;
+        readonly generic: string;
+      };
+    };
+    readonly latestShareCard: {
+      readonly title: string;
+      readonly description: string;
+      readonly statusLabel: string;
+    };
+    readonly generatedDraftHistory: {
+      readonly title: string;
+      readonly description: string;
+      readonly statusLabel: string;
+      readonly featureLabels: {
+        readonly profile_rewrite: string;
+        readonly share_card: string;
+        readonly referral_message: string;
+        readonly bilingual_intro: string;
+        readonly handover_checklist: string;
+      };
+      readonly statusLabels: {
+        readonly draft: string;
+        readonly reviewed: string;
+        readonly archived: string;
+      };
+      readonly actions: {
+        readonly markReviewed: string;
+        readonly archive: string;
+      };
+      readonly copyActions: {
+        readonly fieldsTitle: string;
+        readonly copyAll: string;
+        readonly copyField: string;
+        readonly copied: string;
+        readonly copyAllAria: string;
+        readonly copyFieldAria: string;
+      };
+    };
   };
   readonly access: {
     readonly eyebrow: string;
@@ -258,6 +442,10 @@ export type ReferralWorkspaceCopy = {
     readonly applicationFieldsTitle: string;
     readonly applicationFieldsDescription: string;
     readonly previewOnlyNoSubmit: string;
+    readonly submitAvailable: string;
+    readonly submittedNotice: string;
+    readonly alreadyActiveNotice: string;
+    readonly submitButton: string;
     readonly formLabel: string;
     readonly fields: {
       readonly profile: string;
@@ -336,10 +524,141 @@ export type ReferralWorkspaceCopy = {
       readonly waitlist: string;
       readonly decline: string;
     };
+    readonly reviewActions: {
+      readonly approve: string;
+      readonly waitlist: string;
+      readonly decline: string;
+    };
     readonly requestedCodeTypesTitle: string;
     readonly noRequestedCodeTypes: string;
     readonly reviewFocusTitle: string;
     readonly reviewFocusItems: readonly string[];
+    readonly materialUsage: {
+      readonly eyebrow: string;
+      readonly title: string;
+      readonly description: string;
+      readonly accessRequests: string;
+      readonly workspace: string;
+      readonly boundaryTitle: string;
+      readonly boundary: string;
+      readonly activityTitle: string;
+      readonly activityDescription: string;
+      readonly noDrafts: string;
+      readonly draftCount: {
+        readonly one: string;
+        readonly other: string;
+      };
+      readonly metrics: {
+        readonly total: {
+          readonly label: string;
+          readonly detail: string;
+        };
+        readonly reviewed: {
+          readonly label: string;
+          readonly detail: string;
+        };
+        readonly archived: {
+          readonly label: string;
+          readonly detail: string;
+        };
+        readonly copyEvents: {
+          readonly label: string;
+          readonly detail: string;
+        };
+        readonly copyAll: {
+          readonly label: string;
+          readonly detail: string;
+        };
+        readonly copyField: {
+          readonly label: string;
+          readonly detail: string;
+        };
+        readonly featureMix: {
+          readonly label: string;
+        };
+      };
+      readonly eventCount: {
+        readonly one: string;
+        readonly other: string;
+      };
+      readonly fields: {
+        readonly draftId: string;
+        readonly userId: string;
+        readonly providerDraftId: string;
+        readonly feature: string;
+        readonly status: string;
+        readonly createdAt: string;
+        readonly updatedAt: string;
+        readonly content: string;
+      };
+      readonly featureLabels: {
+        readonly share_card: string;
+        readonly referral_message: string;
+        readonly bilingual_intro: string;
+        readonly handover_checklist: string;
+        readonly profile_rewrite: string;
+      };
+      readonly statusLabels: {
+        readonly draft: string;
+        readonly reviewed: string;
+        readonly archived: string;
+      };
+      readonly contentNotShown: string;
+      readonly contentNotShownDetail: string;
+    };
+  };
+  readonly auth: {
+    readonly login: {
+      readonly eyebrow: string;
+      readonly title: string;
+      readonly description: string;
+      readonly register: string;
+      readonly chooseAccount: string;
+      readonly boundary: string;
+    };
+    readonly register: {
+      readonly eyebrow: string;
+      readonly title: string;
+      readonly description: string;
+      readonly providerCta: string;
+      readonly waitlistCta: string;
+      readonly loginCta: string;
+      readonly boundary: string;
+    };
+    readonly gate: {
+      readonly eyebrow: string;
+      readonly title: string;
+      readonly description: string;
+      readonly loginCta: string;
+      readonly registerCta: string;
+      readonly previewBoundary: string;
+    };
+    readonly adminGate: {
+      readonly eyebrow: string;
+      readonly title: string;
+      readonly description: string;
+      readonly adminCta: string;
+      readonly workspaceCta: string;
+      readonly previewBoundary: string;
+    };
+    readonly demoAccounts: {
+      readonly free: {
+        readonly label: string;
+        readonly description: string;
+      };
+      readonly waitlist: {
+        readonly label: string;
+        readonly description: string;
+      };
+      readonly approved: {
+        readonly label: string;
+        readonly description: string;
+      };
+      readonly admin: {
+        readonly label: string;
+        readonly description: string;
+      };
+    };
   };
   readonly components: {
     readonly basicProfile: {
@@ -509,7 +828,7 @@ const referralWorkspaceCopy: Record<Locale, ReferralWorkspaceCopy> = {
     common: {
       previewOnly: "Preview mode only",
       selfSubmitted: "Based on self-submitted profile information",
-      continueToReadiness: "Continue to readiness review",
+      continueToReadiness: "Review referral blockers",
       trustBoundary:
         "Based on self-submitted profile information. CaresLink does not assess provider quality, clinical suitability, compliance status, or service outcomes, and does not provide legal, clinical, medical, compliance, financial, or other professional advice.",
       nonLiveActions:
@@ -517,7 +836,7 @@ const referralWorkspaceCopy: Record<Locale, ReferralWorkspaceCopy> = {
     },
     shell: {
       brand: "CaresLink",
-      subtitle: "Referral Profile Workspace",
+      subtitle: "Referral Pack Workspace",
       language: "Language",
       pilotPreview: "Pilot preview",
       pilotBoundary:
@@ -525,10 +844,13 @@ const referralWorkspaceCopy: Record<Locale, ReferralWorkspaceCopy> = {
       primaryNav: {
         workspace: "Workspace",
         profile: "Profile",
-        health: "Readiness",
+        health: "Blockers",
         materials: "Materials",
+        referralPack: "Referral Pack",
+        outreach: "Outreach",
         accessCode: "Access code",
         accessRequests: "Access requests",
+        materialUsage: "Material usage",
       },
       legacyNav: {
         groupHeading: "Legacy demos",
@@ -543,11 +865,11 @@ const referralWorkspaceCopy: Record<Locale, ReferralWorkspaceCopy> = {
     },
     workspace: {
       eyebrow: "Referral workspace",
-      title: "Build a clear referral profile",
+      title: "Referral Pack workspace",
       description:
-        "Review self-submitted profile fields, readiness signals, gated materials, and access status in one pilot workspace.",
+        "Prepare what to send, record who received it, and know what to follow up next.",
       requestAccess: "Request access",
-      accessRequests: "Access requests",
+      accessRequests: "Workspace requests",
       routeBlockTitle: "Workspace route unavailable",
       routeBlockDescription:
         "This pilot route is intentionally limited while the referral profile workflow is being prepared.",
@@ -561,12 +883,12 @@ const referralWorkspaceCopy: Record<Locale, ReferralWorkspaceCopy> = {
           detail: "Edit self-submitted referral communication fields.",
         },
         health: {
-          label: "Readiness",
-          detail: "Review completeness signals and priority gaps.",
+          label: "Referral blockers",
+          detail: "Review gaps that may make referral partners hesitate.",
         },
         materials: {
-          label: "Materials",
-          detail: "Preview share cards, handover copy, and intake prompts.",
+          label: "Pack drafts",
+          detail: "Create and review drafts that can be included in the Referral Pack.",
         },
         access: {
           label: "Access",
@@ -585,15 +907,15 @@ const referralWorkspaceCopy: Record<Locale, ReferralWorkspaceCopy> = {
       sendSection: "Send referrals",
       roleMatrixTitle: "Referral role matrix",
       noPersistence:
-        "Changes shown here are preview-only and are not persisted to a live provider record.",
-      builderExample: "Builder example",
+        "Review the current profile details before using them in public sharing or referral communication.",
+      builderExample: "Current profile",
       builderDescription:
-        "Seeded Harbour data is shown as a first-version profile builder. Fields are read-only in this slice and do not persist changes.",
+        "These details are based on the current provider profile. Review and complete them before sharing materials.",
       formLabel: "Read-only referral profile builder",
-      relevantToProfile: "Relevant to this profile",
-      notUsedForDirection: "Not used for this direction",
-      relevant: "Relevant",
-      notUsed: "Not used",
+      relevantToProfile: "Needed for this role",
+      notUsedForDirection: "Not applicable",
+      relevant: "Needed",
+      notUsed: "Not applicable",
       identityDescription:
         "Set who the profile represents, how it participates in referrals, and the self-submitted summary referrers can read.",
       footprintDescription:
@@ -604,7 +926,7 @@ const referralWorkspaceCopy: Record<Locale, ReferralWorkspaceCopy> = {
         "Send-side details describe what should travel with an outgoing referral and how follow-up is handled.",
       previewBoundaryTitle: "Preview and non-live boundary",
       previewBoundaryDescription:
-        "This page uses seeded profile data only. It does not save edits, issue access codes, or perform real account actions.",
+        "This page shows the current profile context for review. It does not assess provider quality, compliance, or care suitability.",
       roleMatrixDescription:
         "The seed set shows how individual and organisation profiles can receive referrals, send referrals, or do both while keeping each side of the profile distinct.",
       directionHelp: {
@@ -644,23 +966,23 @@ const referralWorkspaceCopy: Record<Locale, ReferralWorkspaceCopy> = {
       sendNotUsed: "Send fields are separate and not used for this direction.",
     },
     health: {
-      eyebrow: "Readiness health",
-      title: "Profile readiness",
+      eyebrow: "Referral blockers",
+      title: "What might stop someone from referring to you?",
       description:
-        "Check whether the submitted profile is clear enough for referral conversations, without scoring quality, suitability, or compliance.",
-      scoreMeaningTitle: "What the score means",
+        "Check whether the submitted profile gives referral partners enough context to introduce you with confidence.",
+      scoreMeaningTitle: "What the blocker score means",
       scoreMeaning:
         "The score reflects communication completeness and clarity only. It is not a provider quality assessment, clinical assessment, compliance assessment, or outcome prediction.",
-      profileBuilder: "Profile builder",
-      materialsPreview: "Materials preview",
+      profileBuilder: "Profile source details",
+      materialsPreview: "Referral Pack drafts",
       metrics: {
         signalsReviewed: {
           label: "Signals reviewed",
-          detail: "Profile fields checked for communication completeness.",
+          detail: "Profile fields checked for referral communication clarity.",
         },
         openIssues: {
-          label: "Open issues",
-          detail: "Gaps sorted by priority for this profile.",
+          label: "Referral blockers",
+          detail: "Gaps sorted by likely impact on referral conversations.",
         },
         highPriority: {
           label: "High priority",
@@ -668,67 +990,300 @@ const referralWorkspaceCopy: Record<Locale, ReferralWorkspaceCopy> = {
             "Items to address before relying on the profile for referral conversations.",
         },
       },
-      nextStepFlowTitle: "Next-step flow",
+      nextStepFlowTitle: "Next referral step",
       nextStepFlowDescription:
-        "Use the audit to choose what to update, then review preview materials and the access request screen.",
+        "Use blocker signals to improve the Referral Pack before sending it to referral partners.",
       nextSteps: {
         profile: {
-          label: "Profile builder",
+          label: "Profile source details",
           detail:
-            "Review the self-submitted fields that affect referral communication readiness.",
+            "Review the self-submitted fields that power the Referral Pack.",
         },
         materials: {
-          label: "Materials preview",
+          label: "Referral Pack drafts",
           detail:
-            "Preview profile copy, share cards, and intake prompts from the current fields.",
+            "Review profile copy, share cards, and referral messages created from the current fields.",
         },
         access: {
-          label: "Access request",
+          label: "Workspace access",
           detail:
-            "View the pilot access request state. Submission and guided drafting are not live here.",
+            "View the pilot workspace access state. Submission and guided drafting are not live here.",
         },
       },
     },
     materials: {
-      eyebrow: "Referral materials",
-      title: "Guided materials",
+      eyebrow: "Referral Pack drafts",
+      title: "Create drafts for your Referral Pack",
       description:
-        "Preview profile summaries, referral messages, handover prompts, and share-card copy generated from submitted fields.",
+        "Create and review profile summaries, referral messages, bilingual intros, handover prompts, and share-card copy before adding them to your Referral Pack.",
       freeMode:
-        "Free mode shows structure and locked previews without calling AI drafting actions.",
+        "Free mode shows structure and locked previews without starting live generation.",
       accessMode:
         "Access code mode unlocks guided drafting within quota and pilot limits.",
       noAiCall:
-        "No AI call is made in preview-only mode, and no live referral action is sent.",
-      currentModeTitle: "Current materials mode",
-      accessCodeGuidedPreview: "Access-code guided preview",
-      freePreviewWithoutCode: "Free preview without an access code",
+        "No live generation starts in preview-only mode, and no live referral action is sent.",
+      currentModeTitle: "Current drafting mode",
+      accessCodeGuidedPreview: "Pack drafting available",
+      freePreviewWithoutCode: "Guided pack drafts locked",
       accessModeDetail:
-        "This demo route uses the approved access state so guided drafting steps, unlocked materials, and quota state are visible.",
+        "Your account has guided drafting access within quota and pilot limits.",
       freeModeDetail:
-        "This route shows the default free state: material previews are visible, while guided drafting remains gated behind an access code.",
-      userApproved: "user-approved",
-      userFree: "user-free",
+        "Saved material previews remain visible. Request access before using guided drafting tools.",
+      userApproved: "Access active",
+      userFree: "Access not active",
       accessCode: "Access code",
-      activeForDemo: "Active for demo",
+      activeForDemo: "Active",
       notPresent: "Not present",
       guidedQuota: "Guided quota",
       usedDailyQuota: "{used} used / {total} daily",
       remainingToday: "Remaining today",
       viewFreePreview: "View free preview",
-      accessRequestPreview: "Access request preview",
-      tryAccessCodeDemo: "Try access-code demo",
-      readinessAudit: "Readiness audit",
-      freePreview: "Free preview",
-      accessDemo: "Access demo",
+      accessRequestPreview: "Workspace access preview",
+      tryAccessCodeDemo: "Try access-code preview",
+      readinessAudit: "Referral blockers",
+      freePreview: "Access required",
+      accessDemo: "Access preview",
       access: "Access",
       deterministicPreviewTitle: "Deterministic UI preview",
       guidedReviewBoundary:
         "Guided steps are visible for access-code review, but users still review and control any future drafted material.",
       freePreviewBoundary:
-        "Free preview keeps material requirements visible while showing exactly where access-code gating applies.",
+        "The workspace keeps material requirements visible while showing where access approval is required.",
       accessStateBoundary:
-        "Access state does not signal endorsement, certification, clinical review, compliance approval, or any guaranteed referral outcome.",
+        "Access state does not signal endorsement, certification, clinical review, compliance approval, or any referral outcome promise.",
+      profileRewriteGenerator: {
+        title: "Improve profile wording",
+        description:
+          "Turn the submitted provider profile into reviewable referral-ready wording. The provider reviews every field before reuse.",
+        profileLabel: "Profile",
+        generate: "Generate profile rewrite",
+        generating: "Generating rewrite",
+        successTitle: "Profile rewrite ready for review",
+        boundary:
+          "Draft material only. Based on self-submitted information and not a CaresLink endorsement, certification, compliance approval, clinical assessment, service-quality assessment, or referral guarantee.",
+        disabledReasons: {
+          verified_session_required:
+            "Sign in with a provider account that has active workspace access. Preview mode can show the control for review, but cannot start live generation.",
+          claimed_draft_required:
+            "Claim a saved provider draft before generating guided drafting material.",
+          access_required:
+            "Access code and remaining daily quota are required before generating guided drafting material.",
+        },
+        fieldLabels: {
+          professionalEnglishDescription: "Professional English description",
+          shortEnglishSummary: "Short English summary",
+          chineseCommunityIntro: "Chinese community intro",
+          referralPartnerSummary: "Referral partner summary",
+          profileImprovementNotes: "Profile improvement notes",
+          disclaimer: "Disclaimer",
+        },
+        errors: {
+          loginRequired:
+            "Sign in with a provider account that has active workspace access before generating.",
+          accessRequired:
+            "An active access code is required before generating guided drafting material.",
+          quotaExhausted:
+            "Today's guided drafting quota has been used. Preview materials remain available.",
+          rateLimited:
+            "Too many guided drafting requests. Wait a moment, then try again.",
+          generic:
+            "Unable to generate this profile rewrite draft. Please try again later.",
+        },
+      },
+      shareCardGenerator: {
+        title: "Share-card guided draft",
+        description:
+          "Generate a concise share-card draft from the claimed provider profile. The provider reviews every field before reuse.",
+        profileLabel: "Profile",
+        generate: "Generate share-card draft",
+        generating: "Generating draft",
+        successTitle: "Draft ready for review",
+        boundary:
+          "Draft material only. Based on self-submitted information and not a CaresLink endorsement, certification, compliance approval, clinical assessment, or referral guarantee.",
+        disabledReasons: {
+          verified_session_required:
+            "Sign in with a provider account that has active workspace access. Preview mode can show the control for review, but cannot start live generation.",
+          claimed_draft_required:
+            "Claim a saved provider draft before generating guided drafting material.",
+          access_required:
+            "Access code and remaining daily quota are required before generating guided drafting material.",
+        },
+        fieldLabels: {
+          headline: "Headline",
+          subheadline: "Subheadline",
+          serviceArea: "Service area",
+          languages: "Languages",
+          referralFit: "Referral fit",
+          intakePath: "Intake path",
+          disclaimer: "Disclaimer",
+        },
+        errors: {
+          loginRequired:
+            "Sign in with a provider account that has active workspace access before generating.",
+          accessRequired:
+            "An active access code is required before generating guided drafting material.",
+          quotaExhausted:
+            "Today's guided drafting quota has been used. Preview materials remain available.",
+          rateLimited:
+            "Too many guided drafting requests. Wait a moment, then try again.",
+          generic:
+            "Unable to generate this share-card draft. Please try again later.",
+        },
+      },
+      referralMessageGenerator: {
+        title: "Referral-message guided draft",
+        description:
+          "Generate a reviewable referral partner message from the claimed provider profile. The sender reviews and edits it before use.",
+        profileLabel: "Profile",
+        generate: "Generate referral message",
+        generating: "Generating message",
+        successTitle: "Message draft ready for review",
+        boundary:
+          "Draft material only. Based on self-submitted information and not a CaresLink endorsement, certification, compliance approval, clinical assessment, service-quality assessment, or referral guarantee.",
+        disabledReasons: {
+          verified_session_required:
+            "Sign in with a provider account that has active workspace access. Preview mode can show the control for review, but cannot start live generation.",
+          claimed_draft_required:
+            "Claim a saved provider draft before generating guided drafting material.",
+          access_required:
+            "Access code and remaining daily quota are required before generating guided drafting material.",
+        },
+        fieldLabels: {
+          subjectLine: "Subject line",
+          opening: "Opening",
+          providerSummary: "Provider summary",
+          referralFit: "Referral fit",
+          handoverRequest: "Handover request",
+          nextStep: "Next step",
+          disclaimer: "Disclaimer",
+        },
+        errors: {
+          loginRequired:
+            "Sign in with a provider account that has active workspace access before generating.",
+          accessRequired:
+            "An active access code is required before generating guided drafting material.",
+          quotaExhausted:
+            "Today's guided drafting quota has been used. Preview materials remain available.",
+          rateLimited:
+            "Too many guided drafting requests. Wait a moment, then try again.",
+          generic:
+            "Unable to generate this referral message draft. Please try again later.",
+        },
+      },
+      bilingualIntroGenerator: {
+        title: "Bilingual intro guided draft",
+        description:
+          "Generate a short English and community-language intro from the claimed provider profile. The provider reviews both versions before sharing.",
+        profileLabel: "Profile",
+        generate: "Generate bilingual intro",
+        generating: "Generating intro",
+        successTitle: "Bilingual intro ready for review",
+        boundary:
+          "Draft material only. Based on self-submitted information and not a CaresLink endorsement, certification, compliance approval, clinical assessment, service-quality assessment, translation certification, or referral guarantee.",
+        disabledReasons: {
+          verified_session_required:
+            "Sign in with a provider account that has active workspace access. Preview mode can show the control for review, but cannot start live generation.",
+          claimed_draft_required:
+            "Claim a saved provider draft before generating guided drafting material.",
+          access_required:
+            "Access code and remaining daily quota are required before generating guided drafting material.",
+        },
+        fieldLabels: {
+          englishIntro: "English intro",
+          communityLanguageIntro: "Community-language intro",
+          language: "Language",
+          sharingContext: "Sharing context",
+          disclaimer: "Disclaimer",
+        },
+        errors: {
+          loginRequired:
+            "Sign in with a provider account that has active workspace access before generating.",
+          accessRequired:
+            "An active access code is required before generating guided drafting material.",
+          quotaExhausted:
+            "Today's guided drafting quota has been used. Preview materials remain available.",
+          rateLimited:
+            "Too many guided drafting requests. Wait a moment, then try again.",
+          generic:
+            "Unable to generate this bilingual intro draft. Please try again later.",
+        },
+      },
+      handoverChecklistGenerator: {
+        title: "Handover checklist guided draft",
+        description:
+          "Generate an operational referral handover checklist from the claimed provider profile. Review it before sharing any client context.",
+        profileLabel: "Profile",
+        generate: "Generate handover checklist",
+        generating: "Generating checklist",
+        successTitle: "Handover checklist ready for review",
+        boundary:
+          "Draft material only. Based on self-submitted information and not a CaresLink endorsement, certification, compliance approval, clinical assessment, service-quality assessment, legal advice, or referral guarantee.",
+        disabledReasons: {
+          verified_session_required:
+            "Sign in with a provider account that has active workspace access. Preview mode can show the control for review, but cannot start live generation.",
+          claimed_draft_required:
+            "Claim a saved provider draft before generating guided drafting material.",
+          access_required:
+            "Access code and remaining daily quota are required before generating guided drafting material.",
+        },
+        fieldLabels: {
+          checklistTitle: "Checklist title",
+          consentCheck: "Consent check",
+          clientContext: "Client context",
+          supportNeed: "Support need",
+          handoverDetails: "Handover details",
+          nextStep: "Next step",
+          disclaimer: "Disclaimer",
+        },
+        errors: {
+          loginRequired:
+            "Sign in with a provider account that has active workspace access before generating.",
+          accessRequired:
+            "An active access code is required before generating guided drafting material.",
+          quotaExhausted:
+            "Today's guided drafting quota has been used. Preview materials remain available.",
+          rateLimited:
+            "Too many guided drafting requests. Wait a moment, then try again.",
+          generic:
+            "Unable to generate this handover checklist draft. Please try again later.",
+        },
+      },
+      latestShareCard: {
+        title: "Latest saved share-card draft",
+        description:
+          "Shown from the saved draft store so the provider can review generated material after leaving or refreshing the workspace.",
+        statusLabel: "Saved draft",
+      },
+      generatedDraftHistory: {
+        title: "Generated draft history",
+        description:
+          "Recently saved guided drafts for this account. Review and edit before using any material outside CaresLink AI.",
+        statusLabel: "Review status",
+        featureLabels: {
+          profile_rewrite: "Profile rewrite",
+          share_card: "Share card",
+          referral_message: "Referral message",
+          bilingual_intro: "Bilingual intro",
+          handover_checklist: "Handover checklist",
+        },
+        statusLabels: {
+          draft: "Draft",
+          reviewed: "Reviewed",
+          archived: "Archived",
+        },
+        actions: {
+          markReviewed: "Mark reviewed",
+          archive: "Archive",
+        },
+        copyActions: {
+          fieldsTitle: "Saved fields",
+          copyAll: "Copy all",
+          copyField: "Copy",
+          copied: "Copied",
+          copyAllAria: "Copy all fields for {title}",
+          copyFieldAria: "Copy {field}",
+        },
+      },
     },
     access: {
       eyebrow: "Access controls",
@@ -739,11 +1294,11 @@ const referralWorkspaceCopy: Record<Locale, ReferralWorkspaceCopy> = {
         "Submission is disabled in this preview. Requests can be reviewed by pilot admins only.",
       costControlTitle: "Cost control",
       costControl:
-        "Access gating keeps AI-assisted drafting behind explicit pilot approval and daily usage limits.",
-      materialsDemo: "Materials demo",
+        "Access gating keeps guided drafting behind explicit pilot access and daily usage limits.",
+      materialsDemo: "Materials preview",
       adminQueue: "Admin queue",
       costControlItems: [
-        "Control AI cost with a small daily guided drafting quota.",
+        "Control generation cost with a small daily guided drafting quota.",
         "Reduce abuse, multi-account scraping, and automated extraction of pilot materials.",
         "Keep the first pilot invite-based until review and support flows are ready for broader access.",
       ],
@@ -751,6 +1306,12 @@ const referralWorkspaceCopy: Record<Locale, ReferralWorkspaceCopy> = {
       applicationFieldsDescription:
         "These disabled fields show what the first access-code request could collect for pilot review. They are seeded preview values, not submitted form data.",
       previewOnlyNoSubmit: "Preview only: no submit",
+      submitAvailable: "Ready to submit",
+      submittedNotice:
+        "Workspace request saved. Pilot admins can now review it from the access queue.",
+      alreadyActiveNotice:
+        "Access is already active for this account. Guided materials remain limited by daily quota.",
+      submitButton: "Submit request",
       formLabel: "Access code application preview",
       fields: {
         profile: "Profile",
@@ -768,19 +1329,19 @@ const referralWorkspaceCopy: Record<Locale, ReferralWorkspaceCopy> = {
         reason:
           "Prepare guided referral communication materials from submitted profile details while keeping preview content clearly separate from live generation.",
         abuseCostControlNote:
-          "Access codes limit guided drafting quota, reduce automated scraping or multi-account abuse, and keep the v0.1 pilot invite-based.",
+          "Access codes limit guided drafting quota, reduce automated scraping or multi-account abuse, and keep guided drafting invite-based while the workspace is being piloted.",
       },
       previewRequestStateTitle: "Preview request state",
       previewRequestStateDescription:
-        "This page does not create an access request, send email, call OpenAI, or enqueue an admin review. It only previews the first version of the application surface.",
+        "This page does not create a workspace request, send email, start live generation, or enqueue an admin review. It only previews the first version of the application surface.",
       disabledButton: "Preview only - request not submitted",
-      viewAccessCodeMaterialsDemo: "View access-code materials demo",
+      viewAccessCodeMaterialsDemo: "View access-code materials preview",
       openAdminQueue: "Open admin queue",
       previewDestinationsTitle: "Preview destinations",
       previewDestinationsDescription:
-        "Use these links to compare the no-code materials preview, the access-code materials demo, and the seeded admin queue without changing live access state.",
+        "Use these links to compare the no-code materials preview, the access-code materials preview, and the seeded admin queue without changing live access state.",
       freeMaterials: "Free materials",
-      accessCodeDemo: "Access-code demo",
+      accessCodeDemo: "Access-code preview",
     },
     admin: {
       eyebrow: "Pilot admin",
@@ -850,6 +1411,11 @@ const referralWorkspaceCopy: Record<Locale, ReferralWorkspaceCopy> = {
         waitlist: "Preview waitlist",
         decline: "Preview decline",
       },
+      reviewActions: {
+        approve: "Approve access",
+        waitlist: "Keep queued",
+        decline: "Decline",
+      },
       requestedCodeTypesTitle: "Requested code types",
       noRequestedCodeTypes: "No requested code types in this queue.",
       reviewFocusTitle: "Review focus",
@@ -859,6 +1425,148 @@ const referralWorkspaceCopy: Record<Locale, ReferralWorkspaceCopy> = {
         "Watch for repeated requests, duplicate users, or multi-account misuse patterns.",
         "Keep provider quality, outcomes, clinical suitability, and compliance judgments outside this access queue.",
       ],
+      materialUsage: {
+        eyebrow: "Pilot admin",
+        title: "Generated material usage",
+        description:
+          "Review saved guided material activity by account, provider draft, feature, status, and time.",
+        accessRequests: "Access requests",
+        workspace: "Workspace",
+        boundaryTitle: "Usage review boundary",
+        boundary:
+          "This view supports pilot usage review only. It does not show generated content, assess provider quality, endorse services, or prove referral outcomes.",
+        activityTitle: "Saved material activity",
+        activityDescription:
+          "Use this metadata to learn which draft types providers review, copy, archive, or return to during the pilot.",
+        noDrafts: "No saved generated material drafts yet.",
+        draftCount: {
+          one: "{count} saved draft",
+          other: "{count} saved drafts",
+        },
+        metrics: {
+          total: {
+            label: "Saved drafts",
+            detail: "Generated material drafts saved by providers.",
+          },
+          reviewed: {
+            label: "Reviewed",
+            detail: "Drafts providers marked as reviewed.",
+          },
+          archived: {
+            label: "Archived",
+            detail: "Drafts providers removed from active review.",
+          },
+          copyEvents: {
+            label: "Copy events",
+            detail: "Copy actions recorded after saved draft reuse.",
+          },
+          copyAll: {
+            label: "Copy all events",
+            detail: "Whole-draft copy actions.",
+          },
+          copyField: {
+            label: "Copy field events",
+            detail: "Single-field copy actions.",
+          },
+          featureMix: {
+            label: "Feature mix",
+          },
+        },
+        eventCount: {
+          one: "{count} event",
+          other: "{count} events",
+        },
+        fields: {
+          draftId: "Draft ID",
+          userId: "User ID",
+          providerDraftId: "Provider draft ID",
+          feature: "Feature",
+          status: "Status",
+          createdAt: "Created",
+          updatedAt: "Updated",
+          content: "Content",
+        },
+        featureLabels: {
+          share_card: "Share card",
+          referral_message: "Referral message",
+          bilingual_intro: "Bilingual intro",
+          handover_checklist: "Handover checklist",
+          profile_rewrite: "Profile rewrite",
+        },
+        statusLabels: {
+          draft: "Draft",
+          reviewed: "Reviewed",
+          archived: "Archived",
+        },
+        contentNotShown: "Content not shown",
+        contentNotShownDetail:
+          "Generated text stays in the provider review workspace. Admin usage review only shows metadata needed for pilot learning.",
+      },
+    },
+    auth: {
+      login: {
+        eyebrow: "Account access",
+        title: "Sign in to CaresLink",
+        description:
+          "Sign in with your CaresLink AI account to continue your provider workspace.",
+        register: "Create account",
+        chooseAccount: "Workspace accounts",
+        boundary:
+          "Email/password login creates a Supabase session. Workspace content remains general business profile / operational support only.",
+      },
+      register: {
+        eyebrow: "Provider registration",
+        title: "Create your provider workspace account",
+        description:
+          "Create a real login account, save a provider profile, and continue referral readiness.",
+        providerCta: "Create account and continue",
+        waitlistCta: "Join access waitlist",
+        loginCta: "Already have an account",
+        boundary:
+          "Registration creates a provider account. Guided material access remains reviewed separately before any AI drafting tools are enabled.",
+      },
+      gate: {
+        eyebrow: "Login required",
+        title: "Sign in before using the referral workspace",
+        description:
+          "Provider profiles, workspace access, and guided material states need an account context before they can be previewed.",
+        loginCta: "Sign in",
+        registerCta: "Create account",
+        previewBoundary:
+          "This workspace uses server-side account context. Content remains general business profile / operational support only.",
+      },
+      adminGate: {
+        eyebrow: "Admin access required",
+        title: "Use an admin account to review workspace access",
+        description:
+          "Provider accounts can request workspace access, but they cannot view or operate the access queue.",
+        adminCta: "Open admin workspace",
+        workspaceCta: "Back to workspace",
+        previewBoundary:
+          "This role boundary separates provider and admin actions. It does not endorse providers or make service quality decisions.",
+      },
+      demoAccounts: {
+        free: {
+          label: "Free provider preview",
+          description:
+            "See profile readiness, locked materials, and workspace access prompts without guided drafting.",
+        },
+        waitlist: {
+          label: "Waitlist provider preview",
+          description:
+            "Preview a provider account that has requested access and is waiting for review.",
+        },
+        approved: {
+          label: "Access-code provider preview",
+          description:
+            "Preview a provider account with guided material access inside quota.",
+        },
+        admin: {
+          label: "Admin review preview",
+          description:
+            "Preview the workspace access queue without issuing codes or changing accounts.",
+        },
+      },
     },
     components: {
       basicProfile: {
@@ -1108,13 +1816,13 @@ const referralWorkspaceCopy: Record<Locale, ReferralWorkspaceCopy> = {
         },
         lockedStatusLabels: {
           quotaUsed: "Quota used today",
-          waitlist: "Access request queued",
+          waitlist: "Workspace request queued",
           accessRequired: "Access code required",
         },
         lockedMessages: {
           quotaUsed: "Daily guided quota used. Preview remains visible.",
           waitlist:
-            "Access request queued. Preview remains visible while the request is pending.",
+            "Workspace request queued. Preview remains visible while the request is pending.",
           accessRequired: "Access code required for guided materials.",
         },
         materials: {
@@ -1238,14 +1946,14 @@ const referralWorkspaceCopy: Record<Locale, ReferralWorkspaceCopy> = {
               "Preview materials remain visible. Guided drafting unlocks again with available quota.",
           },
           waitlist: {
-            label: "Access request queued",
+            label: "Workspace request queued",
             detail:
               "Preview materials remain visible until an access code is active.",
           },
           free: {
-            label: "Free preview",
+            label: "Access required",
             detail:
-              "Preview materials are visible. Guided drafting requires an access code.",
+              "Saved material requirements remain visible. Guided drafting requires an active access code.",
           },
         },
         accessCodeLabel: "Access code",
@@ -1279,7 +1987,7 @@ const referralWorkspaceCopy: Record<Locale, ReferralWorkspaceCopy> = {
           quotaUsed:
             "Daily guided quota used. Preview materials remain visible.",
           waitlist:
-            "Access request queued. Preview materials remain visible while the request is pending.",
+            "Workspace request queued. Preview materials remain visible while the request is pending.",
           accessRequired:
             "Access code required before guided drafting is available. Preview materials remain visible.",
         },
@@ -1290,15 +1998,15 @@ const referralWorkspaceCopy: Record<Locale, ReferralWorkspaceCopy> = {
     common: {
       previewOnly: "仅预览模式",
       selfSubmitted: "基于自行提交的资料信息",
-      continueToReadiness: "继续查看准备度",
+      continueToReadiness: "查看转介阻碍",
       trustBoundary:
-        "资料信息基于自行提交的资料信息。CaresLink 不评估服务商质量、临床适用性、合规状态或服务结果，也不提供法律、临床、医疗、合规、财务或其他专业建议。",
+        "仅用于一般商业资料和运营支持。资料信息基于自行提交的资料信息。CaresLink 不评估服务商质量、临床适用性、合规状态或服务结果，也不提供法律、临床、医疗、合规、财务或其他专业建议。",
       nonLiveActions:
         "试点操作仅为非实时预览，不会创建转介、背书、合规审查或专业建议。",
     },
     shell: {
       brand: "CaresLink",
-      subtitle: "转介资料工作区",
+      subtitle: "Referral Pack 工作区",
       language: "语言",
       pilotPreview: "试点预览",
       pilotBoundary:
@@ -1306,10 +2014,13 @@ const referralWorkspaceCopy: Record<Locale, ReferralWorkspaceCopy> = {
       primaryNav: {
         workspace: "工作区",
         profile: "资料",
-        health: "准备度",
+        health: "阻碍",
         materials: "材料",
+        referralPack: "材料包",
+        outreach: "跟进",
         accessCode: "访问码",
         accessRequests: "访问申请",
+        materialUsage: "材料使用",
       },
       legacyNav: {
         groupHeading: "旧版演示",
@@ -1324,9 +2035,9 @@ const referralWorkspaceCopy: Record<Locale, ReferralWorkspaceCopy> = {
     },
     workspace: {
       eyebrow: "转介工作区",
-      title: "建立清晰的转介资料",
+      title: "Referral Pack 工作台",
       description:
-        "在一个试点工作区中查看自行提交的资料字段、准备度信号、受限材料和访问状态。",
+        "准备可发送的转介资料包，记录发给了谁，并跟进下一步。",
       requestAccess: "申请访问权限",
       accessRequests: "访问申请",
       routeBlockTitle: "工作区路径暂不可用",
@@ -1338,19 +2049,19 @@ const referralWorkspaceCopy: Record<Locale, ReferralWorkspaceCopy> = {
       adminAccessQueue: "管理访问队列",
       routes: {
         profile: {
-          label: "资料",
+          label: "资料包来源",
           detail: "编辑自行提交的转介沟通字段。",
         },
         health: {
-          label: "准备度",
-          detail: "查看完整度信号和优先缺口。",
+          label: "转介阻碍",
+          detail: "查看哪些缺口可能让转介方不敢介绍你。",
         },
         materials: {
-          label: "材料",
-          detail: "预览分享卡、交接文案和接收提示。",
+          label: "资料包草稿",
+          detail: "生成和复核可放入 Referral Pack 的草稿。",
         },
         access: {
-          label: "访问",
+          label: "工作区访问",
           detail: "申请或输入访问码以使用引导式起草。",
         },
       },
@@ -1365,15 +2076,15 @@ const referralWorkspaceCopy: Record<Locale, ReferralWorkspaceCopy> = {
       receiveSection: "接收转介",
       sendSection: "发送转介",
       roleMatrixTitle: "转介角色矩阵",
-      noPersistence: "此处显示的更改仅供预览，不会保存到实时服务商记录。",
-      builderExample: "构建器示例",
+      noPersistence: "这里显示的是当前资料预览。服务商需要复核后再用于公开分享或转介沟通。",
+      builderExample: "当前资料",
       builderDescription:
-        "此处使用 Harbour 种子数据展示第一版资料构建器。本切片中的字段为只读，且不会保存更改。",
+        "这些内容来自当前服务商资料。请先补全和复核，再用于分享或生成转介沟通材料。",
       formLabel: "只读转介资料构建器",
-      relevantToProfile: "与此资料相关",
-      notUsedForDirection: "此方向不使用",
-      relevant: "相关",
-      notUsed: "不使用",
+      relevantToProfile: "此角色需要",
+      notUsedForDirection: "暂不适用",
+      relevant: "需要",
+      notUsed: "暂不适用",
       identityDescription:
         "设置资料代表的主体、参与转介的方式，以及转介方可阅读的自行提交摘要。",
       footprintDescription:
@@ -1381,9 +2092,9 @@ const referralWorkspaceCopy: Record<Locale, ReferralWorkspaceCopy> = {
       receiveDescription: "接收侧详情与发送侧交接信息保持分开。",
       sendDescription:
         "发送侧详情说明外发转介时应携带的信息以及后续跟进方式。",
-      previewBoundaryTitle: "预览和非实时边界",
+      previewBoundaryTitle: "资料使用边界",
       previewBoundaryDescription:
-        "此页面仅使用种子资料数据。它不会保存编辑、发放访问码或执行真实账户操作。",
+        "此页面展示当前资料上下文，供服务商复核使用。它不评估服务质量、合规状态或照护适用性。",
       roleMatrixDescription:
         "种子集合展示个人和机构资料如何接收转介、发送转介或同时执行两者，并保持资料两侧互相区分。",
       directionHelp: {
@@ -1416,44 +2127,44 @@ const referralWorkspaceCopy: Record<Locale, ReferralWorkspaceCopy> = {
         sendSide: "发送侧",
       },
       receiveDetailsMissing: "尚未提供接收详情。",
-      receiveNotUsed: "接收字段单独保留，此方向不使用。",
-      sendNotUsed: "发送字段单独保留，此方向不使用。",
+      receiveNotUsed: "此角色暂不需要接收转介字段。",
+      sendNotUsed: "此角色暂不需要发送转介字段。",
     },
     health: {
-      eyebrow: "准备度健康",
-      title: "资料准备度",
+      eyebrow: "转介阻碍",
+      title: "什么可能阻碍别人转介给你？",
       description:
-        "检查提交的资料是否足够清晰以支持转介沟通，但不评分质量、适用性或合规性。",
-      scoreMeaningTitle: "分数含义",
+        "检查提交的资料是否给转介方足够上下文，让他们更放心地介绍你。",
+      scoreMeaningTitle: "阻碍分数含义",
       scoreMeaning:
         "该分数仅反映沟通完整度和清晰度，不是服务商质量评估、临床评估、合规评估或结果预测。",
-      profileBuilder: "资料构建器",
-      materialsPreview: "材料预览",
+      profileBuilder: "资料包来源",
+      materialsPreview: "Referral Pack 草稿",
       metrics: {
         signalsReviewed: {
           label: "已检查信号",
-          detail: "检查资料字段的沟通完整度。",
+          detail: "检查资料字段对转介沟通是否清晰。",
         },
         openIssues: {
-          label: "未解决问题",
-          detail: "按优先级排序的此资料缺口。",
+          label: "转介阻碍",
+          detail: "按对转介沟通影响排序的资料缺口。",
         },
         highPriority: {
           label: "高优先级",
           detail: "在依赖该资料进行转介沟通前需要处理的项目。",
         },
       },
-      nextStepFlowTitle: "下一步流程",
+      nextStepFlowTitle: "下一步转介动作",
       nextStepFlowDescription:
-        "使用审核结果选择需要更新的内容，然后查看预览材料和访问申请页面。",
+        "使用阻碍信号改进 Referral Pack，再发送给转介伙伴。",
       nextSteps: {
         profile: {
-          label: "资料构建器",
-          detail: "查看影响转介沟通准备度的自行提交字段。",
+          label: "资料包来源",
+          detail: "查看会进入 Referral Pack 的自行提交字段。",
         },
         materials: {
-          label: "材料预览",
-          detail: "根据当前字段预览资料文案、分享卡和接收提示。",
+          label: "Referral Pack 草稿",
+          detail: "根据当前字段复核资料文案、分享卡和转介沟通草稿。",
         },
         access: {
           label: "访问申请",
@@ -1463,34 +2174,34 @@ const referralWorkspaceCopy: Record<Locale, ReferralWorkspaceCopy> = {
       },
     },
     materials: {
-      eyebrow: "转介材料",
-      title: "引导式材料",
+      eyebrow: "Referral Pack 草稿",
+      title: "为 Referral Pack 创建草稿",
       description:
-        "预览基于提交字段生成的资料摘要、转介消息、交接提示和分享卡文案。",
-      freeMode: "免费模式显示结构和锁定预览，不调用 AI 起草操作。",
+        "生成和复核资料摘要、转介消息、双语介绍、交接提示和分享卡文案，再放入 Referral Pack 使用。",
+      freeMode: "免费模式显示结构和锁定预览，不启动实时生成。",
       accessMode: "访问码模式会在配额和试点限制内解锁引导式起草。",
-      noAiCall: "仅预览模式不会调用 AI，也不会发送实时转介操作。",
-      currentModeTitle: "当前材料模式",
-      accessCodeGuidedPreview: "访问码引导预览",
-      freePreviewWithoutCode: "无访问码免费预览",
+      noAiCall: "仅预览模式不会启动实时生成，也不会发送实时转介操作。",
+      currentModeTitle: "当前起草模式",
+      accessCodeGuidedPreview: "资料包起草可用",
+      freePreviewWithoutCode: "引导式资料包草稿未开通",
       accessModeDetail:
-        "此演示路径使用已批准的访问状态，因此可以看到引导式起草步骤、解锁材料和配额状态。",
+        "此预览路径使用已开通的访问状态，因此可以看到引导式起草步骤、解锁材料和配额状态。",
       freeModeDetail:
         "此路径显示默认免费状态：材料预览可见，而引导式起草仍受访问码限制。",
-      userApproved: "已批准用户",
+      userApproved: "访问已启用",
       userFree: "免费用户",
       accessCode: "访问码",
-      activeForDemo: "演示中已启用",
+      activeForDemo: "预览中已启用",
       notPresent: "未提供",
       guidedQuota: "引导配额",
       usedDailyQuota: "已用 {used} / 每日 {total}",
       remainingToday: "今日剩余",
       viewFreePreview: "查看免费预览",
       accessRequestPreview: "访问申请预览",
-      tryAccessCodeDemo: "试用访问码演示",
-      readinessAudit: "准备度审核",
+      tryAccessCodeDemo: "试用访问码预览",
+      readinessAudit: "转介阻碍",
       freePreview: "免费预览",
-      accessDemo: "访问演示",
+      accessDemo: "访问预览",
       access: "访问",
       deterministicPreviewTitle: "确定性界面预览",
       guidedReviewBoundary:
@@ -1499,6 +2210,239 @@ const referralWorkspaceCopy: Record<Locale, ReferralWorkspaceCopy> = {
         "免费预览会显示材料要求，并明确展示访问码限制的位置。",
       accessStateBoundary:
         "访问状态不表示背书、认证、临床审核、合规批准或任何转介结果保证。",
+      profileRewriteGenerator: {
+        title: "创建资料包草稿",
+        description:
+          "把已提交的服务商资料整理成可放入 Referral Pack 的转介沟通草稿。服务商需要复核每个字段后再使用。",
+        profileLabel: "资料",
+        generate: "生成资料包草稿",
+        generating: "正在生成改写",
+        successTitle: "资料包草稿已生成，等待复核",
+        boundary:
+          "仅为草稿材料。内容基于自行提交的信息，不代表 CaresLink 背书、认证、合规批准、临床评估、服务质量评估或转介结果保证。",
+        disabledReasons: {
+          verified_session_required:
+            "需要登录且已开通访问的账号。预览模式只能展示控件，不能启动实时生成。",
+          claimed_draft_required:
+            "请先认领已保存的服务商资料草稿，再生成引导式生成材料。",
+          access_required:
+            "需要访问码且今日配额仍可用，才能生成引导式生成材料。",
+        },
+        fieldLabels: {
+          professionalEnglishDescription: "专业英文描述",
+          shortEnglishSummary: "简短英文摘要",
+          chineseCommunityIntro: "中文社区介绍",
+          referralPartnerSummary: "转介伙伴摘要",
+          profileImprovementNotes: "资料改进建议",
+          disclaimer: "免责声明",
+        },
+        errors: {
+          loginRequired:
+            "请使用真实登录且已开通访问的服务商账号登录后再生成。",
+          accessRequired:
+            "需要访问码批准后才能生成引导式生成材料。",
+          quotaExhausted:
+            "今日引导式生成配额已用完。预览材料仍可查看。",
+          rateLimited:
+            "引导式生成请求过于频繁。请稍后再试。",
+          generic:
+            "暂时无法生成这份资料改写草稿。请稍后再试。",
+        },
+      },
+      shareCardGenerator: {
+        title: "分享卡引导式草稿",
+        description:
+          "根据已认领的服务商资料生成简洁分享卡草稿。每个字段都需要由服务商复核后再使用。",
+        profileLabel: "资料",
+        generate: "生成分享卡草稿",
+        generating: "正在生成草稿",
+        successTitle: "草稿已生成，等待审核",
+        boundary:
+          "仅为草稿材料。内容基于自行提交的信息，不代表 CaresLink 背书、认证、合规批准、临床评估或转介结果保证。",
+        disabledReasons: {
+          verified_session_required:
+            "需要登录且已开通访问的账号。预览模式只能展示控件，不能启动实时生成。",
+          claimed_draft_required:
+            "请先认领已保存的服务商资料草稿，再生成引导式生成材料。",
+          access_required:
+            "需要访问码且今日配额仍可用，才能生成引导式生成材料。",
+        },
+        fieldLabels: {
+          headline: "标题",
+          subheadline: "副标题",
+          serviceArea: "服务区域",
+          languages: "语言",
+          referralFit: "适合转介对象",
+          intakePath: "接收路径",
+          disclaimer: "免责声明",
+        },
+        errors: {
+          loginRequired:
+            "请使用真实登录且已开通访问的服务商账号登录后再生成。",
+          accessRequired:
+            "需要访问码批准后才能生成引导式生成材料。",
+          quotaExhausted:
+            "今日引导式生成配额已用完。预览材料仍可查看。",
+          rateLimited:
+            "引导式生成请求过于频繁。请稍后再试。",
+          generic:
+            "暂时无法生成这份分享卡草稿。请稍后再试。",
+        },
+      },
+      referralMessageGenerator: {
+        title: "转介消息引导式草稿",
+        description:
+          "根据已认领的服务商资料生成可复核的转介伙伴消息草稿。发送方需要审核和修改后再使用。",
+        profileLabel: "资料",
+        generate: "生成转介消息",
+        generating: "正在生成消息",
+        successTitle: "消息草稿已生成，等待审核",
+        boundary:
+          "仅为草稿材料。内容基于自行提交的信息，不代表 CaresLink 背书、认证、合规批准、临床评估、服务质量评估或转介结果保证。",
+        disabledReasons: {
+          verified_session_required:
+            "需要登录且已开通访问的账号。预览模式只能展示控件，不能启动实时生成。",
+          claimed_draft_required:
+            "请先认领已保存的服务商资料草稿，再生成引导式生成材料。",
+          access_required:
+            "需要访问码且今日配额仍可用，才能生成引导式生成材料。",
+        },
+        fieldLabels: {
+          subjectLine: "邮件标题",
+          opening: "开场",
+          providerSummary: "服务商摘要",
+          referralFit: "适合转介对象",
+          handoverRequest: "交接信息要求",
+          nextStep: "下一步",
+          disclaimer: "免责声明",
+        },
+        errors: {
+          loginRequired:
+            "请使用真实登录且已开通访问的服务商账号登录后再生成。",
+          accessRequired:
+            "需要访问码批准后才能生成引导式生成材料。",
+          quotaExhausted:
+            "今日引导式生成配额已用完。预览材料仍可查看。",
+          rateLimited:
+            "引导式生成请求过于频繁。请稍后再试。",
+          generic:
+            "暂时无法生成这份转介消息草稿。请稍后再试。",
+        },
+      },
+      bilingualIntroGenerator: {
+        title: "双语介绍引导式草稿",
+        description:
+          "根据已认领的服务商资料生成英文和社区语言介绍草稿。两个版本都需要服务商复核后再分享。",
+        profileLabel: "资料",
+        generate: "生成双语介绍",
+        generating: "正在生成介绍",
+        successTitle: "双语介绍已生成，等待审核",
+        boundary:
+          "仅为草稿材料。内容基于自行提交的信息，不代表 CaresLink 背书、认证、合规批准、临床评估、服务质量评估、翻译认证或转介结果保证。",
+        disabledReasons: {
+          verified_session_required:
+            "需要登录且已开通访问的账号。预览模式只能展示控件，不能启动实时生成。",
+          claimed_draft_required:
+            "请先认领已保存的服务商资料草稿，再生成引导式生成材料。",
+          access_required:
+            "需要访问码且今日配额仍可用，才能生成引导式生成材料。",
+        },
+        fieldLabels: {
+          englishIntro: "英文介绍",
+          communityLanguageIntro: "社区语言介绍",
+          language: "语言",
+          sharingContext: "分享场景",
+          disclaimer: "免责声明",
+        },
+        errors: {
+          loginRequired:
+            "请使用真实登录且已开通访问的服务商账号登录后再生成。",
+          accessRequired:
+            "需要访问码批准后才能生成引导式生成材料。",
+          quotaExhausted:
+            "今日引导式生成配额已用完。预览材料仍可查看。",
+          rateLimited:
+            "引导式生成请求过于频繁。请稍后再试。",
+          generic:
+            "暂时无法生成这份双语介绍草稿。请稍后再试。",
+        },
+      },
+      handoverChecklistGenerator: {
+        title: "交接清单引导式草稿",
+        description:
+          "根据已认领的服务商资料生成运营层面的转介交接清单。分享任何客户上下文前都需要先审核。",
+        profileLabel: "资料",
+        generate: "生成交接清单",
+        generating: "正在生成清单",
+        successTitle: "交接清单已生成，等待审核",
+        boundary:
+          "仅为草稿材料。内容基于自行提交的信息，不代表 CaresLink 背书、认证、合规批准、临床评估、服务质量评估、法律建议或转介结果保证。",
+        disabledReasons: {
+          verified_session_required:
+            "需要登录且已开通访问的账号。预览模式只能展示控件，不能启动实时生成。",
+          claimed_draft_required:
+            "请先认领已保存的服务商资料草稿，再生成引导式生成材料。",
+          access_required:
+            "需要访问码且今日配额仍可用，才能生成引导式生成材料。",
+        },
+        fieldLabels: {
+          checklistTitle: "清单标题",
+          consentCheck: "同意确认",
+          clientContext: "客户上下文",
+          supportNeed: "支持需求",
+          handoverDetails: "交接详情",
+          nextStep: "下一步",
+          disclaimer: "免责声明",
+        },
+        errors: {
+          loginRequired:
+            "请使用真实登录且已开通访问的服务商账号登录后再生成。",
+          accessRequired:
+            "需要访问码批准后才能生成引导式生成材料。",
+          quotaExhausted:
+            "今日引导式生成配额已用完。预览材料仍可查看。",
+          rateLimited:
+            "引导式生成请求过于频繁。请稍后再试。",
+          generic:
+            "暂时无法生成这份交接清单草稿。请稍后再试。",
+        },
+      },
+      latestShareCard: {
+        title: "最近保存的分享卡草稿",
+        description:
+          "从已保存的草稿库中读取，方便服务商在离开或刷新工作区后继续复核生成材料。",
+        statusLabel: "已保存草稿",
+      },
+      generatedDraftHistory: {
+        title: "生成草稿历史",
+        description:
+          "查看此账号的已保存材料和最近动态。任何材料在 CaresLink AI 外使用前都需要先审核和修改。",
+        statusLabel: "审核状态",
+        featureLabels: {
+          profile_rewrite: "资料改写",
+          share_card: "分享卡",
+          referral_message: "转介消息",
+          bilingual_intro: "双语介绍",
+          handover_checklist: "交接清单",
+        },
+        statusLabels: {
+          draft: "草稿",
+          reviewed: "已审核",
+          archived: "已归档",
+        },
+        actions: {
+          markReviewed: "标记已审核",
+          archive: "归档",
+        },
+        copyActions: {
+          fieldsTitle: "已保存字段",
+          copyAll: "复制全部",
+          copyField: "复制",
+          copied: "已复制",
+          copyAllAria: "复制 {title} 的全部字段",
+          copyFieldAria: "复制 {field}",
+        },
+      },
     },
     access: {
       eyebrow: "访问控制",
@@ -1508,7 +2452,7 @@ const referralWorkspaceCopy: Record<Locale, ReferralWorkspaceCopy> = {
       costControlTitle: "成本控制",
       costControl:
         "访问门槛会将 AI 辅助起草限制在明确的试点批准和每日使用限制之内。",
-      materialsDemo: "材料演示",
+      materialsDemo: "材料预览",
       adminQueue: "管理队列",
       costControlItems: [
         "通过较小的每日引导式起草配额控制 AI 成本。",
@@ -1519,6 +2463,11 @@ const referralWorkspaceCopy: Record<Locale, ReferralWorkspaceCopy> = {
       applicationFieldsDescription:
         "这些禁用字段展示第一版访问码申请可能为试点审核收集的内容。它们是种子预览值，不是已提交表单数据。",
       previewOnlyNoSubmit: "仅预览：不提交",
+      submitAvailable: "可以提交",
+      submittedNotice: "访问申请已保存。试点管理员现在可以在申请队列中审核。",
+      alreadyActiveNotice:
+        "此账号的访问已经启用。引导式材料仍受每日配额限制。",
+      submitButton: "提交访问申请",
       formLabel: "访问码申请预览",
       fields: {
         profile: "资料",
@@ -1540,15 +2489,15 @@ const referralWorkspaceCopy: Record<Locale, ReferralWorkspaceCopy> = {
       },
       previewRequestStateTitle: "预览申请状态",
       previewRequestStateDescription:
-        "此页面不会创建访问申请、发送电子邮件、调用 OpenAI 或加入管理审核队列。它只预览第一版申请界面。",
+        "此页面不会创建访问申请、发送电子邮件、启动实时生成或加入管理审核队列。它只预览第一版申请界面。",
       disabledButton: "仅预览 - 申请未提交",
-      viewAccessCodeMaterialsDemo: "查看访问码材料演示",
+      viewAccessCodeMaterialsDemo: "查看访问码材料预览",
       openAdminQueue: "打开管理队列",
       previewDestinationsTitle: "预览目标",
       previewDestinationsDescription:
-        "使用这些链接比较无代码材料预览、访问码材料演示和种子管理队列，而不改变实时访问状态。",
+        "使用这些链接比较无代码材料预览、访问码材料预览和种子管理队列，而不改变实时访问状态。",
       freeMaterials: "免费材料",
-      accessCodeDemo: "访问码演示",
+      accessCodeDemo: "访问码预览",
     },
     admin: {
       eyebrow: "试点管理",
@@ -1617,6 +2566,11 @@ const referralWorkspaceCopy: Record<Locale, ReferralWorkspaceCopy> = {
         waitlist: "预览排队",
         decline: "预览拒绝",
       },
+      reviewActions: {
+        approve: "批准访问",
+        waitlist: "保持排队",
+        decline: "拒绝",
+      },
       requestedCodeTypesTitle: "申请的代码类型",
       noRequestedCodeTypes: "此队列中没有申请的代码类型。",
       reviewFocusTitle: "审核重点",
@@ -1626,6 +2580,148 @@ const referralWorkspaceCopy: Record<Locale, ReferralWorkspaceCopy> = {
         "留意重复申请、重复用户或多账户滥用模式。",
         "不要在此访问队列中判断服务商质量、结果、临床适用性或合规性。",
       ],
+      materialUsage: {
+        eyebrow: "试点管理",
+        title: "生成材料使用情况",
+        description:
+          "按账号、服务商资料草稿、功能、状态和时间查看已保存的引导式材料活动。",
+        accessRequests: "访问申请",
+        workspace: "工作区",
+        boundaryTitle: "使用复盘边界",
+        boundary:
+          "此视图仅用于试点使用复盘。它不展示生成内容，不评估服务商质量，不背书服务，也不证明转介结果。",
+        activityTitle: "已保存材料活动",
+        activityDescription:
+          "用这些元数据了解试点期间服务商会复核、复制、归档或返回查看哪些草稿类型。",
+        noDrafts: "目前还没有已保存的生成材料草稿。",
+        draftCount: {
+          one: "{count} 个已保存草稿",
+          other: "{count} 个已保存草稿",
+        },
+        metrics: {
+          total: {
+            label: "已保存草稿",
+            detail: "服务商保存的生成材料草稿。",
+          },
+          reviewed: {
+            label: "已审核",
+            detail: "服务商标记为已审核的草稿。",
+          },
+          archived: {
+            label: "已归档",
+            detail: "服务商从当前审核中移除的草稿。",
+          },
+          copyEvents: {
+            label: "复制事件",
+            detail: "已保存草稿复用后记录的复制动作。",
+          },
+          copyAll: {
+            label: "复制全部事件",
+            detail: "整份草稿复制动作。",
+          },
+          copyField: {
+            label: "复制字段事件",
+            detail: "单字段复制动作。",
+          },
+          featureMix: {
+            label: "功能组合",
+          },
+        },
+        eventCount: {
+          one: "{count} 个事件",
+          other: "{count} 个事件",
+        },
+        fields: {
+          draftId: "草稿 ID",
+          userId: "用户 ID",
+          providerDraftId: "服务商资料草稿 ID",
+          feature: "功能",
+          status: "状态",
+          createdAt: "创建时间",
+          updatedAt: "更新时间",
+          content: "内容",
+        },
+        featureLabels: {
+          share_card: "分享卡",
+          referral_message: "转介消息",
+          bilingual_intro: "双语介绍",
+          handover_checklist: "交接清单",
+          profile_rewrite: "资料改写",
+        },
+        statusLabels: {
+          draft: "草稿",
+          reviewed: "已审核",
+          archived: "已归档",
+        },
+        contentNotShown: "不显示内容",
+        contentNotShownDetail:
+          "生成文本保留在服务商复核工作区中。管理端使用复盘只显示试点学习所需的元数据。",
+      },
+    },
+    auth: {
+      login: {
+        eyebrow: "账号访问",
+        title: "登录 CaresLink",
+        description:
+          "选择一个预览账号来查看已注册用户的工作区。v0.1 不会创建真实 session，也不会保存密码。",
+        register: "创建预览账号",
+        chooseAccount: "选择预览账号",
+        boundary:
+          "这一版只模拟登录状态。真实登录、邮箱验证、session 和数据库账号归属会在下一阶段实现。",
+      },
+      register: {
+        eyebrow: "注册预览",
+        title: "创建服务商预览账号",
+        description:
+          "先以服务商预览用户进入，也可以加入访问等待名单来等待引导式材料权限。",
+        providerCta: "以服务商预览继续",
+        waitlistCta: "加入访问等待名单",
+        loginCta: "已有预览账号",
+        boundary:
+          "这一版注册不会提交真实数据，不会创建密码、邮箱验证、访问码或真实账号。",
+      },
+      gate: {
+        eyebrow: "需要登录",
+        title: "请先登录再使用转介工作区",
+        description:
+          "服务商资料、访问申请和引导式材料状态需要账号上下文后才能预览。",
+        loginCta: "登录",
+        registerCta: "创建预览账号",
+        previewBoundary:
+          "这个 gate 只控制预览账号上下文，不是真实认证或服务端授权。",
+      },
+      adminGate: {
+        eyebrow: "需要管理员权限",
+        title: "请使用管理员账号查看访问申请队列",
+        description:
+          "服务商预览账号可以申请访问权限，但不能查看或操作访问申请队列。",
+        adminCta: "切换到管理员预览",
+        workspaceCta: "返回工作区",
+        previewBoundary:
+          "这个预览区分服务商和管理员角色，但不会发放真实访问码、开通用户或判断服务质量。",
+      },
+      demoAccounts: {
+        free: {
+          label: "免费服务商预览",
+          description:
+            "查看资料准备度、锁定材料和访问申请提示，不开放引导式起草。",
+        },
+        waitlist: {
+          label: "等待名单服务商预览",
+          description:
+            "预览已经申请访问、正在等待审核的服务商账号状态。",
+        },
+        approved: {
+          label: "访问码服务商预览",
+          description:
+            "预览已开通访问的服务商账号，在配额内查看引导式材料权限。",
+        },
+        admin: {
+          label: "管理员审核预览",
+          description:
+            "预览访问申请队列，不会发放真实访问码或修改账号。",
+        },
+      },
     },
     components: {
       basicProfile: {

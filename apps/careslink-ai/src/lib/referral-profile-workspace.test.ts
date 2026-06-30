@@ -169,6 +169,15 @@ describe("referral profile workspace domain", () => {
     vi.doMock("@/components/referral-profile-workspace", async () =>
       import("../components/referral-profile-workspace")
     );
+    vi.doMock("@/components/referral-workspace-auth-gate", async () =>
+      import("../components/referral-workspace-auth-gate")
+    );
+    vi.doMock("@/components/workspace-layout", async () =>
+      import("../components/workspace-layout")
+    );
+    vi.doMock("@/components/provider-draft-handoff-persister", () => ({
+      ProviderDraftHandoffPersister: () => null,
+    }));
     vi.doMock("@/components/ui", async () => import("../components/ui"));
     vi.doMock("@/lib/referral-profile-workspace", async () => {
       const actual = await import("./referral-profile-workspace");
@@ -180,16 +189,32 @@ describe("referral profile workspace domain", () => {
       return {
         ...actual,
         getReferralProfile: () => unsafeProfile,
+        getReferralProfileForWorkspaceAccount: () => unsafeProfile,
         getSeedReferralProfiles: () => [unsafeProfile],
       };
     });
+    vi.doMock("@/lib/referral-workspace-auth", async () =>
+      import("./referral-workspace-auth")
+    );
+    vi.doMock("@/lib/referral-workspace-session", async () =>
+      import("./referral-workspace-session")
+    );
+    vi.doMock("@/lib/referral-workspace-handoff", async () =>
+      import("./referral-workspace-handoff")
+    );
+    vi.doMock("@/lib/provider-draft-store", async () =>
+      import("./provider-draft-store")
+    );
+    vi.doMock("@/lib/public-provider-profile-generator", async () =>
+      import("./public-provider-profile-generator")
+    );
 
     try {
       const { default: ReferralProfilePage } = await import(
         "../app/referral-workspace/profile/page"
       );
       const element = await ReferralProfilePage({
-        searchParams: Promise.resolve({}),
+        searchParams: Promise.resolve({ account: "user-free" }),
       });
       const markup = renderToStaticMarkup(element).toLowerCase();
 
@@ -200,8 +225,16 @@ describe("referral profile workspace domain", () => {
       vi.doUnmock("@/components/app-shell");
       vi.doUnmock("@/components/page-header");
       vi.doUnmock("@/components/referral-profile-workspace");
+      vi.doUnmock("@/components/referral-workspace-auth-gate");
+      vi.doUnmock("@/components/workspace-layout");
+      vi.doUnmock("@/components/provider-draft-handoff-persister");
       vi.doUnmock("@/components/ui");
       vi.doUnmock("@/lib/referral-profile-workspace");
+      vi.doUnmock("@/lib/referral-workspace-auth");
+      vi.doUnmock("@/lib/referral-workspace-session");
+      vi.doUnmock("@/lib/referral-workspace-handoff");
+      vi.doUnmock("@/lib/provider-draft-store");
+      vi.doUnmock("@/lib/public-provider-profile-generator");
       vi.resetModules();
     }
   });

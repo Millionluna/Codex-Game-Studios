@@ -43,6 +43,12 @@ type BasicProfileCardProps = {
   className?: string;
 };
 
+type ReferralRoleChecklistPanelProps = {
+  summary: BasicProfileSummary;
+  locale?: Locale;
+  className?: string;
+};
+
 type HealthScorePanelProps = {
   audit: HealthAudit;
   locale?: Locale;
@@ -106,6 +112,34 @@ type HealthIssueItem = HealthAudit["issues"][number];
 type IssueCopy = ComponentCopy["topIssues"]["issues"][keyof ComponentCopy["topIssues"]["issues"]];
 type MaterialCopy = ComponentCopy["materialsGrid"]["materials"][keyof ComponentCopy["materialsGrid"]["materials"]];
 type QueueItemCopy = ComponentCopy["agentQueue"]["items"][keyof ComponentCopy["agentQueue"]["items"]];
+
+type RoleChecklistCopy = {
+  title: string;
+  description: string;
+  receiveLabel: string;
+  sendLabel: string;
+  bothLabel: string;
+  receiveNeedsTitle: string;
+  sendNeedsTitle: string;
+  provided: string;
+  needsDetails: string;
+  receiveItems: {
+    serviceArea: string;
+    serviceTypes: string;
+    languages: string;
+    capacity: string;
+    responseTime: string;
+    contact: string;
+  };
+  sendItems: {
+    clientNeed: string;
+    location: string;
+    language: string;
+    consent: string;
+    preferredTime: string;
+    notes: string;
+  };
+};
 
 const signalToneClasses: Record<HealthStatus, string> = {
   good: "border-[#9ed8c9] bg-[#e6f7f2] text-[#0f766e]",
@@ -260,6 +294,68 @@ function accessStatusCopy(
   return {
     ...copy.states.free,
     tone: "warning" as const,
+  };
+}
+
+function getRoleChecklistCopy(locale: Locale): RoleChecklistCopy {
+  if (locale === "zh-Hans") {
+    return {
+      title: "你的转介角色",
+      description:
+        "根据你当前资料，CaresLink 会把后续表格和材料聚焦在你实际需要的转介场景上。",
+      receiveLabel: "我主要接收转介",
+      sendLabel: "我主要发送转介",
+      bothLabel: "我两者都会",
+      receiveNeedsTitle: "接收转介需要补充",
+      sendNeedsTitle: "发送转介需要补充",
+      provided: "已提供",
+      needsDetails: "需要补充",
+      receiveItems: {
+        serviceArea: "服务区域",
+        serviceTypes: "可接收服务类型",
+        languages: "语言能力",
+        capacity: "接单能力",
+        responseTime: "响应时间",
+        contact: "联系方式",
+      },
+      sendItems: {
+        clientNeed: "客户需求摘要",
+        location: "所在地区",
+        language: "首选语言",
+        consent: "同意联系状态",
+        preferredTime: "希望联系时间",
+        notes: "转介备注",
+      },
+    };
+  }
+
+  return {
+    title: "Your referral role",
+    description:
+      "CaresLink uses your current profile to focus forms and materials on the referral scenarios you actually need.",
+    receiveLabel: "I mainly receive referrals",
+    sendLabel: "I mainly send referrals",
+    bothLabel: "I do both",
+    receiveNeedsTitle: "Receive-referral details to complete",
+    sendNeedsTitle: "Send-referral details to complete",
+    provided: "Provided",
+    needsDetails: "Needs details",
+    receiveItems: {
+      serviceArea: "Service area",
+      serviceTypes: "Accepted service types",
+      languages: "Languages",
+      capacity: "Capacity",
+      responseTime: "Response time",
+      contact: "Contact method",
+    },
+    sendItems: {
+      clientNeed: "Client need summary",
+      location: "Location",
+      language: "Preferred language",
+      consent: "Consent to contact",
+      preferredTime: "Preferred contact time",
+      notes: "Referral notes",
+    },
   };
 }
 
@@ -429,6 +525,117 @@ function CopilotMessage({
       <p className="mb-1 text-xs font-semibold text-[#65736f]">{label}</p>
       <p>{children}</p>
     </div>
+  );
+}
+
+function RoleChecklistGroup({
+  title,
+  items,
+  providedLabel,
+  missingLabel,
+}: {
+  title: string;
+  items: readonly (readonly [string, boolean])[];
+  providedLabel: string;
+  missingLabel: string;
+}) {
+  return (
+    <section className="rounded-lg border border-[#dce8e2] bg-[#f8fbfa] p-4">
+      <h3 className="text-sm font-semibold text-[#17211f]">{title}</h3>
+      <div className="mt-3 grid gap-2">
+        {items.map(([label, isProvided]) => (
+          <div
+            className="flex min-h-10 items-center justify-between gap-3 rounded-md border border-[#dce8e2] bg-white px-3 py-2"
+            key={label}
+          >
+            <span className="text-sm text-[#40504b]">{label}</span>
+            <StatusBadge
+              className={
+                isProvided
+                  ? "border-[#9ed8c9] bg-[#e6f7f2] text-[#0f766e]"
+                  : "border-[#f4d28f] bg-[#fff7df] text-[#925b00]"
+              }
+            >
+              {isProvided ? providedLabel : missingLabel}
+            </StatusBadge>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+export function ReferralRoleChecklistPanel({
+  summary,
+  locale = DEFAULT_LOCALE,
+  className = "",
+}: ReferralRoleChecklistPanelProps) {
+  const copy = getRoleChecklistCopy(locale);
+  const roleLabel =
+    summary.referralDirection === "both"
+      ? copy.bothLabel
+      : summary.referralDirection === "send"
+        ? copy.sendLabel
+        : copy.receiveLabel;
+  const showReceive =
+    summary.referralDirection === "receive" ||
+    summary.referralDirection === "both";
+  const showSend =
+    summary.referralDirection === "send" ||
+    summary.referralDirection === "both";
+  const receiveItems = [
+    [copy.receiveItems.serviceArea, summary.serviceAreas.length > 0],
+    [copy.receiveItems.serviceTypes, summary.bestFit.length > 0],
+    [copy.receiveItems.languages, summary.languages.length > 0],
+    [copy.receiveItems.capacity, Boolean(summary.capacityStatus)],
+    [copy.receiveItems.responseTime, Boolean(summary.responseTime)],
+    [copy.receiveItems.contact, Boolean(summary.intakeMethod)],
+  ] as const;
+  const sendItems = [
+    [copy.sendItems.clientNeed, summary.bestFit.length > 0],
+    [copy.sendItems.location, summary.serviceAreas.length > 0],
+    [copy.sendItems.language, summary.languages.length > 0],
+    [copy.sendItems.consent, Boolean(summary.consentReminder)],
+    [copy.sendItems.preferredTime, Boolean(summary.followUpCadence)],
+    [copy.sendItems.notes, summary.handoverRequirements.length > 0],
+  ] as const;
+
+  return (
+    <Card className={cx("p-5 shadow-[var(--shadow-md)]", className)}>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 text-sm font-semibold text-[#0f766e]">
+            <Send className="size-5" aria-hidden="true" />
+            {copy.title}
+          </div>
+          <h2 className="mt-2 break-words text-xl font-semibold text-[#17211f]">
+            {roleLabel}
+          </h2>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-[#40504b]">
+            {copy.description}
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-5 grid gap-4 lg:grid-cols-2">
+        {showReceive ? (
+          <RoleChecklistGroup
+            title={copy.receiveNeedsTitle}
+            items={receiveItems}
+            providedLabel={copy.provided}
+            missingLabel={copy.needsDetails}
+          />
+        ) : null}
+        {showSend ? (
+          <RoleChecklistGroup
+            title={copy.sendNeedsTitle}
+            items={sendItems}
+            providedLabel={copy.provided}
+            missingLabel={copy.needsDetails}
+          />
+        ) : null}
+      </div>
+    </Card>
   );
 }
 
