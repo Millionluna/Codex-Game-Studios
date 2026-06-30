@@ -144,6 +144,7 @@ function getReferralPackCopy(locale: Locale) {
       copied: "已复制",
       recordThisSend: "记录这次发送",
       recordSendHint: "复制后填写联系人，方便之后跟进。",
+      followUpDateHint: "格式 YYYY-MM-DD，默认 3 天后，可修改。",
       targetBadge: "发送对象",
       roleOptions: {
         support_coordinator: "支持协调员",
@@ -246,6 +247,7 @@ function getReferralPackCopy(locale: Locale) {
     copied: "Copied",
     recordThisSend: "Record this send",
     recordSendHint: "After copying, add the recipient so follow-up is easier.",
+    followUpDateHint: "Use YYYY-MM-DD. Defaults to 3 days from today.",
     targetBadge: "Target",
     roleOptions: {
       support_coordinator: "Support coordinator",
@@ -668,7 +670,7 @@ function TargetCopyCards({
             id={`record-send-target-${targetCopy.target}`}
             action={outreachPostAction}
             method="post"
-            className="mt-4 grid gap-3 md:grid-cols-[minmax(0,1fr)_11rem_11rem_auto]"
+            className="mt-4 grid gap-3 md:grid-cols-[minmax(0,1fr)_11rem_13rem_auto] md:items-end"
           >
             <input
               type="hidden"
@@ -690,7 +692,7 @@ function TargetCopyCards({
             />
             <input type="hidden" name="status" value="sent" />
             <FieldLabel>
-              <span className="sr-only">{copy.recipientPlaceholder}</span>
+              {copy.recipientPlaceholder}
               <TextInput
                 name="recipientName"
                 placeholder={copy.recipientPlaceholder}
@@ -698,7 +700,7 @@ function TargetCopyCards({
               />
             </FieldLabel>
             <FieldLabel>
-              <span className="sr-only">{copy.channelLabel}</span>
+              {copy.channelLabel}
               <SelectInput
                 name="channel"
                 defaultValue="wechat"
@@ -715,15 +717,24 @@ function TargetCopyCards({
               {copy.nextFollowUpAtLabel}
               <TextInput
                 name="nextFollowUpAt"
-                type="date"
+                type="text"
+                inputMode="numeric"
+                pattern="\d{4}-\d{2}-\d{2}"
                 defaultValue={defaultFollowUpDate}
+                aria-describedby={`follow-up-hint-target-${targetCopy.target}`}
                 disabled={!canSaveOutreach}
               />
+              <span
+                id={`follow-up-hint-target-${targetCopy.target}`}
+                className="text-xs font-normal text-[#65736f]"
+              >
+                {copy.followUpDateHint}
+              </span>
             </FieldLabel>
             <button
               type="submit"
               disabled={!canSaveOutreach}
-              className="taito-secondary px-3 disabled:cursor-not-allowed disabled:opacity-55"
+              className="taito-secondary min-h-11 px-3 disabled:cursor-not-allowed disabled:opacity-55"
             >
               <ClipboardCheck className="size-4" aria-hidden="true" />
               {copy.recordThisSend}
@@ -812,7 +823,7 @@ function ReferralPackItemCard({
         id={`record-send-${item.id}`}
         action={outreachPostAction}
         method="post"
-        className="mt-4 grid gap-3 md:grid-cols-[minmax(0,1fr)_11rem_11rem_11rem_auto]"
+        className="mt-4 grid gap-3 md:grid-cols-[minmax(0,1fr)_11rem_11rem_13rem_auto] md:items-end"
       >
         <input
           type="hidden"
@@ -834,7 +845,7 @@ function ReferralPackItemCard({
         />
         <input type="hidden" name="status" value="sent" />
         <FieldLabel>
-          <span className="sr-only">{copy.recipientPlaceholder}</span>
+          {copy.recipientPlaceholder}
           <TextInput
             name="recipientName"
             placeholder={copy.recipientPlaceholder}
@@ -842,7 +853,7 @@ function ReferralPackItemCard({
           />
         </FieldLabel>
         <FieldLabel>
-          <span className="sr-only">{copy.roleLabel}</span>
+          {copy.roleLabel}
           <SelectInput
             name="roleType"
             defaultValue="support_coordinator"
@@ -856,7 +867,7 @@ function ReferralPackItemCard({
           </SelectInput>
         </FieldLabel>
         <FieldLabel>
-          <span className="sr-only">{copy.channelLabel}</span>
+          {copy.channelLabel}
           <SelectInput
             name="channel"
             defaultValue="wechat"
@@ -873,15 +884,24 @@ function ReferralPackItemCard({
           {copy.nextFollowUpAtLabel}
           <TextInput
             name="nextFollowUpAt"
-            type="date"
+            type="text"
+            inputMode="numeric"
+            pattern="\d{4}-\d{2}-\d{2}"
             defaultValue={defaultFollowUpDate}
+            aria-describedby={`follow-up-hint-${item.id}`}
             disabled={!canSaveOutreach}
           />
+          <span
+            id={`follow-up-hint-${item.id}`}
+            className="text-xs font-normal text-[#65736f]"
+          >
+            {copy.followUpDateHint}
+          </span>
         </FieldLabel>
         <button
           type="submit"
           disabled={!canSaveOutreach}
-          className="taito-secondary px-3 disabled:cursor-not-allowed disabled:opacity-55"
+          className="taito-secondary min-h-11 px-3 disabled:cursor-not-allowed disabled:opacity-55"
         >
           <ClipboardCheck className="size-4" aria-hidden="true" />
           {copy.markSent}

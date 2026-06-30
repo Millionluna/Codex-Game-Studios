@@ -1096,6 +1096,7 @@ describe("referral workspace route localization", () => {
     expect(markup).toContain('name="nextFollowUpAt"');
     expect(markup).toContain('name="notes"');
     expect(markup).toContain("Next follow-up");
+    expect(markup).toContain("Use YYYY-MM-DD. Defaults to 3 days from today.");
     expect(markup).toContain(
       "Example: Sent in WeChat group, follow up in 3 days.",
     );
