@@ -1086,6 +1086,9 @@ describe("referral workspace route localization", () => {
     expect(markup).toContain("For community groups");
     expect(markup).toContain("Copy target wording");
     expect(markup).toContain("Record this send");
+    expect(markup).toContain(
+      "After copying, add the recipient so follow-up is easier.",
+    );
     expect(markup).toContain("Basic profile intro");
     expect(markup).toContain("Referral intro for community partners");
     expect(markup).toContain("Mark as sent");
@@ -1125,6 +1128,7 @@ describe("referral workspace route localization", () => {
 
     expect(markup).toContain("Follow-up assistant");
     expect(markup).toContain("Add or record a send");
+    expect(markup).toContain("Today&#x27;s follow-up focus");
     expect(markup).toContain("Needs follow-up");
     expect(markup).toContain("No reply yet");
     expect(markup).toContain("Replied");

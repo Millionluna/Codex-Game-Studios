@@ -165,7 +165,7 @@ function buildZhCopy(
         target,
         title: "发给社区群组",
         description: "适合社区群、微信群或即时消息转发的简短版本。",
-        body: `${profile.name} 提供：${services}\n服务范围：${areas || "请确认"}\n语言：${languages || "请确认"}\n联系路径：${intake || "请确认"}\n\n转发前请先复核资料，并由需要服务的人直接联系服务商确认下一步。`,
+        body: `可以了解一下 ${profile.name}。\n服务内容：${services}\n服务范围：${areas || "请确认"}\n可沟通语言：${languages || "请确认"}\n联系路径：${intake || "请确认"}\n\n转发前请先复核资料；如有需要，请由本人或家属直接联系服务商确认是否适合。`,
         reviewNote,
       };
     case "family_contact":
@@ -173,7 +173,7 @@ function buildZhCopy(
         target,
         title: "发给家庭联系人",
         description: "用更容易理解的语言说明服务内容和下一步。",
-        body: `${profile.name} 可能可以协助：${services}\n服务区域包括：${areas || "资料中列出的地区"}。\n可使用语言：${languages || "资料中列出的语言"}。\n\n下一步是通过 ${intake || "资料中列出的联系路径"} 联系服务商，并确认当前需要是否适合。`,
+        body: `${profile.name} 可能可以协助：${services}\n服务区域：${areas || "资料中列出的地区"}。\n可沟通语言：${languages || "资料中列出的语言"}。\n\n下一步可以通过 ${intake || "资料中列出的联系路径"} 联系服务商，先确认当前需要、所在地区和时间安排是否适合。`,
         reviewNote,
       };
   }

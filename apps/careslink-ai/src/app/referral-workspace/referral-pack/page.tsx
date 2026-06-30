@@ -134,6 +134,7 @@ function getReferralPackCopy(locale: Locale) {
       copyTarget: "复制这段文案",
       copied: "已复制",
       recordThisSend: "记录这次发送",
+      recordSendHint: "复制后填写联系人，方便之后跟进。",
       targetBadge: "发送对象",
       roleOptions: {
         support_coordinator: "支持协调员",
@@ -232,6 +233,7 @@ function getReferralPackCopy(locale: Locale) {
     copyTarget: "Copy target wording",
     copied: "Copied",
     recordThisSend: "Record this send",
+    recordSendHint: "After copying, add the recipient so follow-up is easier.",
     targetBadge: "Target",
     roleOptions: {
       support_coordinator: "Support coordinator",
@@ -631,6 +633,7 @@ function TargetCopyCards({
               label={copy.copyTarget}
               copiedLabel={copy.copied}
               ariaLabel={`${copy.copyTarget}: ${targetCopy.title}`}
+              focusAfterCopyId={`record-send-target-${targetCopy.target}`}
             />
           </div>
 
@@ -639,6 +642,9 @@ function TargetCopyCards({
           </pre>
           <p className="mt-3 text-xs leading-5 text-[#65736f]">
             {targetCopy.reviewNote}
+          </p>
+          <p className="mt-3 text-xs font-semibold text-[#40504b]">
+            {copy.recordSendHint}
           </p>
 
           <form
@@ -745,6 +751,7 @@ function ReferralPackItemCard({
           label={copy.copy}
           copiedLabel={copy.copied}
           ariaLabel={`${copy.copy}: ${item.title}`}
+          focusAfterCopyId={`record-send-${item.id}`}
           telemetryEvent={
             item.generatedMaterialDraftId
               ? {
@@ -759,6 +766,9 @@ function ReferralPackItemCard({
       <pre className="mt-4 max-h-52 overflow-auto whitespace-pre-wrap rounded-lg border border-[#e3ddd2] bg-white p-3 text-sm leading-6 text-[#40504b]">
         {item.copyText}
       </pre>
+      <p className="mt-3 text-xs font-semibold text-[#40504b]">
+        {copy.recordSendHint}
+      </p>
 
       <form
         id={`record-send-${item.id}`}

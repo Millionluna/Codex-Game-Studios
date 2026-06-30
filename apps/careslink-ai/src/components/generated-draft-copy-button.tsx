@@ -14,6 +14,7 @@ type GeneratedDraftCopyButtonProps = {
   ariaLabel: string;
   compact?: boolean;
   telemetryEvent?: GeneratedDraftCopyEvent;
+  focusAfterCopyId?: string;
 };
 
 type GeneratedDraftCopyEvent = {
@@ -26,6 +27,19 @@ type GeneratedDraftCopyEventFetcher = (
   input: RequestInfo | URL,
   init?: RequestInit,
 ) => Promise<Response>;
+
+type CopyFocusElement = {
+  scrollIntoView?: (options?: ScrollIntoViewOptions) => void;
+  animate?: (
+    keyframes: Keyframe[] | PropertyIndexedKeyframes,
+    options?: number | KeyframeAnimationOptions,
+  ) => Animation;
+  querySelector?: (selector: string) => { focus?: () => void } | null;
+};
+
+type CopyFocusDocument = {
+  getElementById(id: string): CopyFocusElement | null;
+};
 
 export async function writeGeneratedDraftCopyText(
   text: string,
@@ -68,6 +82,37 @@ export async function recordGeneratedDraftCopyEvent(
   }
 }
 
+export function focusElementAfterGeneratedDraftCopy(
+  elementId: string | undefined,
+  documentRef: CopyFocusDocument | undefined = globalThis.document,
+) {
+  if (!elementId || !documentRef) {
+    return false;
+  }
+
+  const element = documentRef.getElementById(elementId);
+
+  if (!element) {
+    return false;
+  }
+
+  element.scrollIntoView?.({ behavior: "smooth", block: "center" });
+  element.animate?.(
+    [
+      { boxShadow: "0 0 0 0 rgba(15, 118, 110, 0)", backgroundColor: "" },
+      {
+        boxShadow: "0 0 0 3px rgba(15, 118, 110, 0.28)",
+        backgroundColor: "#f0f7f4",
+      },
+      { boxShadow: "0 0 0 0 rgba(15, 118, 110, 0)", backgroundColor: "" },
+    ],
+    { duration: 1400, easing: "ease-out" },
+  );
+  element.querySelector?.('input[name="recipientName"]')?.focus?.();
+
+  return true;
+}
+
 export function GeneratedDraftCopyButton({
   text,
   label,
@@ -75,6 +120,7 @@ export function GeneratedDraftCopyButton({
   ariaLabel,
   compact = false,
   telemetryEvent,
+  focusAfterCopyId,
 }: GeneratedDraftCopyButtonProps) {
   const [copied, setCopied] = useState(false);
 
@@ -87,6 +133,7 @@ export function GeneratedDraftCopyButton({
 
     setCopied(true);
     window.setTimeout(() => setCopied(false), 1600);
+    focusElementAfterGeneratedDraftCopy(focusAfterCopyId);
     void recordGeneratedDraftCopyEvent(telemetryEvent);
   }
 

@@ -57,6 +57,9 @@ function getOutreachCopy(locale: Locale) {
         "这是服务商自己的运营记录，不代表 CaresLink 分发线索、撮合转介或背书服务质量。",
       listTitle: "跟进记录",
       listDescription: "按最近创建时间显示当前服务商的跟进记录。",
+      todayFocusTitle: "今日优先",
+      todayFocusDescription:
+        "优先查看已经标记为待跟进，或下次跟进日期已到的联系人。",
       followUpQueueTitle: "需要跟进",
       followUpQueueDescription:
         "优先处理已标记为待跟进，或已经设置下次跟进日期的联系人。",
@@ -69,6 +72,7 @@ function getOutreachCopy(locale: Locale) {
       recentSendsDescription:
         "查看最近把 Referral Pack 发给了谁，以及当前回应状态。",
       empty: "还没有跟进记录。先从 Referral Pack 复制材料并记录一次发送。",
+      noTodayFocus: "今天暂无需要优先处理的跟进。",
       noFollowUps: "暂无需要跟进的联系人。",
       noNoReply: "暂无尚未回复的发送记录。",
       noReplies: "暂无已回复记录。",
@@ -134,6 +138,9 @@ function getOutreachCopy(locale: Locale) {
       "This is the provider's own operating record for follow-up and general business operations.",
     listTitle: "Recent sends",
     listDescription: "Current provider send records, newest first.",
+    todayFocusTitle: "Today's follow-up focus",
+    todayFocusDescription:
+      "Start with contacts marked for follow-up or records due today.",
     followUpQueueTitle: "Needs follow-up",
     followUpQueueDescription:
       "Prioritise contacts marked for follow-up or records with a next follow-up date.",
@@ -148,6 +155,7 @@ function getOutreachCopy(locale: Locale) {
       "See who received the Referral Pack and the current reply state.",
     empty:
       "No outreach records yet. Start from the Referral Pack, copy material, and record a send.",
+    noTodayFocus: "No priority follow-ups for today.",
     noFollowUps: "No follow-ups due yet.",
     noNoReply: "No no-reply records yet.",
     noReplies: "No replied records yet.",
@@ -257,6 +265,7 @@ async function ProviderOutreach({
         limit: 100,
       })
     : [];
+  const todayFocusRecords = getTodayFocusRecords(outreachRecords, new Date());
   const followUpRecords = getFollowUpRecords(outreachRecords);
   const noReplyRecords = getNoReplyRecords(outreachRecords);
   const repliedRecords = getRepliedRecords(outreachRecords);
@@ -308,6 +317,27 @@ async function ProviderOutreach({
                 {statusMessage}
               </div>
             ) : null}
+
+            <WorkspaceSection
+              title={outreachCopy.todayFocusTitle}
+              description={outreachCopy.todayFocusDescription}
+              action={
+                <WorkspaceStatusPill tone={todayFocusRecords.length ? "warning" : "neutral"}>
+                  {todayFocusRecords.length}
+                </WorkspaceStatusPill>
+              }
+            >
+              <OutreachTable
+                records={todayFocusRecords}
+                copy={outreachCopy}
+                locale={locale}
+                source={handoff.source}
+                draftId={handoff.draftId}
+                canSaveOutreach={canSaveOutreach}
+                outreachPostAction={outreachPostAction}
+                emptyMessage={outreachCopy.noTodayFocus}
+              />
+            </WorkspaceSection>
 
             <WorkspaceSection
               title={outreachCopy.followUpQueueTitle}
@@ -706,6 +736,16 @@ function OutreachTable({
 function getFollowUpRecords(records: OutreachRecord[]) {
   return records.filter(
     (record) => record.status === "follow_up" || Boolean(record.nextFollowUpAt),
+  );
+}
+
+function getTodayFocusRecords(records: OutreachRecord[], now: Date) {
+  const today = now.toISOString().slice(0, 10);
+
+  return records.filter(
+    (record) =>
+      record.status === "follow_up" ||
+      Boolean(record.nextFollowUpAt && record.nextFollowUpAt <= today),
   );
 }
 

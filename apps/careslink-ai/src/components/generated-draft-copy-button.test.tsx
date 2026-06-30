@@ -2,6 +2,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import {
+  focusElementAfterGeneratedDraftCopy,
   GeneratedDraftCopyButton,
   recordGeneratedDraftCopyEvent,
   writeGeneratedDraftCopyText,
@@ -68,5 +69,35 @@ describe("generated draft copy button", () => {
     const [, init] = fetcher.mock.calls[0] ?? [];
     expect(String(init?.body)).toContain("supportNeed");
     expect(String(init?.body)).not.toContain("Private generated text");
+  });
+
+  it("focuses the matching send form after copy", () => {
+    const focus = vi.fn();
+    const scrollIntoView = vi.fn();
+    const animate = vi.fn();
+    const documentRef = {
+      getElementById: vi.fn(() => ({
+        scrollIntoView,
+        animate,
+        querySelector: vi.fn(() => ({ focus })),
+      })),
+    };
+
+    expect(
+      focusElementAfterGeneratedDraftCopy(
+        "record-send-target-support_coordinator",
+        documentRef,
+      ),
+    ).toBe(true);
+
+    expect(documentRef.getElementById).toHaveBeenCalledWith(
+      "record-send-target-support_coordinator",
+    );
+    expect(scrollIntoView).toHaveBeenCalledWith({
+      behavior: "smooth",
+      block: "center",
+    });
+    expect(animate).toHaveBeenCalled();
+    expect(focus).toHaveBeenCalled();
   });
 });
