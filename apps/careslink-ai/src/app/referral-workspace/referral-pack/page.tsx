@@ -6,7 +6,13 @@ import {
   ReferralWorkspaceLoginGate,
 } from "@/components/referral-workspace-auth-gate";
 import { TrustBoundaryNotice } from "@/components/referral-profile-workspace";
-import { ButtonLink, FieldLabel, SelectInput, TextInput } from "@/components/ui";
+import {
+  ButtonLink,
+  FieldLabel,
+  SelectInput,
+  TextArea,
+  TextInput,
+} from "@/components/ui";
 import {
   WorkspaceGrid,
   WorkspaceMainPanel,
@@ -83,7 +89,10 @@ function getReferralPackCopy(locale: Locale) {
       recipientPlaceholder: "联系人姓名",
       channelLabel: "渠道",
       roleLabel: "联系人类型",
-      sendStatusSaved: "发送记录已保存。",
+      nextFollowUpAtLabel: "下次跟进",
+      notesLabel: "备注",
+      notesPlaceholder: "例如：微信群已发送，3 天后跟进。",
+      sendStatusSaved: "发送记录已保存，下次跟进日期已设置。",
       sendStatusLoginRequired:
         "需要真实服务商账号登录后才能保存发送记录。",
       sendStatusMissingRecipient: "请填写联系人姓名。",
@@ -182,7 +191,10 @@ function getReferralPackCopy(locale: Locale) {
     recipientPlaceholder: "Recipient name",
     channelLabel: "Channel",
     roleLabel: "Recipient type",
-    sendStatusSaved: "Send record saved.",
+    nextFollowUpAtLabel: "Next follow-up",
+    notesLabel: "Notes",
+    notesPlaceholder: "Example: Sent in WeChat group, follow up in 3 days.",
+    sendStatusSaved: "Send record saved with a follow-up date.",
     sendStatusLoginRequired:
       "Sign in with a real provider account to save outreach records.",
     sendStatusMissingRecipient: "Add a recipient name first.",
@@ -350,6 +362,7 @@ async function ProviderReferralPack({
   const outreachPostAction = canSaveOutreach
     ? "/api/outreach-records"
     : undefined;
+  const defaultFollowUpDate = getDefaultFollowUpDate();
   const statusMessage = getOutreachStatusMessage(
     params?.outreachStatus,
     packCopy,
@@ -435,6 +448,7 @@ async function ProviderReferralPack({
                 draftId={handoff.draftId}
                 canSaveOutreach={canSaveOutreach}
                 outreachPostAction={outreachPostAction}
+                defaultFollowUpDate={defaultFollowUpDate}
               />
             </WorkspaceSection>
 
@@ -477,6 +491,7 @@ async function ProviderReferralPack({
                           draftId={handoff.draftId}
                           canSaveOutreach={canSaveOutreach}
                           outreachPostAction={outreachPostAction}
+                          defaultFollowUpDate={defaultFollowUpDate}
                         />
                       ))}
                     </div>
@@ -599,6 +614,7 @@ function TargetCopyCards({
   draftId,
   canSaveOutreach,
   outreachPostAction,
+  defaultFollowUpDate,
 }: {
   targetCopies: ReferralPackTargetCopy[];
   copy: ReturnType<typeof getReferralPackCopy>;
@@ -608,6 +624,7 @@ function TargetCopyCards({
   draftId?: string;
   canSaveOutreach: boolean;
   outreachPostAction?: string;
+  defaultFollowUpDate: string;
 }) {
   return (
     <div className="grid gap-4">
@@ -651,7 +668,7 @@ function TargetCopyCards({
             id={`record-send-target-${targetCopy.target}`}
             action={outreachPostAction}
             method="post"
-            className="mt-4 grid gap-3 md:grid-cols-[minmax(0,1fr)_11rem_auto]"
+            className="mt-4 grid gap-3 md:grid-cols-[minmax(0,1fr)_11rem_11rem_auto]"
           >
             <input
               type="hidden"
@@ -694,6 +711,15 @@ function TargetCopyCards({
                 ))}
               </SelectInput>
             </FieldLabel>
+            <FieldLabel>
+              {copy.nextFollowUpAtLabel}
+              <TextInput
+                name="nextFollowUpAt"
+                type="date"
+                defaultValue={defaultFollowUpDate}
+                disabled={!canSaveOutreach}
+              />
+            </FieldLabel>
             <button
               type="submit"
               disabled={!canSaveOutreach}
@@ -702,6 +728,16 @@ function TargetCopyCards({
               <ClipboardCheck className="size-4" aria-hidden="true" />
               {copy.recordThisSend}
             </button>
+            <div className="md:col-span-4">
+              <FieldLabel>
+                {copy.notesLabel}
+                <TextArea
+                  name="notes"
+                  placeholder={copy.notesPlaceholder}
+                  disabled={!canSaveOutreach}
+                />
+              </FieldLabel>
+            </div>
           </form>
         </article>
       ))}
@@ -718,6 +754,7 @@ function ReferralPackItemCard({
   draftId,
   canSaveOutreach,
   outreachPostAction,
+  defaultFollowUpDate,
 }: {
   item: ReferralPackItem;
   copy: ReturnType<typeof getReferralPackCopy>;
@@ -727,6 +764,7 @@ function ReferralPackItemCard({
   draftId?: string;
   canSaveOutreach: boolean;
   outreachPostAction?: string;
+  defaultFollowUpDate: string;
 }) {
   return (
     <article className="rounded-lg border border-[#e3ddd2] bg-[#fbfaf7] p-4">
@@ -774,7 +812,7 @@ function ReferralPackItemCard({
         id={`record-send-${item.id}`}
         action={outreachPostAction}
         method="post"
-        className="mt-4 grid gap-3 md:grid-cols-[minmax(0,1fr)_11rem_11rem_auto]"
+        className="mt-4 grid gap-3 md:grid-cols-[minmax(0,1fr)_11rem_11rem_11rem_auto]"
       >
         <input
           type="hidden"
@@ -831,6 +869,15 @@ function ReferralPackItemCard({
             ))}
           </SelectInput>
         </FieldLabel>
+        <FieldLabel>
+          {copy.nextFollowUpAtLabel}
+          <TextInput
+            name="nextFollowUpAt"
+            type="date"
+            defaultValue={defaultFollowUpDate}
+            disabled={!canSaveOutreach}
+          />
+        </FieldLabel>
         <button
           type="submit"
           disabled={!canSaveOutreach}
@@ -839,6 +886,16 @@ function ReferralPackItemCard({
           <ClipboardCheck className="size-4" aria-hidden="true" />
           {copy.markSent}
         </button>
+        <div className="md:col-span-5">
+          <FieldLabel>
+            {copy.notesLabel}
+            <TextArea
+              name="notes"
+              placeholder={copy.notesPlaceholder}
+              disabled={!canSaveOutreach}
+            />
+          </FieldLabel>
+        </div>
       </form>
     </article>
   );
@@ -1014,6 +1071,14 @@ function formatFieldKey(value: string, locale: Locale) {
 
 function getString(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function getDefaultFollowUpDate(now = new Date()) {
+  const followUpDate = new Date(now);
+
+  followUpDate.setDate(followUpDate.getDate() + 3);
+
+  return followUpDate.toISOString().slice(0, 10);
 }
 
 function getOutreachStatusMessage(

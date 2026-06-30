@@ -1093,6 +1093,12 @@ describe("referral workspace route localization", () => {
     expect(markup).toContain("Referral intro for community partners");
     expect(markup).toContain("Mark as sent");
     expect(markup).toContain('name="recipientName"');
+    expect(markup).toContain('name="nextFollowUpAt"');
+    expect(markup).toContain('name="notes"');
+    expect(markup).toContain("Next follow-up");
+    expect(markup).toContain(
+      "Example: Sent in WeChat group, follow up in 3 days.",
+    );
     expect(markup).toContain('href="/referral-workspace/outreach?lang=en&amp;account=user-approved"');
     expect(visibleText.toLowerCase()).not.toContain("marketplace");
     expect(visibleText.toLowerCase()).not.toContain("verified provider");
