@@ -60,11 +60,18 @@ function getOutreachCopy(locale: Locale) {
       followUpQueueTitle: "需要跟进",
       followUpQueueDescription:
         "优先处理已标记为待跟进，或已经设置下次跟进日期的联系人。",
+      noReplyTitle: "尚未回复",
+      noReplyDescription:
+        "这些发送已经记录，但还没有标记为已回复。可以按实际情况更新状态。",
+      repliedTitle: "已回复",
+      repliedDescription: "这些联系人已经有回应，可继续记录下一步或保留状态。",
       recentSendsTitle: "最近发送",
       recentSendsDescription:
         "查看最近把 Referral Pack 发给了谁，以及当前回应状态。",
       empty: "还没有跟进记录。先从 Referral Pack 复制材料并记录一次发送。",
       noFollowUps: "暂无需要跟进的联系人。",
+      noNoReply: "暂无尚未回复的发送记录。",
+      noReplies: "暂无已回复记录。",
       saved: "跟进记录已保存。",
       updated: "跟进记录已更新。",
       loginRequired: "需要真实服务商账号登录后才能保存记录。",
@@ -130,12 +137,20 @@ function getOutreachCopy(locale: Locale) {
     followUpQueueTitle: "Needs follow-up",
     followUpQueueDescription:
       "Prioritise contacts marked for follow-up or records with a next follow-up date.",
+    noReplyTitle: "No reply yet",
+    noReplyDescription:
+      "Sends that have been recorded but have not been marked as replied.",
+    repliedTitle: "Replied",
+    repliedDescription:
+      "Contacts that have replied, ready for next-step notes or follow-up status.",
     recentSendsTitle: "Recent sends",
     recentSendsDescription:
       "See who received the Referral Pack and the current reply state.",
     empty:
       "No outreach records yet. Start from the Referral Pack, copy material, and record a send.",
     noFollowUps: "No follow-ups due yet.",
+    noNoReply: "No no-reply records yet.",
+    noReplies: "No replied records yet.",
     saved: "Outreach record saved.",
     updated: "Outreach record updated.",
     loginRequired: "Sign in with a real provider account to save records.",
@@ -243,6 +258,8 @@ async function ProviderOutreach({
       })
     : [];
   const followUpRecords = getFollowUpRecords(outreachRecords);
+  const noReplyRecords = getNoReplyRecords(outreachRecords);
+  const repliedRecords = getRepliedRecords(outreachRecords);
   const recentSendRecords = getRecentSendRecords(outreachRecords);
   const statusMessage = getOutreachStatusMessage(
     params?.outreachStatus,
@@ -310,6 +327,48 @@ async function ProviderOutreach({
                 canSaveOutreach={canSaveOutreach}
                 outreachPostAction={outreachPostAction}
                 emptyMessage={outreachCopy.noFollowUps}
+              />
+            </WorkspaceSection>
+
+            <WorkspaceSection
+              title={outreachCopy.noReplyTitle}
+              description={outreachCopy.noReplyDescription}
+              action={
+                <WorkspaceStatusPill tone={noReplyRecords.length ? "warning" : "neutral"}>
+                  {noReplyRecords.length}
+                </WorkspaceStatusPill>
+              }
+            >
+              <OutreachTable
+                records={noReplyRecords}
+                copy={outreachCopy}
+                locale={locale}
+                source={handoff.source}
+                draftId={handoff.draftId}
+                canSaveOutreach={canSaveOutreach}
+                outreachPostAction={outreachPostAction}
+                emptyMessage={outreachCopy.noNoReply}
+              />
+            </WorkspaceSection>
+
+            <WorkspaceSection
+              title={outreachCopy.repliedTitle}
+              description={outreachCopy.repliedDescription}
+              action={
+                <WorkspaceStatusPill tone={repliedRecords.length ? "success" : "neutral"}>
+                  {repliedRecords.length}
+                </WorkspaceStatusPill>
+              }
+            >
+              <OutreachTable
+                records={repliedRecords}
+                copy={outreachCopy}
+                locale={locale}
+                source={handoff.source}
+                draftId={handoff.draftId}
+                canSaveOutreach={canSaveOutreach}
+                outreachPostAction={outreachPostAction}
+                emptyMessage={outreachCopy.noReplies}
               />
             </WorkspaceSection>
 
@@ -648,6 +707,16 @@ function getFollowUpRecords(records: OutreachRecord[]) {
   return records.filter(
     (record) => record.status === "follow_up" || Boolean(record.nextFollowUpAt),
   );
+}
+
+function getNoReplyRecords(records: OutreachRecord[]) {
+  return records.filter(
+    (record) => record.status === "sent" || record.status === "to_send",
+  );
+}
+
+function getRepliedRecords(records: OutreachRecord[]) {
+  return records.filter((record) => record.status === "replied");
 }
 
 function getRecentSendRecords(records: OutreachRecord[]) {

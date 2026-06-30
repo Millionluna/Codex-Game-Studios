@@ -19,7 +19,16 @@ import {
   getGeneratedMaterialDraftStore,
   type GeneratedMaterialDraftRecord,
 } from "@/lib/generated-material-draft-store";
-import { getOutreachStore } from "@/lib/outreach-store";
+import {
+  getOutreachStore,
+  type OutreachRecipientRole,
+} from "@/lib/outreach-store";
+import {
+  buildReferralPackTargetCopy,
+  referralPackTargetOptions,
+  type ReferralPackTarget,
+  type ReferralPackTargetCopy,
+} from "@/lib/referral-pack-target-copy";
 import { withWorkspaceAccount } from "@/lib/referral-workspace-auth";
 import { withAuthHandoffParams } from "@/lib/referral-workspace-handoff";
 import {
@@ -122,7 +131,9 @@ function getReferralPackCopy(locale: Locale) {
         "预览模式可以查看材料包，但只有真实服务商登录后才能保存发送记录。",
       boundaryTitle: "使用边界",
       copy: "复制",
+      copyTarget: "复制这段文案",
       copied: "已复制",
+      recordThisSend: "记录这次发送",
       targetBadge: "发送对象",
       roleOptions: {
         support_coordinator: "支持协调员",
@@ -218,7 +229,9 @@ function getReferralPackCopy(locale: Locale) {
       "Preview mode can show the pack, but only a real provider login can save outreach records.",
     boundaryTitle: "Use boundary",
     copy: "Copy",
+    copyTarget: "Copy target wording",
     copied: "Copied",
+    recordThisSend: "Record this send",
     targetBadge: "Target",
     roleOptions: {
       support_coordinator: "Support coordinator",
@@ -323,6 +336,13 @@ async function ProviderReferralPack({
     locale,
     copy: packCopy,
   });
+  const targetCopies = referralPackTargetOptions.map((target) =>
+    buildReferralPackTargetCopy({
+      profile,
+      target: target.id,
+      locale,
+    }),
+  );
   const groups = getReferralPackGroups(items, packCopy);
   const canSaveOutreach = isSupabaseAuthUserId(gate.account.id);
   const outreachPostAction = canSaveOutreach
@@ -404,7 +424,16 @@ async function ProviderReferralPack({
               title={packCopy.targetTitle}
               description={packCopy.targetDescription}
             >
-              <PackTargetRows copy={packCopy} />
+              <TargetCopyCards
+                targetCopies={targetCopies}
+                copy={packCopy}
+                locale={locale}
+                providerDraftId={resolvedDraft?.record?.id}
+                source={handoff.source}
+                draftId={handoff.draftId}
+                canSaveOutreach={canSaveOutreach}
+                outreachPostAction={outreachPostAction}
+              />
             </WorkspaceSection>
 
             <WorkspaceSection
@@ -551,29 +580,124 @@ async function ProviderReferralPack({
   );
 }
 
-function PackTargetRows({
-  copy,
-}: {
-  copy: ReturnType<typeof getReferralPackCopy>;
-}) {
-  const targetKeys = [
-    "support_coordinator",
-    "case_manager",
-    "provider",
-    "community_group",
-    "family_contact",
-  ] as const;
+const targetRoleMap: Record<ReferralPackTarget, OutreachRecipientRole> = {
+  support_coordinator: "support_coordinator",
+  case_manager: "case_manager",
+  provider_partner: "provider",
+  community_group: "community_group",
+  family_contact: "family_contact",
+};
 
+function TargetCopyCards({
+  targetCopies,
+  copy,
+  locale,
+  providerDraftId,
+  source,
+  draftId,
+  canSaveOutreach,
+  outreachPostAction,
+}: {
+  targetCopies: ReferralPackTargetCopy[];
+  copy: ReturnType<typeof getReferralPackCopy>;
+  locale: Locale;
+  providerDraftId?: string;
+  source?: string;
+  draftId?: string;
+  canSaveOutreach: boolean;
+  outreachPostAction?: string;
+}) {
   return (
-    <div className="grid gap-0">
-      {targetKeys.map((targetKey) => (
-        <WorkspaceSignalRow
-          key={targetKey}
-          title={copy.roleOptions[targetKey]}
-          detail={copy.targetDetails[targetKey]}
-          status={copy.targetBadge}
-          tone="neutral"
-        />
+    <div className="grid gap-4">
+      {targetCopies.map((targetCopy) => (
+        <article
+          key={targetCopy.target}
+          className="rounded-lg border border-[#e3ddd2] bg-[#fbfaf7] p-4"
+        >
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0">
+              <WorkspaceStatusPill tone="neutral">
+                {copy.targetBadge}
+              </WorkspaceStatusPill>
+              <h3 className="mt-3 text-base font-semibold text-[#17211f]">
+                {targetCopy.title}
+              </h3>
+              <p className="mt-1 text-sm leading-6 text-[#65736f]">
+                {targetCopy.description}
+              </p>
+            </div>
+            <GeneratedDraftCopyButton
+              text={targetCopy.body}
+              label={copy.copyTarget}
+              copiedLabel={copy.copied}
+              ariaLabel={`${copy.copyTarget}: ${targetCopy.title}`}
+            />
+          </div>
+
+          <pre className="mt-4 max-h-48 overflow-auto whitespace-pre-wrap rounded-lg border border-[#e3ddd2] bg-white p-3 text-sm leading-6 text-[#40504b]">
+            {targetCopy.body}
+          </pre>
+          <p className="mt-3 text-xs leading-5 text-[#65736f]">
+            {targetCopy.reviewNote}
+          </p>
+
+          <form
+            id={`record-send-target-${targetCopy.target}`}
+            action={outreachPostAction}
+            method="post"
+            className="mt-4 grid gap-3 md:grid-cols-[minmax(0,1fr)_11rem_auto]"
+          >
+            <input
+              type="hidden"
+              name="redirectTo"
+              value="/referral-workspace/referral-pack"
+            />
+            <input type="hidden" name="lang" value={locale} />
+            <input type="hidden" name="source" value={source ?? ""} />
+            <input type="hidden" name="draftId" value={draftId ?? ""} />
+            <input
+              type="hidden"
+              name="providerDraftId"
+              value={providerDraftId ?? ""}
+            />
+            <input
+              type="hidden"
+              name="roleType"
+              value={targetRoleMap[targetCopy.target]}
+            />
+            <input type="hidden" name="status" value="sent" />
+            <FieldLabel>
+              <span className="sr-only">{copy.recipientPlaceholder}</span>
+              <TextInput
+                name="recipientName"
+                placeholder={copy.recipientPlaceholder}
+                disabled={!canSaveOutreach}
+              />
+            </FieldLabel>
+            <FieldLabel>
+              <span className="sr-only">{copy.channelLabel}</span>
+              <SelectInput
+                name="channel"
+                defaultValue="wechat"
+                disabled={!canSaveOutreach}
+              >
+                {Object.entries(copy.channelOptions).map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </SelectInput>
+            </FieldLabel>
+            <button
+              type="submit"
+              disabled={!canSaveOutreach}
+              className="taito-secondary px-3 disabled:cursor-not-allowed disabled:opacity-55"
+            >
+              <ClipboardCheck className="size-4" aria-hidden="true" />
+              {copy.recordThisSend}
+            </button>
+          </form>
+        </article>
       ))}
     </div>
   );

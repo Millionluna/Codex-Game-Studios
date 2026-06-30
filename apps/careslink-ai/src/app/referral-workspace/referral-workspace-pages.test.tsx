@@ -192,6 +192,9 @@ vi.mock("@/lib/generated-material-event-store", async () =>
 vi.mock("@/lib/outreach-store", async () =>
   import("../../lib/outreach-store"),
 );
+vi.mock("@/lib/referral-pack-target-copy", async () =>
+  import("../../lib/referral-pack-target-copy"),
+);
 vi.mock("@/lib/referral-workspace-i18n", async () =>
   import("../../lib/referral-workspace-i18n"),
 );
@@ -1077,6 +1080,12 @@ describe("referral workspace route localization", () => {
 
     expect(markup).toContain("Referral Pack");
     expect(markup).toContain("Ready-to-send materials");
+    expect(markup).toContain("Choose who you are sending to");
+    expect(markup).toContain("For support coordinators");
+    expect(markup).toContain("For case managers");
+    expect(markup).toContain("For community groups");
+    expect(markup).toContain("Copy target wording");
+    expect(markup).toContain("Record this send");
     expect(markup).toContain("Basic profile intro");
     expect(markup).toContain("Referral intro for community partners");
     expect(markup).toContain("Mark as sent");
@@ -1117,6 +1126,8 @@ describe("referral workspace route localization", () => {
     expect(markup).toContain("Follow-up assistant");
     expect(markup).toContain("Add or record a send");
     expect(markup).toContain("Needs follow-up");
+    expect(markup).toContain("No reply yet");
+    expect(markup).toContain("Replied");
     expect(markup).toContain("Recent sends");
     expect(markup).toContain("Mia Chen");
     expect(markup).toContain("Community Link");

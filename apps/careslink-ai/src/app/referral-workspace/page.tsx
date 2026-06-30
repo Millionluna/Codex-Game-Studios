@@ -1124,21 +1124,29 @@ function getPrimaryProviderActionKey({
   materialDrafts: GeneratedMaterialDraftRecord[];
   outreachRecords: OutreachRecord[];
 }): (typeof providerActions)[number]["key"] {
+  if (audit.score < 60) {
+    return "profile";
+  }
+
+  if (materialDrafts.length === 0 && outreachRecords.length === 0) {
+    return "referralPack";
+  }
+
+  if (outreachRecords.length === 0) {
+    return "outreach";
+  }
+
   if (
     outreachRecords.some((record) => record.status === "follow_up")
   ) {
     return "outreach";
   }
 
-  if (materialDrafts.length === 0 || outreachRecords.length === 0) {
-    return "referralPack";
-  }
-
   if (audit.issues.length > 0) {
     return "health";
   }
 
-  return "outreach";
+  return "referralPack";
 }
 
 function getProviderActionRouteLabel({
