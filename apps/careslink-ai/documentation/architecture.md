@@ -9,7 +9,7 @@ CaresLink AI provides guided business-document drafting. The provider-authentica
 | Layer | Current implementation |
 | --- | --- |
 | Web | Next.js App Router, React, TypeScript, Tailwind CSS |
-| Authentication | Supabase Auth session cookies via `@supabase/ssr` |
+| Authentication | Supabase Auth email/password and Google PKCE session cookies via `@supabase/ssr` |
 | Persistence | Supabase Postgres accessed from server code with the service-role key |
 | AI | OpenAI Responses API with strict JSON Schema and `store: false` |
 | Hosting | Vercel; production and preview use environment-scoped variables |
@@ -25,6 +25,13 @@ CaresLink AI provides guided business-document drafting. The provider-authentica
 6. OpenAI returns a strict bilingual object. Server parsing rejects malformed, identifying, prohibited, or numerically inconsistent output as a whole.
 7. A successful result is stored as a 30-minute claim already bound to the current provider under a SHA-256 token hash; this entry point creates no anonymous claim.
 8. The provider may explicitly save the claim to `generated_material_drafts`. Saved-document reads always query with the current account ID. Admin surfaces expose metadata or aggregates, not case-note content.
+
+Login and registration present Google only when the server-side release gate is
+explicitly enabled after Supabase provider and redirect verification. The server
+action requests a Supabase PKCE authorization URL, and `/auth/callback` exchanges
+the code before applying the same internal-route allowlist used by password auth.
+Only `app_metadata` may grant an existing account the admin role; a new Google
+account and any role-like `user_metadata` remain provider-scoped.
 
 ## Trust boundaries
 

@@ -8,6 +8,9 @@
 | Full Chinese acceptance case | Names, phone, NDIS number block; location/context require review; observable facts remain | Same test file | Existing automated |
 | Pre-generation closure | Missing date/facts, unresolved findings, or unchecked confirmations produce no request object | Same test file | Existing automated |
 | Server auth gate | Signed-out POST returns `401` before JSON parsing, quota, claim, telemetry, or OpenAI; admin returns `403` | `src/app/api/template-companion/ndis-case-note/route.test.ts` | Existing automated |
+| Google OAuth availability | Server release gate must be exactly true; absent or disabled state fails closed | `src/lib/google-oauth.test.ts`, auth page render tests | Automated |
+| OAuth callback safety | PKCE code exchange, internal next allowlist, trusted-role routing, cancellation sanitization, and no token-bearing final URL | `src/app/auth/actions.test.ts`, `src/app/auth/callback/route.test.ts` | Automated |
+| Brand typography | Root, document, Tailwind sans/mono, controls and data surfaces use the single CaresLink serif stack | `src/app/brand-font.test.ts` | Automated |
 | Server bypass | After auth, missing attestation/facts and crafted PII return `422` before quota or OpenAI | Same route test | Existing automated |
 | Authenticated quota | Provider account/IP limits return `429`; failed generation still consumes the attempted quota | Route and store tests | Existing automated |
 | OpenAI contract | Request uses `store:false`, strict schema, bounded output, controlled prompt | `src/lib/openai-ndis-case-note.test.ts` | Existing automated with mocked HTTP |

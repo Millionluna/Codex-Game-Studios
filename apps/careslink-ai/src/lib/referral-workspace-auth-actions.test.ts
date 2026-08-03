@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   getSafeAuthRedirectHref,
+  getSafePendingAuthNextHref,
+  getTrustedAuthRedirectRole,
   signInWithPasswordForWorkspace,
   signUpWithPasswordForWorkspace,
 } from "./referral-workspace-auth-actions";
@@ -63,6 +65,33 @@ describe("referral workspace auth actions", () => {
         "zh-Hans",
       ),
     ).toBe("/ai-documents?lang=zh-Hans");
+    expect(getSafePendingAuthNextHref("https://evil.example/phish")).toBeUndefined();
+    expect(getSafePendingAuthNextHref("/admin/material-usage?lang=en")).toBe(
+      "/admin/material-usage?lang=en",
+    );
+  });
+
+  it("uses trusted app metadata for roles and ignores user-editable metadata", () => {
+    expect(
+      getTrustedAuthRedirectRole({
+        app_metadata: { careslink_role: "admin" },
+      }),
+    ).toBe("admin");
+    expect(
+      getTrustedAuthRedirectRole({
+        app_metadata: {},
+        user_metadata: { role: "admin" },
+      } as { app_metadata: Record<string, unknown> }),
+    ).toBe("provider");
+  });
+
+  it("only appends supported locales", () => {
+    expect(getSafeAuthRedirectHref("/ai-documents", "fr")).toBe(
+      "/ai-documents",
+    );
+    expect(getSafeAuthRedirectHref("/ai-documents", "zh-Hans")).toBe(
+      "/ai-documents?lang=zh-Hans",
+    );
   });
 
   it("returns a provider to the companion with safe attribution only", () => {

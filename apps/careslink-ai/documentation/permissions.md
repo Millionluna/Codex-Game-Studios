@@ -9,6 +9,11 @@
 | Admin | Verified Supabase user with admin role metadata | May access aggregate/metadata admin pages; cannot use provider save flow |
 | Service role | Server-only Supabase key | Bypasses RLS; never sent to the browser |
 
+Email/password and Google identities share this role model. OAuth profile fields
+are user metadata and cannot grant admin. Only trusted Supabase `app_metadata`
+can identify an existing admin; all other authenticated identities default to
+provider.
+
 ## Resource matrix
 
 | Resource and operation | Guest | Provider | Admin | Enforcement |

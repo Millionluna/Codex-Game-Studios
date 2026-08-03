@@ -9,6 +9,21 @@
 3. A provider login returns to the same Companion route ready for input. Admin roles fall back to the admin workspace.
 4. A direct unauthenticated generation POST returns `401` before JSON parsing, quota, claim creation, telemetry, or OpenAI.
 
+### Google OAuth
+
+1. Login/Register shows Google only when the server-only release gate is exactly
+   `true`; absent or unverified configuration fails closed and leaves
+   email/password available.
+2. The server action normalizes locale and reduces `next` to an allowlisted
+   provider route before calling `signInWithOAuth({ provider: "google" })`.
+3. Supabase returns through `/auth/callback` with a short-lived PKCE code. The
+   route exchanges it, reads the verified user, and strips the code from the
+   final URL.
+4. A trusted `app_metadata` admin may enter an admin destination. A new Google
+   user or user-editable admin claim remains a provider and cannot enter admin.
+5. Cancellation or provider/config errors return a generic page message without
+   forwarding provider details or tokens.
+
 ## Authenticated draft generation
 
 **Actor:** signed-in provider. **Precondition:** no participant identifiers are intentionally supplied. **Outcome:** one short-lived, owner-bound reviewable draft.

@@ -8,7 +8,9 @@ import {
 } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { AuthSubmitButton } from "@/components/auth-submit-button";
+import { GoogleOAuthForm } from "@/components/google-oauth-form";
 import { ButtonLink, FieldLabel, TextInput } from "@/components/ui";
+import { isGoogleOAuthAvailable } from "@/lib/google-oauth";
 import {
   getProviderGeneratorHandoffContext,
   getSafeNextHrefWithHandoff,
@@ -19,7 +21,10 @@ import {
   withLocale,
   type Locale,
 } from "@/lib/referral-workspace-i18n";
-import { registerWithSupabaseAction } from "../actions";
+import {
+  continueWithGoogleFromRegisterAction,
+  registerWithSupabaseAction,
+} from "../actions";
 
 type AuthSearchParams = {
   readonly [key: string]: string | string[] | undefined;
@@ -37,6 +42,7 @@ export default async function RegisterPage({ searchParams }: RegisterPageProps) 
   const nextHref = getSafeNextHrefWithHandoff(params);
   const loginHref = withAuthHandoffParams("/auth/login", params);
   const message = getAuthMessage(params);
+  const googleOAuthAvailable = await isGoogleOAuthAvailable();
 
   return (
     <AppShell
@@ -58,7 +64,21 @@ export default async function RegisterPage({ searchParams }: RegisterPageProps) 
 
           {message ? <AuthMessage message={message} /> : null}
 
-          <form action={registerWithSupabaseAction} className="mt-6 grid gap-4">
+          {googleOAuthAvailable ? (
+            <GoogleOAuthForm
+              action={continueWithGoogleFromRegisterAction}
+              dividerLabel={copy.emailDivider}
+              label={copy.googleCta}
+              locale={locale}
+              nextHref={nextHref}
+              pendingLabel={copy.googlePending}
+            />
+          ) : null}
+
+          <form
+            action={registerWithSupabaseAction}
+            className={`${googleOAuthAvailable ? "" : "mt-6"} grid gap-4`}
+          >
             <HiddenAuthInputs
               source={handoff.source}
               draftId={handoff.draftId}
@@ -243,6 +263,9 @@ function getAuthPageCopy(locale: Locale) {
       namePlaceholder: "服务商负责人",
       email: "邮箱",
       password: "密码",
+      googleCta: "使用 Google 继续",
+      googlePending: "正在连接 Google...",
+      emailDivider: "或使用邮箱创建账户",
       pending: "正在创建账户...",
       submit: "创建账户并进入工作区",
       loginCta: "已有账户",
@@ -284,6 +307,9 @@ function getAuthPageCopy(locale: Locale) {
     namePlaceholder: "Provider owner",
     email: "Email",
     password: "Password",
+    googleCta: "Continue with Google",
+    googlePending: "Opening Google...",
+    emailDivider: "or create an account with email",
     pending: "Creating account...",
     submit: "Create account and enter workspace",
     loginCta: "Already have an account",

@@ -1,11 +1,18 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { isGoogleOAuthAvailable } from "../../lib/google-oauth";
 import {
+  getSafeAuthRedirectHref,
+  getSafePendingAuthNextHref,
+  normalizeAuthLocale,
   signInWithPasswordForWorkspace,
   signUpWithPasswordForWorkspace,
 } from "../../lib/referral-workspace-auth-actions";
-import { createCareslinkServerSupabaseClient } from "../../lib/supabase-server";
+import {
+  createCareslinkServerSupabaseClient,
+  getSupabasePublicAuthConfig,
+} from "../../lib/supabase-server";
 
 const defaultAuthBaseUrl = "https://ai.careslink.com.au";
 
@@ -80,6 +87,67 @@ export async function registerWithSupabaseAction(formData: FormData) {
   );
 }
 
+export async function continueWithGoogleFromLoginAction(formData: FormData) {
+  return continueWithGoogleAction("/auth/login", formData);
+}
+
+export async function continueWithGoogleFromRegisterAction(formData: FormData) {
+  return continueWithGoogleAction("/auth/register", formData);
+}
+
+async function continueWithGoogleAction(
+  returnPath: "/auth/login" | "/auth/register",
+  formData: FormData,
+) {
+  const locale = normalizeAuthLocale(getFormString(formData, "lang"));
+  const safeNext =
+    getSafePendingAuthNextHref(getFormString(formData, "next")) ??
+    getSafeAuthRedirectHref(undefined, undefined, "provider");
+
+  if (!(await isGoogleOAuthAvailable())) {
+    return redirect(
+      getAuthPageRedirectHref(returnPath, formData, {
+        error: "Google sign-in is not available. Please use email and password.",
+      }),
+    );
+  }
+
+  const supabase = await createCareslinkServerSupabaseClient();
+
+  if (!supabase) {
+    return redirect(
+      getAuthPageRedirectHref(returnPath, formData, {
+        error: "Supabase auth is not configured.",
+      }),
+    );
+  }
+
+  const callbackUrl = new URL("/auth/callback", getAuthBaseUrl());
+  callbackUrl.searchParams.set("flow", "oauth");
+  callbackUrl.searchParams.set("next", safeNext);
+
+  if (locale) {
+    callbackUrl.searchParams.set("lang", locale);
+  }
+
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider: "google",
+    options: {
+      redirectTo: callbackUrl.toString(),
+    },
+  });
+
+  if (error || !data.url || !isTrustedSupabaseOAuthUrl(data.url)) {
+    return redirect(
+      getAuthPageRedirectHref(returnPath, formData, {
+        error: "Unable to start Google sign-in. Please try again.",
+      }),
+    );
+  }
+
+  return redirect(data.url);
+}
+
 export async function requestPasswordResetAction(formData: FormData) {
   const supabase = await createCareslinkServerSupabaseClient();
 
@@ -101,7 +169,7 @@ export async function requestPasswordResetAction(formData: FormData) {
     );
   }
 
-  const locale = getFormString(formData, "lang");
+  const locale = normalizeAuthLocale(getFormString(formData, "lang"));
   const updatePasswordPath = locale
     ? `/auth/update-password?lang=${encodeURIComponent(locale)}`
     : "/auth/update-password";
@@ -179,16 +247,16 @@ function getAuthPageRedirectHref(
   params: { error?: string; notice?: string },
 ) {
   const queryParams = new URLSearchParams();
-  const next = getFormString(formData, "next");
-  const lang = getFormString(formData, "lang");
+  const next = getSafePendingAuthNextHref(getFormString(formData, "next"));
+  const lang = normalizeAuthLocale(getFormString(formData, "lang"));
   const source = getFormString(formData, "source");
   const draftId = getFormString(formData, "draftId");
 
-  if (source) {
+  if (source === "provider-profile-generator") {
     queryParams.set("source", source);
   }
 
-  if (draftId) {
+  if (draftId && /^[A-Za-z0-9_-]{1,100}$/.test(draftId)) {
     queryParams.set("draftId", draftId);
   }
 
@@ -214,6 +282,13 @@ function getAuthPageRedirectHref(
 }
 
 function getAuthBaseUrl() {
+  if (process.env.VERCEL_ENV === "preview" && process.env.VERCEL_URL) {
+    return `https://${process.env.VERCEL_URL.replace(/^https?:\/\//, "")}`.replace(
+      /\/+$/,
+      "",
+    );
+  }
+
   const configured =
     process.env.NEXT_PUBLIC_CARESLINK_AI_BASE_URL ??
     process.env.NEXT_PUBLIC_APP_URL ??
@@ -223,6 +298,26 @@ function getAuthBaseUrl() {
       : undefined);
 
   return (configured ?? defaultAuthBaseUrl).replace(/\/+$/, "");
+}
+
+function isTrustedSupabaseOAuthUrl(href: string) {
+  const config = getSupabasePublicAuthConfig();
+
+  if (!config) {
+    return false;
+  }
+
+  try {
+    const target = new URL(href);
+    const supabaseOrigin = new URL(config.supabaseUrl).origin;
+
+    return (
+      target.origin === supabaseOrigin &&
+      target.pathname === "/auth/v1/authorize"
+    );
+  } catch {
+    return false;
+  }
 }
 
 function getFormString(formData: FormData, key: string) {

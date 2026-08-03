@@ -8,7 +8,9 @@ import {
   UserRound,
 } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
+import { GoogleOAuthForm } from "@/components/google-oauth-form";
 import { ButtonLink, FieldLabel, TextInput } from "@/components/ui";
+import { isGoogleOAuthAvailable } from "@/lib/google-oauth";
 import {
   getProviderGeneratorHandoffContext,
   getSafeNextHrefWithHandoff,
@@ -19,7 +21,10 @@ import {
   withLocale,
   type Locale,
 } from "@/lib/referral-workspace-i18n";
-import { loginWithSupabaseAction } from "../actions";
+import {
+  continueWithGoogleFromLoginAction,
+  loginWithSupabaseAction,
+} from "../actions";
 
 type AuthSearchParams = {
   readonly [key: string]: string | string[] | undefined;
@@ -38,6 +43,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   const forgotPasswordHref = withLocale("/auth/forgot-password", locale);
   const handoff = getProviderGeneratorHandoffContext(params);
   const message = getAuthMessage(params);
+  const googleOAuthAvailable = await isGoogleOAuthAvailable();
 
   return (
     <AppShell
@@ -59,7 +65,21 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
 
           {message ? <AuthMessage message={message} /> : null}
 
-          <form action={loginWithSupabaseAction} className="mt-6 grid gap-4">
+          {googleOAuthAvailable ? (
+            <GoogleOAuthForm
+              action={continueWithGoogleFromLoginAction}
+              dividerLabel={copy.emailDivider}
+              label={copy.googleCta}
+              locale={locale}
+              nextHref={nextHref}
+              pendingLabel={copy.googlePending}
+            />
+          ) : null}
+
+          <form
+            action={loginWithSupabaseAction}
+            className={`${googleOAuthAvailable ? "" : "mt-6"} grid gap-4`}
+          >
             <HiddenAuthInputs
               source={handoff.source}
               draftId={handoff.draftId}
@@ -245,6 +265,9 @@ function getAuthPageCopy(locale: Locale) {
       email: "邮箱",
       password: "密码",
       forgotPassword: "忘记密码？",
+      googleCta: "使用 Google 继续",
+      googlePending: "正在连接 Google...",
+      emailDivider: "或使用邮箱继续",
       submit: "登录并进入工作区",
       registerCta: "创建账户",
       boundaryHeading: "使用边界",
@@ -284,6 +307,9 @@ function getAuthPageCopy(locale: Locale) {
     email: "Email",
     password: "Password",
     forgotPassword: "Forgot password?",
+    googleCta: "Continue with Google",
+    googlePending: "Opening Google...",
+    emailDivider: "or continue with email",
     submit: "Sign in to workspace",
     registerCta: "Create account",
     boundaryHeading: "Use boundary",

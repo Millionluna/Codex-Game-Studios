@@ -14,6 +14,7 @@ describe("Supabase server auth client", () => {
       auth: {
         getUser: vi.fn(),
         signInWithPassword: vi.fn(),
+        signInWithOAuth: vi.fn(),
         signUp: vi.fn(),
         resetPasswordForEmail: vi.fn(),
         updateUser: vi.fn(),

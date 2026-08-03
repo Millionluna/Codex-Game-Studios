@@ -43,6 +43,15 @@ export type CareslinkServerSupabaseClient = {
       email: string;
       password: string;
     }): Promise<{ error: { message?: string } | null }>;
+    signInWithOAuth(input: {
+      provider: "google";
+      options: {
+        redirectTo: string;
+      };
+    }): Promise<{
+      data: { url: string | null };
+      error: { message?: string } | null;
+    }>;
     signUp(input: {
       email: string;
       password: string;

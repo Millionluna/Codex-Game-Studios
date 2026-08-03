@@ -38,10 +38,22 @@ tokens. Draft persistence still uses the server-only service role key.
 
 ## Supabase Auth Session Cookies
 
-`/auth/login` and `/auth/register` now use Supabase email/password auth through
-`@supabase/ssr` server-side cookie sessions. Workspace pages resolve the current
-account from the verified Supabase cookie session first, then fall back to local
-demo query-param accounts for preview/development.
+`/auth/login` and `/auth/register` use Supabase email/password auth through
+`@supabase/ssr` server-side cookie sessions. They also show **Continue with
+Google** when `CARESLINK_GOOGLE_OAUTH_ENABLED=true`, which must be set only after
+the project's Google provider and redirect allowlist are verified. The Google flow uses PKCE, exchanges the one-time
+code at `/auth/callback`, and then permits only the existing internal provider or
+admin destinations. OAuth tokens are not placed in application URLs, analytics,
+logs, or application tables.
+
+Google client credentials remain in Google Cloud and Supabase Auth. Do not add a
+Google client secret to this repository or Vercel application variables. The
+Supabase redirect allowlist must include the production callback and any exact or
+wildcard Preview callback pattern that is intentionally used.
+
+Workspace pages resolve the current account from the verified Supabase cookie
+session first, then fall back to local demo query-param accounts for
+preview/development.
 
 Provider/admin role for real users is read only from Supabase
 `app_metadata.careslink_role` or `app_metadata.role`. User-editable metadata is
@@ -448,7 +460,9 @@ persistent Supabase draft store is active.
 
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+The interface uses the same CaresLink brand serif stack as the wordmark across
+English, Simplified Chinese, forms, tables, document surfaces, and code-like
+metadata. No runtime web-font request is required.
 
 ## Learn More
 

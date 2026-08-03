@@ -1,8 +1,16 @@
 ﻿import { renderToStaticMarkup } from "react-dom/server";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { getReferralWorkspaceCopy } from "../../lib/referral-workspace-i18n";
+
+const googleOAuthMock = vi.hoisted(() => ({
+  isGoogleOAuthAvailable: vi.fn(async () => false),
+}));
+
+vi.mock("@/lib/google-oauth", () => ({
+  isGoogleOAuthAvailable: googleOAuthMock.isGoogleOAuthAvailable,
+}));
 
 vi.mock("@/components/app-shell", async () =>
   import("../../components/app-shell"),
@@ -30,6 +38,9 @@ vi.mock("@/components/page-header", async () =>
 );
 vi.mock("@/components/auth-submit-button", async () =>
   import("../../components/auth-submit-button"),
+);
+vi.mock("@/components/google-oauth-form", async () =>
+  import("../../components/google-oauth-form"),
 );
 vi.mock("@/components/referral-workspace-auth-gate", async () =>
   import("../../components/referral-workspace-auth-gate"),
@@ -184,6 +195,10 @@ async function renderPage(
 }
 
 describe("auth and access gate pages", () => {
+  afterEach(() => {
+    googleOAuthMock.isGoogleOAuthAvailable.mockResolvedValue(false);
+  });
+
   it("renders localized login form without demo account choices", async () => {
     const { default: LoginPage } = await import("./login/page");
     const copy = getReferralWorkspaceCopy("zh-Hans");
@@ -227,6 +242,30 @@ describe("auth and access gate pages", () => {
     expect(markup).not.toContain(copy.auth.register.waitlistCta);
     expect(markup).not.toContain("account=user-free");
     expect(markup).not.toContain("account=user-waitlist");
+  });
+
+  it("shows Google OAuth on login and registration only when Supabase enables it", async () => {
+    googleOAuthMock.isGoogleOAuthAvailable.mockResolvedValue(true);
+    const { default: LoginPage } = await import("./login/page");
+    const { default: RegisterPage } = await import("./register/page");
+
+    const loginMarkup = await renderPage(LoginPage, {
+      lang: "zh-Hans",
+      next: "/template-companion/ndis-case-note?source=ndis-case-note-download",
+    });
+    const registerMarkup = await renderPage(RegisterPage, {
+      lang: "en",
+      next: "/ai-documents",
+    });
+
+    expect(loginMarkup).toContain("使用 Google 继续");
+    expect(loginMarkup).toContain("或使用邮箱继续");
+    expect(loginMarkup).toContain('src="/google-g.svg"');
+    expect(loginMarkup).toContain(
+      'name="next" value="/template-companion/ndis-case-note?source=ndis-case-note-download"',
+    );
+    expect(registerMarkup).toContain("Continue with Google");
+    expect(registerMarkup).toContain("or create an account with email");
   });
 
   it("preserves a safe next route when creating a provider preview account", async () => {

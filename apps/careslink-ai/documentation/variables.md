@@ -29,6 +29,14 @@ No secret values belong in this document, source control, browser bundles, URLs,
 
 `NEXT_PUBLIC_APP_URL`, `NEXT_PUBLIC_CARESLINK_AI_BASE_URL`, `NEXT_PUBLIC_SITE_URL`, `APP_URL`, and `VERCEL_PROJECT_PRODUCTION_URL` may be used to construct safe internal redirects or public links. Demo flags must remain false for real preview/provider sessions.
 
+Google OAuth client ID and secret are configured in Google Cloud and Supabase
+Auth, not as CaresLink AI environment variables.
+`CARESLINK_GOOGLE_OAUTH_ENABLED` is a non-secret, server-only release gate and
+must remain false until provider and callback configuration is verified. Preview callbacks use
+Vercel's deployment-specific `VERCEL_URL`; Supabase must explicitly allow the
+intended Preview URL pattern. No Google access or refresh token is stored by the
+application.
+
 Legacy anonymous quota columns/scopes remain in the migration for compatibility, but the current Companion entry point does not read anonymous-limit variables or consume anonymous quota.
 
 ## Client-bundle rule

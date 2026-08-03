@@ -64,7 +64,7 @@ const adminAllowedRedirectPrefixes = [
   "/admin/access-requests",
   "/admin/material-usage",
 ];
-type AuthRedirectRole = "provider" | "admin";
+export type AuthRedirectRole = "provider" | "admin";
 
 export function getSafeAuthRedirectHref(
   next?: string,
@@ -77,6 +77,32 @@ export function getSafeAuthRedirectHref(
     : getDefaultAuthRedirectHref(role);
 
   return appendLocale(safePath, locale);
+}
+
+export function getSafePendingAuthNextHref(next?: string): string | undefined {
+  const rawNext = next?.trim();
+
+  if (
+    isSafeInternalWorkspaceHref(rawNext, "provider") ||
+    isSafeInternalWorkspaceHref(rawNext, "admin")
+  ) {
+    return rawNext;
+  }
+
+  return undefined;
+}
+
+export function getTrustedAuthRedirectRole(
+  user:
+    | {
+        app_metadata?: Record<string, unknown>;
+      }
+    | null
+    | undefined,
+): AuthRedirectRole {
+  const role = user?.app_metadata?.careslink_role ?? user?.app_metadata?.role;
+
+  return role === "admin" ? "admin" : "provider";
 }
 
 export async function signInWithPasswordForWorkspace({
@@ -108,7 +134,13 @@ export async function signInWithPasswordForWorkspace({
     };
   }
 
-  redirect(getSafeAuthRedirectHref(next, locale, getRoleFromSignInUser(data?.user)));
+  redirect(
+    getSafeAuthRedirectHref(
+      next,
+      locale,
+      getTrustedAuthRedirectRole(data?.user),
+    ),
+  );
 
   return {
     status: "success",
@@ -204,21 +236,8 @@ function isSafeInternalWorkspaceHref(
   }
 }
 
-function getRoleFromSignInUser(
-  user:
-    | {
-        app_metadata?: Record<string, unknown>;
-      }
-    | null
-    | undefined,
-): AuthRedirectRole {
-  const role = user?.app_metadata?.careslink_role ?? user?.app_metadata?.role;
-
-  return role === "admin" ? "admin" : "provider";
-}
-
 function appendLocale(href: string, locale?: string) {
-  const normalizedLocale = locale?.trim();
+  const normalizedLocale = normalizeAuthLocale(locale);
 
   if (!normalizedLocale) {
     return href;
@@ -233,4 +252,12 @@ function appendLocale(href: string, locale?: string) {
   const hash = parsed.hash;
 
   return `${parsed.pathname}${parsed.search}${hash}`;
+}
+
+export function normalizeAuthLocale(locale?: string) {
+  return locale?.trim() === "zh-Hans"
+    ? "zh-Hans"
+    : locale?.trim() === "en"
+      ? "en"
+      : undefined;
 }

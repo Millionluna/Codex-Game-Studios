@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const supabaseServerMock = vi.hoisted(() => ({
   createCareslinkServerSupabaseClient: vi.fn(),
@@ -8,13 +8,25 @@ const navigationMock = vi.hoisted(() => ({
   redirect: vi.fn(),
 }));
 
+const googleOAuthMock = vi.hoisted(() => ({
+  isGoogleOAuthAvailable: vi.fn(),
+}));
+
 vi.mock("../../lib/supabase-server", () => ({
   createCareslinkServerSupabaseClient:
     supabaseServerMock.createCareslinkServerSupabaseClient,
+  getSupabasePublicAuthConfig: () => ({
+    supabaseUrl: "https://project.supabase.co",
+    publishableKey: "publishable-key",
+  }),
 }));
 
 vi.mock("next/navigation", () => ({
   redirect: navigationMock.redirect,
+}));
+
+vi.mock("../../lib/google-oauth", () => ({
+  isGoogleOAuthAvailable: googleOAuthMock.isGoogleOAuthAvailable,
 }));
 
 function createFormData(values: Record<string, string>) {
@@ -32,6 +44,8 @@ function createAuthClient({
   signInRole = "provider",
   resetPasswordError,
   updateUserError,
+  oauthError,
+  oauthUrl = "https://project.supabase.co/auth/v1/authorize?provider=google",
 }: {
   signInError?: string;
   signUpError?: string;
@@ -39,6 +53,8 @@ function createAuthClient({
   signInRole?: "provider" | "admin";
   resetPasswordError?: string;
   updateUserError?: string;
+  oauthError?: string;
+  oauthUrl?: string | null;
 } = {}) {
   return {
     auth: {
@@ -53,6 +69,19 @@ function createAuthClient({
         },
         error: signInError ? { message: signInError } : null,
       })),
+      signInWithOAuth: vi.fn(
+        async (_input: {
+          provider: "google";
+          options: { redirectTo: string };
+        }) => {
+          void _input;
+
+          return {
+            data: { url: oauthUrl },
+            error: oauthError ? { message: oauthError } : null,
+          };
+        },
+      ),
       signUp: vi.fn(async () => ({
         data: { session: signUpSession },
         error: signUpError ? { message: signUpError } : null,
@@ -73,6 +102,14 @@ describe("auth server actions", () => {
   beforeEach(() => {
     supabaseServerMock.createCareslinkServerSupabaseClient.mockReset();
     navigationMock.redirect.mockReset();
+    googleOAuthMock.isGoogleOAuthAvailable.mockReset();
+    googleOAuthMock.isGoogleOAuthAvailable.mockResolvedValue(true);
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://project.supabase.co");
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY", "publishable-key");
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
   });
 
   it("signs in with Supabase and redirects to the safe workspace next route", async () => {
@@ -151,6 +188,123 @@ describe("auth server actions", () => {
 
     expect(navigationMock.redirect).toHaveBeenCalledWith(
       "/ai-documents?lang=en",
+    );
+  });
+
+  it("starts Google OAuth with a safe provider callback and redirects to Supabase", async () => {
+    const authClient = createAuthClient();
+    supabaseServerMock.createCareslinkServerSupabaseClient.mockResolvedValue(authClient);
+    const { continueWithGoogleFromLoginAction } = await import("./actions");
+
+    await continueWithGoogleFromLoginAction(
+      createFormData({
+        next: "/template-companion/ndis-case-note?source=ndis-case-note-download",
+        lang: "zh-Hans",
+      }),
+    );
+
+    expect(authClient.auth.signInWithOAuth).toHaveBeenCalledWith({
+      provider: "google",
+      options: {
+        redirectTo: expect.stringMatching(
+          /^https:\/\/ai\.careslink\.com\.au\/auth\/callback\?/,
+        ),
+      },
+    });
+
+    const redirectTo = new URL(
+      authClient.auth.signInWithOAuth.mock.calls[0][0].options.redirectTo,
+    );
+    expect(redirectTo.searchParams.get("flow")).toBe("oauth");
+    expect(redirectTo.searchParams.get("lang")).toBe("zh-Hans");
+    expect(redirectTo.searchParams.get("next")).toBe(
+      "/template-companion/ndis-case-note?source=ndis-case-note-download",
+    );
+    expect(navigationMock.redirect).toHaveBeenLastCalledWith(
+      "https://project.supabase.co/auth/v1/authorize?provider=google",
+    );
+  });
+
+  it("rejects an external OAuth next value before constructing the callback", async () => {
+    const authClient = createAuthClient();
+    supabaseServerMock.createCareslinkServerSupabaseClient.mockResolvedValue(authClient);
+    const { continueWithGoogleFromRegisterAction } = await import("./actions");
+
+    await continueWithGoogleFromRegisterAction(
+      createFormData({
+        next: "https://evil.example/steal",
+        lang: "en",
+      }),
+    );
+
+    const redirectTo = new URL(
+      authClient.auth.signInWithOAuth.mock.calls[0][0].options.redirectTo,
+    );
+    expect(redirectTo.searchParams.get("next")).toBe("/ai-documents");
+    expect(redirectTo.toString()).not.toContain("evil.example");
+  });
+
+  it("preserves a safe admin next until the callback verifies the account role", async () => {
+    const authClient = createAuthClient();
+    supabaseServerMock.createCareslinkServerSupabaseClient.mockResolvedValue(authClient);
+    const { continueWithGoogleFromLoginAction } = await import("./actions");
+
+    await continueWithGoogleFromLoginAction(
+      createFormData({ next: "/admin/material-usage", lang: "en" }),
+    );
+
+    const redirectTo = new URL(
+      authClient.auth.signInWithOAuth.mock.calls[0][0].options.redirectTo,
+    );
+    expect(redirectTo.searchParams.get("next")).toBe("/admin/material-usage");
+    expect(redirectTo.searchParams.get("lang")).toBe("en");
+  });
+
+  it("uses the deployment-specific callback for Preview OAuth", async () => {
+    vi.stubEnv("VERCEL_ENV", "preview");
+    vi.stubEnv("VERCEL_URL", "careslink-preview.example.vercel.app");
+    const authClient = createAuthClient();
+    supabaseServerMock.createCareslinkServerSupabaseClient.mockResolvedValue(authClient);
+    const { continueWithGoogleFromLoginAction } = await import("./actions");
+
+    await continueWithGoogleFromLoginAction(
+      createFormData({ next: "/ai-documents", lang: "en" }),
+    );
+
+    expect(
+      authClient.auth.signInWithOAuth.mock.calls[0][0].options.redirectTo,
+    ).toMatch(/^https:\/\/careslink-preview\.example\.vercel\.app\/auth\/callback\?/);
+  });
+
+  it("fails closed in-page when Google is disabled", async () => {
+    googleOAuthMock.isGoogleOAuthAvailable.mockResolvedValue(false);
+    const authClient = createAuthClient();
+    supabaseServerMock.createCareslinkServerSupabaseClient.mockResolvedValue(authClient);
+    const { continueWithGoogleFromLoginAction } = await import("./actions");
+
+    await continueWithGoogleFromLoginAction(
+      createFormData({ next: "/ai-documents", lang: "en" }),
+    );
+
+    expect(authClient.auth.signInWithOAuth).not.toHaveBeenCalled();
+    expect(navigationMock.redirect).toHaveBeenCalledWith(
+      "/auth/login?next=%2Fai-documents&lang=en&error=Google+sign-in+is+not+available.+Please+use+email+and+password.",
+    );
+  });
+
+  it("does not follow a non-Supabase URL returned by the OAuth client", async () => {
+    const authClient = createAuthClient({
+      oauthUrl: "https://evil.example/authorize",
+    });
+    supabaseServerMock.createCareslinkServerSupabaseClient.mockResolvedValue(authClient);
+    const { continueWithGoogleFromLoginAction } = await import("./actions");
+
+    await continueWithGoogleFromLoginAction(
+      createFormData({ next: "/ai-documents", lang: "en" }),
+    );
+
+    expect(navigationMock.redirect).toHaveBeenLastCalledWith(
+      "/auth/login?next=%2Fai-documents&lang=en&error=Unable+to+start+Google+sign-in.+Please+try+again.",
     );
   });
 
@@ -245,6 +399,30 @@ describe("auth server actions", () => {
     );
     expect(navigationMock.redirect).toHaveBeenCalledWith(
       "/auth/login?lang=zh-Hans&notice=password-reset-sent",
+    );
+  });
+
+  it("drops unsupported locale values from password reset redirects", async () => {
+    const authClient = createAuthClient();
+    supabaseServerMock.createCareslinkServerSupabaseClient.mockResolvedValue(authClient);
+    const { requestPasswordResetAction } = await import("./actions");
+
+    await requestPasswordResetAction(
+      createFormData({
+        email: "provider@example.com",
+        lang: "https://evil.example/steal",
+      }),
+    );
+
+    expect(authClient.auth.resetPasswordForEmail).toHaveBeenCalledWith(
+      "provider@example.com",
+      {
+        redirectTo:
+          "https://ai.careslink.com.au/auth/callback?next=%2Fauth%2Fupdate-password",
+      },
+    );
+    expect(navigationMock.redirect).toHaveBeenCalledWith(
+      "/auth/login?notice=password-reset-sent",
     );
   });
 
