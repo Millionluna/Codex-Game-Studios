@@ -61,6 +61,9 @@ vi.mock("@/components/ui", async () => {
 vi.mock("@/lib/referral-workspace-i18n", async () =>
   import("../../lib/referral-workspace-i18n"),
 );
+vi.mock("@/lib/ndis-case-note-companion-navigation", async () =>
+  import("../../lib/ndis-case-note-companion-navigation"),
+);
 vi.mock("@/lib/public-provider-profile-generator", async () =>
   import("../../lib/public-provider-profile-generator"),
 );
@@ -120,12 +123,16 @@ describe("public provider profile generator funnel", () => {
     const { default: HomePage } = await import("../page");
     const markup = await renderPage(HomePage);
 
-    expect(markup).toContain("Build a referral-ready provider profile.");
-    expect(markup).toContain("Create a provider profile and share card");
+    expect(markup).toContain("把支持事实整理成可复核的文档草稿。");
+    expect(markup).toContain("AI Documents");
+    expect(markup).toContain("创建免费账户");
+    expect(markup).toContain("/careslink-ai-logo-reverse.svg");
+    expect(markup).toContain('href="/auth/register?next=');
     expect(markup).toContain(
-      'href="/provider-profile-generator/new?lang=zh-Hans"',
+      "%2Ftemplate-companion%2Fndis-case-note%3Fsource%3Dndis-case-note-download",
     );
-    expect(markup).toContain('href="/auth/login?lang=zh-Hans"');
+    expect(markup).not.toContain("Provider growth funnel");
+    expect(markup).not.toContain("Access Code");
   });
 
   it("renders the generator landing page with no-cost deterministic preview positioning", async () => {
