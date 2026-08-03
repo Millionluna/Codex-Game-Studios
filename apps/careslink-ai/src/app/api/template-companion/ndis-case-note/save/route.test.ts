@@ -126,7 +126,7 @@ describe("NDIS case note save route", () => {
       materialStore,
     );
     supabaseMock.createCareslinkServerSupabaseClient.mockResolvedValue(
-      undefined,
+      { auth: {} },
     );
     sessionMock.resolveWorkspaceAccountFromSupabaseSession.mockResolvedValue(
       provider,
@@ -141,7 +141,7 @@ describe("NDIS case note save route", () => {
     );
   });
 
-  it("requires sign-in only when saving is requested", async () => {
+  it("requires sign-in before claim lookup or persistence", async () => {
     sessionMock.resolveWorkspaceAccountFromSupabaseSession.mockResolvedValueOnce(
       undefined,
     );

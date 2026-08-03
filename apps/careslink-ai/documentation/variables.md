@@ -17,8 +17,6 @@ No secret values belong in this document, source control, browser bundles, URLs,
 | Name | Default/role | Risk |
 | --- | --- | --- |
 | `OPENAI_NDIS_CASE_NOTE_MODEL` | Falls back to `OPENAI_MODEL`, then `gpt-5.4-mini` | Model changes can alter quality/cost; rerun guarded live smoke |
-| `NDIS_CASE_NOTE_ANON_DAILY_LIMIT` | `1` | Raising increases abuse/cost exposure |
-| `NDIS_CASE_NOTE_ANON_IP_DAILY_LIMIT` | `5` | Shared-network trade-off |
 | `NDIS_CASE_NOTE_AUTH_DAILY_LIMIT` | `3` | Authenticated cost cap |
 | `NDIS_CASE_NOTE_AUTH_IP_DAILY_LIMIT` | `20` | Shared-network and abuse cap |
 | `GUIDED_AI_RATE_LIMIT_PER_MINUTE` | Shared per-minute limiter | Raising increases burst exposure |
@@ -31,7 +29,7 @@ No secret values belong in this document, source control, browser bundles, URLs,
 
 `NEXT_PUBLIC_APP_URL`, `NEXT_PUBLIC_CARESLINK_AI_BASE_URL`, `NEXT_PUBLIC_SITE_URL`, `APP_URL`, and `VERCEL_PROJECT_PRODUCTION_URL` may be used to construct safe internal redirects or public links. Demo flags must remain false for real preview/provider sessions.
 
-Other workspace feature/table variables remain documented in `.env.example`; they are not required by the anonymous generation path unless the corresponding workspace pages are exercised.
+Legacy anonymous quota columns/scopes remain in the migration for compatibility, but the current Companion entry point does not read anonymous-limit variables or consume anonymous quota.
 
 ## Client-bundle rule
 
@@ -43,4 +41,5 @@ Only `NEXT_PUBLIC_*` values may be bundled. They must contain public URLs, publi
 - Confirm demo auth and companion memory fallback are not enabled.
 - Confirm the Supabase project has the companion migration.
 - Run PII denial before any live generation.
-- Run one synthetic generation, quota denial, claim/save, cross-account denial, metadata-only checks, then delete temporary accounts/data.
+- Confirm unauthenticated GET enters login and unauthenticated POST returns `401` before quota/OpenAI.
+- Run one authenticated synthetic generation, PII denial, account/IP quota denial, owner-bound claim/save, cross-account denial, metadata-only checks, then delete temporary accounts/data.

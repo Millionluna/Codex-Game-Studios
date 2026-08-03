@@ -20,10 +20,30 @@ type CompanionEventPostBody = {
 const CLIENT_EVENT_NAMES = new Set<NdisCaseNoteCompanionEventName>([
   "companion_viewed",
   "companion_started",
-  "companion_save_prompt_clicked",
 ]);
 
 export async function POST(request: Request) {
+  const supabase = await createCareslinkServerSupabaseClient();
+  const account = await resolveWorkspaceAccountFromSupabaseSession(supabase);
+
+  if (!account) {
+    return NextResponse.json(
+      { ok: false, code: "login_required", error: "Login required" },
+      { status: 401 },
+    );
+  }
+
+  if (account.role !== "provider") {
+    return NextResponse.json(
+      {
+        ok: false,
+        code: "provider_account_required",
+        error: "Only provider accounts can record companion activity.",
+      },
+      { status: 403 },
+    );
+  }
+
   let body: CompanionEventPostBody;
 
   try {
@@ -55,7 +75,7 @@ export async function POST(request: Request) {
     );
   }
   const rateLimit = getGuidedAiRateLimiter().check(
-    `ndis-case-note-event:${identity.deviceHash}`,
+    `ndis-case-note-event:user:${account.id}`,
   );
 
   if (!rateLimit.allowed) {
@@ -65,14 +85,11 @@ export async function POST(request: Request) {
     );
   }
 
-  const supabase = await createCareslinkServerSupabaseClient();
-  const account = await resolveWorkspaceAccountFromSupabaseSession(supabase);
-
   try {
     await getNdisCaseNoteCompanionStore().recordEvent(
       createNdisCaseNoteCompanionEvent({
         eventName,
-        userId: account?.id,
+        userId: account.id,
         visitorHash: identity.visitorHash,
         attribution: getNdisCaseNoteCompanionAttribution(request.url),
       }),

@@ -9,7 +9,6 @@ import {
   History,
   Languages,
   LockKeyhole,
-  LogIn,
   Menu,
   Save,
   ShieldCheck,
@@ -59,7 +58,6 @@ export type SavedNdisCaseNoteDraft = {
 
 type NdisCaseNoteCompanionProps = {
   attribution: NdisCaseNoteCompanionAttribution;
-  accountRole?: "provider" | "admin";
   initialClaimToken?: string;
   initialMaterial?: NdisCaseNoteMaterial;
   autoSave: boolean;
@@ -98,7 +96,6 @@ const EMPTY_INPUT: NdisCaseNoteCompanionInput = {
 
 export function NdisCaseNoteCompanion({
   attribution,
-  accountRole,
   initialClaimToken,
   initialMaterial,
   autoSave,
@@ -133,8 +130,6 @@ export function NdisCaseNoteCompanion({
   const trackedView = useRef(false);
   const trackedStart = useRef(false);
   const attemptedAutoSave = useRef(false);
-  const isProvider = accountRole === "provider";
-  const isAdmin = accountRole === "admin";
   const attributionQuery = useMemo(
     () => buildAttributionQuery(attribution),
     [attribution],
@@ -349,19 +344,11 @@ export function NdisCaseNoteCompanion({
       return;
     }
 
-    if (isProvider) {
-      await saveDraft();
-      return;
-    }
-
-    await trackEvent("companion_save_prompt_clicked", attributionQuery);
-    window.location.assign(
-      buildAuthHref("/auth/register", attribution, claimToken),
-    );
+    await saveDraft();
   }
 
   async function saveDraft() {
-    if (!claimToken || !material || !isProvider || isSaving) {
+    if (!claimToken || !material || isSaving) {
       return;
     }
 
@@ -417,7 +404,6 @@ export function NdisCaseNoteCompanion({
   useEffect(() => {
     if (
       !autoSave ||
-      !isProvider ||
       !claimToken ||
       !material ||
       attemptedAutoSave.current
@@ -429,21 +415,14 @@ export function NdisCaseNoteCompanion({
     void saveDraft();
     // saveDraft is intentionally triggered once for the short-lived return token.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoSave, claimToken, isProvider, material]);
-
-  const loginHref = claimToken
-    ? buildAuthHref("/auth/login", attribution, claimToken)
-    : buildAuthHref("/auth/login", attribution);
-  const registerHref = claimToken
-    ? buildAuthHref("/auth/register", attribution, claimToken)
-    : buildAuthHref("/auth/register", attribution);
+  }, [autoSave, claimToken, material]);
 
   return (
     <main className="case-note-page">
       <header className="case-note-brandbar border-b border-white/10">
         <div className="mx-auto flex min-h-16 max-w-[1600px] items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
           <Link
-            href={accountRole ? buildAiDocumentsHref(attribution.locale) : "/"}
+            href={buildAiDocumentsHref(attribution.locale)}
             className="inline-flex items-center rounded-sm focus-visible:ring-2 focus-visible:ring-[#9fe1ca]"
             aria-label="CaresLink AI"
           >
@@ -481,22 +460,12 @@ export function NdisCaseNoteCompanion({
               <Languages className="size-4" aria-hidden="true" />
               {copy.language}
             </a>
-            {accountRole ? (
-              <Link
-                href={buildAiDocumentsHref(attribution.locale)}
-                className="hidden min-h-10 items-center rounded-md border border-[#9fe1ca]/35 bg-[#9fe1ca]/12 px-3 text-xs font-semibold text-[#d8f2e7] hover:bg-[#9fe1ca]/18 sm:inline-flex"
-              >
-                {isProvider ? copy.signedIn : copy.adminAccount}
-              </Link>
-            ) : (
-              <a
-                href={loginHref}
-                className="inline-flex min-h-10 shrink-0 items-center gap-2 whitespace-nowrap rounded-md border border-white bg-white px-3 text-sm font-semibold text-[#063d34] hover:bg-[#e9f3ee]"
-              >
-                <LogIn className="size-4" aria-hidden="true" />
-                {copy.signIn}
-              </a>
-            )}
+            <Link
+              href={buildAiDocumentsHref(attribution.locale)}
+              className="hidden min-h-10 items-center rounded-md border border-[#9fe1ca]/35 bg-[#9fe1ca]/12 px-3 text-xs font-semibold text-[#d8f2e7] hover:bg-[#9fe1ca]/18 sm:inline-flex"
+            >
+              {copy.signedIn}
+            </Link>
             <details className="case-note-mobile-menu relative md:hidden">
               <summary aria-label={copy.menu}>
                 <Menu className="size-5" aria-hidden="true" />
@@ -938,7 +907,6 @@ export function NdisCaseNoteCompanion({
                 type="submit"
                 disabled={
                   isGenerating ||
-                  isAdmin ||
                   (reviewIsCurrent &&
                     (missingMinimumFacts.length > 0 ||
                       !allPrivacyFindingsResolved ||
@@ -948,13 +916,11 @@ export function NdisCaseNoteCompanion({
                 className="coral-action w-full"
               >
                 <Sparkles className="size-4" aria-hidden="true" />
-                {isAdmin
-                  ? copy.adminProviderRequired
-                  : isGenerating
-                    ? copy.generating
-                    : reviewIsCurrent
-                      ? copy.generate
-                      : copy.reviewPrivacy}
+                {isGenerating
+                  ? copy.generating
+                  : reviewIsCurrent
+                    ? copy.generate
+                    : copy.reviewPrivacy}
               </button>
               <p className="text-center text-xs leading-5 text-muted">
                 {copy.boundary}
@@ -1116,37 +1082,16 @@ export function NdisCaseNoteCompanion({
                     <button
                       type="button"
                       onClick={promptToSave}
-                      disabled={isSaving || isAdmin}
+                      disabled={isSaving}
                       className="jade-action w-full"
                     >
-                      {isProvider ? (
-                        <Save className="size-4" aria-hidden="true" />
-                      ) : (
-                        <LockKeyhole className="size-4" aria-hidden="true" />
-                      )}
+                      <Save className="size-4" aria-hidden="true" />
                       {isSaving ? copy.saving : copy.save}
                       {!isSaving ? (
                         <ArrowRight className="size-4" aria-hidden="true" />
                       ) : null}
                     </button>
                   )}
-                  {!isProvider && !isAdmin ? (
-                    <p className="mt-3 text-center text-xs leading-5 text-muted">
-                      {copy.savePrompt}{" "}
-                      <a
-                        href={loginHref}
-                        onClick={() => {
-                          void trackEvent(
-                            "companion_save_prompt_clicked",
-                            attributionQuery,
-                          );
-                        }}
-                        className="font-semibold text-brand hover:underline"
-                      >
-                        {copy.signInInstead}
-                      </a>
-                    </p>
-                  ) : null}
                   {saveState === "error" ? (
                     <p className="mt-3 text-sm text-[#963b3b]">
                       {copy.errors.save}
@@ -1169,7 +1114,7 @@ export function NdisCaseNoteCompanion({
           </section>
         </div>
 
-        {isProvider && savedDrafts.length > 0 ? (
+        {savedDrafts.length > 0 ? (
           <section className="document-paper mt-5 overflow-hidden">
             <div className="flex items-end justify-between gap-4 border-b border-line px-5 py-4 sm:px-6">
               <div>
@@ -1222,20 +1167,11 @@ export function NdisCaseNoteCompanion({
 
         <footer className="mt-8 flex flex-col gap-3 border-t border-[#bfcfc7] py-6 text-xs leading-5 text-muted sm:flex-row sm:items-center sm:justify-between">
           <span>{copy.footerBoundary}</span>
-          {!accountRole ? (
-            <a
-              href={registerHref}
-              className="font-semibold text-brand hover:underline"
-            >
-              {copy.createAccount}
-            </a>
-          ) : null}
         </footer>
       </div>
     </main>
   );
 }
-
 function CompanionField({
   fieldId,
   label,
@@ -1612,39 +1548,6 @@ function buildAttributionQuery(
   return href.split("?", 2)[1] ?? "";
 }
 
-function buildAuthHref(
-  authPath: "/auth/login" | "/auth/register",
-  attribution: NdisCaseNoteCompanionAttribution,
-  claimToken?: string,
-) {
-  const returnTo = buildNdisCaseNoteCompanionHref({
-    attribution,
-    claimToken,
-    autoSave: Boolean(claimToken),
-  });
-  const params = new URLSearchParams({
-    next: returnTo,
-    returnTo,
-    source: attribution.source,
-    resourceSlug: attribution.resourceSlug,
-    lang: attribution.locale,
-  });
-
-  if (attribution.utmSource) {
-    params.set("utm_source", attribution.utmSource);
-  }
-
-  if (attribution.utmMedium) {
-    params.set("utm_medium", attribution.utmMedium);
-  }
-
-  if (attribution.utmCampaign) {
-    params.set("utm_campaign", attribution.utmCampaign);
-  }
-
-  return `${authPath}?${params.toString()}`;
-}
-
 function buildLanguageHref(
   attribution: NdisCaseNoteCompanionAttribution,
   claimToken?: string,
@@ -1676,10 +1579,6 @@ function getFriendlyError(
   fallback: string | undefined,
   copy: ReturnType<typeof getCompanionCopy>,
 ) {
-  if (code === "free_limit_reached") {
-    return copy.errors.freeLimit;
-  }
-
   if (code === "daily_limit_reached") {
     return copy.errors.dailyLimit;
   }
@@ -1720,13 +1619,11 @@ function getCompanionCopy(locale: "en" | "zh-Hans") {
       referrals: "转介",
       language: "English",
       signedIn: "返回 AI 文档",
-      adminAccount: "返回管理工作区",
-      signIn: "登录",
-      freeDraft: "免费生成 1 份草稿",
-      noCard: "无需信用卡",
+      freeDraft: "免费账户可用",
+      noCard: "注册或登录后生成",
       title: "NDIS Case Note AI 助手",
       subtitle:
-        "把去标识化的支持事实整理成中性、可复核的 case note 草稿。先生成，再决定是否登录保存。",
+        "把去标识化的支持事实整理成中性、可复核的 case note 草稿，并保存到当前服务商账号。",
       steps: ["填写支持事实", "检查隐私提示", "复核、复制或保存"],
       formTitle: "输入去标识化的支持信息",
       privacyIntro:
@@ -1768,10 +1665,9 @@ function getCompanionCopy(locale: "en" | "zh-Hans") {
       },
       boundary:
         "输出是需要用户复核的草稿，不是完成记录，也不构成临床、法律、照护、监管、合规或其他专业建议。",
-      generate: "生成免费草稿",
+      generate: "生成待复核草稿",
       reviewPrivacy: "先进行隐私复核",
       generating: "正在生成草稿",
-      adminProviderRequired: "请使用服务商账号",
       privacyReviewTitle: "隐私检查",
       privacyNeedsAttention: "发现需要修改的字段",
       privacyNeedsAttentionDetail:
@@ -1822,7 +1718,7 @@ function getCompanionCopy(locale: "en" | "zh-Hans") {
       resultTitle: "待复核草稿",
       resultReady: "逐项核对事实，再复制或保存。",
       resultEmpty: "生成后，草稿会显示在这张文档纸上。",
-      emptyDetail: "填写事实并生成第一份免费草稿。",
+      emptyDetail: "填写事实并完成隐私复核后生成草稿。",
       copyAll: "复制全部",
       copy: "复制",
       copied: "已复制",
@@ -1839,21 +1735,16 @@ function getCompanionCopy(locale: "en" | "zh-Hans") {
       save: "保存这份草稿",
       saving: "正在保存",
       saved: "草稿已保存到你的账号",
-      savePrompt: "创建账号后可保存、查看历史并再次使用。",
-      signInInstead: "已有账号？登录",
       historyEyebrow: "账号内文档",
       historyTitle: "最近保存的草稿",
       savedCount: "份已保存",
       footerBoundary:
         "CaresLink AI 仅提供一般文档和运营支持。所有草稿都需要用户复核。",
-      createAccount: "创建服务商账号",
       requiredField: "生成前必须补充此项。",
       errors: {
         identifiers: "请移除已标出的可识别信息后重试。",
         privacyReview: "请先完成隐私复核并勾选两项确认。",
         minimumFacts: "请先补全标出的最低事实，再重新进行隐私复核。",
-        freeLimit:
-          "此设备的免费草稿已使用。登录后可以保存并继续使用。",
         dailyLimit: "今天的生成额度已用完，请明天再试。",
         rateLimit: "请求过于频繁，请稍后再试。",
         save: "暂时无法保存这份草稿，请稍后再试。",
@@ -1870,13 +1761,11 @@ function getCompanionCopy(locale: "en" | "zh-Hans") {
     referrals: "Referrals",
     language: "简体中文",
     signedIn: "Back to AI Documents",
-    adminAccount: "Back to admin workspace",
-    signIn: "Sign in",
-    freeDraft: "1 free draft",
-    noCard: "No credit card",
+    freeDraft: "Available with a free account",
+    noCard: "Register or sign in to generate",
     title: "NDIS Case Note AI Companion",
     subtitle:
-      "Turn de-identified support facts into neutral case-note wording you can review. Generate first, then choose whether to sign in and save.",
+      "Turn de-identified support facts into neutral case-note wording you can review and save to your provider account.",
     steps: ["Enter support facts", "Check privacy findings", "Review, copy or save"],
     formTitle: "Enter de-identified support details",
     privacyIntro:
@@ -1918,10 +1807,9 @@ function getCompanionCopy(locale: "en" | "zh-Hans") {
     },
     boundary:
       "The output is a user-reviewed draft, not a completed record or clinical, legal, compliance, regulatory, care or professional advice.",
-    generate: "Generate my free draft",
+    generate: "Generate reviewable draft",
     reviewPrivacy: "Review privacy first",
     generating: "Generating draft",
-    adminProviderRequired: "Use a provider account",
     privacyReviewTitle: "Privacy Review",
     privacyNeedsAttention: "Some fields need attention",
     privacyNeedsAttentionDetail:
@@ -1972,7 +1860,7 @@ function getCompanionCopy(locale: "en" | "zh-Hans") {
     resultTitle: "Reviewable draft",
     resultReady: "Check every fact before copying or saving.",
     resultEmpty: "Your generated wording will appear on this document surface.",
-    emptyDetail: "Enter the facts and generate your first free draft.",
+    emptyDetail: "Enter the facts and complete Privacy Review to generate a draft.",
     copyAll: "Copy all",
     copy: "Copy",
     copied: "Copied",
@@ -1989,176 +1877,16 @@ function getCompanionCopy(locale: "en" | "zh-Hans") {
     save: "Save this draft",
     saving: "Saving",
     saved: "Draft saved to your account",
-    savePrompt: "Create an account to save, view history and use it again.",
-    signInInstead: "Already registered? Sign in",
     historyEyebrow: "Your account",
     historyTitle: "Recently saved drafts",
     savedCount: "saved",
     footerBoundary:
       "CaresLink AI provides general documentation and operational support. Every draft requires user review.",
-    createAccount: "Create provider account",
     requiredField: "Required before a draft can be generated.",
     errors: {
       identifiers: "Remove the highlighted identifying information and try again.",
       privacyReview: "Complete Privacy Review and both confirmations first.",
       minimumFacts: "Complete the highlighted minimum facts, then run Privacy Review again.",
-      freeLimit:
-        "This device has used its free draft. Sign in to save and use the companion again.",
-      dailyLimit: "Your draft limit has been reached for today.",
-      rateLimit: "Too many requests. Please wait before trying again.",
-      save: "This draft could not be saved. Please try again.",
-      generic: "The draft could not be generated. Please try again.",
-    },
-  };
-}
-
-export function getLegacyCompanionCopy(locale: "en" | "zh-Hans") {
-  if (locale === "zh-Hans") {
-    return {
-      productLabel: "文档草稿助手",
-      language: "English",
-      signedIn: "服务商账号已登录",
-      adminAccount: "管理员账号",
-      signIn: "登录",
-      freeDraft: "免费生成 1 份草稿",
-      noCard: "无需信用卡",
-      title: "NDIS Case Note AI 助手",
-      subtitle:
-        "将去标识化的支持事实整理成中性、可复核的 case note 草稿。先免费生成，再决定是否登录保存。",
-      steps: ["填写支持事实", "生成中性草稿", "复核、复制或保存"],
-      formTitle: "输入去标识化的支持信息",
-      privacyIntro: "仅填写完成草稿所需的事实，并使用“参与者”等通用称呼。",
-      identifierWarning:
-        "不要输入姓名、NDIS number、出生日期、地址、电话、邮箱或其他可识别个人的信息。自动拦截只能识别部分明显格式。",
-      deidentifiedHint: "请勿填写个人身份信息",
-      fields: {
-        supportDateTime: "支持日期与时间（可选）",
-        supportType: "支持类型",
-        setting: "支持场景或地点类型",
-        supportDelivered: "提供了什么支持",
-        observableFacts: "可观察事实与参与者反应",
-        actionTaken: "工作人员采取的行动",
-        followUp: "后续跟进或升级事项（可选）",
-      },
-      placeholders: {
-        supportType: "例如：社区参与支持",
-        setting: "例如：社区场所，不要填写具体地址",
-        supportDelivered: "只描述实际提供的支持。",
-        observableFacts: "描述看见、听见或记录到的事实，不作诊断或推断。",
-        actionTaken: "描述工作人员实际采取的行动。",
-        followUp: "记录需要交接、复核或跟进的事项。",
-      },
-      boundary:
-        "输出是需要用户复核的草稿，不是完成记录，也不构成临床、法律、合规、监管、照护或专业建议。",
-      generate: "生成免费草稿",
-      generating: "正在生成草稿",
-      adminProviderRequired: "请使用服务商账号",
-      resultTitle: "待复核草稿",
-      resultReady: "逐项检查事实，再复制或保存。",
-      resultEmpty: "生成后，草稿和复核提示会显示在这里。",
-      emptyDetail: "填写左侧事实并生成第一份免费草稿。",
-      copyAll: "复制全部",
-      copy: "复制",
-      copied: "已复制",
-      output: {
-        caseNoteDraft: "Case note 草稿",
-        missingFacts: "待补充事实",
-        neutralWordingChecks: "中性措辞检查",
-        followUpPrompts: "后续提示",
-        none: "没有额外项目。",
-      },
-      save: "保存这份草稿",
-      saving: "正在保存",
-      saved: "草稿已保存到你的账号",
-      savePrompt: "注册后可保存、查看历史并再次使用。",
-      signInInstead: "已有账号？登录",
-      historyEyebrow: "账号内资料",
-      historyTitle: "最近保存的草稿",
-      savedCount: "份",
-      footerBoundary:
-        "CaresLink AI 提供一般文档与运营支持。所有内容均需用户自行复核。",
-      createAccount: "创建服务商账号",
-      errors: {
-        identifiers: "请移除标出的可识别信息后再试。",
-        freeLimit: "本设备的免费草稿已使用。登录后可以保存并继续使用。",
-        dailyLimit: "今天的生成额度已用完，请明天再试。",
-        rateLimit: "请求过于频繁，请稍后再试。",
-        save: "暂时无法保存这份草稿，请稍后再试。",
-        generic: "暂时无法生成草稿，请稍后再试。",
-      },
-    };
-  }
-
-  return {
-    productLabel: "Documentation companion",
-    language: "简体中文",
-    signedIn: "Provider signed in",
-    adminAccount: "Admin account",
-    signIn: "Sign in",
-    freeDraft: "1 free draft",
-    noCard: "No credit card",
-    title: "NDIS Case Note AI Companion",
-    subtitle:
-      "Turn de-identified support facts into neutral case-note wording you can review. Generate first, then choose whether to sign in and save.",
-    steps: ["Enter support facts", "Generate neutral wording", "Review, copy or save"],
-    formTitle: "Enter de-identified support details",
-    privacyIntro:
-      "Include only the facts needed for the draft and use generic terms such as “participant”.",
-    identifierWarning:
-      "Do not enter names, NDIS numbers, dates of birth, addresses, phone numbers, email addresses or other identifying information. Automated checks only catch some obvious formats.",
-    deidentifiedHint: "No identifying information",
-    fields: {
-      supportDateTime: "Support date and time (optional)",
-      supportType: "Support type",
-      setting: "Setting or location type",
-      supportDelivered: "Support delivered",
-      observableFacts: "Observable facts and participant response",
-      actionTaken: "Action taken",
-      followUp: "Follow-up or escalation (optional)",
-    },
-    placeholders: {
-      supportType: "For example: community participation support",
-      setting: "For example: community setting, without a street address",
-      supportDelivered: "Describe only the support that was delivered.",
-      observableFacts:
-        "Record what was seen, heard or documented without diagnosis or interpretation.",
-      actionTaken: "Describe the action the worker actually took.",
-      followUp: "Note any handover, review or follow-up that is still needed.",
-    },
-    boundary:
-      "The output is a user-reviewed draft, not a completed record or clinical, legal, compliance, regulatory, care or professional advice.",
-    generate: "Generate my free draft",
-    generating: "Generating draft",
-    adminProviderRequired: "Use a provider account",
-    resultTitle: "Reviewable draft",
-    resultReady: "Check every fact before copying or saving.",
-    resultEmpty: "Your draft and review prompts will appear here.",
-    emptyDetail: "Enter the facts on the left to generate your first free draft.",
-    copyAll: "Copy all",
-    copy: "Copy",
-    copied: "Copied",
-    output: {
-      caseNoteDraft: "Case note draft",
-      missingFacts: "Missing facts to review",
-      neutralWordingChecks: "Neutral wording checks",
-      followUpPrompts: "Follow-up prompts",
-      none: "No additional items.",
-    },
-    save: "Save this draft",
-    saving: "Saving",
-    saved: "Draft saved to your account",
-    savePrompt: "Create an account to save, view history and use it again.",
-    signInInstead: "Already registered? Sign in",
-    historyEyebrow: "Your account",
-    historyTitle: "Recently saved drafts",
-    savedCount: "saved",
-    footerBoundary:
-      "CaresLink AI provides general documentation and operational support. Every draft requires user review.",
-    createAccount: "Create provider account",
-    errors: {
-      identifiers: "Remove the highlighted identifying information and try again.",
-      freeLimit:
-        "This device has used its free draft. Sign in to save and use the companion again.",
       dailyLimit: "Your draft limit has been reached for today.",
       rateLimit: "Too many requests. Please wait before trying again.",
       save: "This draft could not be saved. Please try again.",

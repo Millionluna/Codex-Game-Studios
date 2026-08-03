@@ -408,7 +408,7 @@ function getAiDocumentsCopy(locale: Locale) {
       savedPrivacy: "按当前账号读取",
       emptyTitle: "还没有保存的文档。",
       emptyDescription:
-        "先生成一份 Case Note 草稿；登录账号保存后，它会显示在这里。",
+        "使用当前账号生成并保存 Case Note 草稿后，它会显示在这里。",
       savedMetadataOnly: "已保存的引导式材料草稿",
       guidedLayer: "下一步",
       nextActionTitle: "先完成一份可复核的草稿",
@@ -461,7 +461,7 @@ function getAiDocumentsCopy(locale: Locale) {
     savedPrivacy: "Read for this account only",
     emptyTitle: "No saved documents yet.",
     emptyDescription:
-      "Create a case-note draft first. Once you sign in and save it, it will return here.",
+      "Generate and save a case-note draft with this account, and it will appear here.",
     savedMetadataOnly: "Saved guided material draft",
     guidedLayer: "Next action",
     nextActionTitle: "Complete one reviewable draft first",

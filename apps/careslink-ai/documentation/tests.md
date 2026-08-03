@@ -7,26 +7,27 @@
 | Browser Privacy Review | Matched ranges stay local; direct/indirect/evaluative clues are found and cleaned | `src/lib/ndis-case-note-browser-privacy.test.ts` | Existing automated |
 | Full Chinese acceptance case | Names, phone, NDIS number block; location/context require review; observable facts remain | Same test file | Existing automated |
 | Pre-generation closure | Missing date/facts, unresolved findings, or unchecked confirmations produce no request object | Same test file | Existing automated |
-| Server bypass | Missing attestation/facts and crafted PII return `422` before session, quota, or OpenAI | `src/app/api/template-companion/ndis-case-note/route.test.ts` | Existing automated |
-| Anonymous quota | First use succeeds; over-limit request returns `429`; failed generation still consumes paid-attempt quota | Route and store tests | Existing automated |
+| Server auth gate | Signed-out POST returns `401` before JSON parsing, quota, claim, telemetry, or OpenAI; admin returns `403` | `src/app/api/template-companion/ndis-case-note/route.test.ts` | Existing automated |
+| Server bypass | After auth, missing attestation/facts and crafted PII return `422` before quota or OpenAI | Same route test | Existing automated |
+| Authenticated quota | Provider account/IP limits return `429`; failed generation still consumes the attempted quota | Route and store tests | Existing automated |
 | OpenAI contract | Request uses `store:false`, strict schema, bounded output, controlled prompt | `src/lib/openai-ndis-case-note.test.ts` | Existing automated with mocked HTTP |
 | Output safety | Malformed, PII, prohibited conclusions, and bilingual numeric mismatch reject the whole result | `src/lib/ndis-case-note-companion.test.ts` | Existing automated |
-| Claim ownership | Expiry and same-owner binding; cross-owner claim denied | `src/lib/ndis-case-note-companion-store.test.ts`, save route tests | Existing automated |
+| Claim ownership | Generation immediately binds the claim to provider; expiry and cross-owner use are denied | `src/lib/ndis-case-note-companion-store.test.ts`, generation/save route tests | Existing automated |
 | Provider save | Signed-out/admin denied; provider save idempotent and owner-scoped | Save route tests | Existing automated |
 | Telemetry privacy | Events contain metadata and no generated content/input | Store/event route tests | Existing automated |
 | Admin isolation | Material usage uses metadata and excludes NDIS case-note details | Admin/material store tests | Existing automated |
-| Responsive product shell | Public task flow, unchecked confirmations, no demo cards | Companion static render plus guarded 1440/390 smoke | Existing automated/manual |
+| Responsive product shell | Authenticated task flow, unchecked confirmations, no guest/demo cards | Companion static render plus guarded 1440/390 smoke | Existing automated/manual |
 
-Current local gate result for this RC worktree: 76 Vitest files and 456 tests passed, followed by TypeScript, ESLint, and Next build.
+Current local gate result for this auth-gated RC worktree: 67 Vitest files and 437 tests passed, followed by TypeScript, ESLint, and Next build.
 
 ## Release-candidate live checks
 
 | Check | Type | Expected result |
 | --- | --- | --- |
-| One real OpenAI synthetic generation | Guarded live, 3 August 2026 | Passed locally: privacy gate `422`, server PII bypass `422`, safe generation `200`, six fields returned, numeric parity and output boundaries passed, repeat anonymous request `429` |
-| Vercel Preview page and API | Guarded live | Public page `200`; PII denial `422`; safe generation `200` |
-| Preview claim/login/save | Guarded live | Provider owns saved draft; second provider cannot claim/read it |
-| Preview quota | Guarded live | Second anonymous attempt for same identity returns `429` |
+| Previous real OpenAI synthetic generation | Guarded live, 3 August 2026, commit `10f9f55` | Passed under the superseded guest-first decision; retained only as model/privacy/output evidence |
+| Auth-gate Preview GET/API | Guarded live | Signed-out GET enters login; signed-out POST `401` with no quota/OpenAI; provider form renders |
+| Authenticated Preview generation/save | Guarded live | PII denial `422`; safe generation `200`; provider owns saved draft; second provider cannot read/save it |
+| Preview quota | Guarded live | Authenticated account/IP limit returns `429` |
 | Preview cleanup | Manual/SQL verification | Temporary accounts, claims, drafts, events, and quota rows removed |
 
 The local live check used only synthetic de-identified facts. Its evidence records statuses, field names and lengths, token counts, and cleanup state; it does not retain input or generated wording. The exact claim, quota, and telemetry rows created by that check were deleted and verified absent afterward.

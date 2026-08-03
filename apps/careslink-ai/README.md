@@ -203,7 +203,7 @@ evidence.
 
 ## NDIS Case Note AI Companion
 
-The public, single-task companion route is:
+The provider-authenticated, single-task companion route is:
 
 ```text
 GET /template-companion/ndis-case-note
@@ -244,18 +244,21 @@ intentionally include identifying information, and that they are authorised to
 process the details for this documentation purpose. The second confirmation is
 explicitly not a statement of participant consent. The server independently
 requires both confirmations and revalidates every structured field before
-session, quota or OpenAI work. It fails closed on obvious email, Australian
+quota or OpenAI work. A verified provider session is required before the server
+parses the generation body. It fails closed on obvious email, Australian
 phone, NDIS-number, date-of-birth, name/title, exact-address, indirect identity
 and unsafe evaluative wording patterns.
 
-Anonymous users can generate one free draft without an account or access code.
-The generation route applies a short-window server rate limit plus persistent
-daily device and IP quotas. Signed-in providers use separate account and IP
-daily quotas. Any request that reaches OpenAI consumes the attempt even if the
-model response is rejected by the safety parser, preventing repeated paid
-retries. Production fails closed if persistent Supabase storage or the
-dedicated fingerprint pepper is missing. The model uses strict structured
-output with these fields:
+As of 3 August 2026, the Companion is provider-login-first. An unauthenticated
+GET redirects into the existing login flow with a validated internal `next`
+URL containing only allowlisted locale/source/resource/UTM values. An
+unauthenticated generation POST returns `401` before JSON parsing, rate limit,
+quota, claim creation, telemetry, or OpenAI. Signed-in providers do not need an
+access code and use account plus IP quotas. Any request that reaches OpenAI
+consumes the attempt even if the model response is rejected by the safety
+parser, preventing repeated paid retries. Production fails closed if persistent
+Supabase storage or the dedicated fingerprint pepper is missing. The model uses
+strict structured output with these fields:
 
 ```text
 englishCaseNoteDraft
@@ -266,11 +269,11 @@ followUpPrompts
 disclaimer
 ```
 
-Successful generation creates a 30-minute opaque claim token. Only its SHA-256
-hash is stored. The temporary record contains the generated output, not the raw
-input. Register/login links carry only the token and safe attribution inside a
-validated internal `next` URL. After a verified provider session returns, the
-save endpoint atomically binds the claim to that user and persists an
+Successful authenticated generation creates a 30-minute opaque claim token and
+immediately binds its hash to the current provider user ID. The temporary record
+contains generated output, not raw input. It exists only to support the explicit
+Save action and legacy claim compatibility; this entry point does not create an
+anonymous claim or place a claim in the login URL. The save endpoint persists an
 owner-scoped `generated_material_drafts.feature = ndis_case_note` record. Owner
 binding is never reversed. The temporary claim is deleted after a successful
 save, and expired claims are purged opportunistically before generation/save.
@@ -285,13 +288,16 @@ Companion telemetry is metadata-only. The event names are:
 companion_viewed
 companion_started
 companion_generated
-companion_save_prompt_clicked
 companion_saved
 ```
 
+Historical rows may contain `companion_save_prompt_clicked` from the superseded
+guest-first flow; the current provider-only UI and client event endpoint do not
+emit it.
+
 `template_companion_events` has no input, output or participant-fact columns.
-Anonymous content is not written to telemetry. Existing saved-draft copy events
-remain metadata-only and copying never consumes model quota.
+Unauthenticated Companion telemetry is rejected. Existing saved-draft copy
+events remain metadata-only and copying never consumes model quota.
 NDIS case-note drafts and copy events are excluded from the existing raw
 material-usage admin view; only the owning provider can read saved content.
 
@@ -307,8 +313,6 @@ Server-only environment variables:
 OPENAI_API_KEY=your-server-only-openai-key
 OPENAI_NDIS_CASE_NOTE_MODEL=gpt-5.4-mini
 NDIS_CASE_NOTE_FINGERPRINT_PEPPER=a-long-random-server-secret
-NDIS_CASE_NOTE_ANON_DAILY_LIMIT=1
-NDIS_CASE_NOTE_ANON_IP_DAILY_LIMIT=5
 NDIS_CASE_NOTE_AUTH_DAILY_LIMIT=3
 NDIS_CASE_NOTE_AUTH_IP_DAILY_LIMIT=20
 ```

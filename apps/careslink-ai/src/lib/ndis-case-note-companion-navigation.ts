@@ -69,3 +69,31 @@ export function buildNdisCaseNoteCompanionHref({
 
   return `${NDIS_CASE_NOTE_COMPANION_PATH}?${search.toString()}`;
 }
+
+export function buildNdisCaseNoteCompanionAuthHref(
+  authPath: "/auth/login" | "/auth/register",
+  attribution: NdisCaseNoteCompanionAttribution,
+) {
+  const returnTo = buildNdisCaseNoteCompanionHref({ attribution });
+  const search = new URLSearchParams({
+    next: returnTo,
+    returnTo,
+    source: attribution.source,
+    resourceSlug: attribution.resourceSlug,
+    lang: attribution.locale,
+  });
+
+  if (attribution.utmSource) {
+    search.set("utm_source", attribution.utmSource);
+  }
+
+  if (attribution.utmMedium) {
+    search.set("utm_medium", attribution.utmMedium);
+  }
+
+  if (attribution.utmCampaign) {
+    search.set("utm_campaign", attribution.utmCampaign);
+  }
+
+  return `${authPath}?${search.toString()}`;
+}

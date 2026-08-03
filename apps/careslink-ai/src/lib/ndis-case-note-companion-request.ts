@@ -2,6 +2,7 @@ import { createHash, randomBytes } from "node:crypto";
 import type { NdisCaseNoteQuotaScope } from "./ndis-case-note-companion-store";
 
 export {
+  buildNdisCaseNoteCompanionAuthHref,
   buildNdisCaseNoteCompanionHref,
   getNdisCaseNoteCompanionAttribution,
   NDIS_CASE_NOTE_COMPANION_PATH,

@@ -3,6 +3,7 @@ import {
   NDIS_CASE_NOTE_COMPANION_SOURCE,
   NDIS_CASE_NOTE_RESOURCE_SLUG,
   NDIS_CASE_NOTE_UTM_CAMPAIGN,
+  buildNdisCaseNoteCompanionAuthHref,
   buildNdisCaseNoteCompanionHref,
   getNdisCaseNoteCompanionAttribution,
   getNdisCaseNoteRequestIdentity,
@@ -76,5 +77,29 @@ describe("NDIS case note request metadata", () => {
     expect(href).toContain(`claimToken=${"a".repeat(43)}`);
     expect(href).not.toContain("observableFacts");
     expect(href).not.toContain("caseNoteDraft");
+  });
+
+  it("builds a provider login handoff with only allowlisted attribution", () => {
+    const href = buildNdisCaseNoteCompanionAuthHref("/auth/login", {
+      source: NDIS_CASE_NOTE_COMPANION_SOURCE,
+      resourceSlug: NDIS_CASE_NOTE_RESOURCE_SLUG,
+      utmSource: "careslink",
+      utmMedium: "post_download",
+      utmCampaign: NDIS_CASE_NOTE_UTM_CAMPAIGN,
+      locale: "zh-Hans",
+    });
+    const authUrl = new URL(href, "https://ai.careslink.com.au");
+    const next = authUrl.searchParams.get("next");
+
+    expect(authUrl.pathname).toBe("/auth/login");
+    expect(authUrl.searchParams.get("returnTo")).toBe(next);
+    expect(next).toContain("/template-companion/ndis-case-note?");
+    expect(next).toContain("source=ndis-case-note-download");
+    expect(next).toContain("resourceSlug=ndis-case-note-template");
+    expect(next).toContain("utm_source=careslink");
+    expect(next).toContain("lang=zh-Hans");
+    expect(href).not.toContain("observableFacts");
+    expect(href).not.toContain("caseNoteDraft");
+    expect(href).not.toContain("claimToken");
   });
 });

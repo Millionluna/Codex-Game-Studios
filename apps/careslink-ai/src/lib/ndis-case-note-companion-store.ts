@@ -139,10 +139,12 @@ type GlobalCompanionStore = typeof globalThis & {
 
 export function createNdisCaseNoteClaim({
   material,
+  claimedByUserId,
   now = new Date(),
   ttlMs = DEFAULT_CLAIM_TTL_MS,
 }: {
   material: NdisCaseNoteMaterial;
+  claimedByUserId?: string;
   now?: Date;
   ttlMs?: number;
 }) {
@@ -155,6 +157,8 @@ export function createNdisCaseNoteClaim({
       tokenHash: hashCompanionToken(token),
       material: cloneMaterial(material),
       expiresAt: new Date(now.getTime() + ttlMs).toISOString(),
+      claimedByUserId: claimedByUserId || undefined,
+      claimedAt: claimedByUserId ? createdAt : undefined,
       createdAt,
     } satisfies NdisCaseNoteCompanionClaimRecord,
   };

@@ -22,26 +22,6 @@ type SaveNdisCaseNotePostBody = {
 const CLAIM_TOKEN_PATTERN = /^[A-Za-z0-9_-]{32,100}$/;
 
 export async function POST(request: Request) {
-  let body: SaveNdisCaseNotePostBody;
-
-  try {
-    body = (await request.json()) as SaveNdisCaseNotePostBody;
-  } catch {
-    return NextResponse.json(
-      { ok: false, error: "Invalid JSON body" },
-      { status: 400 },
-    );
-  }
-
-  const claimToken = getClaimToken(body.claimToken);
-
-  if (!claimToken) {
-    return NextResponse.json(
-      { ok: false, error: "A valid claim token is required" },
-      { status: 400 },
-    );
-  }
-
   const supabase = await createCareslinkServerSupabaseClient();
   const account = await resolveWorkspaceAccountFromSupabaseSession(supabase);
 
@@ -60,6 +40,26 @@ export async function POST(request: Request) {
         error: "Only provider accounts can save case note drafts.",
       },
       { status: 403 },
+    );
+  }
+
+  let body: SaveNdisCaseNotePostBody;
+
+  try {
+    body = (await request.json()) as SaveNdisCaseNotePostBody;
+  } catch {
+    return NextResponse.json(
+      { ok: false, error: "Invalid JSON body" },
+      { status: 400 },
+    );
+  }
+
+  const claimToken = getClaimToken(body.claimToken);
+
+  if (!claimToken) {
+    return NextResponse.json(
+      { ok: false, error: "A valid claim token is required" },
+      { status: 400 },
     );
   }
 

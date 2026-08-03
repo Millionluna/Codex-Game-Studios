@@ -1,10 +1,12 @@
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 import { getGeneratedMaterialDraftStore } from "@/lib/generated-material-draft-store";
 import {
   getNdisCaseNoteCompanionStore,
   type NdisCaseNoteCompanionAttribution,
 } from "@/lib/ndis-case-note-companion-store";
 import {
+  buildNdisCaseNoteCompanionAuthHref,
   getNdisCaseNoteCompanionAttribution,
   NDIS_CASE_NOTE_COMPANION_PATH,
 } from "@/lib/ndis-case-note-companion-request";
@@ -30,8 +32,8 @@ export const metadata: Metadata = {
       "https://ai.careslink.com.au/template-companion/ndis-case-note",
   },
   robots: {
-    index: true,
-    follow: true,
+    index: false,
+    follow: false,
   },
   referrer: "no-referrer",
 };
@@ -47,22 +49,27 @@ export default async function NdisCaseNoteCompanionPage({
   );
   const supabase = await createCareslinkServerSupabaseClient();
   const account = await resolveWorkspaceAccountFromSupabaseSession(supabase);
+
+  if (!account) {
+    redirect(buildNdisCaseNoteCompanionAuthHref("/auth/login", attribution));
+  }
+
+  if (account.role !== "provider") {
+    redirect(`/referral-workspace?lang=${attribution.locale}`);
+  }
+
   const claimToken = getClaimToken(params);
   const claim = claimToken
     ? await getNdisCaseNoteCompanionStore().getClaim(claimToken)
     : undefined;
   const canReadClaim =
     claim &&
-    (!claim.claimedByUserId || claim.claimedByUserId === account?.id);
-  const savedDrafts =
-    account?.role === "provider"
-      ? await getSavedNdisCaseNoteDrafts(account.id)
-      : [];
+    (!claim.claimedByUserId || claim.claimedByUserId === account.id);
+  const savedDrafts = await getSavedNdisCaseNoteDrafts(account.id);
 
   return (
     <NdisCaseNoteCompanion
       attribution={attribution}
-      accountRole={account?.role}
       initialClaimToken={canReadClaim ? claimToken : undefined}
       initialMaterial={canReadClaim ? claim.material : undefined}
       autoSave={getFirstParam(params?.save) === "1"}

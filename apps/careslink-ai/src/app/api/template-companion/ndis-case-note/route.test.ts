@@ -82,6 +82,13 @@ const validInput = {
   followUp: "Review at the next team handover.",
 };
 
+const provider = {
+  id: "11111111-1111-4111-8111-111111111111",
+  role: "provider" as const,
+  name: "Provider",
+  email: "provider@example.com",
+};
+
 const store = {
   kind: "memory",
   saveClaim: vi.fn(),
@@ -117,7 +124,7 @@ function createRequest(
   );
 }
 
-describe("anonymous NDIS case note generation route", () => {
+describe("provider-only NDIS case note generation route", () => {
   beforeEach(() => {
     vi.resetModules();
     vi.stubEnv("OPENAI_API_KEY", "test-openai-key");
@@ -144,10 +151,10 @@ describe("anonymous NDIS case note generation route", () => {
       resetAt: "2026-07-23T00:01:00.000Z",
     });
     sessionMock.resolveWorkspaceAccountFromSupabaseSession.mockResolvedValue(
-      undefined,
+      provider,
     );
     supabaseMock.createCareslinkServerSupabaseClient.mockResolvedValue(
-      undefined,
+      { auth: {} },
     );
     store.consumeQuota.mockResolvedValue({
       allowed: true,
@@ -169,7 +176,7 @@ describe("anonymous NDIS case note generation route", () => {
     vi.unstubAllEnvs();
   });
 
-  it("generates the first anonymous draft and records metadata only", async () => {
+  it("generates an owner-bound provider draft and records metadata only", async () => {
     const { POST } = await import("./route");
     const response = await POST(createRequest());
     const payload = await response.json();
@@ -179,14 +186,20 @@ describe("anonymous NDIS case note generation route", () => {
       ok: true,
       feature: "ndis_case_note",
       material,
-      signedIn: false,
+      signedIn: true,
     });
     expect(payload.claimToken).toMatch(/^[A-Za-z0-9_-]{32,100}$/);
     expect(store.consumeQuota).toHaveBeenCalledTimes(2);
     expect(store.consumeQuota.mock.calls.map(([input]) => input.scope)).toEqual([
-      "anonymous_device",
-      "anonymous_ip",
+      "authenticated_user",
+      "authenticated_ip",
     ]);
+    expect(store.saveClaim).toHaveBeenCalledWith(
+      expect.objectContaining({
+        claimedByUserId: provider.id,
+        claimedAt: expect.any(String),
+      }),
+    );
     expect(openAiMock.generateNdisCaseNoteDraft).toHaveBeenCalledWith(
       expect.objectContaining({ input: validInput }),
     );
@@ -206,19 +219,45 @@ describe("anonymous NDIS case note generation route", () => {
     expect(JSON.stringify(event)).not.toContain(material.chineseReviewVersion);
   });
 
-  it("does not call OpenAI, session or quota before Privacy Review is confirmed", async () => {
+  it("requires a provider session before parsing JSON, quota, claims or OpenAI", async () => {
+    sessionMock.resolveWorkspaceAccountFromSupabaseSession.mockResolvedValueOnce(
+      undefined,
+    );
+    const json = vi.fn();
+    const request = {
+      url: "http://localhost/api/template-companion/ndis-case-note",
+      headers: new Headers(),
+      json,
+    } as unknown as Request;
+
+    const { POST } = await import("./route");
+    const response = await POST(request);
+    const payload = await response.json();
+
+    expect(response.status).toBe(401);
+    expect(payload.code).toBe("login_required");
+    expect(json).not.toHaveBeenCalled();
+    expect(companionStoreMock.getNdisCaseNoteCompanionStore).not.toHaveBeenCalled();
+    expect(rateLimitMock.check).not.toHaveBeenCalled();
+    expect(store.consumeQuota).not.toHaveBeenCalled();
+    expect(store.saveClaim).not.toHaveBeenCalled();
+    expect(openAiMock.generateNdisCaseNoteDraft).not.toHaveBeenCalled();
+  });
+
+  it("does not call quota or OpenAI before Privacy Review is confirmed", async () => {
     const { POST } = await import("./route");
     const response = await POST(createRequest(validInput, {}));
     const payload = await response.json();
 
     expect(response.status).toBe(422);
     expect(payload.code).toBe("privacy_review_required");
-    expect(supabaseMock.createCareslinkServerSupabaseClient).not.toHaveBeenCalled();
+    expect(supabaseMock.createCareslinkServerSupabaseClient).toHaveBeenCalledOnce();
+    expect(sessionMock.resolveWorkspaceAccountFromSupabaseSession).toHaveBeenCalledOnce();
     expect(store.consumeQuota).not.toHaveBeenCalled();
     expect(openAiMock.generateNdisCaseNoteDraft).not.toHaveBeenCalled();
   });
 
-  it("blocks the next anonymous request when the device daily limit is reached", async () => {
+  it("blocks a provider request when the account daily limit is reached", async () => {
     store.consumeQuota.mockResolvedValueOnce({
       allowed: false,
       usageCount: 1,
@@ -229,12 +268,12 @@ describe("anonymous NDIS case note generation route", () => {
     const payload = await response.json();
 
     expect(response.status).toBe(429);
-    expect(payload.code).toBe("free_limit_reached");
+    expect(payload.code).toBe("daily_limit_reached");
     expect(openAiMock.generateNdisCaseNoteDraft).not.toHaveBeenCalled();
     expect(store.saveClaim).not.toHaveBeenCalled();
   });
 
-  it("blocks obvious identifiers before session, quota or OpenAI work", async () => {
+  it("blocks obvious identifiers after auth but before quota or OpenAI work", async () => {
     const { POST } = await import("./route");
     const response = await POST(
       createRequest({
@@ -252,11 +291,12 @@ describe("anonymous NDIS case note generation route", () => {
         expect.objectContaining({ field: "observableFacts" }),
       ]),
     );
+    expect(supabaseMock.createCareslinkServerSupabaseClient).toHaveBeenCalledOnce();
     expect(store.consumeQuota).not.toHaveBeenCalled();
     expect(openAiMock.generateNdisCaseNoteDraft).not.toHaveBeenCalled();
   });
 
-  it("blocks a missing support date/time before session, quota or OpenAI work", async () => {
+  it("blocks a missing support date/time after auth but before quota or OpenAI work", async () => {
     const { POST } = await import("./route");
     const response = await POST(
       createRequest({
@@ -271,7 +311,7 @@ describe("anonymous NDIS case note generation route", () => {
     expect(payload.issues).toContainEqual(
       expect.objectContaining({ field: "supportDateTime", code: "required" }),
     );
-    expect(supabaseMock.createCareslinkServerSupabaseClient).not.toHaveBeenCalled();
+    expect(supabaseMock.createCareslinkServerSupabaseClient).toHaveBeenCalledOnce();
     expect(store.consumeQuota).not.toHaveBeenCalled();
     expect(openAiMock.generateNdisCaseNoteDraft).not.toHaveBeenCalled();
   });
@@ -294,7 +334,7 @@ describe("anonymous NDIS case note generation route", () => {
         expect.objectContaining({ field: "observableFacts" }),
       ]),
     );
-    expect(supabaseMock.createCareslinkServerSupabaseClient).not.toHaveBeenCalled();
+    expect(supabaseMock.createCareslinkServerSupabaseClient).toHaveBeenCalledOnce();
     expect(store.consumeQuota).not.toHaveBeenCalled();
     expect(openAiMock.generateNdisCaseNoteDraft).not.toHaveBeenCalled();
   });
@@ -314,22 +354,27 @@ describe("anonymous NDIS case note generation route", () => {
     expect(store.saveClaim).not.toHaveBeenCalled();
   });
 
-  it("uses account and IP quotas for a signed-in provider without requiring an access code", async () => {
+  it("rejects an admin before parsing or quota work", async () => {
     sessionMock.resolveWorkspaceAccountFromSupabaseSession.mockResolvedValueOnce(
       {
-        id: "11111111-1111-4111-8111-111111111111",
-        role: "provider",
-        name: "Provider",
-        email: "provider@example.com",
+        ...provider,
+        role: "admin",
       },
     );
+    const json = vi.fn();
+    const request = {
+      url: "http://localhost/api/template-companion/ndis-case-note",
+      headers: new Headers(),
+      json,
+    } as unknown as Request;
     const { POST } = await import("./route");
-    const response = await POST(createRequest());
+    const response = await POST(request);
+    const payload = await response.json();
 
-    expect(response.status).toBe(200);
-    expect(store.consumeQuota.mock.calls.map(([input]) => input.scope)).toEqual([
-      "authenticated_user",
-      "authenticated_ip",
-    ]);
+    expect(response.status).toBe(403);
+    expect(payload.code).toBe("provider_account_required");
+    expect(json).not.toHaveBeenCalled();
+    expect(store.consumeQuota).not.toHaveBeenCalled();
+    expect(openAiMock.generateNdisCaseNoteDraft).not.toHaveBeenCalled();
   });
 });

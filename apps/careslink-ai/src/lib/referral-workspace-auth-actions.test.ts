@@ -65,17 +65,17 @@ describe("referral workspace auth actions", () => {
     ).toBe("/ai-documents?lang=zh-Hans");
   });
 
-  it("returns a provider to the short-lived companion claim without putting draft content in the URL", () => {
-    const claimToken = "a".repeat(43);
+  it("returns a provider to the companion with safe attribution only", () => {
     const next =
-      `/template-companion/ndis-case-note?claimToken=${claimToken}` +
-      "&source=ndis-case-note-download&resourceSlug=ndis-case-note-template&save=1";
+      "/template-companion/ndis-case-note?source=ndis-case-note-download" +
+      "&resourceSlug=ndis-case-note-template&utm_source=careslink" +
+      "&utm_medium=post_download&utm_campaign=ndis_case_note_ai_companion_v01";
     const redirectHref = getSafeAuthRedirectHref(next, "zh-Hans", "provider");
 
     expect(redirectHref).toContain(
       "/template-companion/ndis-case-note?",
     );
-    expect(redirectHref).toContain(`claimToken=${claimToken}`);
+    expect(redirectHref).not.toContain("claimToken");
     expect(redirectHref).toContain("lang=zh-Hans");
     expect(redirectHref).not.toContain("caseNoteDraft");
     expect(redirectHref).not.toContain("observableFacts");

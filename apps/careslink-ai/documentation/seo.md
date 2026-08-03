@@ -1,17 +1,17 @@
-# Public Companion SEO
+# Companion SEO Boundary
 
-## Indexable route
+## Route policy
 
 | Route | Public/indexable | Metadata source | Public-data rule |
 | --- | --- | --- | --- |
-| `/template-companion/ndis-case-note` | Yes, explicitly | Static Next.js metadata in the route page | Title and description contain product-level copy only |
+| `/template-companion/ndis-case-note` | No; authenticated provider route | Static Next.js metadata in the route page | Signed-out requests enter auth and never render the form |
 
-The page uses static title/description metadata and `referrer: no-referrer`. UTM, locale, opaque claim, and save query parameters do not change metadata. Generated content and pasted text are client/session content and are never inserted into metadata or server-rendered public HTML for an unauthorised viewer.
+The page uses static title/description metadata, `noindex, nofollow`, and `referrer: no-referrer`. UTM and locale parameters do not change metadata. Generated content and pasted text are authenticated client/session content and are never inserted into metadata or server-rendered HTML for an unauthorised viewer.
 
 ## Bot and canonical behavior
 
 - There is no bot-specific rendering path.
-- The route is server-rendered with the same safe product shell for bots and humans.
+- Bots and signed-out humans receive the same authentication boundary.
 - No dynamic participant/provider metadata exists.
-- The page explicitly overrides the authenticated layout's `noindex` default with `index, follow` and uses `https://ai.careslink.com.au/template-companion/ndis-case-note` as its canonical URL.
-- Authenticated AI Documents, saved drafts, and admin pages are outside this document's public SEO scope.
+- The canonical remains `https://ai.careslink.com.au/template-companion/ndis-case-note`, but the route is not an acquisition landing page.
+- Public acquisition/indexing belongs to the Core landing page, which is outside this AI-app document.

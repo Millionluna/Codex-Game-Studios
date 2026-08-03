@@ -2,7 +2,7 @@
 
 ## Product boundary
 
-CaresLink AI provides guided business-document drafting. The public NDIS Case Note Companion turns de-identified, user-entered support facts into an English draft and a Simplified Chinese review version. Every output remains a user-reviewed draft. The product does not make clinical, legal, compliance, regulatory, care, risk, qualification, quality, or service-endorsement decisions.
+CaresLink AI provides guided business-document drafting. The provider-authenticated NDIS Case Note Companion turns de-identified, user-entered support facts into an English draft and a Simplified Chinese review version. The public Core landing remains separate. Every output remains a user-reviewed draft. The product does not make clinical, legal, compliance, regulatory, care, risk, qualification, quality, or service-endorsement decisions.
 
 ## Stack
 
@@ -17,20 +17,20 @@ CaresLink AI provides guided business-document drafting. The public NDIS Case No
 
 ## Runtime map
 
-1. The public companion keeps pasted source text and matched ranges in React memory only.
-2. Browser Privacy Review detects obvious identifiers and unsafe wording, proposes cleaned structured facts, and requires each finding to be resolved.
-3. The browser constructs a generation body only after minimum facts and two unchecked-by-default confirmations are complete.
-4. `POST /api/template-companion/ndis-case-note` repeats privacy attestation and input validation before auth lookup, quota consumption, or OpenAI.
-5. OpenAI returns a strict bilingual object. Server parsing rejects malformed, identifying, prohibited, or numerically inconsistent output as a whole.
-6. A successful guest result is stored as a 30-minute claim under a SHA-256 token hash. The opaque token, never the content, may travel through the login return URL.
-7. A signed-in provider may atomically bind the claim to their Supabase user and save it to `generated_material_drafts`.
-8. Saved-document reads always query with the current account ID. Companion admin surfaces expose metadata or aggregates, not case-note content.
+1. An unauthenticated GET is redirected to login with an allowlisted internal return URL; an admin is redirected to the admin workspace.
+2. The authenticated provider page keeps pasted source text and matched ranges in React memory only.
+3. Browser Privacy Review detects obvious identifiers and unsafe wording, proposes cleaned structured facts, and requires each finding to be resolved.
+4. The browser constructs a generation body only after minimum facts and two unchecked-by-default confirmations are complete.
+5. `POST /api/template-companion/ndis-case-note` verifies a provider session before body parsing, quota, claim, telemetry, or OpenAI, then repeats privacy attestation and input validation.
+6. OpenAI returns a strict bilingual object. Server parsing rejects malformed, identifying, prohibited, or numerically inconsistent output as a whole.
+7. A successful result is stored as a 30-minute claim already bound to the current provider under a SHA-256 token hash; this entry point creates no anonymous claim.
+8. The provider may explicitly save the claim to `generated_material_drafts`. Saved-document reads always query with the current account ID. Admin surfaces expose metadata or aggregates, not case-note content.
 
 ## Trust boundaries
 
 | Crossing | Enforcement |
 | --- | --- |
-| Browser to companion API | No raw paste field in request type; minimum-fact closure; two attestations; server revalidation |
+| Browser to companion API | Verified provider session first; no raw paste field in request type; minimum-fact closure; two attestations; server revalidation |
 | Server to OpenAI | Server-only API key; bounded output; strict schema; `store: false`; no tool calls |
 | Server to Supabase | Service-role client only for claims, quota, events, and material drafts |
 | Claim to account | Opaque token hash plus `claimed_by_user_id` condition in a service-role-only RPC |
@@ -43,7 +43,7 @@ The browser cannot query the protected tables directly. Their grants are revoked
 
 | Store | Content |
 | --- | --- |
-| `ndis_case_note_companion_claims` | Generated material only, token hash, expiry, optional claiming user |
+| `ndis_case_note_companion_claims` | Generated material only, token hash, expiry, provider owner for this entry point |
 | `template_companion_quota_usage` | Date, quota scope, pseudonymous fingerprint hash, count |
 | `template_companion_events` | Event name, optional user ID, visitor hash, allowlisted attribution, locale, timestamp |
 | `generated_material_drafts` | Provider-owned saved output and status |
@@ -53,8 +53,8 @@ Raw pasted notes, matched spans, structured input, and generated content are not
 ## Known risks and assumptions
 
 - Privacy detection is heuristic and cannot guarantee complete de-identification. Manual review remains mandatory.
-- IP, user-agent, cookie, and pepper-derived quota identities are abuse controls, not durable identity. Shared networks may share an IP limit.
-- An opaque claim URL is a short-lived bearer capability. `referrer: no-referrer`, 30-minute expiry, hashed storage, and one-owner binding reduce but do not eliminate forwarding risk.
+- Account and pepper-derived IP quota identities are abuse controls. Shared networks may share an IP limit.
+- The short-lived claim token remains a bearer capability inside the authenticated page. Immediate owner binding, `referrer: no-referrer`, 30-minute expiry, and hashed storage reduce forwarding risk.
 - Owner isolation for service-role draft access depends on server handlers continuing to apply `user_id` checks.
 - Non-production may use an in-memory fallback. Production fails closed without persistent companion storage unless `CARESLINK_ALLOW_COMPANION_MEMORY_STORE=true` is deliberately set.
 - There is no scheduled work and no automated email in this release, so there are no `cron.md` or `emails.md` documents.
@@ -67,3 +67,4 @@ Raw pasted notes, matched spans, structured input, and generated content are not
 - [tests.md](./tests.md)
 - [automation.md](./automation.md)
 - [seo.md](./seo.md)
+- [prd.md](./prd.md)

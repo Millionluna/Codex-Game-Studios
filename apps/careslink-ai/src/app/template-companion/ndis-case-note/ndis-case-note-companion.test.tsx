@@ -24,11 +24,11 @@ const material = {
 };
 
 describe("NDIS case note companion UI", () => {
-  it("keeps only the public companion route explicitly indexable", () => {
+  it("keeps the authenticated companion route out of search indexes", () => {
     const pageSource = readFileSync(new URL("./page.tsx", import.meta.url), "utf8");
 
-    expect(pageSource).toContain("index: true");
-    expect(pageSource).toContain("follow: true");
+    expect(pageSource).toContain("index: false");
+    expect(pageSource).toContain("follow: false");
     expect(pageSource).toContain(
       "https://ai.careslink.com.au/template-companion/ndis-case-note",
     );
@@ -43,7 +43,8 @@ describe("NDIS case note companion UI", () => {
       }),
     );
 
-    expect(markup).toContain("1 free draft");
+    expect(markup).toContain("Available with a free account");
+    expect(markup).toContain("Register or sign in to generate");
     expect(markup).toContain("Do not enter names");
     expect(markup).toContain("Review privacy first");
     expect(markup).toContain("Structured facts");
@@ -64,7 +65,7 @@ describe("NDIS case note companion UI", () => {
     expect(markup).not.toContain("Demo account");
   });
 
-  it("shows a reviewable result and save-after-generation handoff without content in the URL", () => {
+  it("shows an authenticated reviewable result without a guest save handoff", () => {
     const claimToken = "a".repeat(43);
     const markup = renderToStaticMarkup(
       createElement(NdisCaseNoteCompanion, {
@@ -77,8 +78,8 @@ describe("NDIS case note companion UI", () => {
     );
 
     expect(markup).toContain("Save this draft");
-    expect(markup).toContain("Already registered? Sign in");
-    expect(markup).toContain(`claimToken%3D${claimToken}`);
+    expect(markup).not.toContain("Already registered? Sign in");
+    expect(markup).toContain(`claimToken=${claimToken}`);
     expect(markup).not.toContain(
       encodeURIComponent(material.englishCaseNoteDraft),
     );
@@ -90,7 +91,6 @@ describe("NDIS case note companion UI", () => {
     const markup = renderToStaticMarkup(
       createElement(NdisCaseNoteCompanion, {
         attribution,
-        accountRole: "provider",
         autoSave: false,
         savedDrafts: [
           {

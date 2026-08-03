@@ -34,12 +34,31 @@ type ReservedQuota = {
 };
 
 const DEFAULT_MODEL = "gpt-5.4-mini";
-const DEFAULT_ANONYMOUS_DAILY_LIMIT = 1;
-const DEFAULT_ANONYMOUS_IP_DAILY_LIMIT = 5;
 const DEFAULT_AUTHENTICATED_DAILY_LIMIT = 3;
 const DEFAULT_AUTHENTICATED_IP_DAILY_LIMIT = 20;
 
 export async function POST(request: Request) {
+  const supabase = await createCareslinkServerSupabaseClient();
+  const account = await resolveWorkspaceAccountFromSupabaseSession(supabase);
+
+  if (!account) {
+    return NextResponse.json(
+      { ok: false, code: "login_required", error: "Login required" },
+      { status: 401 },
+    );
+  }
+
+  if (account.role !== "provider") {
+    return NextResponse.json(
+      {
+        ok: false,
+        code: "provider_account_required",
+        error: "Use a provider account to generate case note drafts.",
+      },
+      { status: 403 },
+    );
+  }
+
   let body: NdisCaseNotePostBody;
 
   try {
@@ -91,20 +110,6 @@ export async function POST(request: Request) {
     );
   }
 
-  const supabase = await createCareslinkServerSupabaseClient();
-  const account = await resolveWorkspaceAccountFromSupabaseSession(supabase);
-
-  if (account?.role === "admin") {
-    return NextResponse.json(
-      {
-        ok: false,
-        code: "provider_account_required",
-        error: "Use a provider account for saved case note drafts.",
-      },
-      { status: 403 },
-    );
-  }
-
   let identity: ReturnType<typeof getNdisCaseNoteRequestIdentity>;
   let store: NdisCaseNoteCompanionStore;
 
@@ -123,9 +128,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const rateLimitKey = account?.id
-    ? `ndis-case-note:user:${account.id}`
-    : `ndis-case-note:device:${identity.deviceHash}`;
+  const rateLimitKey = `ndis-case-note:user:${account.id}`;
   const rateLimit = getGuidedAiRateLimiter().check(rateLimitKey);
 
   if (!rateLimit.allowed) {
@@ -149,8 +152,7 @@ export async function POST(request: Request) {
   try {
     quota = await reserveCompanionQuota({
       store,
-      accountId: account?.id,
-      deviceHash: identity.deviceHash,
+      accountId: account.id,
       ipHash: identity.ipHash,
     });
   } catch {
@@ -172,10 +174,8 @@ export async function POST(request: Request) {
       NextResponse.json(
         {
           ok: false,
-          code: account ? "daily_limit_reached" : "free_limit_reached",
-          error: account
-            ? "Your case note draft limit has been reached for today."
-            : "This device has used its free draft. Sign in to save and use the companion again.",
+          code: "daily_limit_reached",
+          error: "Your case note draft limit has been reached for today.",
         },
         { status: 429 },
       ),
@@ -196,13 +196,14 @@ export async function POST(request: Request) {
     });
     const claim = createNdisCaseNoteClaim({
       material: generated.material,
+      claimedByUserId: account.id,
     });
 
     await store.saveClaim(claim.record);
     await recordCompanionEventSafely({
       store,
       eventName: "companion_generated",
-      userId: account?.id,
+      userId: account.id,
       visitorHash: identity.visitorHash,
       request,
     });
@@ -213,7 +214,7 @@ export async function POST(request: Request) {
         feature: "ndis_case_note",
         material: generated.material,
         claimToken: claim.token,
-        signedIn: Boolean(account),
+        signedIn: true,
         meta: {
           model,
           inputTokenCount: generated.inputTokenCount,
@@ -243,59 +244,36 @@ export async function POST(request: Request) {
 async function reserveCompanionQuota({
   store,
   accountId,
-  deviceHash,
   ipHash,
 }: {
   store: NdisCaseNoteCompanionStore;
-  accountId?: string;
-  deviceHash: string;
+  accountId: string;
   ipHash: string;
 }): Promise<
   | { allowed: true; reservations: ReservedQuota[] }
   | { allowed: false; reservations: [] }
 > {
   const usageDate = getNdisCaseNoteUsageDate();
-  const candidates: Array<ReservedQuota & { limit: number }> = accountId
-    ? [
-        {
-          scope: "authenticated_user",
-          fingerprintHash: hashAuthenticatedCompanionUser(accountId),
-          usageDate,
-          limit: getPositiveIntegerEnv(
-            "NDIS_CASE_NOTE_AUTH_DAILY_LIMIT",
-            DEFAULT_AUTHENTICATED_DAILY_LIMIT,
-          ),
-        },
-        {
-          scope: "authenticated_ip",
-          fingerprintHash: ipHash,
-          usageDate,
-          limit: getPositiveIntegerEnv(
-            "NDIS_CASE_NOTE_AUTH_IP_DAILY_LIMIT",
-            DEFAULT_AUTHENTICATED_IP_DAILY_LIMIT,
-          ),
-        },
-      ]
-    : [
-        {
-          scope: "anonymous_device",
-          fingerprintHash: deviceHash,
-          usageDate,
-          limit: getPositiveIntegerEnv(
-            "NDIS_CASE_NOTE_ANON_DAILY_LIMIT",
-            DEFAULT_ANONYMOUS_DAILY_LIMIT,
-          ),
-        },
-        {
-          scope: "anonymous_ip",
-          fingerprintHash: ipHash,
-          usageDate,
-          limit: getPositiveIntegerEnv(
-            "NDIS_CASE_NOTE_ANON_IP_DAILY_LIMIT",
-            DEFAULT_ANONYMOUS_IP_DAILY_LIMIT,
-          ),
-        },
-      ];
+  const candidates: Array<ReservedQuota & { limit: number }> = [
+    {
+      scope: "authenticated_user",
+      fingerprintHash: hashAuthenticatedCompanionUser(accountId),
+      usageDate,
+      limit: getPositiveIntegerEnv(
+        "NDIS_CASE_NOTE_AUTH_DAILY_LIMIT",
+        DEFAULT_AUTHENTICATED_DAILY_LIMIT,
+      ),
+    },
+    {
+      scope: "authenticated_ip",
+      fingerprintHash: ipHash,
+      usageDate,
+      limit: getPositiveIntegerEnv(
+        "NDIS_CASE_NOTE_AUTH_IP_DAILY_LIMIT",
+        DEFAULT_AUTHENTICATED_IP_DAILY_LIMIT,
+      ),
+    },
+  ];
   const reservations: ReservedQuota[] = [];
 
   for (const candidate of candidates) {

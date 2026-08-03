@@ -31,7 +31,7 @@ describe("NDIS case note companion store", () => {
     ).toBe("memory");
   });
 
-  it("allows one anonymous daily reservation and blocks the next", async () => {
+  it("retains legacy anonymous quota-scope storage compatibility", async () => {
     const store = createMemoryNdisCaseNoteCompanionStore();
     const reservation = {
       scope: "anonymous_device" as const,
@@ -82,6 +82,19 @@ describe("NDIS case note companion store", () => {
 
     await store.completeClaim({ token: claim.token, userId: "user-a" });
     await expect(store.getClaim(claim.token)).resolves.toBeUndefined();
+  });
+
+  it("can bind a generated claim to the authenticated provider immediately", async () => {
+    const claim = createNdisCaseNoteClaim({
+      material,
+      claimedByUserId: "provider-a",
+      now: new Date("2026-07-23T00:00:00.000Z"),
+    });
+
+    expect(claim.record).toMatchObject({
+      claimedByUserId: "provider-a",
+      claimedAt: "2026-07-23T00:00:00.000Z",
+    });
   });
 
   it("does not expose an expired claim", async () => {
