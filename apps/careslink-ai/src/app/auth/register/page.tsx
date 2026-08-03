@@ -43,20 +43,22 @@ export default async function RegisterPage({ searchParams }: RegisterPageProps) 
       locale={locale}
       languageSwitcherHref={withAuthHandoffParams("/auth/register", params)}
     >
-      <section className="mx-auto grid max-w-7xl gap-6 py-4 lg:grid-cols-[minmax(0,0.98fr)_minmax(360px,0.72fr)] lg:items-start">
+      <section className="mx-auto grid max-w-7xl gap-6 py-4 lg:grid-cols-[minmax(0,0.95fr)_minmax(340px,0.7fr)] lg:items-start">
         <div className="surface-card p-5 shadow-[var(--shadow-md)] sm:p-7 lg:p-8">
           <div className="flex items-center gap-2 text-sm font-semibold text-[#0f766e]">
             <UserPlus className="size-5" aria-hidden="true" />
             {copy.formHeading}
           </div>
-          <h1 className="hero-title mt-5 max-w-4xl">{copy.title}</h1>
-          <p className="mt-5 max-w-2xl text-base leading-7 text-[#635f57]">
+          <h1 className="mt-4 max-w-2xl text-4xl font-semibold leading-[0.98] tracking-normal text-[#181715] sm:text-5xl">
+            {copy.title}
+          </h1>
+          <p className="mt-4 max-w-2xl text-base leading-7 text-[#635f57]">
             {copy.description}
           </p>
 
           {message ? <AuthMessage message={message} /> : null}
 
-          <form action={registerWithSupabaseAction} className="mt-7 grid gap-4">
+          <form action={registerWithSupabaseAction} className="mt-6 grid gap-4">
             <HiddenAuthInputs
               source={handoff.source}
               draftId={handoff.draftId}

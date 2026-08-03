@@ -95,6 +95,24 @@ describe("referral workspace server session gate", () => {
     });
   });
 
+  it("does not accept a query-string demo account when demo auth is disabled", async () => {
+    const gate = await getWorkspaceAccessGateWithServerSession(
+      {
+        account: "user-admin",
+      },
+      {
+        resolveSessionAccount: vi.fn(async () => undefined),
+        allowDemoAuth: false,
+      },
+    );
+
+    expect(gate).toMatchObject({
+      source: "none",
+      status: "signed_out",
+      canViewAdmin: false,
+    });
+  });
+
   it("maps a verified Supabase cookie session into a workspace account", async () => {
     const getUser = vi.fn(async () => ({
       data: {

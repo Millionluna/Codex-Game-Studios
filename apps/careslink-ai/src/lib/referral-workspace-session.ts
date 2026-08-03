@@ -6,7 +6,10 @@ import {
   type WorkspaceAccessGate,
   type WorkspaceAccount,
 } from "./referral-workspace-auth";
-import { createWorkspaceAccountFromSupabaseUser } from "./referral-workspace-server-auth";
+import {
+  createWorkspaceAccountFromSupabaseUser,
+  isDemoWorkspaceAuthEnabled,
+} from "./referral-workspace-server-auth";
 import {
   createCareslinkServerSupabaseClient,
   type CareslinkServerSupabaseClient,
@@ -28,6 +31,7 @@ type WorkspaceSessionGateOptions = {
   resolveAccessState?: (
     account: WorkspaceAccount,
   ) => Promise<AccessState | undefined>;
+  allowDemoAuth?: boolean;
 };
 
 export async function getWorkspaceAccessGateWithServerSession(
@@ -35,6 +39,7 @@ export async function getWorkspaceAccessGateWithServerSession(
   {
     resolveSessionAccount = resolveWorkspaceAccountFromServerSession,
     resolveAccessState = resolveAccessStateFromAccessControlStore,
+    allowDemoAuth = isDemoWorkspaceAuthEnabled(),
   }: WorkspaceSessionGateOptions = {},
 ): Promise<WorkspaceAccessGate> {
   const sessionAccount = await resolveSessionAccount();
@@ -49,7 +54,7 @@ export async function getWorkspaceAccessGateWithServerSession(
     );
   }
 
-  return getWorkspaceAccessGate(searchParams);
+  return getWorkspaceAccessGate(allowDemoAuth ? searchParams : undefined);
 }
 
 export async function resolveWorkspaceAccountFromSupabaseSession(

@@ -46,6 +46,12 @@ describe("generated material event store", () => {
         fieldKey: "supportNeed",
         createdAt: "2026-06-26T10:00:00.000Z",
       },
+      {
+        ...materialEventRecord,
+        id: "ndis-case-note-copy",
+        feature: "ndis_case_note",
+        createdAt: "2026-06-26T11:00:00.000Z",
+      },
     ]);
 
     await expect(
@@ -59,6 +65,15 @@ describe("generated material event store", () => {
         fieldKey: "supportNeed",
       },
     ]);
+    await expect(
+      store.listGeneratedMaterialEvents({
+        excludeFeature: "ndis_case_note",
+      }),
+    ).resolves.not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: "ndis-case-note-copy" }),
+      ]),
+    );
   });
 
   it("creates normalized event records", () => {

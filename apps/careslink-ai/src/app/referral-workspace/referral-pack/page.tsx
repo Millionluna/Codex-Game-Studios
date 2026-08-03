@@ -979,6 +979,10 @@ function getReferralPackItemFromDraft({
   locale: Locale;
   copy: ReturnType<typeof getReferralPackCopy>;
 }): ReferralPackItem | undefined {
+  if (draft.feature === "ndis_case_note") {
+    return undefined;
+  }
+
   const fields = Object.entries(draft.content)
     .map(([key, value]) => [formatFieldKey(key, locale), getString(value)] as const)
     .filter(([, value]) => Boolean(value));
@@ -1011,14 +1015,14 @@ function getReferralPackGroups(
   items: ReferralPackItem[],
   copy: ReturnType<typeof getReferralPackCopy>,
 ) {
-  const order: ReferralPackItem["feature"][] = [
+  const order = [
     "profile_intro",
     "profile_rewrite",
     "referral_message",
     "share_card",
     "bilingual_intro",
     "handover_checklist",
-  ];
+  ] as const;
 
   return order
     .map((feature) => ({
@@ -1034,6 +1038,10 @@ function getFeatureLabel(
   feature: GeneratedMaterialDraftRecord["feature"],
   locale: Locale,
 ) {
+  if (feature === "ndis_case_note") {
+    return locale === "zh-Hans" ? "NDIS case note 草稿" : "NDIS case note";
+  }
+
   const labels = {
     profile_rewrite: locale === "zh-Hans" ? "资料改写草稿" : "Profile rewrite",
     share_card: locale === "zh-Hans" ? "分享卡片" : "Share card",

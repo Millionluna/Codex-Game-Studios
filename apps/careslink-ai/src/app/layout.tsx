@@ -13,9 +13,12 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "CaresLink Referral Workspace",
+  title: {
+    default: "CaresLink AI",
+    template: "%s | CaresLink AI",
+  },
   description:
-    "Preview workspace for referral profile completeness, readiness signals, access-code gated guidance, and communication material drafts.",
+    "Guided AI documents and referral operations for Australian care providers.",
   robots: {
     index: false,
     follow: false,

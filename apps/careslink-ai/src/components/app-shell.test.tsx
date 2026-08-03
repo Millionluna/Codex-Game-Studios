@@ -50,10 +50,11 @@ describe("AppShell", () => {
       </AppShell>,
     );
 
-    expect(markup).toContain("Referral Pack 工作区");
+    expect(markup).toContain("AI 文档");
     expect(markup).toContain("简体中文");
-    expect(markup).toContain("材料包");
-    expect(markup).toContain("仅用于一般商业资料和运营支持");
+    expect(markup).toContain("已保存文档");
+    expect(markup).toContain("资料与转介准备");
+    expect(markup).toContain("仅用于一般文档和运营支持");
     expect(markup).not.toMatch(new RegExp("[\\uFFFD\\u00C3]"));
     expect(markup).not.toContain(String.fromCharCode(0x93c8));
     expect(markup).not.toContain(String.fromCharCode(0x9427));
@@ -71,13 +72,13 @@ describe("AppShell", () => {
       </AppShell>,
     );
 
-    expect(markup).toContain('href="/referral-workspace?lang=en"');
+    expect(markup).toContain('href="/ai-documents?lang=en"');
     expect(markup).toContain('href="/referral-workspace/referral-pack?lang=en"');
-    expect(markup).toContain('href="/referral-workspace/outreach?lang=en"');
     expect(markup).toContain('href="/referral-workspace/profile?lang=en"');
-    expect(markup).toContain('href="/referral-workspace/health?lang=en"');
-    expect(markup).toContain('href="/referral-workspace/materials?lang=en"');
     expect(markup).toContain('href="/referral-workspace/access?lang=en"');
+    expect(markup).toContain("AI Documents");
+    expect(markup).toContain("Referrals");
+    expect(markup).toContain("Saved Documents");
     expect(markup).not.toContain("/admin/access-requests");
     expect(markup).not.toContain("/admin/material-usage");
     expect(markup).not.toContain("/demo");
@@ -122,16 +123,10 @@ describe("AppShell", () => {
     );
 
     expect(markup).toContain(
-      'href="/referral-workspace?lang=en&amp;account=user-approved"',
+      'href="/ai-documents?lang=en&amp;account=user-approved"',
     );
     expect(markup).toContain(
       'href="/referral-workspace/profile?lang=en&amp;account=user-approved"',
-    );
-    expect(markup).toContain(
-      'href="/referral-workspace/health?lang=en&amp;account=user-approved"',
-    );
-    expect(markup).toContain(
-      'href="/referral-workspace/materials?lang=en&amp;account=user-approved"',
     );
     expect(markup).toContain(
       'href="/referral-workspace/access?lang=en&amp;account=user-approved"',

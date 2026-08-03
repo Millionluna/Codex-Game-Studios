@@ -52,11 +52,33 @@ describe("referral workspace auth actions", () => {
 
   it("does not redirect to external next URLs", () => {
     expect(getSafeAuthRedirectHref("https://evil.example/phish", "zh-Hans")).toBe(
-      "/referral-workspace/profile?lang=zh-Hans",
+      "/ai-documents?lang=zh-Hans",
     );
     expect(getSafeAuthRedirectHref("//evil.example/phish", "zh-Hans")).toBe(
-      "/referral-workspace/profile?lang=zh-Hans",
+      "/ai-documents?lang=zh-Hans",
     );
+    expect(
+      getSafeAuthRedirectHref(
+        "/template-companion/ndis-case-note-lookalike",
+        "zh-Hans",
+      ),
+    ).toBe("/ai-documents?lang=zh-Hans");
+  });
+
+  it("returns a provider to the short-lived companion claim without putting draft content in the URL", () => {
+    const claimToken = "a".repeat(43);
+    const next =
+      `/template-companion/ndis-case-note?claimToken=${claimToken}` +
+      "&source=ndis-case-note-download&resourceSlug=ndis-case-note-template&save=1";
+    const redirectHref = getSafeAuthRedirectHref(next, "zh-Hans", "provider");
+
+    expect(redirectHref).toContain(
+      "/template-companion/ndis-case-note?",
+    );
+    expect(redirectHref).toContain(`claimToken=${claimToken}`);
+    expect(redirectHref).toContain("lang=zh-Hans");
+    expect(redirectHref).not.toContain("caseNoteDraft");
+    expect(redirectHref).not.toContain("observableFacts");
   });
 
   it("returns a form error without calling Supabase when credentials are incomplete", async () => {

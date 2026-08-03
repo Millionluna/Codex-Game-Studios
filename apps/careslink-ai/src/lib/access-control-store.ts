@@ -13,7 +13,8 @@ export type AiUsageFeature =
   | "share_card"
   | "referral_message"
   | "bilingual_intro"
-  | "handover_checklist";
+  | "handover_checklist"
+  | "ndis_case_note";
 
 export type AccessControlRequestRecord = {
   id: string;
@@ -1131,7 +1132,8 @@ function getAiUsageFeature(value: string | null | undefined): AiUsageFeature {
     value === "profile_rewrite" ||
     value === "referral_message" ||
     value === "bilingual_intro" ||
-    value === "handover_checklist"
+    value === "handover_checklist" ||
+    value === "ndis_case_note"
   ) {
     return value;
   }

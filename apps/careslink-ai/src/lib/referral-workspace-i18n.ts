@@ -409,6 +409,7 @@ export type ReferralWorkspaceCopy = {
         readonly referral_message: string;
         readonly bilingual_intro: string;
         readonly handover_checklist: string;
+        readonly ndis_case_note: string;
       };
       readonly statusLabels: {
         readonly draft: string;
@@ -596,6 +597,7 @@ export type ReferralWorkspaceCopy = {
         readonly referral_message: string;
         readonly bilingual_intro: string;
         readonly handover_checklist: string;
+        readonly ndis_case_note: string;
         readonly profile_rewrite: string;
       };
       readonly statusLabels: {
@@ -1265,6 +1267,7 @@ const referralWorkspaceCopy: Record<Locale, ReferralWorkspaceCopy> = {
           referral_message: "Referral message",
           bilingual_intro: "Bilingual intro",
           handover_checklist: "Handover checklist",
+          ndis_case_note: "NDIS case note draft",
         },
         statusLabels: {
           draft: "Draft",
@@ -1491,6 +1494,7 @@ const referralWorkspaceCopy: Record<Locale, ReferralWorkspaceCopy> = {
           referral_message: "Referral message",
           bilingual_intro: "Bilingual intro",
           handover_checklist: "Handover checklist",
+          ndis_case_note: "NDIS case note draft",
           profile_rewrite: "Profile rewrite",
         },
         statusLabels: {
@@ -2424,6 +2428,7 @@ const referralWorkspaceCopy: Record<Locale, ReferralWorkspaceCopy> = {
           referral_message: "转介消息",
           bilingual_intro: "双语介绍",
           handover_checklist: "交接清单",
+          ndis_case_note: "NDIS case note 草稿",
         },
         statusLabels: {
           draft: "草稿",
@@ -2646,6 +2651,7 @@ const referralWorkspaceCopy: Record<Locale, ReferralWorkspaceCopy> = {
           referral_message: "转介消息",
           bilingual_intro: "双语介绍",
           handover_checklist: "交接清单",
+          ndis_case_note: "NDIS case note 草稿",
           profile_rewrite: "资料改写",
         },
         statusLabels: {

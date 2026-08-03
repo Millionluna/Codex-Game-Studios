@@ -52,9 +52,13 @@ type PasswordSignUpInput = PasswordSignInInput & {
   name: string;
 };
 
-const defaultWorkspaceRedirectHref = "/referral-workspace/profile";
+const defaultWorkspaceRedirectHref = "/ai-documents";
 const adminWorkspaceRedirectHref = "/referral-workspace";
-const providerAllowedRedirectPrefixes = ["/referral-workspace"];
+const providerAllowedRedirectPrefixes = [
+  "/ai-documents",
+  "/referral-workspace",
+  "/template-companion/ndis-case-note",
+];
 const adminAllowedRedirectPrefixes = [
   "/referral-workspace",
   "/admin/access-requests",
@@ -190,8 +194,10 @@ function isSafeInternalWorkspaceHref(
         ? adminAllowedRedirectPrefixes
         : providerAllowedRedirectPrefixes;
 
-    return allowedRedirectPrefixes.some((prefix) =>
-      parsed.pathname.startsWith(prefix),
+    return allowedRedirectPrefixes.some(
+      (prefix) =>
+        parsed.pathname === prefix ||
+        parsed.pathname.startsWith(`${prefix}/`),
     );
   } catch {
     return false;

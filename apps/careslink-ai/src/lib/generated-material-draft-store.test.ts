@@ -137,16 +137,94 @@ describe("generated material draft store", () => {
         createdAt: "2026-06-26T02:00:00.000Z",
         updatedAt: "2026-06-26T02:00:00.000Z",
       },
+      {
+        ...materialDraftRecord,
+        id: "private-ndis-case-note",
+        feature: "ndis_case_note",
+        content: { caseNoteDraft: "Owner-only case note draft." },
+        createdAt: "2026-06-26T03:00:00.000Z",
+        updatedAt: "2026-06-26T03:00:00.000Z",
+      },
     ]);
 
     await expect(
-      store.listGeneratedMaterialDrafts({ limit: 1 }),
+      store.listGeneratedMaterialDraftMetadata({
+        limit: 1,
+        excludeFeature: "ndis_case_note",
+      }),
     ).resolves.toMatchObject([
       {
         id: "new-admin-usage-referral-message",
         userId: "22222222-2222-4222-8222-222222222222",
       },
     ]);
+    await expect(
+      store.listGeneratedMaterialDraftMetadata({
+        limit: 25,
+        excludeFeature: "ndis_case_note",
+      }),
+    ).resolves.not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: "private-ndis-case-note" }),
+      ]),
+    );
+    const metadata = await store.listGeneratedMaterialDraftMetadata({
+      limit: 25,
+    });
+    expect(metadata.every((record) => !("content" in record))).toBe(true);
+  });
+
+  it("uses a metadata-only Supabase projection for admin usage review", async () => {
+    const selectedColumns: string[] = [];
+    const metadataRow = {
+      id: materialDraftRecord.id,
+      user_id: materialDraftRecord.userId,
+      provider_draft_id: materialDraftRecord.providerDraftId ?? null,
+      feature: materialDraftRecord.feature,
+      status: materialDraftRecord.status,
+      created_at: materialDraftRecord.createdAt,
+      updated_at: materialDraftRecord.updatedAt,
+    };
+    const query = {
+      select(columns: string) {
+        selectedColumns.push(columns);
+        return this;
+      },
+      neq() {
+        return this;
+      },
+      order() {
+        return this;
+      },
+      limit() {
+        return this;
+      },
+      then(resolve: (value: unknown) => unknown) {
+        return Promise.resolve({ data: [metadataRow], error: null }).then(resolve);
+      },
+    };
+    const store = createSupabaseGeneratedMaterialDraftStore({
+      from: () => query,
+    });
+
+    await expect(
+      store.listGeneratedMaterialDraftMetadata({
+        limit: 25,
+        excludeFeature: "ndis_case_note",
+      }),
+    ).resolves.toEqual([
+      {
+        id: materialDraftRecord.id,
+        userId: materialDraftRecord.userId,
+        providerDraftId: materialDraftRecord.providerDraftId,
+        feature: materialDraftRecord.feature,
+        status: materialDraftRecord.status,
+        createdAt: materialDraftRecord.createdAt,
+        updatedAt: materialDraftRecord.updatedAt,
+      },
+    ]);
+    expect(selectedColumns).toHaveLength(1);
+    expect(selectedColumns[0]).not.toContain("content");
   });
 
   it("updates generated material draft status only for the owning user", async () => {

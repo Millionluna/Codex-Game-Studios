@@ -13,7 +13,7 @@ import {
 import { ButtonLink, Card, MetricCard } from "@/components/ui";
 import {
   getGeneratedMaterialDraftStore,
-  type GeneratedMaterialDraftRecord,
+  type GeneratedMaterialDraftMetadataRecord,
 } from "@/lib/generated-material-draft-store";
 import { getGeneratedMaterialEventStore } from "@/lib/generated-material-event-store";
 import { withWorkspaceAccount } from "@/lib/referral-workspace-auth";
@@ -36,7 +36,10 @@ type MaterialUsagePageProps = {
 
 type MaterialUsageCopy = ReferralWorkspaceCopy["admin"]["materialUsage"];
 
-const statusClasses: Record<GeneratedMaterialDraftRecord["status"], string> = {
+const statusClasses: Record<
+  GeneratedMaterialDraftMetadataRecord["status"],
+  string
+> = {
   draft: "border-[#f4d28f] bg-[#fff7df] text-[#925b00]",
   reviewed: "border-[#9ed8c9] bg-[#e6f7f2] text-[#0f766e]",
   archived: "border-[#c8d5cf] bg-[#eef3f1] text-[#40504b]",
@@ -113,7 +116,7 @@ function MaterialStatusBadge({
   status,
   copy,
 }: {
-  status: GeneratedMaterialDraftRecord["status"];
+  status: GeneratedMaterialDraftMetadataRecord["status"];
   copy: MaterialUsageCopy;
 }) {
   return (
@@ -130,7 +133,7 @@ function MaterialUsageCard({
   locale,
   copy,
 }: {
-  draft: GeneratedMaterialDraftRecord;
+  draft: GeneratedMaterialDraftMetadataRecord;
   locale: Locale;
   copy: MaterialUsageCopy;
 }) {
@@ -222,12 +225,15 @@ export default async function AdminMaterialUsagePage({
       ? withWorkspaceAccount(localizedHref, accountId)
       : localizedHref;
   };
-  const drafts = await getGeneratedMaterialDraftStore().listGeneratedMaterialDrafts({
-    limit: 25,
-  });
+  const drafts =
+    await getGeneratedMaterialDraftStore().listGeneratedMaterialDraftMetadata({
+      limit: 25,
+      excludeFeature: "ndis_case_note",
+    });
   const events =
     await getGeneratedMaterialEventStore().listGeneratedMaterialEvents({
       limit: 500,
+      excludeFeature: "ndis_case_note",
     });
   const reviewedCount = drafts.filter(
     (draft) => draft.status === "reviewed",

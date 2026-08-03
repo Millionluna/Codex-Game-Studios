@@ -27,6 +27,7 @@ export type GeneratedMaterialEventStore = {
     userId?: string;
     generatedMaterialDraftId?: string;
     eventType?: GeneratedMaterialEventType;
+    excludeFeature?: AiUsageFeature;
     limit?: number;
   }): Promise<GeneratedMaterialEventRecord[]>;
 };
@@ -49,7 +50,8 @@ create table if not exists public.generated_material_events (
       'share_card',
       'referral_message',
       'bilingual_intro',
-      'handover_checklist'
+      'handover_checklist',
+      'ndis_case_note'
     )),
   event_type text not null
     check (event_type in ('copy_all', 'copy_field', 'mark_reviewed', 'archive')),
@@ -123,6 +125,7 @@ type SupabaseGeneratedMaterialEventListResult = {
 type SupabaseGeneratedMaterialEventQueryBuilder = {
   select(columns: string): SupabaseGeneratedMaterialEventQueryBuilder;
   eq(column: string, value: string): SupabaseGeneratedMaterialEventQueryBuilder;
+  neq(column: string, value: string): SupabaseGeneratedMaterialEventQueryBuilder;
   order(
     column: string,
     options: { ascending: boolean },
@@ -265,6 +268,7 @@ export function createSupabaseGeneratedMaterialEventStore(
       userId,
       generatedMaterialDraftId,
       eventType,
+      excludeFeature,
       limit,
     } = {}) {
       let builder = (supabase.from(
@@ -283,6 +287,10 @@ export function createSupabaseGeneratedMaterialEventStore(
 
       if (eventType) {
         builder = builder.eq("event_type", eventType);
+      }
+
+      if (excludeFeature) {
+        builder = builder.neq("feature", excludeFeature);
       }
 
       const { data, error } = await builder.limit(
@@ -341,12 +349,14 @@ function filterGeneratedMaterialEvents({
   userId,
   generatedMaterialDraftId,
   eventType,
+  excludeFeature,
   limit,
 }: {
   records: GeneratedMaterialEventRecord[];
   userId?: string;
   generatedMaterialDraftId?: string;
   eventType?: GeneratedMaterialEventType;
+  excludeFeature?: AiUsageFeature;
   limit?: number;
 }) {
   return records
@@ -355,7 +365,8 @@ function filterGeneratedMaterialEvents({
         (!userId || record.userId === userId) &&
         (!generatedMaterialDraftId ||
           record.generatedMaterialDraftId === generatedMaterialDraftId) &&
-        (!eventType || record.eventType === eventType),
+        (!eventType || record.eventType === eventType) &&
+        record.feature !== excludeFeature,
     )
     .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
     .slice(0, clampGeneratedMaterialEventLimit(limit))
@@ -414,7 +425,8 @@ function getGeneratedMaterialFeature(value: unknown): AiUsageFeature {
     value === "profile_rewrite" ||
     value === "referral_message" ||
     value === "bilingual_intro" ||
-    value === "handover_checklist"
+    value === "handover_checklist" ||
+    value === "ndis_case_note"
   ) {
     return value;
   }

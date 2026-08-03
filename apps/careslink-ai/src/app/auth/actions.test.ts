@@ -150,7 +150,7 @@ describe("auth server actions", () => {
     );
 
     expect(navigationMock.redirect).toHaveBeenCalledWith(
-      "/referral-workspace/profile?lang=en",
+      "/ai-documents?lang=en",
     );
   });
 

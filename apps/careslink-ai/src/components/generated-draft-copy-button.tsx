@@ -99,12 +99,12 @@ export function focusElementAfterGeneratedDraftCopy(
   element.scrollIntoView?.({ behavior: "smooth", block: "center" });
   element.animate?.(
     [
-      { boxShadow: "0 0 0 0 rgba(15, 118, 110, 0)", backgroundColor: "" },
+      { boxShadow: "0 0 0 0 rgba(36, 107, 253, 0)", backgroundColor: "" },
       {
-        boxShadow: "0 0 0 3px rgba(15, 118, 110, 0.28)",
-        backgroundColor: "#f0f7f4",
+        boxShadow: "0 0 0 3px rgba(36, 107, 253, 0.22)",
+        backgroundColor: "#edf7f2",
       },
-      { boxShadow: "0 0 0 0 rgba(15, 118, 110, 0)", backgroundColor: "" },
+      { boxShadow: "0 0 0 0 rgba(36, 107, 253, 0)", backgroundColor: "" },
     ],
     { duration: 1400, easing: "ease-out" },
   );
@@ -143,7 +143,7 @@ export function GeneratedDraftCopyButton({
       aria-label={ariaLabel}
       disabled={!text.trim()}
       onClick={copyDraftText}
-      className={`inline-flex min-h-8 items-center justify-center gap-1.5 rounded-md border border-[#cfded8] bg-white font-semibold text-[#263834] transition hover:bg-[#f0f7f4] disabled:cursor-not-allowed disabled:text-[#91a09b] ${
+      className={`inline-flex min-h-8 items-center justify-center gap-1.5 rounded-md border border-[#dedbd2] bg-white font-semibold text-[#263241] transition hover:border-[#0b5c4d] hover:bg-[#edf7f2] disabled:cursor-not-allowed disabled:text-[#91a0b5] ${
         compact ? "px-2 py-1 text-xs" : "px-2.5 py-1 text-xs"
       }`}
     >

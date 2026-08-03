@@ -14,6 +14,11 @@ export type GeneratedMaterialDraftRecord = {
   updatedAt: string;
 };
 
+export type GeneratedMaterialDraftMetadataRecord = Omit<
+  GeneratedMaterialDraftRecord,
+  "content"
+>;
+
 export type GeneratedMaterialDraftStore = {
   kind: "memory" | "supabase";
   getGeneratedMaterialDraft(
@@ -25,9 +30,10 @@ export type GeneratedMaterialDraftStore = {
     providerDraftId?: string;
     limit?: number;
   }): Promise<GeneratedMaterialDraftRecord[]>;
-  listGeneratedMaterialDrafts(input?: {
+  listGeneratedMaterialDraftMetadata(input?: {
     limit?: number;
-  }): Promise<GeneratedMaterialDraftRecord[]>;
+    excludeFeature?: AiUsageFeature;
+  }): Promise<GeneratedMaterialDraftMetadataRecord[]>;
   getLatestGeneratedMaterialDraftByUser(input: {
     userId: string;
     feature?: AiUsageFeature;
@@ -43,6 +49,8 @@ const GLOBAL_GENERATED_MATERIAL_DRAFT_STORE_KEY =
 const GENERATED_MATERIAL_DRAFTS_TABLE = "generated_material_drafts";
 const GENERATED_MATERIAL_DRAFTS_COLUMNS =
   "id, user_id, provider_draft_id, feature, status, content, created_at, updated_at";
+const GENERATED_MATERIAL_DRAFT_METADATA_COLUMNS =
+  "id, user_id, provider_draft_id, feature, status, created_at, updated_at";
 
 export const generatedMaterialDraftSupabaseSchemaSql = `
 create table if not exists public.generated_material_drafts (
@@ -55,7 +63,8 @@ create table if not exists public.generated_material_drafts (
       'share_card',
       'referral_message',
       'bilingual_intro',
-      'handover_checklist'
+      'handover_checklist',
+      'ndis_case_note'
     )),
   status text not null default 'draft'
     check (status in ('draft', 'reviewed', 'archived')),
@@ -109,7 +118,7 @@ type SupabaseGeneratedMaterialRow = {
   provider_draft_id: string | null;
   feature: string | null;
   status: string | null;
-  content: unknown;
+  content?: unknown;
   created_at: string;
   updated_at: string;
 };
@@ -128,6 +137,7 @@ type SupabaseGeneratedMaterialWriteRow = {
 type SupabaseGeneratedMaterialQueryBuilder = {
   select(columns: string): SupabaseGeneratedMaterialQueryBuilder;
   eq(column: string, value: string): SupabaseGeneratedMaterialQueryBuilder;
+  neq(column: string, value: string): SupabaseGeneratedMaterialQueryBuilder;
   order(
     column: string,
     options: { ascending: boolean },
@@ -247,11 +257,12 @@ export function createMemoryGeneratedMaterialDraftStore(
         limit,
       });
     },
-    async listGeneratedMaterialDrafts({ limit } = {}) {
+    async listGeneratedMaterialDraftMetadata({ limit, excludeFeature } = {}) {
       return Array.from(records.values())
+        .filter((record) => record.feature !== excludeFeature)
         .sort(compareGeneratedMaterialCreatedAtDesc)
         .slice(0, clampGeneratedMaterialLimit(limit))
-        .map(cloneGeneratedMaterialDraft);
+        .map(mapGeneratedMaterialRecordToMetadata);
     },
     async getLatestGeneratedMaterialDraftByUser({
       userId,
@@ -354,11 +365,17 @@ export function createSupabaseGeneratedMaterialDraftStore(
 
       return (data ?? []).map(mapGeneratedMaterialRowToRecord);
     },
-    async listGeneratedMaterialDrafts({ limit } = {}) {
-      const builder = (supabase.from(
+    async listGeneratedMaterialDraftMetadata({ limit, excludeFeature } = {}) {
+      let builder = (supabase.from(
         tableName,
       ) as SupabaseGeneratedMaterialQueryBuilder)
-        .select(GENERATED_MATERIAL_DRAFTS_COLUMNS)
+        .select(GENERATED_MATERIAL_DRAFT_METADATA_COLUMNS);
+
+      if (excludeFeature) {
+        builder = builder.neq("feature", excludeFeature);
+      }
+
+      builder = builder
         .order("created_at", { ascending: false })
         .limit(clampGeneratedMaterialLimit(limit));
       const { data, error } = await builder;
@@ -367,7 +384,7 @@ export function createSupabaseGeneratedMaterialDraftStore(
         throw new Error(formatSupabaseGeneratedMaterialError("load", error));
       }
 
-      return (data ?? []).map(mapGeneratedMaterialRowToRecord);
+      return (data ?? []).map(mapGeneratedMaterialRowToMetadata);
     },
     async getLatestGeneratedMaterialDraftByUser({
       userId,
@@ -465,6 +482,20 @@ function cloneGeneratedMaterialDraft(
   };
 }
 
+function mapGeneratedMaterialRecordToMetadata(
+  record: GeneratedMaterialDraftRecord,
+): GeneratedMaterialDraftMetadataRecord {
+  return {
+    id: record.id,
+    userId: record.userId,
+    providerDraftId: record.providerDraftId,
+    feature: record.feature,
+    status: record.status,
+    createdAt: record.createdAt,
+    updatedAt: record.updatedAt,
+  };
+}
+
 function normalizeMaterialContent(content: Record<string, unknown>) {
   return JSON.parse(JSON.stringify(content ?? {})) as Record<string, unknown>;
 }
@@ -552,6 +583,20 @@ function mapGeneratedMaterialRowToRecord(
   });
 }
 
+function mapGeneratedMaterialRowToMetadata(
+  row: SupabaseGeneratedMaterialRow,
+): GeneratedMaterialDraftMetadataRecord {
+  return {
+    id: row.id,
+    userId: row.user_id,
+    providerDraftId: row.provider_draft_id ?? undefined,
+    feature: getGeneratedMaterialFeature(row.feature),
+    status: getGeneratedMaterialStatus(row.status),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
 function mapGeneratedMaterialRecordToRow(
   record: GeneratedMaterialDraftRecord,
 ): SupabaseGeneratedMaterialWriteRow {
@@ -578,7 +623,8 @@ function getGeneratedMaterialFeature(value: unknown): AiUsageFeature {
     value === "profile_rewrite" ||
     value === "referral_message" ||
     value === "bilingual_intro" ||
-    value === "handover_checklist"
+    value === "handover_checklist" ||
+    value === "ndis_case_note"
   ) {
     return value;
   }

@@ -16,6 +16,9 @@ bun dev
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
+Release architecture, permission, variable, flow, test, automation, and public
+SEO maps live in [`documentation/`](./documentation/architecture.md).
+
 ## Supabase Provider Draft Store
 
 Provider profile drafts use an in-memory store by default. To persist drafts in
@@ -197,6 +200,134 @@ timestamps, and copy/review/archive event counts. It intentionally does not
 render generated content JSON, so admins can review usage patterns without
 turning draft material into endorsement, quality review, or referral outcome
 evidence.
+
+## NDIS Case Note AI Companion
+
+The public, single-task companion route is:
+
+```text
+GET /template-companion/ndis-case-note
+POST /api/template-companion/ndis-case-note
+POST /api/template-companion/ndis-case-note/save
+POST /api/template-companion/events
+```
+
+Core should use this production handoff contract:
+
+```text
+https://ai.careslink.com.au/template-companion/ndis-case-note
+  ?source=ndis-case-note-download
+  &resourceSlug=ndis-case-note-template
+  &utm_source=careslink
+  &utm_medium=post_download
+  &utm_campaign=ndis_case_note_ai_companion_v01
+```
+
+Only non-personal attribution values belong in the URL. Email, participant
+details, support facts and generated wording must never be added to query
+parameters. The form supports structured facts (default) and pasted Chinese
+working notes. Original pasted text stays in React memory only: it is not added
+to local storage, URLs, analytics, logs or admin views. A testable browser-side
+Privacy Review identifies obvious direct and indirect identity clues plus
+subjective, clinical, risk, goal-achievement and worker/provider-quality
+wording, then shows suggested removals, replacements or generalisations and an
+editable structured-facts proposal. The review displays the original
+session-only text with matched ranges highlighted beside the cleaned text and
+extracted facts. Every finding must be handled before generation. This review
+is deliberately incomplete and does not claim automatic de-identification.
+
+Support date/approximate time, support type, setting, support delivered,
+observable facts, and action taken are minimum required facts. No generation
+request is built until these facts are present, the user completes Privacy Review and
+selects two unchecked confirmations: that they reviewed the facts and did not
+intentionally include identifying information, and that they are authorised to
+process the details for this documentation purpose. The second confirmation is
+explicitly not a statement of participant consent. The server independently
+requires both confirmations and revalidates every structured field before
+session, quota or OpenAI work. It fails closed on obvious email, Australian
+phone, NDIS-number, date-of-birth, name/title, exact-address, indirect identity
+and unsafe evaluative wording patterns.
+
+Anonymous users can generate one free draft without an account or access code.
+The generation route applies a short-window server rate limit plus persistent
+daily device and IP quotas. Signed-in providers use separate account and IP
+daily quotas. Any request that reaches OpenAI consumes the attempt even if the
+model response is rejected by the safety parser, preventing repeated paid
+retries. Production fails closed if persistent Supabase storage or the
+dedicated fingerprint pepper is missing. The model uses strict structured
+output with these fields:
+
+```text
+englishCaseNoteDraft
+chineseReviewVersion
+missingFacts
+neutralWordingChecks
+followUpPrompts
+disclaimer
+```
+
+Successful generation creates a 30-minute opaque claim token. Only its SHA-256
+hash is stored. The temporary record contains the generated output, not the raw
+input. Register/login links carry only the token and safe attribution inside a
+validated internal `next` URL. After a verified provider session returns, the
+save endpoint atomically binds the claim to that user and persists an
+owner-scoped `generated_material_drafts.feature = ndis_case_note` record. Owner
+binding is never reversed. The temporary claim is deleted after a successful
+save, and expired claims are purged opportunistically before generation/save.
+
+The Responses request sets `store: false`. Standard API abuse-monitoring
+retention can still apply unless the OpenAI project has separately approved
+Zero Data Retention controls.
+
+Companion telemetry is metadata-only. The event names are:
+
+```text
+companion_viewed
+companion_started
+companion_generated
+companion_save_prompt_clicked
+companion_saved
+```
+
+`template_companion_events` has no input, output or participant-fact columns.
+Anonymous content is not written to telemetry. Existing saved-draft copy events
+remain metadata-only and copying never consumes model quota.
+NDIS case-note drafts and copy events are excluded from the existing raw
+material-usage admin view; only the owning provider can read saved content.
+
+Apply the migration before enabling the Core CTA:
+
+```text
+supabase/migrations/20260723113000_create_ndis_case_note_companion.sql
+```
+
+Server-only environment variables:
+
+```bash
+OPENAI_API_KEY=your-server-only-openai-key
+OPENAI_NDIS_CASE_NOTE_MODEL=gpt-5.4-mini
+NDIS_CASE_NOTE_FINGERPRINT_PEPPER=a-long-random-server-secret
+NDIS_CASE_NOTE_ANON_DAILY_LIMIT=1
+NDIS_CASE_NOTE_ANON_IP_DAILY_LIMIT=5
+NDIS_CASE_NOTE_AUTH_DAILY_LIMIT=3
+NDIS_CASE_NOTE_AUTH_IP_DAILY_LIMIT=20
+```
+
+Optional table overrides:
+
+```bash
+SUPABASE_NDIS_CASE_NOTE_CLAIMS_TABLE=ndis_case_note_companion_claims
+SUPABASE_TEMPLATE_COMPANION_EVENTS_TABLE=template_companion_events
+```
+
+The strict structured output contains an English case-note draft, a fact-matched
+Simplified Chinese review version, missing facts, neutral-wording checks,
+follow-up prompts and a controlled disclaimer. The Chinese version is labelled
+as a review aid only, not a second formal record. Output parsing rejects obvious
+identifiers, prohibited conclusions and mismatched numeric facts across the two
+languages. The result remains user-reviewed draft wording for general
+documentation support only. It is not a completed record and does not provide
+clinical, legal, care, compliance, regulatory or professional advice.
 
 ## Provider Draft Handoff Smoke Test
 
