@@ -126,7 +126,11 @@ function redirectToOAuthError(
     query.set("lang", locale);
   }
 
-  return NextResponse.redirect(new URL(`/auth/login?${query}`, requestUrl));
+  const destination = new URL(`/auth/login?${query}`, requestUrl);
+
+  // An explicit empty fragment prevents browsers from inheriting a provider
+  // error fragment from the OAuth callback URL into the login page URL.
+  return NextResponse.redirect(new URL(`${destination.href}#`));
 }
 
 function getSafeAuthCallbackNext(next: string | null) {

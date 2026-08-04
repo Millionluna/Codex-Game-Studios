@@ -145,6 +145,29 @@ describe("Supabase auth callback", () => {
     expect(cancelledLocation).toContain("next=%2Fai-documents");
     expect(cancelledLocation).not.toContain("private-provider-message");
     expect(cancelledLocation).not.toContain("access_denied");
+    expect(cancelledLocation.endsWith("#")).toBe(true);
+    expect(new URL(cancelledLocation).hash).toBe("");
+  });
+
+  it("prevents a browser from inheriting a private OAuth error fragment", async () => {
+    const { GET } = await import("./route");
+    const callbackUrl =
+      "https://ai.careslink.com.au/auth/callback?flow=oauth" +
+      "&next=%2Fai-documents%3Flang%3Dzh-Hans&lang=zh-Hans" +
+      "#error=access_denied&error_description=private-provider-message";
+    const response = await GET(new Request(callbackUrl));
+    const location = response.headers.get("location") ?? "";
+    const finalUrl = followBrowserRedirect(callbackUrl, location);
+
+    expect(location.endsWith("#")).toBe(true);
+    expect(finalUrl.pathname).toBe("/auth/login");
+    expect(finalUrl.searchParams.get("next")).toBe(
+      "/ai-documents?lang=zh-Hans",
+    );
+    expect(finalUrl.searchParams.get("lang")).toBe("zh-Hans");
+    expect(finalUrl.hash).toBe("");
+    expect(finalUrl.href).not.toContain("access_denied");
+    expect(finalUrl.href).not.toContain("private-provider-message");
   });
 
   it("keeps the password-reset callback restricted to update-password", async () => {
@@ -165,3 +188,14 @@ describe("Supabase auth callback", () => {
     );
   });
 });
+
+function followBrowserRedirect(sourceHref: string, location: string) {
+  const source = new URL(sourceHref);
+  const destination = new URL(location, source);
+
+  if (!location.includes("#") && source.hash) {
+    destination.hash = source.hash;
+  }
+
+  return destination;
+}

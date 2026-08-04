@@ -30,7 +30,7 @@
 | Admin isolation | Material usage uses metadata and excludes NDIS case-note details | Admin/material store tests | Existing automated |
 | Responsive product shell | Authenticated task flow, unchecked confirmations, no guest/demo cards | Companion static render plus guarded 1440/390 smoke | Existing automated/manual |
 
-The post-review Production Pilot Release Gate baseline is 77 Vitest files and 530 passing tests, followed by TypeScript, ESLint and the Next production build. Preview and Production smoke are recorded separately because Production promotion requires an independent review greenlight.
+The post-review Production Pilot Release Gate baseline is 77 Vitest files and 531 passing tests, followed by TypeScript, ESLint and the Next production build. Preview and Production smoke are recorded separately because Production promotion requires an independent review greenlight.
 
 ## Release-candidate live checks
 
