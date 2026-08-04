@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  clearCareslinkSupabaseAuthCookies,
   createCareslinkServerSupabaseClient,
   getSupabasePublicAuthConfig,
 } from "./supabase-server";
@@ -92,5 +93,48 @@ describe("Supabase server auth client", () => {
         },
       }),
     ).resolves.toBeUndefined();
+  });
+
+  it("clears only Supabase auth cookies so an unavailable client cannot revive a session", async () => {
+    const cookieStore = {
+      getAll: vi.fn(() => [
+        { name: "sb-projectref-auth-token", value: "access" },
+        { name: "sb-projectref-auth-token.0", value: "chunk" },
+        { name: "sb-projectref-auth-token-code-verifier", value: "verifier" },
+        { name: "careslink-locale", value: "en" },
+      ]),
+      set: vi.fn(),
+    };
+
+    await expect(
+      clearCareslinkSupabaseAuthCookies({ cookieStore }),
+    ).resolves.toEqual({ ok: true, cleared: 3 });
+
+    expect(cookieStore.set).toHaveBeenCalledTimes(3);
+    expect(cookieStore.set).not.toHaveBeenCalledWith(
+      "careslink-locale",
+      expect.anything(),
+      expect.anything(),
+    );
+    expect(cookieStore.set).toHaveBeenCalledWith(
+      "sb-projectref-auth-token",
+      "",
+      expect.objectContaining({ maxAge: 0, path: "/" }),
+    );
+  });
+
+  it("reports cookie cleanup failure instead of claiming a successful sign-out", async () => {
+    const cookieStore = {
+      getAll: vi.fn(() => [
+        { name: "sb-projectref-auth-token", value: "access" },
+      ]),
+      set: vi.fn(() => {
+        throw new Error("cookie mutation unavailable");
+      }),
+    };
+
+    await expect(
+      clearCareslinkSupabaseAuthCookies({ cookieStore }),
+    ).resolves.toEqual({ ok: false, cleared: 0 });
   });
 });

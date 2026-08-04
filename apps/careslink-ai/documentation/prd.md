@@ -34,12 +34,12 @@ A registered provider can safely turn de-identified structured facts or reviewed
 
 - Companion attribution accepts only two public Core entry pairs: `core_product_landing` with `product_landing`, and `core_download_success` with `post_download`. Unknown or mismatched values are discarded rather than persisted as arbitrary text.
 - Source, resource slug, UTM source and campaign are fixed allowlisted values. No user content or contact data belongs in a handoff URL.
-- A visible server-side Sign out action is available in desktop and mobile account surfaces. It clears the Supabase session and immediately restores the provider-only gate; its optional return path is an allowlisted internal URL only.
+- A visible server-side Sign out action is available in desktop and mobile account surfaces. It clears the Supabase session and matching local auth cookies, then restores the provider-only gate; its optional return path is an allowlisted internal URL only. Configuration or cleanup failure must show an error, never a false signed-out success.
 - The AI-specific Privacy, Collection & Retention Notice is reachable from auth, Companion, Saved Documents and shared application surfaces.
 
 ## Save and ownership
 
-- Successful generation creates a 30-minute opaque claim already bound to the current provider.
+- Successful generation creates an opaque claim already bound to the current provider. It is usable for recovery/save for 30 minutes; expiry blocks use immediately, while physical row cleanup occurs opportunistically during a later generation/save cleanup run.
 - The Save endpoint accepts only the same provider and persists `generated_material_drafts.feature = ndis_case_note`.
 - Saved reads remain owner-scoped. Admin surfaces remain metadata-only and exclude case-note content.
 - The owning provider can permanently delete a saved case-note draft after an explicit confirmation. Signed-out, admin, cross-owner and wrong-feature deletion are denied without disclosing another record's existence.
@@ -58,4 +58,4 @@ A registered provider can safely turn de-identified structured facts or reviewed
 7. A provider can confirm and delete their own saved NDIS case-note draft; another account, an admin, an invalid ID and a wrong document feature cannot delete it and receive no existence signal.
 8. Retention copy states that saved drafts remain until user deletion and directs required records to an authorised record system.
 9. A zero-credit opt-in records only authenticated metadata, cannot collect free text/contact details, and cannot charge or mutate the entitlement balance.
-10. The 30-day invite-only pilot is operated and evaluated using the aggregate-only funnel runbook; any privacy, cross-owner, double-charge or failed-release incident pauses expansion.
+10. The 30-day invite-only pilot is operated and evaluated using the aggregate-only funnel runbook and the service-role-managed UUID cohort allowlist. Non-members never enter pilot activation, utility, repeat, paid-intent or reliability measures; any privacy, cross-owner, double-charge or failed-release incident pauses expansion.

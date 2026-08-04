@@ -247,6 +247,36 @@ describe("NDIS case note companion boundaries", () => {
       "The activity started at 2:30 pm and continued for 25 minutes.",
       "活动于下午2:30开始，持续25分钟。",
     ],
+    [
+      "morning boundary",
+      "The activity started at 10:30 am.",
+      "活动于上午10:30开始。",
+    ],
+    [
+      "afternoon boundary",
+      "The activity started at 1:30 pm.",
+      "活动于下午1:30开始。",
+    ],
+    [
+      "noon boundary",
+      "The activity started at 12:15 pm.",
+      "活动于中午12:15开始。",
+    ],
+    [
+      "midnight boundary",
+      "The activity started at 12:05 am.",
+      "活动于凌晨12:05开始。",
+    ],
+    [
+      "evening boundary",
+      "The activity started at 8:30 pm.",
+      "活动于晚上8:30开始。",
+    ],
+    [
+      "evening midnight boundary",
+      "The activity started at 12:05 am.",
+      "活动于晚上12:05开始。",
+    ],
   ])("accepts date-aware bilingual parity for %s", (_label, english, chinese) => {
     expect(
       parseNdisCaseNoteMaterial(
@@ -304,6 +334,80 @@ describe("NDIS case note companion boundaries", () => {
           englishCaseNoteDraft:
             "Support was delivered on 4 August 2026 at 2:30 pm.",
           chineseReviewVersion: "支持于2026年8月4日下午3:30提供。",
+        }),
+      ),
+    ).toThrow("bilingual drafts did not preserve core numeric facts");
+
+    expect(() =>
+      parseNdisCaseNoteMaterial(
+        JSON.stringify({
+          ...validMaterial,
+          englishCaseNoteDraft: "The activity started at 12:05 pm.",
+          chineseReviewVersion: "活动于晚上12:05开始。",
+        }),
+      ),
+    ).toThrow("bilingual drafts did not preserve core numeric facts");
+
+    expect(() =>
+      parseNdisCaseNoteMaterial(
+        JSON.stringify({
+          ...validMaterial,
+          englishCaseNoteDraft: "The activity started at 1:30 am.",
+          chineseReviewVersion: "活动于晚上1:30开始。",
+        }),
+      ),
+    ).toThrow("bilingual drafts did not preserve core numeric facts");
+  });
+
+  it("does not canonicalize slash or ISO-shaped numbers without date semantics", () => {
+    expect(() =>
+      parseNdisCaseNoteMaterial(
+        JSON.stringify({
+          ...validMaterial,
+          englishCaseNoteDraft: "The measured ratio was 04/08/2026.",
+          chineseReviewVersion: "测得的比率为2026-08-04。",
+        }),
+      ),
+    ).toThrow("bilingual drafts did not preserve core numeric facts");
+
+    expect(() =>
+      parseNdisCaseNoteMaterial(
+        JSON.stringify({
+          ...validMaterial,
+          englishCaseNoteDraft: "The reference code was 2026-08-04.",
+          chineseReviewVersion: "参考代码为04/08/2026。",
+        }),
+      ),
+    ).toThrow("bilingual drafts did not preserve core numeric facts");
+  });
+
+  it("does not turn an invalid noon hour into an evening time", () => {
+    expect(() =>
+      parseNdisCaseNoteMaterial(
+        JSON.stringify({
+          ...validMaterial,
+          englishCaseNoteDraft: "The activity started at 10:30 am.",
+          chineseReviewVersion: "活动于中午10:30开始。",
+        }),
+      ),
+    ).toThrow("bilingual drafts did not preserve core numeric facts");
+
+    expect(() =>
+      parseNdisCaseNoteMaterial(
+        JSON.stringify({
+          ...validMaterial,
+          englishCaseNoteDraft: "The activity started at 10:30 pm.",
+          chineseReviewVersion: "活动于中午10:30开始。",
+        }),
+      ),
+    ).toThrow("bilingual drafts did not preserve core numeric facts");
+
+    expect(() =>
+      parseNdisCaseNoteMaterial(
+        JSON.stringify({
+          ...validMaterial,
+          englishCaseNoteDraft: "The activity started at 12:30 am.",
+          chineseReviewVersion: "活动于中午12:30开始。",
         }),
       ),
     ).toThrow("bilingual drafts did not preserve core numeric facts");

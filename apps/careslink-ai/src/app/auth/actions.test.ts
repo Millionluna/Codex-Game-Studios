@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const supabaseServerMock = vi.hoisted(() => ({
+  clearCareslinkSupabaseAuthCookies: vi.fn(),
   createCareslinkServerSupabaseClient: vi.fn(),
 }));
 
@@ -13,6 +14,8 @@ const googleOAuthMock = vi.hoisted(() => ({
 }));
 
 vi.mock("../../lib/supabase-server", () => ({
+  clearCareslinkSupabaseAuthCookies:
+    supabaseServerMock.clearCareslinkSupabaseAuthCookies,
   createCareslinkServerSupabaseClient:
     supabaseServerMock.createCareslinkServerSupabaseClient,
   getSupabasePublicAuthConfig: () => ({
@@ -46,6 +49,7 @@ function createAuthClient({
   updateUserError,
   oauthError,
   oauthUrl = "https://project.supabase.co/auth/v1/authorize?provider=google",
+  signOutError,
 }: {
   signInError?: string;
   signUpError?: string;
@@ -55,6 +59,7 @@ function createAuthClient({
   updateUserError?: string;
   oauthError?: string;
   oauthUrl?: string | null;
+  signOutError?: string;
 } = {}) {
   return {
     auth: {
@@ -93,13 +98,20 @@ function createAuthClient({
         error: updateUserError ? { message: updateUserError } : null,
       })),
       exchangeCodeForSession: vi.fn(async () => ({ error: null })),
-      signOut: vi.fn(async () => ({ error: null })),
+      signOut: vi.fn(async () => ({
+        error: signOutError ? { message: signOutError } : null,
+      })),
     },
   };
 }
 
 describe("auth server actions", () => {
   beforeEach(() => {
+    supabaseServerMock.clearCareslinkSupabaseAuthCookies.mockReset();
+    supabaseServerMock.clearCareslinkSupabaseAuthCookies.mockResolvedValue({
+      ok: true,
+      cleared: 1,
+    });
     supabaseServerMock.createCareslinkServerSupabaseClient.mockReset();
     navigationMock.redirect.mockReset();
     googleOAuthMock.isGoogleOAuthAvailable.mockReset();
@@ -480,8 +492,60 @@ describe("auth server actions", () => {
     );
 
     expect(authClient.auth.signOut).toHaveBeenCalledOnce();
+    expect(
+      supabaseServerMock.clearCareslinkSupabaseAuthCookies,
+    ).toHaveBeenCalledOnce();
     expect(navigationMock.redirect).toHaveBeenCalledWith(
       "/auth/login?next=%2Ftemplate-companion%2Fndis-case-note%3Fsource%3Dndis-case-note-download%26resourceSlug%3Dndis-case-note-template%26lang%3Dzh-Hans&lang=zh-Hans&notice=signed-out",
+    );
+  });
+
+  it("fails closed and clears local auth cookies when Supabase is unavailable", async () => {
+    supabaseServerMock.createCareslinkServerSupabaseClient.mockResolvedValue(
+      undefined,
+    );
+    const { signOutAction } = await import("./actions");
+
+    await signOutAction(
+      createFormData({
+        returnTo: "/template-companion/ndis-case-note?lang=en",
+        lang: "en",
+      }),
+    );
+
+    expect(
+      supabaseServerMock.clearCareslinkSupabaseAuthCookies,
+    ).toHaveBeenCalledOnce();
+    expect(navigationMock.redirect).toHaveBeenCalledWith(
+      expect.stringContaining("error=Authentication+is+unavailable."),
+    );
+    expect(navigationMock.redirect).not.toHaveBeenCalledWith(
+      expect.stringContaining("notice=signed-out"),
+    );
+  });
+
+  it("does not report success when remote sign-out or cookie cleanup fails", async () => {
+    const authClient = createAuthClient({ signOutError: "network unavailable" });
+    supabaseServerMock.createCareslinkServerSupabaseClient.mockResolvedValue(
+      authClient,
+    );
+    const { signOutAction } = await import("./actions");
+
+    await signOutAction(
+      createFormData({
+        returnTo: "/ai-documents?lang=en",
+        lang: "en",
+      }),
+    );
+
+    expect(
+      supabaseServerMock.clearCareslinkSupabaseAuthCookies,
+    ).toHaveBeenCalledOnce();
+    expect(navigationMock.redirect).toHaveBeenCalledWith(
+      expect.stringContaining("error=Unable+to+confirm+sign-out."),
+    );
+    expect(navigationMock.redirect).not.toHaveBeenCalledWith(
+      expect.stringContaining("notice=signed-out"),
     );
   });
 

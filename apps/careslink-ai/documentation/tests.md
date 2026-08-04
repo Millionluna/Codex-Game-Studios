@@ -17,19 +17,20 @@
 | Idempotent generation | Same key replays one owner-bound claim; concurrent replay calls neither quota nor model; exhausted balance blocks; generation/claim failures release credits | NDIS generation route tests | Automated |
 | Plan & Usage | Provider page reads only the current owner and renders EN/zh-Hans metadata without reservation IDs or document content | `src/app/plan-and-usage/page.test.tsx` | Automated |
 | OpenAI contract | Request uses `store:false`, strict schema, bounded output, controlled prompt | `src/lib/openai-ndis-case-note.test.ts` | Existing automated with mocked HTTP |
-| Output safety | Malformed, PII and prohibited conclusions reject the whole result; English/Chinese dates and times canonicalize while real date/time/quantity differences still reject | `src/lib/ndis-case-note-companion.test.ts` | Automated |
+| Output safety | Malformed, PII and prohibited conclusions reject the whole result; only semantic dates canonicalize; slash/code counterexamples, noon/midnight boundaries and real differences reject | `src/lib/ndis-case-note-companion.test.ts` | Automated |
 | Claim ownership | Generation immediately binds the claim to provider; expiry and cross-owner use are denied | `src/lib/ndis-case-note-companion-store.test.ts`, generation/save route tests | Existing automated |
 | Provider save | Signed-out/admin denied; provider save idempotent and owner-scoped | Save route tests | Existing automated |
 | Provider delete | Two-step UI; signed-out/admin denied; one owner-and-feature-scoped delete; cross-owner/wrong-feature/missing share one `404` | Delete route, store and companion UI tests | Automated |
 | Saved-draft owner RLS | Migration revokes broad grants, allows authenticated owner `SELECT`/`DELETE` only, and leaves `INSERT`/`UPDATE` server-controlled | Generated material store/schema tests plus migration review | Automated/static |
 | Telemetry privacy | Events contain metadata and no generated content/input; only two surface/medium pairs and fixed offer/copy events are accepted | Store/event route/request tests plus attribution migration review | Automated/static |
-| Sign out | Provider/admin sessions call server-side sign-out; safe internal return is preserved and external return is dropped; real protected route re-gates | Auth action, AppShell and release smoke | Automated/live |
-| Privacy notice | EN/zh-Hans notice states account data, reviewed facts, `store:false` without a ZDR claim, 30-minute claim, saved-until-delete, telemetry and draft boundary | `src/app/privacy/page.test.tsx` plus route smoke | Automated/live |
+| Sign out | Provider/admin sessions call server-side sign-out; matching local auth cookies clear; missing client/remote/cleanup failure cannot show success; safe return and re-gate remain | Auth action, Supabase cookie helper, AppShell and release smoke | Automated/live |
+| Privacy notice | EN/zh-Hans notice states account data, reviewed facts, `store:false` without a ZDR claim, 30-minute claim usability plus opportunistic row cleanup, saved-until-delete, telemetry and draft boundary | `src/app/privacy/page.test.tsx` plus route smoke | Automated/live |
 | Zero-credit fake door | Explicit Starter A$9.99/30-credit concept, no charge/top-up/contact/free text; offer events metadata-only | Companion render and event route tests | Automated |
+| Invite-only cohort report | Service-role UUID allowlist and effective membership interval filter every event/credit aggregate; pure CTE report is read-only; non-members cannot enter pilot measures | `src/lib/pilot-funnel-contract.test.ts`, migration review and target database read-only execution | Automated/static/live database |
 | Admin isolation | Material usage uses metadata and excludes NDIS case-note details | Admin/material store tests | Existing automated |
 | Responsive product shell | Authenticated task flow, unchecked confirmations, no guest/demo cards | Companion static render plus guarded 1440/390 smoke | Existing automated/manual |
 
-The prior Credits / Entitlements V0.1 baseline was 75 Vitest files and 485 tests. The Production Pilot Release Gate records its new final count after all tests, TypeScript, ESLint, build, Preview and Production smoke pass.
+The post-review Production Pilot Release Gate baseline is 77 Vitest files and 530 passing tests, followed by TypeScript, ESLint and the Next production build. Preview and Production smoke are recorded separately because Production promotion requires an independent review greenlight.
 
 ## Release-candidate live checks
 
@@ -54,6 +55,7 @@ The local live check used only synthetic de-identified facts. Its evidence recor
 | P1 | Heuristic privacy rules cannot cover every direct or indirect identifier | A user could submit an undetected identifying clue; manual review remains mandatory |
 | P1 | Current server routes use service role and bypass the new owner RLS | A future server route omitting its explicit owner predicate could expose another owner's content; route tests remain mandatory |
 | P1 | No automatic saved-draft purge policy has been selected | Saved drafts remain until the owner deletes them; required records must live in the organisation's authorised record system |
+| P2 | Expired unsaved claim rows are purged opportunistically, not by a scheduler | Claims cannot be used after 30 minutes, but an expired row may remain until a later generation/save cleanup runs |
 | P2 | IP/device quota behavior varies behind shared proxies and privacy tools | False positives or lower abuse resistance |
 | P2 | No end-to-end browser test is currently a repository CI job | UI interaction regressions rely on release smoke |
 | P2 | This repository has no merge-gating workflow for the CaresLink AI test/build commands | Local/preview gates must be run explicitly before merge |

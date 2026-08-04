@@ -1,22 +1,36 @@
 -- CaresLink AI Documents V1 metadata-only pilot report.
--- Change the two timestamps before running. Result sets contain aggregates only.
--- Never select identifiers, hashes, idempotency keys, result refs, input or output.
+-- Change the two timestamps before running. Every result set is aggregate-only.
+-- Membership is determined by public.pilot_cohort_members, not auth email or
+-- general provider activity. Never return account, visitor, reservation,
+-- idempotency, result, input, output, participant, or generated-content fields.
 
-begin;
-set local transaction read only;
+begin transaction read only;
 
-create temporary table pilot_window on commit drop as
-select
-  timestamptz '2026-08-05 00:00:00+00' as starts_at,
-  timestamptz '2026-09-04 00:00:00+00' as ends_at;
-
--- Aggregate acquisition and product funnel, including allowlisted surface.
-with events as (
-  select event_name, user_id, visitor_hash, surface, created_at
-  from public.template_companion_events, pilot_window
-  where created_at >= starts_at
-    and created_at < ends_at
-    and user_id is not null
+-- Invite, activation, utility, repeat, paid-intent and credit-exhaustion funnel.
+with
+params as (
+  select
+    timestamptz '2026-08-05 00:00:00+00' as starts_at,
+    timestamptz '2026-09-04 00:00:00+00' as ends_at
+),
+members as (
+  select member.user_id, member.enrolled_at, member.removed_at
+  from public.pilot_cohort_members member
+  cross join params
+  where member.cohort_code = 'ndis_case_note_v01'
+    and member.enrolled_at < params.ends_at
+    and coalesce(member.removed_at, 'infinity'::timestamptz) >= params.starts_at
+),
+events as (
+  select event.event_name, event.user_id, event.visitor_hash, event.created_at
+  from public.template_companion_events event
+  join members on members.user_id = event.user_id
+  cross join params
+  where event.created_at >= greatest(params.starts_at, members.enrolled_at)
+    and event.created_at < least(
+      params.ends_at,
+      coalesce(members.removed_at, 'infinity'::timestamptz)
+    )
 ),
 first_seen as (
   select user_id, min(created_at) filter (where event_name = 'companion_viewed') as viewed_at
@@ -24,12 +38,13 @@ first_seen as (
   group by user_id
 ),
 activated as (
-  select distinct f.user_id
-  from first_seen f
-  join events e on e.user_id = f.user_id
-  where f.viewed_at is not null
-    and e.event_name = 'companion_generated'
-    and e.created_at between f.viewed_at and f.viewed_at + interval '72 hours'
+  select first_seen.user_id, min(events.created_at) as activated_at
+  from first_seen
+  join events on events.user_id = first_seen.user_id
+  where first_seen.viewed_at is not null
+    and events.event_name = 'companion_generated'
+    and events.created_at between first_seen.viewed_at and first_seen.viewed_at + interval '72 hours'
+  group by first_seen.user_id
 ),
 utility as (
   select distinct generated.user_id
@@ -41,63 +56,113 @@ utility as (
    and action.created_at between generated.created_at and generated.created_at + interval '4 hours'
   where generated.event_name = 'companion_generated'
 ),
-first_generation as (
-  select user_id, min(created_at)::date as first_generated_on
-  from events
-  where event_name = 'companion_generated'
-  group by user_id
-),
 repeat_users as (
-  select distinct first_generation.user_id
-  from first_generation
+  select distinct activated.user_id
+  from activated
   join events
-    on events.user_id = first_generation.user_id
+    on events.user_id = activated.user_id
    and events.event_name = 'companion_generated'
-   and events.created_at::date > first_generation.first_generated_on
-   and events.created_at::date <= first_generation.first_generated_on + 14
+   and events.created_at::date > activated.activated_at::date
+   and events.created_at <= activated.activated_at + interval '14 days'
 ),
 paid_intent as (
   select distinct user_id
   from events
   where event_name = 'companion_offer_requested'
+),
+totals as (
+  select
+    (select count(*) from members) as invited_providers,
+    count(distinct events.user_id) as unique_providers,
+    count(distinct events.user_id) filter (where events.event_name = 'companion_viewed') as viewed,
+    count(distinct events.user_id) filter (where events.event_name = 'companion_started') as started,
+    count(distinct events.user_id) filter (where events.event_name = 'companion_generated') as generated,
+    (select count(*) from activated) as activated_within_72h,
+    (select count(*) from utility) as same_session_save_or_copy,
+    (select count(*) from repeat_users) as repeated_within_14d,
+    (select count(*) from paid_intent) as requested_more_credits,
+    count(*) filter (where events.event_name = 'companion_credit_exhausted') as credit_exhausted_events
+  from events
 )
 select
-  count(distinct events.user_id) as unique_providers,
-  count(distinct events.user_id) filter (where event_name = 'companion_viewed') as viewed,
-  count(distinct events.user_id) filter (where event_name = 'companion_started') as started,
-  count(distinct events.user_id) filter (where event_name = 'companion_generated') as generated,
-  count(distinct activated.user_id) as activated_within_72h,
-  count(distinct utility.user_id) as same_session_save_or_copy,
-  count(distinct repeat_users.user_id) as repeated_within_14d,
-  count(distinct paid_intent.user_id) as requested_more_credits,
-  count(*) filter (where event_name = 'companion_credit_exhausted') as credit_exhausted_events
-from events
-left join activated on activated.user_id = events.user_id
-left join utility on utility.user_id = events.user_id
-left join repeat_users on repeat_users.user_id = events.user_id
-left join paid_intent on paid_intent.user_id = events.user_id;
+  invited_providers,
+  unique_providers,
+  viewed,
+  started,
+  generated,
+  activated_within_72h,
+  round(100.0 * activated_within_72h / nullif(invited_providers, 0), 1) as activation_percent,
+  same_session_save_or_copy,
+  round(100.0 * same_session_save_or_copy / nullif(generated, 0), 1) as utility_percent,
+  repeated_within_14d,
+  round(100.0 * repeated_within_14d / nullif(activated_within_72h, 0), 1) as repeat_percent,
+  requested_more_credits,
+  credit_exhausted_events
+from totals;
 
--- Allowlisted source-surface distribution. Null means direct/legacy attribution.
+-- Allowlisted source-surface distribution for active pilot members only.
+with
+params as (
+  select
+    timestamptz '2026-08-05 00:00:00+00' as starts_at,
+    timestamptz '2026-09-04 00:00:00+00' as ends_at
+),
+members as (
+  select member.user_id, member.enrolled_at, member.removed_at
+  from public.pilot_cohort_members member
+  cross join params
+  where member.cohort_code = 'ndis_case_note_v01'
+    and member.enrolled_at < params.ends_at
+    and coalesce(member.removed_at, 'infinity'::timestamptz) >= params.starts_at
+),
+events as (
+  select event.surface, event.event_name, event.user_id
+  from public.template_companion_events event
+  join members on members.user_id = event.user_id
+  cross join params
+  where event.created_at >= greatest(params.starts_at, members.enrolled_at)
+    and event.created_at < least(
+      params.ends_at,
+      coalesce(members.removed_at, 'infinity'::timestamptz)
+    )
+)
 select
   coalesce(surface, 'direct_or_legacy') as surface,
   event_name,
   count(*) as event_count,
   count(distinct user_id) as unique_providers
-from public.template_companion_events, pilot_window
-where created_at >= starts_at
-  and created_at < ends_at
+from events
 group by coalesce(surface, 'direct_or_legacy'), event_name
 order by surface, event_name;
 
--- Controlled release reasons and technical success. No free-text errors are stored.
-with terminal as (
-  select event, reason_code
-  from public.credit_ledger, pilot_window
-  where feature = 'ndis_case_note'
-    and action = 'generate'
-    and created_at >= starts_at
-    and created_at < ends_at
-    and event in ('commit', 'release')
+-- Controlled release reasons and technical success for active pilot members.
+with
+params as (
+  select
+    timestamptz '2026-08-05 00:00:00+00' as starts_at,
+    timestamptz '2026-09-04 00:00:00+00' as ends_at
+),
+members as (
+  select member.user_id, member.enrolled_at, member.removed_at
+  from public.pilot_cohort_members member
+  cross join params
+  where member.cohort_code = 'ndis_case_note_v01'
+    and member.enrolled_at < params.ends_at
+    and coalesce(member.removed_at, 'infinity'::timestamptz) >= params.starts_at
+),
+terminal as (
+  select ledger.event, ledger.reason_code
+  from public.credit_ledger ledger
+  join members on members.user_id = ledger.user_id
+  cross join params
+  where ledger.feature = 'ndis_case_note'
+    and ledger.action = 'generate'
+    and ledger.created_at >= greatest(params.starts_at, members.enrolled_at)
+    and ledger.created_at < least(
+      params.ends_at,
+      coalesce(members.removed_at, 'infinity'::timestamptz)
+    )
+    and ledger.event in ('commit', 'release')
 ),
 technical as (
   select *
@@ -119,29 +184,72 @@ select
   ) as technical_success_percent
 from technical;
 
+-- Controlled release counts only; reason_code is constrained metadata.
+with
+params as (
+  select
+    timestamptz '2026-08-05 00:00:00+00' as starts_at,
+    timestamptz '2026-09-04 00:00:00+00' as ends_at
+),
+members as (
+  select member.user_id, member.enrolled_at, member.removed_at
+  from public.pilot_cohort_members member
+  cross join params
+  where member.cohort_code = 'ndis_case_note_v01'
+    and member.enrolled_at < params.ends_at
+    and coalesce(member.removed_at, 'infinity'::timestamptz) >= params.starts_at
+),
+releases as (
+  select ledger.reason_code
+  from public.credit_ledger ledger
+  join members on members.user_id = ledger.user_id
+  cross join params
+  where ledger.feature = 'ndis_case_note'
+    and ledger.action = 'generate'
+    and ledger.event = 'release'
+    and ledger.created_at >= greatest(params.starts_at, members.enrolled_at)
+    and ledger.created_at < least(
+      params.ends_at,
+      coalesce(members.removed_at, 'infinity'::timestamptz)
+    )
+)
 select reason_code, count(*) as release_count
-from public.credit_ledger, pilot_window
-where feature = 'ndis_case_note'
-  and action = 'generate'
-  and event = 'release'
-  and created_at >= starts_at
-  and created_at < ends_at
+from releases
 group by reason_code
 order by release_count desc, reason_code;
 
--- Must return zero. Aggregate-only credit correctness check.
-with reservation_terminal_counts as (
+-- Must return zero. Aggregate-only credit correctness check for the cohort.
+with
+params as (
   select
-    reservation_id,
-    count(*) filter (where event = 'reserve') as reserve_count,
-    count(*) filter (where event in ('commit', 'release')) as terminal_count
-  from public.credit_ledger, pilot_window
-  where feature = 'ndis_case_note'
-    and action = 'generate'
-    and created_at >= starts_at
-    and created_at < ends_at
-    and reservation_id is not null
-  group by reservation_id
+    timestamptz '2026-08-05 00:00:00+00' as starts_at,
+    timestamptz '2026-09-04 00:00:00+00' as ends_at
+),
+members as (
+  select member.user_id, member.enrolled_at, member.removed_at
+  from public.pilot_cohort_members member
+  cross join params
+  where member.cohort_code = 'ndis_case_note_v01'
+    and member.enrolled_at < params.ends_at
+    and coalesce(member.removed_at, 'infinity'::timestamptz) >= params.starts_at
+),
+reservation_terminal_counts as (
+  select
+    ledger.reservation_id,
+    count(*) filter (where ledger.event = 'reserve') as reserve_count,
+    count(*) filter (where ledger.event in ('commit', 'release')) as terminal_count
+  from public.credit_ledger ledger
+  join members on members.user_id = ledger.user_id
+  cross join params
+  where ledger.feature = 'ndis_case_note'
+    and ledger.action = 'generate'
+    and ledger.created_at >= greatest(params.starts_at, members.enrolled_at)
+    and ledger.created_at < least(
+      params.ends_at,
+      coalesce(members.removed_at, 'infinity'::timestamptz)
+    )
+    and ledger.reservation_id is not null
+  group by ledger.reservation_id
 )
 select count(*) as credit_correctness_anomalies
 from reservation_terminal_counts

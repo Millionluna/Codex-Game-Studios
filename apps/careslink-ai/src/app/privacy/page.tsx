@@ -102,7 +102,7 @@ function getPrivacyCopy(locale: Locale) {
         {
           title: "临时结果与已保存文档",
           paragraphs: [
-            "成功结果通过与当前账号绑定的不透明 claim 暂存，默认有效期为 30 分钟，用于幂等恢复和保存流程。",
+            "成功结果通过与当前账号绑定的不透明 claim 暂存，可在 30 分钟内用于幂等恢复和保存；到期后不能再领取或保存。过期记录会在后续生成或保存流程运行清理时删除，不承诺在第 30 分钟即时物理删除。",
             "用户选择保存后，文档会保留，直到该用户主动删除。已保存内容按账号 owner 边界读取；用户应把需要成为正式记录的内容转入其获授权的记录系统。",
           ],
         },
@@ -152,7 +152,7 @@ function getPrivacyCopy(locale: Locale) {
       {
         title: "Temporary results and saved documents",
         paragraphs: [
-          "A successful result is held under an opaque, account-bound claim for 30 minutes by default to support idempotent recovery and saving.",
+          "A successful result uses an opaque, account-bound claim that can be recovered or saved for 30 minutes. After expiry it cannot be claimed or saved. Expired rows are removed when a later generation or save cleanup runs; this release does not promise physical deletion at the exact 30-minute mark.",
           "When a user saves a document, it remains until that user deletes it. Saved content is read within the account-owner boundary. Material that must become an official record should be transferred to the user's authorised record system.",
         ],
       },

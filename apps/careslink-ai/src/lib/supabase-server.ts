@@ -98,6 +98,13 @@ type CreateCareslinkServerSupabaseClientOptions = {
   env?: SupabasePublicAuthEnv;
 };
 
+type ClearCareslinkSupabaseAuthCookiesOptions = {
+  cookieStore?: ServerCookieStore;
+};
+
+const SUPABASE_AUTH_COOKIE_PATTERN =
+  /^sb-[a-z0-9]+-auth-token(?:-code-verifier)?(?:\.\d+)?$/i;
+
 export function getSupabasePublicAuthConfig(
   env: SupabasePublicAuthEnv = process.env as SupabasePublicAuthEnv,
 ) {
@@ -148,4 +155,31 @@ export async function createCareslinkServerSupabaseClient({
       },
     },
   });
+}
+
+export async function clearCareslinkSupabaseAuthCookies({
+  cookieStore,
+}: ClearCareslinkSupabaseAuthCookiesOptions = {}) {
+  const store = cookieStore ?? ((await nextCookies()) as unknown as ServerCookieStore);
+
+  try {
+    const authCookies = store
+      .getAll()
+      .filter(({ name }) => SUPABASE_AUTH_COOKIE_PATTERN.test(name));
+
+    authCookies.forEach(({ name }) => {
+      store.set(name, "", {
+        expires: new Date(0),
+        httpOnly: true,
+        maxAge: 0,
+        path: "/",
+        sameSite: "lax",
+        secure: process.env.NODE_ENV === "production",
+      });
+    });
+
+    return { ok: true as const, cleared: authCookies.length };
+  } catch {
+    return { ok: false as const, cleared: 0 };
+  }
 }

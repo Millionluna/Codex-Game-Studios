@@ -487,11 +487,17 @@ function getNumericFactTokens(value: string) {
   );
   collect(
     /\b(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})\b/g,
-    (match) => getCanonicalDateFact(match[1], match[2], match[3]),
+    (match) =>
+      hasDateSemanticContext(value, match.index, match.index + match[0].length)
+        ? getCanonicalDateFact(match[1], match[2], match[3])
+        : undefined,
   );
   collect(
     /\b(\d{1,2})[/-](\d{1,2})[/-](\d{4})\b/g,
-    (match) => getCanonicalDateFact(match[3], match[2], match[1]),
+    (match) =>
+      hasDateSemanticContext(value, match.index, match.index + match[0].length)
+        ? getCanonicalDateFact(match[3], match[2], match[1])
+        : undefined,
   );
   collect(
     /\b(\d{1,2})(?:st|nd|rd|th)?\s+(january|february|march|april|may|june|july|august|september|october|november|december)\b/gi,
@@ -612,21 +618,79 @@ function getCanonicalTimeFact(
 
   if (period) {
     if (hour < 1 || hour > 12) {
-      return undefined;
+      return `invalid-time-period:out-of-range:${hour}:${padTwo(minute)}`;
     }
 
-    if (period === "pm" || period === "下午" || period === "晚上") {
+    if (period === "pm") {
       hour = hour === 12 ? 12 : hour + 12;
-    } else if (period === "am" || period === "上午" || period === "凌晨") {
+    } else if (period === "am") {
       hour = hour === 12 ? 0 : hour;
+    } else if (period === "上午") {
+      if (hour === 12) {
+        return getInvalidChineseTimePeriodFact("morning", hour, minute);
+      }
+    } else if (period === "下午") {
+      if (hour === 12) {
+        hour = 12;
+      } else if (hour >= 1 && hour <= 6) {
+        hour += 12;
+      } else {
+        return getInvalidChineseTimePeriodFact("afternoon", hour, minute);
+      }
     } else if (period === "中午") {
-      hour = hour < 11 ? hour + 12 : hour;
+      if (hour !== 12) {
+        return getInvalidChineseTimePeriodFact("noon", hour, minute);
+      }
+    } else if (period === "凌晨") {
+      if (hour === 12) {
+        hour = 0;
+      } else if (hour < 1 || hour > 5) {
+        return getInvalidChineseTimePeriodFact("pre-dawn", hour, minute);
+      }
+    } else if (period === "晚上") {
+      if (hour === 12) {
+        hour = 0;
+      } else if (hour >= 6 && hour <= 11) {
+        hour += 12;
+      } else {
+        return getInvalidChineseTimePeriodFact("evening", hour, minute);
+      }
     }
   } else if (hour < 0 || hour > 23) {
     return undefined;
   }
 
   return `time:${padTwo(hour)}:${padTwo(minute)}`;
+}
+
+function getInvalidChineseTimePeriodFact(
+  period: string,
+  hour: number,
+  minute: number,
+) {
+  return `invalid-time-period:${period}:${padTwo(hour)}:${padTwo(minute)}`;
+}
+
+function hasDateSemanticContext(value: string, start: number, end: number) {
+  const before = value.slice(Math.max(0, start - 96), start).toLowerCase();
+  const after = value.slice(end, Math.min(value.length, end + 48)).toLowerCase();
+
+  const englishBefore = [
+    /\bdate\s*[:\-]?\s*$/,
+    /\b(?:support|service|visit|activity|session|event|incident|record|note)\s+date\s*[:\-]?\s*$/,
+    /\b(?:support|service|visit|activity|session|event|incident|record|note)\b.{0,48}\b(?:on|dated)\s*$/,
+    /\b(?:occurred|provided|delivered|started|ended|recorded|took\s+place)\s+on\s*$/,
+  ];
+  const chineseBefore = [
+    /(?:日期|支持日期|服务日期|活动日期|记录日期)\s*[：:\-]?\s*$/,
+    /(?:支持|服务|活动|访问|会面|记录|事件).{0,32}(?:于|在)\s*$/,
+  ];
+
+  return (
+    englishBefore.some((pattern) => pattern.test(before)) ||
+    chineseBefore.some((pattern) => pattern.test(before)) ||
+    /^\s*(?:提供|进行|发生|开始|结束|记录)/.test(after)
+  );
 }
 
 function isValidCalendarDate(year: number, month: number, day: number) {

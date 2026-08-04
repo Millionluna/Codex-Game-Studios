@@ -8,7 +8,7 @@
 2. Without a session it redirects to `/auth/login` with a validated internal `next`/`returnTo` containing only allowlisted locale, source, resource, and UTM values. No case-note text is accepted in that URL.
 3. A provider login returns to the same Companion route ready for input. Admin roles fall back to the admin workspace.
 4. A direct unauthenticated generation POST returns `401` before JSON parsing, quota, claim creation, telemetry, or OpenAI.
-5. Sign out runs as a server action. It invalidates the Supabase session, retains only an allowlisted provider/admin return route, and sends the user to login. The next protected GET re-enters the auth gate.
+5. Sign out runs as a server action. It invalidates the Supabase session, clears matching local Supabase auth cookies, retains only an allowlisted provider/admin return route, and sends the user to login. Missing auth configuration, remote failure or cookie-cleanup failure returns an error rather than a signed-out success notice. The next protected GET re-enters the auth gate.
 
 ### Google OAuth
 
@@ -38,8 +38,8 @@
 6. The server validates a required idempotency key and atomically reserves 1 monthly account credit. Existing completed keys recover the same owner-bound claim; concurrent keys return a stable in-progress state without another model call.
 7. Server abuse controls apply a per-minute account rate limit and atomic daily account/IP quota. **Deny:** `429` without OpenAI; the reserved account credit is released.
 8. Server calls OpenAI with strict structured output, `store: false`, bounded tokens, and no tools.
-9. Output parsing rejects the whole response if it is malformed, contains an obvious identifier/prohibited conclusion, or fails bilingual numeric parity. English month names, Chinese numeric months, numeric dates and 12/24-hour times are canonicalized before all remaining numeric facts are compared.
-10. Server stores only the generated material in a 30-minute claim immediately bound to the current provider. Only then does the credit commit and metadata-only `companion_generated` emit. Generation or claim failure releases the credit without restoring abuse quota already consumed after OpenAI.
+9. Output parsing rejects the whole response if it is malformed, contains an obvious identifier/prohibited conclusion, or fails bilingual numeric parity. Month names and explicit Chinese date markers are date facts; numeric slash/ISO-shaped values are canonicalized only beside explicit date semantics. Non-date codes and ratios remain exact. Chinese period-hour ranges are explicit; invalid combinations such as `中午10:30` or `晚上1:30` are consumed as non-equivalent sentinels, while `晚上12:05` maps only to `00:05`.
+10. Server stores only the generated material in an account-bound claim that can be recovered or saved for 30 minutes. Expired claims are unusable and are removed opportunistically by a later generation/save cleanup, not by an exact 30-minute scheduler. Only after claim persistence does the credit commit and metadata-only `companion_generated` emit. Generation or claim failure releases the credit without restoring abuse quota already consumed after OpenAI.
 
 ## Privacy and server-bypass denial
 

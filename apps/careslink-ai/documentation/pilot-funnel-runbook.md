@@ -15,7 +15,7 @@ Rollout sequence:
 
 | Metric | Operational definition |
 |---|---|
-| Invited | Provider on the separately controlled invite list. The invite list is not joined into product telemetry. |
+| Invited | Provider has an active `ndis_case_note_v01` row in the service-role-managed `pilot_cohort_members` allowlist. Reports join by owner UUID and membership effective time; they never join or return email. |
 | Activated | First successful `companion_generated` event within 72 hours of that provider's first pilot `companion_viewed` event. |
 | Utility | `companion_saved` or `companion_copied` in the same hashed browser context within 4 hours after a successful generation. This time-bounded proxy avoids storing a raw session or flow ID. |
 | Repeat | Successful generations on at least 2 different UTC dates within 14 days of first activation. |
@@ -24,6 +24,18 @@ Rollout sequence:
 | Credit correctness | Every reservation has exactly one terminal commit or release, no duplicate terminal event, and no negative available balance. |
 
 The application may store allowlisted metadata such as event name, owner ID, hashed visitor context, source/surface, locale, timestamps, credit state, controlled reason code, model name and token counts. Pilot reports must expose only aggregate counts and rates. Never export user IDs, visitor hashes, reservation IDs, idempotency keys, prompts, inputs, outputs, participant facts, generated content, or free-text errors.
+
+## Cohort membership control
+
+`public.pilot_cohort_members` is the sole reporting allowlist for this pilot. It stores only account owner UUID, the fixed cohort code, controlled rollout stage, enrollment time and optional removal time. RLS is enabled; `anon` and `authenticated` have no table privileges. Only a trusted service-role operation may add or close membership.
+
+- Add the 3 canary accounts with `cohort_code = 'ndis_case_note_v01'`, `cohort_stage = 'canary'` and the real invitation time in `enrolled_at`.
+- At the 8-person stage, add only newly invited accounts with `cohort_stage = 'eight_provider'`; do not rewrite earlier enrollment times.
+- At 10-20 people, use `cohort_stage = 'full_pilot'` for new members.
+- To stop counting an account prospectively, set `removed_at`; do not delete the row during the 30-day audit window.
+- Do not store email, contact details, invite messages, answers, prompts or document content in this table.
+
+Every report query joins events and credit ledger rows to an active membership interval. A signed-in provider without a membership row is therefore excluded from invited, activation, utility, repeat, paid-intent, technical-success and credit-correctness pilot measures.
 
 ## Go gate
 
@@ -52,11 +64,12 @@ Do not weaken validation or RLS to keep the pilot running. Record only incident 
 ## Daily operation
 
 1. Review aggregate SQL output from `documentation/pilot-funnel.sql`.
-2. Check Vercel runtime errors and controlled HTTP failure rates without inspecting request bodies.
-3. Confirm outstanding reservations have not exceeded their expiry window.
-4. Confirm credit-correctness anomaly count is zero.
-5. Confirm no new admin view or export exposes content.
-6. At the 48-hour canary checkpoint, record a Go/Pause decision before inviting the next cohort.
+2. Confirm the aggregate invited count matches the controlled cohort stage before interpreting rates; never export the underlying UUID allowlist.
+3. Check Vercel runtime errors and controlled HTTP failure rates without inspecting request bodies.
+4. Confirm outstanding reservations have not exceeded their expiry window.
+5. Confirm credit-correctness anomaly count is zero.
+6. Confirm no new admin view or export exposes content.
+7. At the 48-hour canary checkpoint, record a Go/Pause decision before inviting the next cohort.
 
 ## Attribution contract
 

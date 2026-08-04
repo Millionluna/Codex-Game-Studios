@@ -315,14 +315,17 @@ followUpPrompts
 disclaimer
 ```
 
-Successful authenticated generation creates a 30-minute opaque claim token and
-immediately binds its hash to the current provider user ID. The temporary record
+Successful authenticated generation creates an opaque claim token that can be
+recovered or saved for 30 minutes and immediately binds its hash to the current
+provider user ID. The temporary record
 contains generated output, not raw input. It exists only to support the explicit
 Save action and legacy claim compatibility; this entry point does not create an
 anonymous claim or place a claim in the login URL. The save endpoint persists an
 owner-scoped `generated_material_drafts.feature = ndis_case_note` record. Owner
 binding is never reversed. The temporary claim is deleted after a successful
-save, and expired claims are purged opportunistically before generation/save.
+save. Expiry blocks claiming/saving immediately; the expired row is physically
+removed opportunistically before a later generation/save rather than by an
+exact 30-minute scheduler.
 The provider can permanently delete that saved draft from the product UI.
 Saved drafts otherwise remain in the account until the provider deletes them.
 CaresLink AI is not a formal case-management or statutory record-retention
@@ -334,10 +337,13 @@ retention can still apply unless the OpenAI project has separately approved
 Zero Data Retention controls.
 
 Bilingual numeric-fact comparison canonicalises English month names, Chinese
-numeric dates, Australian/ISO numeric dates, and English/Chinese time forms.
-Dates and times that describe the same moment therefore do not produce false
-alarms, while unrelated counts and durations remain exact. A genuine date,
-time, or quantity mismatch rejects the complete output.
+date markers, context-qualified Australian/ISO numeric dates, and audited
+English/Chinese time forms. Slash or ISO-shaped ratios/codes without date
+semantics remain exact. Chinese period-hour ranges are explicit: noon accepts
+only 12:xx, pre-dawn accepts 12/1-5, and evening accepts 6-11 with evening 12
+mapped to 00. Invalid combinations become non-equivalent sentinels instead of
+falling through to a generic time matcher. A genuine date,
+time, code, ratio, or quantity mismatch rejects the complete output.
 
 Companion telemetry is metadata-only. The event names are:
 
@@ -373,6 +379,7 @@ supabase/migrations/20260804190000_create_account_credit_entitlements.sql
 supabase/migrations/20260804193000_tighten_account_credit_table_privileges.sql
 supabase/migrations/20260804194500_fix_new_entitlement_effective_time.sql
 supabase/migrations/20260804203500_add_companion_pilot_attribution_events.sql
+supabase/migrations/20260804223000_create_ndis_case_note_pilot_cohort.sql
 ```
 
 `/plan-and-usage` reads the current owner's server-side entitlement and
@@ -383,11 +390,15 @@ opt in to a concept test for `Starter A$9.99/month for 30 generation credits`. T
 collects no free text or new contact details, records metadata only, does not
 charge the account, and does not add credits. Pilot operations and aggregate
 queries are documented in `documentation/pilot-funnel-runbook.md` and
-`documentation/pilot-funnel.sql`.
+`documentation/pilot-funnel.sql`. The report includes only accounts in the
+service-role-managed `pilot_cohort_members` UUID allowlist during each
+membership's effective interval; non-invited providers never enter pilot rates.
 
 The server-side Sign out action is available from desktop and mobile account
 surfaces. It clears the Supabase session and returns only through an allowlisted
-internal path; signed-out access immediately restores the provider gate. The
+internal path; signed-out access immediately restores the provider gate. If the
+auth client or remote sign-out is unavailable, matching local Supabase auth
+cookies are cleared and the page shows an error rather than a false success. The
 AI-specific Privacy, Collection & Retention Notice is available at `/privacy`
 from authentication, Companion, Saved Documents, the shared shell, and the
 public AI landing page.

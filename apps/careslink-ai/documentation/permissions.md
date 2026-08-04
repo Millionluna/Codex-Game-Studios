@@ -28,7 +28,7 @@ provider.
 | Change saved status | Deny | Own record only | Not exposed for case notes | Server record-owner comparison |
 | Write companion telemetry | Deny | Allowlisted metadata events | Deny | Session-first event route, server constructors and schema |
 | View admin material usage | Deny | Deny | Allow | Admin route gate; metadata selectors; case-note exclusion |
-| Sign out | No active session | Clear own session; safe provider return only | Clear own session; safe admin return allowed | Server action plus internal-route allowlist |
+| Sign out | No active session | Clear own session; safe provider return only | Clear own session; safe admin return allowed | Server action, internal-route allowlist, matching local auth-cookie cleanup, fail-closed error state |
 | View privacy notice | Allow | Allow | Allow | Public read-only route; no account data |
 | Request more credits fake door | Deny | Metadata opt-in for own signed-in account | Deny | Provider-only event route; fixed event name; no contact/free-text body; no entitlement mutation |
 
@@ -43,6 +43,7 @@ provider.
 | `generated_material_events` | RLS enabled; service role only | Server-created metadata events; no content column |
 | `account_entitlements` | RLS enabled; `authenticated` and service role receive `SELECT` only | Owner policy uses `auth.uid() = user_id`; creation/configuration occurs only inside service-role RPC/migration |
 | `credit_ledger` | RLS enabled; `authenticated` and service role receive `SELECT` only | Owner policy plus append-only constraints; grant/reserve/commit/release writes are security-definer RPC only |
+| `pilot_cohort_members` | RLS enabled; all privileges revoked from `public`/`anon`/`authenticated`; service role only | Fixed cohort/stage constraints and effective membership interval; aggregate reports join UUID internally but never return it |
 
 Credit RPC execution is revoked from `public`, `anon`, and `authenticated` and
 granted only to `service_role`. Their `search_path` is fixed to an empty path,

@@ -10,6 +10,7 @@ import {
   signUpWithPasswordForWorkspace,
 } from "../../lib/referral-workspace-auth-actions";
 import {
+  clearCareslinkSupabaseAuthCookies,
   createCareslinkServerSupabaseClient,
   getSupabasePublicAuthConfig,
 } from "../../lib/supabase-server";
@@ -104,16 +105,27 @@ export async function signOutAction(formData: FormData) {
 
   const supabase = await createCareslinkServerSupabaseClient();
 
-  if (supabase) {
-    const { error } = await supabase.auth.signOut();
+  if (!supabase) {
+    const cookieCleanup = await clearCareslinkSupabaseAuthCookies();
 
-    if (error) {
-      return redirect(
-        getAuthPageRedirectHref("/auth/login", formData, {
-          error: "Unable to sign out. Please try again.",
-        }),
-      );
-    }
+    return redirect(
+      getAuthPageRedirectHref("/auth/login", formData, {
+        error: cookieCleanup.ok
+          ? "Authentication is unavailable. Local session cookies were cleared, but remote sign-out could not be confirmed. Please try again before continuing."
+          : "Authentication is unavailable and local session cookies could not be cleared. Do not continue on this device until sign-out succeeds.",
+      }),
+    );
+  }
+
+  const { error } = await supabase.auth.signOut();
+  const cookieCleanup = await clearCareslinkSupabaseAuthCookies();
+
+  if (error || !cookieCleanup.ok) {
+    return redirect(
+      getAuthPageRedirectHref("/auth/login", formData, {
+        error: "Unable to confirm sign-out. Please try again.",
+      }),
+    );
   }
 
   if (locale) {
