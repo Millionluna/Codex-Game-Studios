@@ -343,10 +343,10 @@ function getNavigation(
           ],
         },
         {
-          href: "/referral-workspace/access",
+          href: "/plan-and-usage",
           label: copy.planUsage,
           icon: KeyRound,
-          activePaths: ["/referral-workspace/access"],
+          activePaths: ["/plan-and-usage"],
         },
       ],
     } satisfies { primary: ShellNavItem[]; secondary: ShellNavItem[] };
@@ -471,6 +471,7 @@ function allowsWorkspaceAccount(pathname: string) {
     pathname === "/ai-documents" ||
     pathname.startsWith("/ai-documents/") ||
     pathname === "/template-companion/ndis-case-note" ||
+    pathname === "/plan-and-usage" ||
     pathname === "/referral-workspace" ||
     pathname.startsWith("/referral-workspace/") ||
     pathname === "/admin/access-requests" ||

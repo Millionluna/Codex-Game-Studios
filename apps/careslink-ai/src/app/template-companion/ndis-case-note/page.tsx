@@ -1,5 +1,9 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
+import {
+  getAccountCreditStore,
+  type AccountCreditSummary,
+} from "@/lib/account-credit-store";
 import { getGeneratedMaterialDraftStore } from "@/lib/generated-material-draft-store";
 import {
   getNdisCaseNoteCompanionStore,
@@ -65,7 +69,10 @@ export default async function NdisCaseNoteCompanionPage({
   const canReadClaim =
     claim &&
     (!claim.claimedByUserId || claim.claimedByUserId === account.id);
-  const savedDrafts = await getSavedNdisCaseNoteDrafts(account.id);
+  const [savedDrafts, creditUsage] = await Promise.all([
+    getSavedNdisCaseNoteDrafts(account.id),
+    getAccountCreditSummary(account.id),
+  ]);
 
   return (
     <NdisCaseNoteCompanion
@@ -74,8 +81,33 @@ export default async function NdisCaseNoteCompanionPage({
       initialMaterial={canReadClaim ? claim.material : undefined}
       autoSave={getFirstParam(params?.save) === "1"}
       savedDrafts={savedDrafts}
+      initialCreditUsage={creditUsage}
     />
   );
+}
+
+async function getAccountCreditSummary(
+  userId: string,
+): Promise<AccountCreditSummary | null> {
+  try {
+    const usage = await getAccountCreditStore().getUsage({
+      userId,
+      recentLimit: 1,
+    });
+
+    return {
+      planCode: usage.planCode,
+      status: usage.status,
+      periodStart: usage.periodStart,
+      periodEnd: usage.periodEnd,
+      creditLimit: usage.creditLimit,
+      remainingCredits: usage.remainingCredits,
+      usedCredits: usage.usedCredits,
+      reservedCredits: usage.reservedCredits,
+    };
+  } catch {
+    return null;
+  }
 }
 
 async function getSavedNdisCaseNoteDrafts(

@@ -25,6 +25,11 @@ No secret values belong in this document, source control, browser bundles, URLs,
 | `SUPABASE_GENERATED_MATERIAL_DRAFTS_TABLE` | `generated_material_drafts` | Wrong name disables save/history |
 | `CARESLINK_ALLOW_COMPANION_MEMORY_STORE` | Not enabled in production | Setting `true` in production makes claims/quota non-durable and is not RC-approved |
 
+Credits have no client or environment limit override in V0.1. The free limit
+of 3 per UTC calendar month is persisted in `account_entitlements` by the
+database RPC. Missing tables/functions or service-role access fails closed;
+there is no memory-credit fallback.
+
 ## URL and auth configuration
 
 `NEXT_PUBLIC_APP_URL`, `NEXT_PUBLIC_CARESLINK_AI_BASE_URL`, `NEXT_PUBLIC_SITE_URL`, `APP_URL`, and `VERCEL_PROJECT_PRODUCTION_URL` may be used to construct safe internal redirects or public links. Demo flags must remain false for real preview/provider sessions.
@@ -48,6 +53,7 @@ Only `NEXT_PUBLIC_*` values may be bundled. They must contain public URLs, publi
 - Confirm required names exist in the Vercel Preview environment without printing values.
 - Confirm demo auth and companion memory fallback are not enabled.
 - Confirm the Supabase project has the companion migration.
+- Confirm the account entitlement/ledger migrations, owner RLS, and service-role-only credit RPC grants are present.
 - Run PII denial before any live generation.
 - Confirm unauthenticated GET enters login and unauthenticated POST returns `401` before quota/OpenAI.
 - Run one authenticated synthetic generation, PII denial, account/IP quota denial, owner-bound claim/save, cross-account denial, metadata-only checks, then delete temporary accounts/data.

@@ -22,9 +22,10 @@ CaresLink AI provides guided business-document drafting. The provider-authentica
 3. Browser Privacy Review detects obvious identifiers and unsafe wording, proposes cleaned structured facts, and requires each finding to be resolved.
 4. The browser constructs a generation body only after minimum facts and two unchecked-by-default confirmations are complete.
 5. `POST /api/template-companion/ndis-case-note` verifies a provider session before body parsing, quota, claim, telemetry, or OpenAI, then repeats privacy attestation and input validation.
-6. OpenAI returns a strict bilingual object. Server parsing rejects malformed, identifying, prohibited, or numerically inconsistent output as a whole.
-7. A successful result is stored as a 30-minute claim already bound to the current provider under a SHA-256 token hash; this entry point creates no anonymous claim.
-8. The provider may explicitly save the claim to `generated_material_drafts`, later read it or permanently delete it. Saved-document operations always include the current account ID. Admin surfaces expose metadata or aggregates, not case-note content.
+6. A server-only RPC lazily creates the monthly free entitlement and grant, then atomically reserves 1 credit against the request idempotency key. Same-key concurrent/replayed requests cannot reserve twice.
+7. OpenAI returns a strict bilingual object. Server parsing rejects malformed, identifying, prohibited, or numerically inconsistent output as a whole.
+8. A successful result is stored as a 30-minute claim already bound to the current provider under a deterministic pepper-derived token hash. The credit commits only after that claim is available; failed work releases the credit.
+9. The provider may explicitly save the claim to `generated_material_drafts`, later read it or permanently delete it. Saved-document operations always include the current account ID. Admin surfaces expose metadata or aggregates, not case-note content.
 
 Login and registration present Google only when the server-side release gate is
 explicitly enabled after Supabase provider and redirect verification. The server
@@ -40,6 +41,7 @@ account and any role-like `user_metadata` remain provider-scoped.
 | Browser to companion API | Verified provider session first; no raw paste field in request type; minimum-fact closure; two attestations; server revalidation |
 | Server to OpenAI | Server-only API key; bounded output; strict schema; `store: false`; no tool calls |
 | Server to Supabase | Service-role client only for claims, quota, events, and material drafts |
+| Credit authorization | Monthly entitlement plus append-only ledger; service-role-only reserve/commit/release RPCs; idempotency key and per-user advisory lock |
 | Claim to account | Opaque token hash plus `claimed_by_user_id` condition in a service-role-only RPC |
 | Saved draft to account | Server resolves Supabase session and filters/checks `user_id`; delete uses one `id + user_id + feature` statement; authenticated owner `SELECT`/`DELETE` RLS is prepared by migration |
 | Admin reporting | Metadata-only selectors; NDIS case-note drafts are excluded from current material-usage detail |
@@ -59,6 +61,8 @@ target Supabase project.
 | `template_companion_quota_usage` | Date, quota scope, pseudonymous fingerprint hash, count |
 | `template_companion_events` | Event name, optional user ID, visitor hash, allowlisted attribution, locale, timestamp |
 | `generated_material_drafts` | Provider-owned saved output and status |
+| `account_entitlements` | Provider owner, free plan status, UTC monthly period, limit, and effective timestamps |
+| `credit_ledger` | Append-only feature/action/event/units/reservation/model/token-count metadata; no prompt, input, output, participant fact, or email |
 
 Raw pasted notes, matched spans, structured input, and generated content are not written to companion telemetry. There is no participant database or upload surface.
 
@@ -70,6 +74,7 @@ formal record-retention system.
 
 - Privacy detection is heuristic and cannot guarantee complete de-identification. Manual review remains mandatory.
 - Account and pepper-derived IP quota identities are abuse controls. Shared networks may share an IP limit.
+- Credits and abuse quota are intentionally separate: failures release credits, while an attempt that reached OpenAI can still consume the daily abuse quota.
 - The short-lived claim token remains a bearer capability inside the authenticated page. Immediate owner binding, `referrer: no-referrer`, 30-minute expiry, and hashed storage reduce forwarding risk.
 - Owner isolation for service-role draft access depends on server handlers continuing to apply `user_id` checks; owner RLS applies only to session-bound authenticated queries after its migration is applied.
 - Non-production may use an in-memory fallback. Production fails closed without persistent companion storage unless `CARESLINK_ALLOW_COMPANION_MEMORY_STORE=true` is deliberately set.

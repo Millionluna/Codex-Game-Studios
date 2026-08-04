@@ -23,6 +23,17 @@ const material = {
   disclaimer: NDIS_CASE_NOTE_DISCLAIMER,
 };
 
+const creditUsage = {
+  planCode: "free" as const,
+  status: "active" as const,
+  periodStart: "2026-08-01",
+  periodEnd: "2026-09-01",
+  creditLimit: 3,
+  remainingCredits: 2,
+  usedCredits: 1,
+  reservedCredits: 0,
+};
+
 describe("NDIS case note companion UI", () => {
   it("keeps the authenticated companion route out of search indexes", () => {
     const pageSource = readFileSync(new URL("./page.tsx", import.meta.url), "utf8");
@@ -40,11 +51,12 @@ describe("NDIS case note companion UI", () => {
         attribution,
         autoSave: false,
         savedDrafts: [],
+        initialCreditUsage: creditUsage,
       }),
     );
 
-    expect(markup).toContain("Available with a free account");
-    expect(markup).toContain("Register or sign in to generate");
+    expect(markup).toContain("2 of 3 credits remaining this period");
+    expect(markup).toContain("One new draft uses 1 credit");
     expect(markup).toContain("Do not enter names");
     expect(markup).toContain("Review privacy first");
     expect(markup).toContain("Structured facts");
@@ -74,6 +86,7 @@ describe("NDIS case note companion UI", () => {
         initialMaterial: material,
         autoSave: false,
         savedDrafts: [],
+        initialCreditUsage: creditUsage,
       }),
     );
 
@@ -92,6 +105,7 @@ describe("NDIS case note companion UI", () => {
       createElement(NdisCaseNoteCompanion, {
         attribution,
         autoSave: false,
+        initialCreditUsage: creditUsage,
         savedDrafts: [
           {
             id: "ndis-case-note-owner-1",
@@ -118,6 +132,7 @@ describe("NDIS case note companion UI", () => {
         attribution: { ...attribution, locale: "zh-Hans" as const },
         autoSave: false,
         savedDrafts: [],
+        initialCreditUsage: creditUsage,
       }),
     );
 
@@ -125,6 +140,7 @@ describe("NDIS case note companion UI", () => {
     expect(markup).toContain("粘贴中文记录");
     expect(markup).toContain("仅说明处理权限");
     expect(markup).toContain("不代表或替代 participant consent");
+    expect(markup).toContain("本周期剩余 2 / 3 credits");
     expect(markup.match(/type="checkbox"/g)).toHaveLength(2);
     expect(markup).not.toMatch(/type="checkbox"[^>]*checked/);
   });

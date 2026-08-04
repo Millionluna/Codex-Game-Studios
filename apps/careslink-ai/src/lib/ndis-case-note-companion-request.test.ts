@@ -5,6 +5,7 @@ import {
   NDIS_CASE_NOTE_UTM_CAMPAIGN,
   buildNdisCaseNoteCompanionAuthHref,
   buildNdisCaseNoteCompanionHref,
+  createNdisCaseNoteIdempotentClaimToken,
   getNdisCaseNoteCompanionAttribution,
   getNdisCaseNoteRequestIdentity,
 } from "./ndis-case-note-companion-request";
@@ -77,6 +78,27 @@ describe("NDIS case note request metadata", () => {
     expect(href).toContain(`claimToken=${"a".repeat(43)}`);
     expect(href).not.toContain("observableFacts");
     expect(href).not.toContain("caseNoteDraft");
+  });
+
+  it("derives a stable opaque claim token from the owner and credit reservation", () => {
+    const input = {
+      userId: "11111111-1111-4111-8111-111111111111",
+      reservationId: "22222222-2222-4222-8222-222222222222",
+    };
+    const env = {
+      NODE_ENV: "production",
+      NDIS_CASE_NOTE_FINGERPRINT_PEPPER: "dedicated-test-pepper",
+    };
+    const token = createNdisCaseNoteIdempotentClaimToken(input, env);
+
+    expect(token).toMatch(/^[a-f0-9]{64}$/);
+    expect(createNdisCaseNoteIdempotentClaimToken(input, env)).toBe(token);
+    expect(
+      createNdisCaseNoteIdempotentClaimToken(
+        { ...input, userId: "33333333-3333-4333-8333-333333333333" },
+        env,
+      ),
+    ).not.toBe(token);
   });
 
   it("builds a provider login handoff with only allowlisted attribution", () => {

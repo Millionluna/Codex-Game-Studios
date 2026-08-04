@@ -1,13 +1,21 @@
 import { NextResponse } from "next/server";
+import {
+  getAccountCreditStore,
+  type AccountCreditDecision,
+  type AccountCreditStore,
+} from "@/lib/account-credit-store";
 import { getGuidedAiRateLimiter } from "@/lib/guided-ai-rate-limit";
 import {
   createNdisCaseNoteClaim,
   createNdisCaseNoteCompanionEvent,
   getNdisCaseNoteCompanionStore,
+  hashCompanionToken,
+  type NdisCaseNoteCompanionClaimRecord,
   type NdisCaseNoteCompanionStore,
   type NdisCaseNoteQuotaScope,
 } from "@/lib/ndis-case-note-companion-store";
 import {
+  createNdisCaseNoteIdempotentClaimToken,
   getNdisCaseNoteCompanionAttribution,
   getNdisCaseNoteRequestIdentity,
   getNdisCaseNoteUsageDate,
@@ -33,9 +41,18 @@ type ReservedQuota = {
   usageDate: string;
 };
 
+type GenerationMeta = {
+  model: string;
+  inputTokenCount: number;
+  outputTokenCount: number;
+};
+
 const DEFAULT_MODEL = "gpt-5.4-mini";
 const DEFAULT_AUTHENTICATED_DAILY_LIMIT = 3;
 const DEFAULT_AUTHENTICATED_IP_DAILY_LIMIT = 20;
+const CREDIT_FEATURE = "ndis_case_note";
+const CREDIT_ACTION = "generate";
+const IDEMPOTENCY_KEY_PATTERN = /^[A-Za-z0-9_-]{16,128}$/;
 
 export async function POST(request: Request) {
   const supabase = await createCareslinkServerSupabaseClient();
@@ -97,6 +114,19 @@ export async function POST(request: Request) {
     );
   }
 
+  const idempotencyKey = request.headers.get("idempotency-key")?.trim();
+
+  if (!idempotencyKey || !IDEMPOTENCY_KEY_PATTERN.test(idempotencyKey)) {
+    return NextResponse.json(
+      {
+        ok: false,
+        code: "idempotency_key_required",
+        error: "A valid idempotency key is required.",
+      },
+      { status: 400 },
+    );
+  }
+
   const apiKey = process.env.OPENAI_API_KEY?.trim();
 
   if (!apiKey) {
@@ -111,12 +141,14 @@ export async function POST(request: Request) {
   }
 
   let identity: ReturnType<typeof getNdisCaseNoteRequestIdentity>;
-  let store: NdisCaseNoteCompanionStore;
+  let companionStore: NdisCaseNoteCompanionStore;
+  let creditStore: AccountCreditStore;
 
   try {
     identity = getNdisCaseNoteRequestIdentity(request);
-    store = getNdisCaseNoteCompanionStore();
-    await store.purgeExpiredClaims();
+    companionStore = getNdisCaseNoteCompanionStore();
+    creditStore = getAccountCreditStore();
+    await companionStore.purgeExpiredClaims();
   } catch {
     return NextResponse.json(
       {
@@ -128,10 +160,86 @@ export async function POST(request: Request) {
     );
   }
 
+  let credit: AccountCreditDecision;
+
+  try {
+    credit = await creditStore.reserveCredit({
+      userId: account.id,
+      feature: CREDIT_FEATURE,
+      action: CREDIT_ACTION,
+      idempotencyKey,
+    });
+  } catch {
+    return withCompanionSessionCookie(
+      NextResponse.json(
+        {
+          ok: false,
+          code: "credits_unavailable",
+          error: "Credit availability could not be confirmed.",
+        },
+        { status: 503 },
+      ),
+      identity.sessionId,
+    );
+  }
+
+  const replay = await resolveExistingReservation({
+    credit,
+    creditStore,
+    companionStore,
+    userId: account.id,
+    sessionId: identity.sessionId,
+  });
+
+  if (replay) {
+    return replay;
+  }
+
+  if (credit.reservationStatus === "exhausted") {
+    return withCompanionSessionCookie(
+      NextResponse.json(
+        {
+          ok: false,
+          code: "credit_exhausted",
+          error: "No case note generation credits remain in this period.",
+          credits: toCreditSummary(credit),
+        },
+        { status: 429 },
+      ),
+      identity.sessionId,
+    );
+  }
+
+  if (
+    credit.reservationStatus !== "reserved" ||
+    !credit.isNew ||
+    !credit.reservationId
+  ) {
+    return withCompanionSessionCookie(
+      NextResponse.json(
+        {
+          ok: false,
+          code: "credits_unavailable",
+          error: "A generation credit could not be reserved.",
+        },
+        { status: 503 },
+      ),
+      identity.sessionId,
+    );
+  }
+
+  const reservationId = credit.reservationId;
   const rateLimitKey = `ndis-case-note:user:${account.id}`;
   const rateLimit = getGuidedAiRateLimiter().check(rateLimitKey);
 
   if (!rateLimit.allowed) {
+    await releaseCreditSafely({
+      creditStore,
+      userId: account.id,
+      reservationId,
+      reasonCode: "rate_limited",
+    });
+
     return withCompanionSessionCookie(
       NextResponse.json(
         {
@@ -151,11 +259,18 @@ export async function POST(request: Request) {
 
   try {
     quota = await reserveCompanionQuota({
-      store,
+      store: companionStore,
       accountId: account.id,
       ipHash: identity.ipHash,
     });
   } catch {
+    await releaseCreditSafely({
+      creditStore,
+      userId: account.id,
+      reservationId,
+      reasonCode: "abuse_quota_unavailable",
+    });
+
     return withCompanionSessionCookie(
       NextResponse.json(
         {
@@ -170,6 +285,13 @@ export async function POST(request: Request) {
   }
 
   if (!quota.allowed) {
+    await releaseCreditSafely({
+      creditStore,
+      userId: account.id,
+      reservationId,
+      reasonCode: "daily_limit_reached",
+    });
+
     return withCompanionSessionCookie(
       NextResponse.json(
         {
@@ -187,57 +309,320 @@ export async function POST(request: Request) {
     process.env.OPENAI_NDIS_CASE_NOTE_MODEL?.trim() ||
     process.env.OPENAI_MODEL?.trim() ||
     DEFAULT_MODEL;
+  let generated: Awaited<ReturnType<typeof generateNdisCaseNoteDraft>>;
 
   try {
-    const generated = await generateNdisCaseNoteDraft({
+    generated = await generateNdisCaseNoteDraft({
       input: validation.input,
       apiKey,
       model,
     });
-    const claim = createNdisCaseNoteClaim({
-      material: generated.material,
-      claimedByUserId: account.id,
-    });
-
-    await store.saveClaim(claim.record);
-    await recordCompanionEventSafely({
-      store,
-      eventName: "companion_generated",
-      userId: account.id,
-      visitorHash: identity.visitorHash,
-      request,
-    });
-
-    return withCompanionSessionCookie(
-      NextResponse.json({
-        ok: true,
-        feature: "ndis_case_note",
-        material: generated.material,
-        claimToken: claim.token,
-        signedIn: true,
-        meta: {
-          model,
-          inputTokenCount: generated.inputTokenCount,
-          outputTokenCount: generated.outputTokenCount,
-          expiresAt: claim.record.expiresAt,
-          note:
-            "User-reviewed draft wording. General documentation support only.",
-        },
-      }),
-      identity.sessionId,
-    );
   } catch {
+    await releaseCreditSafely({
+      creditStore,
+      userId: account.id,
+      reservationId,
+      reasonCode: "generation_failed",
+    });
+
+    return generationFailedResponse(identity.sessionId);
+  }
+
+  const claimToken = createNdisCaseNoteIdempotentClaimToken({
+    userId: account.id,
+    reservationId,
+  });
+  const generationMeta = {
+    model,
+    inputTokenCount: generated.inputTokenCount,
+    outputTokenCount: generated.outputTokenCount,
+  } satisfies GenerationMeta;
+  const claim = createNdisCaseNoteClaim({
+    token: claimToken,
+    material: generated.material,
+    generationMeta,
+    claimedByUserId: account.id,
+  });
+
+  try {
+    await companionStore.saveClaim(claim.record);
+  } catch {
+    await releaseCreditSafely({
+      creditStore,
+      userId: account.id,
+      reservationId,
+      reasonCode: "claim_persistence_failed",
+    });
+
+    return generationFailedResponse(identity.sessionId);
+  }
+
+  let committed: AccountCreditDecision;
+
+  try {
+    committed = await creditStore.commitCredit({
+      userId: account.id,
+      reservationId,
+      resultRef: claim.record.tokenHash,
+      ...generationMeta,
+    });
+  } catch {
+    await releaseCreditSafely({
+      creditStore,
+      userId: account.id,
+      reservationId,
+      reasonCode: "credit_commit_failed",
+    });
+
     return withCompanionSessionCookie(
       NextResponse.json(
         {
           ok: false,
-          code: "generation_failed",
-          error: "The draft could not be generated safely.",
+          code: "service_unavailable",
+          error: "The generation result could not be finalised.",
         },
-        { status: 502 },
+        { status: 503 },
       ),
       identity.sessionId,
     );
+  }
+
+  if (committed.reservationStatus !== "completed") {
+    await releaseCreditSafely({
+      creditStore,
+      userId: account.id,
+      reservationId,
+      reasonCode: "credit_commit_rejected",
+    });
+
+    return withCompanionSessionCookie(
+      NextResponse.json(
+        {
+          ok: false,
+          code: "service_unavailable",
+          error: "The generation result could not be finalised.",
+        },
+        { status: 503 },
+      ),
+      identity.sessionId,
+    );
+  }
+
+  await recordCompanionEventSafely({
+    store: companionStore,
+    eventName: "companion_generated",
+    userId: account.id,
+    visitorHash: identity.visitorHash,
+    request,
+  });
+
+  return createSuccessResponse({
+    claimToken,
+    claim: claim.record,
+    generationMeta,
+    credit: committed,
+    sessionId: identity.sessionId,
+  });
+}
+
+async function resolveExistingReservation({
+  credit,
+  creditStore,
+  companionStore,
+  userId,
+  sessionId,
+}: {
+  credit: AccountCreditDecision;
+  creditStore: AccountCreditStore;
+  companionStore: NdisCaseNoteCompanionStore;
+  userId: string;
+  sessionId: string;
+}) {
+  if (
+    credit.reservationStatus !== "completed" &&
+    !(credit.reservationStatus === "reserved" && !credit.isNew)
+  ) {
+    if (credit.reservationStatus === "released") {
+      return withCompanionSessionCookie(
+        NextResponse.json(
+          {
+            ok: false,
+            code: "generation_not_completed",
+            error: "This generation attempt did not complete.",
+          },
+          { status: 409 },
+        ),
+        sessionId,
+      );
+    }
+
+    return undefined;
+  }
+
+  if (!credit.reservationId) {
+    return idempotencyResultUnavailable(sessionId);
+  }
+
+  const claimToken = createNdisCaseNoteIdempotentClaimToken({
+    userId,
+    reservationId: credit.reservationId,
+  });
+  const resultRef = hashCompanionToken(claimToken);
+
+  if (
+    credit.reservationStatus === "completed" &&
+    credit.resultRef !== resultRef
+  ) {
+    return idempotencyResultUnavailable(sessionId);
+  }
+
+  let claim: NdisCaseNoteCompanionClaimRecord | undefined;
+
+  try {
+    claim = await companionStore.getClaim(claimToken);
+  } catch {
+    return idempotencyResultUnavailable(sessionId);
+  }
+
+  if (!claim || claim.claimedByUserId !== userId || !claim.generationMeta) {
+    if (credit.reservationStatus === "reserved") {
+      return withCompanionSessionCookie(
+        NextResponse.json(
+          {
+            ok: false,
+            code: "generation_in_progress",
+            error: "This generation request is still being processed.",
+            retryAfterSeconds: 2,
+          },
+          { status: 409 },
+        ),
+        sessionId,
+      );
+    }
+
+    return idempotencyResultUnavailable(sessionId);
+  }
+
+  let completed = credit;
+
+  if (credit.reservationStatus === "reserved") {
+    try {
+      completed = await creditStore.commitCredit({
+        userId,
+        reservationId: credit.reservationId,
+        resultRef,
+        ...claim.generationMeta,
+      });
+    } catch {
+      return idempotencyResultUnavailable(sessionId);
+    }
+  }
+
+  if (completed.reservationStatus !== "completed") {
+    return idempotencyResultUnavailable(sessionId);
+  }
+
+  return createSuccessResponse({
+    claimToken,
+    claim,
+    generationMeta: claim.generationMeta,
+    credit: completed,
+    sessionId,
+  });
+}
+
+function createSuccessResponse({
+  claimToken,
+  claim,
+  generationMeta,
+  credit,
+  sessionId,
+}: {
+  claimToken: string;
+  claim: NdisCaseNoteCompanionClaimRecord;
+  generationMeta: GenerationMeta;
+  credit: AccountCreditDecision;
+  sessionId: string;
+}) {
+  return withCompanionSessionCookie(
+    NextResponse.json({
+      ok: true,
+      feature: CREDIT_FEATURE,
+      material: claim.material,
+      claimToken,
+      signedIn: true,
+      credits: toCreditSummary(credit),
+      meta: {
+        ...generationMeta,
+        expiresAt: claim.expiresAt,
+        note:
+          "User-reviewed draft wording. General documentation support only.",
+      },
+    }),
+    sessionId,
+  );
+}
+
+function idempotencyResultUnavailable(sessionId: string) {
+  return withCompanionSessionCookie(
+    NextResponse.json(
+      {
+        ok: false,
+        code: "idempotency_result_unavailable",
+        error: "This completed attempt is no longer available to display.",
+      },
+      { status: 409 },
+    ),
+    sessionId,
+  );
+}
+
+function generationFailedResponse(sessionId: string) {
+  return withCompanionSessionCookie(
+    NextResponse.json(
+      {
+        ok: false,
+        code: "generation_failed",
+        error: "The draft could not be generated safely.",
+      },
+      { status: 502 },
+    ),
+    sessionId,
+  );
+}
+
+function toCreditSummary(credit: AccountCreditDecision) {
+  return {
+    planCode: credit.planCode,
+    status: credit.status,
+    periodStart: credit.periodStart,
+    periodEnd: credit.periodEnd,
+    creditLimit: credit.creditLimit,
+    remainingCredits: credit.remainingCredits,
+    usedCredits: credit.usedCredits,
+    reservedCredits: credit.reservedCredits,
+  };
+}
+
+async function releaseCreditSafely({
+  creditStore,
+  userId,
+  reservationId,
+  reasonCode,
+}: {
+  creditStore: AccountCreditStore;
+  userId: string;
+  reservationId: string;
+  reasonCode: string;
+}) {
+  try {
+    return await creditStore.releaseCredit({
+      userId,
+      reservationId,
+      reasonCode,
+    });
+  } catch {
+    return undefined;
   }
 }
 

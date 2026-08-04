@@ -34,6 +34,11 @@ export type NdisCaseNoteCompanionEventRecord = {
 export type NdisCaseNoteCompanionClaimRecord = {
   tokenHash: string;
   material: NdisCaseNoteMaterial;
+  generationMeta?: {
+    model: string;
+    inputTokenCount: number;
+    outputTokenCount: number;
+  };
   expiresAt: string;
   claimedByUserId?: string;
   claimedAt?: string;
@@ -103,6 +108,9 @@ type CompanionStoreEnv = {
 type CompanionClaimRow = {
   token_hash: string;
   material: unknown;
+  generation_model: string | null;
+  input_token_count: number | null;
+  output_token_count: number | null;
   expires_at: string;
   claimed_by_user_id: string | null;
   claimed_at: string | null;
@@ -127,7 +135,7 @@ const GLOBAL_STORE_KEY = "__careslinkNdisCaseNoteCompanionStore__";
 const DEFAULT_CLAIMS_TABLE = "ndis_case_note_companion_claims";
 const DEFAULT_EVENTS_TABLE = "template_companion_events";
 const CLAIM_COLUMNS =
-  "token_hash,material,expires_at,claimed_by_user_id,claimed_at,created_at";
+  "token_hash,material,generation_model,input_token_count,output_token_count,expires_at,claimed_by_user_id,claimed_at,created_at";
 const EVENT_COLUMNS =
   "id,event_name,user_id,visitor_hash,source,resource_slug,utm_source,utm_medium,utm_campaign,locale,created_at";
 const TOKEN_PATTERN = /^[A-Za-z0-9_-]{32,100}$/;
@@ -140,15 +148,24 @@ type GlobalCompanionStore = typeof globalThis & {
 export function createNdisCaseNoteClaim({
   material,
   claimedByUserId,
+  generationMeta,
+  token: requestedToken,
   now = new Date(),
   ttlMs = DEFAULT_CLAIM_TTL_MS,
 }: {
   material: NdisCaseNoteMaterial;
   claimedByUserId?: string;
+  generationMeta?: NdisCaseNoteCompanionClaimRecord["generationMeta"];
+  token?: string;
   now?: Date;
   ttlMs?: number;
 }) {
-  const token = randomBytes(32).toString("base64url");
+  const token = requestedToken?.trim() || randomBytes(32).toString("base64url");
+
+  if (!TOKEN_PATTERN.test(token)) {
+    throw new Error("Invalid companion claim token");
+  }
+
   const createdAt = now.toISOString();
 
   return {
@@ -156,6 +173,7 @@ export function createNdisCaseNoteClaim({
     record: {
       tokenHash: hashCompanionToken(token),
       material: cloneMaterial(material),
+      generationMeta: normalizeGenerationMeta(generationMeta),
       expiresAt: new Date(now.getTime() + ttlMs).toISOString(),
       claimedByUserId: claimedByUserId || undefined,
       claimedAt: claimedByUserId ? createdAt : undefined,
@@ -501,6 +519,7 @@ function normalizeClaim(
   return {
     tokenHash: record.tokenHash,
     material: cloneMaterial(record.material),
+    generationMeta: normalizeGenerationMeta(record.generationMeta),
     expiresAt: record.expiresAt,
     claimedByUserId: record.claimedByUserId || undefined,
     claimedAt: record.claimedAt || undefined,
@@ -593,6 +612,9 @@ function mapClaimToRow(record: NdisCaseNoteCompanionClaimRecord) {
   return {
     token_hash: record.tokenHash,
     material: record.material,
+    generation_model: record.generationMeta?.model ?? null,
+    input_token_count: record.generationMeta?.inputTokenCount ?? null,
+    output_token_count: record.generationMeta?.outputTokenCount ?? null,
     expires_at: record.expiresAt,
     claimed_by_user_id: record.claimedByUserId ?? null,
     claimed_at: record.claimedAt ?? null,
@@ -604,11 +626,35 @@ function mapRowToClaim(row: CompanionClaimRow): NdisCaseNoteCompanionClaimRecord
   return normalizeClaim({
     tokenHash: row.token_hash,
     material: row.material as NdisCaseNoteMaterial,
+    generationMeta:
+      typeof row.generation_model === "string" &&
+      typeof row.input_token_count === "number" &&
+      typeof row.output_token_count === "number"
+        ? {
+            model: row.generation_model,
+            inputTokenCount: row.input_token_count,
+            outputTokenCount: row.output_token_count,
+          }
+        : undefined,
     expiresAt: row.expires_at,
     claimedByUserId: row.claimed_by_user_id ?? undefined,
     claimedAt: row.claimed_at ?? undefined,
     createdAt: row.created_at,
   });
+}
+
+function normalizeGenerationMeta(
+  value: NdisCaseNoteCompanionClaimRecord["generationMeta"],
+) {
+  if (!value) {
+    return undefined;
+  }
+
+  return {
+    model: value.model.slice(0, 120),
+    inputTokenCount: Math.max(0, Math.trunc(value.inputTokenCount)),
+    outputTokenCount: Math.max(0, Math.trunc(value.outputTokenCount)),
+  };
 }
 
 function mapEventToRow(record: NdisCaseNoteCompanionEventRecord) {

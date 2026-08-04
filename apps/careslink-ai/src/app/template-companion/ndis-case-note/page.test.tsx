@@ -10,6 +10,8 @@ const mocks = vi.hoisted(() => ({
   resolveAccount: vi.fn(),
   getCompanionStore: vi.fn(),
   getMaterialStore: vi.fn(),
+  getCreditStore: vi.fn(),
+  getCreditUsage: vi.fn(),
   getClaim: vi.fn(),
   listDrafts: vi.fn(),
 }));
@@ -33,6 +35,9 @@ vi.mock("@/lib/ndis-case-note-companion-store", async () => {
 });
 vi.mock("@/lib/generated-material-draft-store", () => ({
   getGeneratedMaterialDraftStore: mocks.getMaterialStore,
+}));
+vi.mock("@/lib/account-credit-store", () => ({
+  getAccountCreditStore: mocks.getCreditStore,
 }));
 vi.mock("@/lib/ndis-case-note-companion-request", async () => {
   return vi.importActual("../../../lib/ndis-case-note-companion-request");
@@ -59,8 +64,20 @@ describe("NDIS case note companion page auth gate", () => {
     mocks.getMaterialStore.mockReturnValue({
       listGeneratedMaterialDraftsByUser: mocks.listDrafts,
     });
+    mocks.getCreditStore.mockReturnValue({ getUsage: mocks.getCreditUsage });
     mocks.getClaim.mockResolvedValue(undefined);
     mocks.listDrafts.mockResolvedValue([]);
+    mocks.getCreditUsage.mockResolvedValue({
+      planCode: "free",
+      status: "active",
+      periodStart: "2026-08-01",
+      periodEnd: "2026-09-01",
+      creditLimit: 3,
+      remainingCredits: 3,
+      usedCredits: 0,
+      reservedCredits: 0,
+      recentUsage: [],
+    });
   });
 
   it("redirects an unauthenticated request to login with a safe internal return", async () => {
@@ -104,11 +121,16 @@ describe("NDIS case note companion page auth gate", () => {
     expect(markup).toContain("Structured facts");
     expect(markup).toContain("Privacy Review");
     expect(markup).toContain("Review privacy first");
+    expect(markup).toContain("3 of 3 credits remaining this period");
     expect(markup).not.toContain("1 free draft");
     expect(mocks.listDrafts).toHaveBeenCalledWith({
       userId: provider.id,
       feature: "ndis_case_note",
       limit: 6,
+    });
+    expect(mocks.getCreditUsage).toHaveBeenCalledWith({
+      userId: provider.id,
+      recentLimit: 1,
     });
   });
 

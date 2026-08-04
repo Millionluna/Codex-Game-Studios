@@ -75,7 +75,7 @@ describe("AppShell", () => {
     expect(markup).toContain('href="/ai-documents?lang=en"');
     expect(markup).toContain('href="/referral-workspace/referral-pack?lang=en"');
     expect(markup).toContain('href="/referral-workspace/profile?lang=en"');
-    expect(markup).toContain('href="/referral-workspace/access?lang=en"');
+    expect(markup).toContain('href="/plan-and-usage?lang=en"');
     expect(markup).toContain("AI Documents");
     expect(markup).toContain("Referrals");
     expect(markup).toContain("Saved Documents");
@@ -102,7 +102,7 @@ describe("AppShell", () => {
     expect(markup).toContain('href="/admin/material-usage?lang=en"');
     expect(markup).not.toContain("/referral-workspace/profile");
     expect(markup).not.toContain("/referral-workspace/materials");
-    expect(markup).not.toContain("/referral-workspace/access");
+    expect(markup).not.toContain("/plan-and-usage");
     expect(markup).not.toContain("/demo");
     expect(markup).not.toContain("account=");
   });
@@ -129,7 +129,7 @@ describe("AppShell", () => {
       'href="/referral-workspace/profile?lang=en&amp;account=user-approved"',
     );
     expect(markup).toContain(
-      'href="/referral-workspace/access?lang=en&amp;account=user-approved"',
+      'href="/plan-and-usage?lang=en&amp;account=user-approved"',
     );
     expect(markup).not.toContain("/demo");
     expect(markup).not.toContain("/providers");

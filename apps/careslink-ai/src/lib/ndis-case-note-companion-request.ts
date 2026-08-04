@@ -79,6 +79,24 @@ export function hashAuthenticatedCompanionUser(
   return hashFingerprint(`user:${userId}`, pepper);
 }
 
+export function createNdisCaseNoteIdempotentClaimToken(
+  {
+    userId,
+    reservationId,
+  }: {
+    userId: string;
+    reservationId: string;
+  },
+  env: RequestIdentityEnv = process.env as RequestIdentityEnv,
+) {
+  const pepper = getFingerprintPepper(env);
+
+  return hashFingerprint(
+    `claim:${userId}:${reservationId}`,
+    pepper,
+  );
+}
+
 function getClientIp(headers: Headers) {
   const forwarded = headers.get("x-forwarded-for");
   const firstForwardedIp = forwarded?.split(",")[0]?.trim();

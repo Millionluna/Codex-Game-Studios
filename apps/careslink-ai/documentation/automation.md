@@ -10,10 +10,10 @@
 | External API | OpenAI `POST /v1/responses` only |
 | Tools | None; no web search, retrieval, uploads, MCP, or tool calling |
 | Steering | System/user instructions in `src/lib/openai-ndis-case-note.ts` |
-| Hard guardrails | Provider session before body parsing, server input validator, account/IP rate and quota controls, strict JSON Schema, output parser, PII/prohibited-language rejection, bilingual numeric parity |
+| Hard guardrails | Provider session before body parsing, server input validator, idempotent monthly credit reservation, account/IP rate and quota controls, strict JSON Schema, output parser, PII/prohibited-language rejection, bilingual numeric parity |
 | Output | English draft, Chinese review version, missing facts, neutral wording checks, follow-up prompts, controlled disclaimer |
 | Side effects | App creates a short-lived claim already bound to the provider and a metadata event after safe parsing; the model cannot save or send anything |
-| Retry | No automatic model retry; a failed safety parse returns a generic failure and does not lower controls |
+| Retry | No automatic model retry; same-key transport retries recover one completed claim or a stable state without another model call/credit; a new explicit attempt uses a new key |
 | Kill switch | Remove/disable `OPENAI_API_KEY`, or disable the route at deployment level |
 
 OpenAI requests set `store: false` and a maximum output-token limit. The controlled disclaimer is replaced server-side even when a model returns another value.

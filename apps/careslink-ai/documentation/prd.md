@@ -1,6 +1,6 @@
 # NDIS Case Note AI Companion Product Decision
 
-**Decision date:** 3 August 2026
+**Decision date:** 4 August 2026
 **Status:** Release-candidate requirement
 **Supersedes:** guest-first generation followed by optional login to save
 
@@ -16,6 +16,9 @@ A registered provider can safely turn de-identified structured facts or reviewed
 - Signed-out generation, telemetry, and save POST requests return `401` before body parsing or paid/stateful work.
 - Admin accounts cannot use the provider Companion or view case-note content.
 - Provider generation does not require an access code. Account and IP quotas still apply.
+- A free provider account receives 3 credits per UTC calendar month. Credits do not roll over and are not purchasable in this release.
+- One credit commits only for a new, complete, safely displayable result whose owner-bound claim was persisted. Privacy review, editing, viewing, saving, copying, and downloading cost 0 credits.
+- Every generation request carries an idempotency key. Repeated/concurrent use of the same key cannot call the model or commit a credit twice.
 
 ## Privacy and content boundary
 

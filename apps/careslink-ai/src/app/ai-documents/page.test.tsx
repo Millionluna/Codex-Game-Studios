@@ -4,6 +4,20 @@ import { getGeneratedMaterialDraftStore } from "../../lib/generated-material-dra
 import { NDIS_CASE_NOTE_DISCLAIMER } from "../../lib/ndis-case-note-companion";
 import AiDocumentsPage from "./page";
 
+const creditMocks = vi.hoisted(() => ({
+  getUsage: vi.fn().mockResolvedValue({
+    planCode: "free",
+    status: "active",
+    periodStart: "2026-08-01",
+    periodEnd: "2026-09-01",
+    creditLimit: 3,
+    remainingCredits: 2,
+    usedCredits: 1,
+    reservedCredits: 0,
+    recentUsage: [],
+  }),
+}));
+
 vi.mock("@/components/app-shell", async () =>
   import("../../components/app-shell"),
 );
@@ -20,6 +34,9 @@ vi.mock("@/components/referral-workspace-auth-gate", async () => {
 vi.mock("@/lib/generated-material-draft-store", async () =>
   import("../../lib/generated-material-draft-store"),
 );
+vi.mock("@/lib/account-credit-store", () => ({
+  getAccountCreditStore: () => ({ getUsage: creditMocks.getUsage }),
+}));
 vi.mock("@/lib/ndis-case-note-companion", async () =>
   import("../../lib/ndis-case-note-companion"),
 );
@@ -105,6 +122,9 @@ describe("AI Documents page", () => {
     expect(markup).toContain("AI Documents");
     expect(markup).toContain("Referrals");
     expect(markup).toContain("Create case note draft");
+    expect(markup).toContain("2 of 3 available");
+    expect(markup).toContain("2 credits remaining");
+    expect(markup).toContain("/plan-and-usage?lang=en");
     expect(markup).toContain("Saved Documents");
     expect(markup).toContain(
       "Saved drafts remain in this workspace until you delete them.",

@@ -19,7 +19,8 @@ provider.
 | Resource and operation | Guest | Provider | Admin | Enforcement |
 | --- | --- | --- | --- | --- |
 | View Companion form/privacy/result | Deny; redirect to login | Allow | Deny; redirect to admin workspace | Server page session and role gate |
-| Generate a draft | Deny `401` before body parsing | Allow within account/IP limits | Deny `403` | Session-first API role check, rate limit, quota RPC |
+| Generate a draft | Deny `401` before body parsing | Allow with monthly credit plus account/IP limits | Deny `403` | Session-first API role check, transactional credit RPC, rate limit, abuse quota RPC |
+| View plan and credit usage | Deny | Own entitlement/ledger metadata only | No provider-ledger detail | Provider page gate plus owner-scoped query/RLS |
 | Read temporary claim | Deny | Same owner only | Deny | Server page session gate and claim owner check |
 | Bind and save claim | Deny | Allow for own account | Deny | Verified session, provider role, claim RPC owner condition |
 | List saved drafts | Deny | Own `user_id` only | No provider-content view | Server query filtered by account ID |
@@ -37,6 +38,12 @@ provider.
 | `template_companion_events` | RLS enabled; service role only | Event-name database constraint and server allowlist |
 | `generated_material_drafts` | RLS enabled; after migration, `authenticated` receives owner-only `SELECT`/`DELETE`; no end-user `INSERT`/`UPDATE`; service role retains CRUD | Owner policies use `auth.uid() = user_id`; current server reads/writes/deletes still use service role with explicit owner predicates |
 | `generated_material_events` | RLS enabled; service role only | Server-created metadata events; no content column |
+| `account_entitlements` | RLS enabled; `authenticated` and service role receive `SELECT` only | Owner policy uses `auth.uid() = user_id`; creation/configuration occurs only inside service-role RPC/migration |
+| `credit_ledger` | RLS enabled; `authenticated` and service role receive `SELECT` only | Owner policy plus append-only constraints; grant/reserve/commit/release writes are security-definer RPC only |
+
+Credit RPC execution is revoked from `public`, `anon`, and `authenticated` and
+granted only to `service_role`. Their `search_path` is fixed to an empty path,
+and every table reference is schema-qualified.
 
 The migration revokes broad `public`, `anon` and `authenticated` grants before
 adding the narrow owner policies. They are defence in depth for authenticated

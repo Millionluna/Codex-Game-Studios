@@ -282,7 +282,15 @@ unauthenticated generation POST returns `401` before JSON parsing, rate limit,
 quota, claim creation, telemetry, or OpenAI. Signed-in providers do not need an
 access code and use account plus IP quotas. Any request that reaches OpenAI
 consumes the attempt even if the model response is rejected by the safety
-parser, preventing repeated paid retries. Production fails closed if persistent
+parser, preventing repeated paid retries. A free provider entitlement supplies
+3 credits per UTC calendar month. The server requires an idempotency key and
+atomically reserves 1 credit after input/privacy validation and before OpenAI.
+Only a new, complete result whose owner-bound claim is persisted commits that
+credit. Rate-limit, quota, generation, safety, claim-persistence, and system
+failures release it; the separate account/IP abuse quota remains consumed once
+OpenAI has been reached. Same-key retries return the same claim or a stable
+in-progress/completed state without another model call or charge. Production
+fails closed if persistent
 Supabase storage or the dedicated fingerprint pepper is missing. The model uses
 strict structured output with these fields:
 
@@ -336,7 +344,14 @@ Apply the migration before enabling the Core CTA:
 
 ```text
 supabase/migrations/20260723113000_create_ndis_case_note_companion.sql
+supabase/migrations/20260804190000_create_account_credit_entitlements.sql
+supabase/migrations/20260804193000_tighten_account_credit_table_privileges.sql
 ```
+
+`/plan-and-usage` reads the current owner's server-side entitlement and
+metadata-only ledger. Privacy review, editing, viewing, saving, copying, and
+downloading use 0 credits. Credits do not roll over, and this release has no
+payment or credit-purchase flow.
 
 Server-only environment variables:
 

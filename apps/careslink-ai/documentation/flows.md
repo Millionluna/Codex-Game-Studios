@@ -33,10 +33,11 @@
 3. Minimum facts include support date/approximate time, support type, setting, support delivered, observable facts, and action taken.
 4. The two privacy/processing-authority confirmations start unchecked. No generation request is constructed until all gates close.
 5. The API verifies the provider session, then repeats attestation and identifier/wording validation. **Deny:** signed-out `401`; admin `403`; unsafe input `422`, all before quota or OpenAI.
-6. Server abuse controls apply a per-minute account rate limit and atomic daily account/IP quota. **Deny:** `429` without OpenAI.
-7. Server calls OpenAI with strict structured output, `store: false`, bounded tokens, and no tools.
-8. Output parsing rejects the whole response if it is malformed, contains an obvious identifier/prohibited conclusion, or fails bilingual numeric parity.
-9. Server stores only the generated material in a 30-minute claim immediately bound to the current provider and emits metadata-only `companion_generated`.
+6. The server validates a required idempotency key and atomically reserves 1 monthly account credit. Existing completed keys recover the same owner-bound claim; concurrent keys return a stable in-progress state without another model call.
+7. Server abuse controls apply a per-minute account rate limit and atomic daily account/IP quota. **Deny:** `429` without OpenAI; the reserved account credit is released.
+8. Server calls OpenAI with strict structured output, `store: false`, bounded tokens, and no tools.
+9. Output parsing rejects the whole response if it is malformed, contains an obvious identifier/prohibited conclusion, or fails bilingual numeric parity.
+10. Server stores only the generated material in a 30-minute claim immediately bound to the current provider. Only then does the credit commit and metadata-only `companion_generated` emit. Generation or claim failure releases the credit without restoring abuse quota already consumed after OpenAI.
 
 ## Privacy and server-bypass denial
 
@@ -97,3 +98,4 @@ not a formal case-management or statutory record-retention system.
 - Attribution values are allowlisted and length-bounded. Visitor/device/IP values are one-way hashes.
 - Companion telemetry has no input, output, participant-fact, email, or contact columns.
 - Current admin material usage loads generated-draft metadata without `content` and excludes `ndis_case_note` details.
+- `/plan-and-usage` loads only the current provider's entitlement and ledger metadata. It never renders reservation/idempotency references or case-note content.

@@ -88,12 +88,24 @@ describe("NDIS case note companion store", () => {
     const claim = createNdisCaseNoteClaim({
       material,
       claimedByUserId: "provider-a",
+      token: "a".repeat(64),
+      generationMeta: {
+        model: "gpt-5.4-mini",
+        inputTokenCount: 120,
+        outputTokenCount: 80,
+      },
       now: new Date("2026-07-23T00:00:00.000Z"),
     });
 
+    expect(claim.token).toBe("a".repeat(64));
     expect(claim.record).toMatchObject({
       claimedByUserId: "provider-a",
       claimedAt: "2026-07-23T00:00:00.000Z",
+      generationMeta: {
+        model: "gpt-5.4-mini",
+        inputTokenCount: 120,
+        outputTokenCount: 80,
+      },
     });
   });
 

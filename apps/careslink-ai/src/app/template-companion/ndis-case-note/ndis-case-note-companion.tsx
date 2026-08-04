@@ -19,6 +19,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { GeneratedDraftCopyButton } from "../../../components/generated-draft-copy-button";
 import { GeneratedDraftDeleteButton } from "../../../components/generated-draft-delete-button";
+import type { AccountCreditSummary } from "../../../lib/account-credit-store";
 import type {
   GeneratedMaterialDraftStatus,
 } from "../../../lib/generated-material-draft-store";
@@ -63,6 +64,7 @@ type NdisCaseNoteCompanionProps = {
   initialMaterial?: NdisCaseNoteMaterial;
   autoSave: boolean;
   savedDrafts: SavedNdisCaseNoteDraft[];
+  initialCreditUsage: AccountCreditSummary | null;
 };
 
 type CompanionApiResult =
@@ -70,12 +72,14 @@ type CompanionApiResult =
       ok: true;
       material: NdisCaseNoteMaterial;
       claimToken: string;
+      credits: AccountCreditSummary;
     }
   | {
       ok: false;
       code?: string;
       error?: string;
       issues?: NdisCaseNoteInputIssue[];
+      credits?: AccountCreditSummary;
     };
 
 type SaveApiResult = {
@@ -101,6 +105,7 @@ export function NdisCaseNoteCompanion({
   initialMaterial,
   autoSave,
   savedDrafts: initialSavedDrafts,
+  initialCreditUsage,
 }: NdisCaseNoteCompanionProps) {
   const copy = getCompanionCopy(attribution.locale);
   const [inputMode, setInputMode] =
@@ -128,9 +133,11 @@ export function NdisCaseNoteCompanion({
     "idle" | "saved" | "error"
   >("idle");
   const [savedDrafts, setSavedDrafts] = useState(initialSavedDrafts);
+  const [creditUsage, setCreditUsage] = useState(initialCreditUsage);
   const trackedView = useRef(false);
   const trackedStart = useRef(false);
   const attemptedAutoSave = useRef(false);
+  const generationIdempotencyKey = useRef<string | undefined>(undefined);
   const attributionQuery = useMemo(
     () => buildAttributionQuery(attribution),
     [attribution],
@@ -175,6 +182,7 @@ export function NdisCaseNoteCompanion({
     resetConfirmations();
     setIssues((current) => current.filter((issue) => issue.field !== field));
     setError("");
+    generationIdempotencyKey.current = undefined;
 
     if (!trackedStart.current) {
       trackedStart.current = true;
@@ -191,6 +199,7 @@ export function NdisCaseNoteCompanion({
     resetConfirmations();
     setIssues([]);
     setError("");
+    generationIdempotencyKey.current = undefined;
 
     if (!trackedStart.current) {
       trackedStart.current = true;
@@ -207,6 +216,7 @@ export function NdisCaseNoteCompanion({
     resetConfirmations();
     setIssues([]);
     setError("");
+    generationIdempotencyKey.current = undefined;
   }
 
   function resetConfirmations() {
@@ -273,6 +283,7 @@ export function NdisCaseNoteCompanion({
     }));
     resetConfirmations();
     setError("");
+    generationIdempotencyKey.current = undefined;
   }
 
   async function generateDraft(event: React.FormEvent<HTMLFormElement>) {
@@ -304,19 +315,31 @@ export function NdisCaseNoteCompanion({
     setError("");
     setIssues([]);
     setSaveState("idle");
+    const idempotencyKey =
+      generationIdempotencyKey.current ?? window.crypto.randomUUID();
+    generationIdempotencyKey.current = idempotencyKey;
 
     try {
       const response = await fetch(
         `/api/template-companion/ndis-case-note?${attributionQuery}`,
         {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            "Idempotency-Key": idempotencyKey,
+          },
           body: JSON.stringify(requestBody),
         },
       );
       const result = (await response.json()) as CompanionApiResult;
 
       if (!response.ok || !result.ok) {
+        if (!result.ok && result.code !== "generation_in_progress") {
+          generationIdempotencyKey.current = undefined;
+        }
+        if (!result.ok && result.credits) {
+          setCreditUsage(result.credits);
+        }
         setIssues(result.ok ? [] : result.issues ?? []);
         setError(
           result.ok
@@ -328,6 +351,8 @@ export function NdisCaseNoteCompanion({
 
       setMaterial(result.material);
       setClaimToken(result.claimToken);
+      setCreditUsage(result.credits);
+      generationIdempotencyKey.current = undefined;
       window.requestAnimationFrame(() => {
         document
           .getElementById("case-note-result")
@@ -503,11 +528,22 @@ export function NdisCaseNoteCompanion({
             <div className="flex flex-wrap items-center gap-2">
               <span className="inline-flex items-center gap-2 rounded-md border border-[#b9d5c8] bg-[#e2f1e9] px-2.5 py-1 text-xs font-bold text-[#0b5c4d]">
                 <Sparkles className="size-3.5" aria-hidden="true" />
-                {copy.freeDraft}
+                {creditUsage
+                  ? copy.creditBalance(
+                      creditUsage.remainingCredits,
+                      creditUsage.creditLimit,
+                    )
+                  : copy.creditsUnavailable}
               </span>
               <span className="text-xs font-semibold text-muted">
-                {copy.noCard}
+                {copy.creditCost}
               </span>
+              <Link
+                href={`/plan-and-usage?lang=${encodeURIComponent(attribution.locale)}`}
+                className="text-xs font-semibold text-brand hover:underline"
+              >
+                {copy.viewCredits}
+              </Link>
             </div>
             <h1 className="document-title mt-4 max-w-4xl sm:text-[2.75rem]">
               {copy.title}
@@ -904,6 +940,18 @@ export function NdisCaseNoteCompanion({
                 </div>
               ) : null}
 
+              {reviewIsCurrent &&
+              (!creditUsage || creditUsage.remainingCredits < 1) ? (
+                <div
+                  role="status"
+                  className="rounded-md border border-[#d5c8b4] bg-[#fbf6ed] px-4 py-3 text-sm leading-6 text-[#6f5735]"
+                >
+                  {creditUsage
+                    ? copy.errors.creditExhausted
+                    : copy.errors.creditsUnavailable}
+                </div>
+              ) : null}
+
               <button
                 type="submit"
                 disabled={
@@ -912,7 +960,9 @@ export function NdisCaseNoteCompanion({
                     (missingMinimumFacts.length > 0 ||
                       !allPrivacyFindingsResolved ||
                       !confirmations.reviewedNoIdentifiers ||
-                      !confirmations.processingAuthorityConfirmed))
+                      !confirmations.processingAuthorityConfirmed ||
+                      !creditUsage ||
+                      creditUsage.remainingCredits < 1))
                 }
                 className="coral-action w-full"
               >
@@ -1602,6 +1652,18 @@ function getFriendlyError(
     return copy.errors.rateLimit;
   }
 
+  if (code === "credit_exhausted") {
+    return copy.errors.creditExhausted;
+  }
+
+  if (code === "credits_unavailable") {
+    return copy.errors.creditsUnavailable;
+  }
+
+  if (code === "generation_in_progress") {
+    return copy.errors.generationInProgress;
+  }
+
   if (code === "input_review_required") {
     return copy.errors.identifiers;
   }
@@ -1634,8 +1696,11 @@ function getCompanionCopy(locale: "en" | "zh-Hans") {
       referrals: "转介",
       language: "English",
       signedIn: "返回 AI 文档",
-      freeDraft: "免费账户可用",
-      noCard: "注册或登录后生成",
+      creditBalance: (remaining: number, limit: number) =>
+        `本周期剩余 ${remaining} / ${limit} credits`,
+      creditsUnavailable: "暂时无法读取 credits",
+      creditCost: "生成一份新草稿使用 1 credit",
+      viewCredits: "查看使用量",
       title: "NDIS Case Note AI 助手",
       subtitle:
         "把去标识化的支持事实整理成中性、可复核的 case note 草稿，并保存到当前服务商账号。",
@@ -1680,7 +1745,7 @@ function getCompanionCopy(locale: "en" | "zh-Hans") {
       },
       boundary:
         "输出是需要用户复核的草稿，不是完成记录，也不构成临床、法律、照护、监管、合规或其他专业建议。",
-      generate: "生成待复核草稿",
+      generate: "生成待复核草稿 · 1 credit",
       reviewPrivacy: "先进行隐私复核",
       generating: "正在生成草稿",
       privacyReviewTitle: "隐私检查",
@@ -1764,6 +1829,9 @@ function getCompanionCopy(locale: "en" | "zh-Hans") {
         minimumFacts: "请先补全标出的最低事实，再重新进行隐私复核。",
         dailyLimit: "今天的生成额度已用完，请明天再试。",
         rateLimit: "请求过于频繁，请稍后再试。",
+        creditExhausted: "本周期的生成 credits 已用完。查看使用量可确认下次重置时间。",
+        creditsUnavailable: "暂时无法确认 credits，生成已安全停用，请稍后再试。",
+        generationInProgress: "同一生成请求正在处理中，请稍后重试。",
         save: "暂时无法保存这份草稿，请稍后再试。",
         generic: "暂时无法生成草稿，请稍后再试。",
       },
@@ -1778,8 +1846,11 @@ function getCompanionCopy(locale: "en" | "zh-Hans") {
     referrals: "Referrals",
     language: "简体中文",
     signedIn: "Back to AI Documents",
-    freeDraft: "Available with a free account",
-    noCard: "Register or sign in to generate",
+    creditBalance: (remaining: number, limit: number) =>
+      `${remaining} of ${limit} credits remaining this period`,
+    creditsUnavailable: "Credits temporarily unavailable",
+    creditCost: "One new draft uses 1 credit",
+    viewCredits: "View usage",
     title: "NDIS Case Note AI Companion",
     subtitle:
       "Turn de-identified support facts into neutral case-note wording you can review and save to your provider account.",
@@ -1824,7 +1895,7 @@ function getCompanionCopy(locale: "en" | "zh-Hans") {
     },
     boundary:
       "The output is a user-reviewed draft, not a completed record or clinical, legal, compliance, regulatory, care or professional advice.",
-    generate: "Generate reviewable draft",
+    generate: "Generate reviewable draft · 1 credit",
     reviewPrivacy: "Review privacy first",
     generating: "Generating draft",
     privacyReviewTitle: "Privacy Review",
@@ -1908,6 +1979,9 @@ function getCompanionCopy(locale: "en" | "zh-Hans") {
       minimumFacts: "Complete the highlighted minimum facts, then run Privacy Review again.",
       dailyLimit: "Your draft limit has been reached for today.",
       rateLimit: "Too many requests. Please wait before trying again.",
+      creditExhausted: "Your generation credits are used for this period. View usage to see the next reset date.",
+      creditsUnavailable: "Credits cannot be confirmed right now, so generation is safely unavailable.",
+      generationInProgress: "The same generation request is still processing. Try again shortly.",
       save: "This draft could not be saved. Please try again.",
       generic: "The draft could not be generated. Please try again.",
     },

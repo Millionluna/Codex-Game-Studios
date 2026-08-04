@@ -13,6 +13,10 @@ import { AppShell } from "@/components/app-shell";
 import { GeneratedDraftDeleteButton } from "@/components/generated-draft-delete-button";
 import { ReferralWorkspaceLoginGate } from "@/components/referral-workspace-auth-gate";
 import {
+  getAccountCreditStore,
+  type AccountCreditSummary,
+} from "@/lib/account-credit-store";
+import {
   getGeneratedMaterialDraftStore,
   type GeneratedMaterialDraftRecord,
 } from "@/lib/generated-material-draft-store";
@@ -88,7 +92,10 @@ export default async function AiDocumentsPage({
     );
   }
 
-  const savedDrafts = await getOwnerDrafts(gate.account.id);
+  const [savedDrafts, creditUsage] = await Promise.all([
+    getOwnerDrafts(gate.account.id),
+    getCreditUsage(gate.account.id, gate.source === "supabase"),
+  ]);
   const latestDraft = savedDrafts[0];
 
   return (
@@ -128,8 +135,15 @@ export default async function AiDocumentsPage({
               }
             />
             <DocumentStat
-              label={copy.workspaceLabel}
-              value={gate.canUseGuidedMaterials ? copy.active : copy.freeAccess}
+              label={copy.creditsLabel}
+              value={
+                creditUsage
+                  ? copy.creditBalance(
+                      creditUsage.remainingCredits,
+                      creditUsage.creditLimit,
+                    )
+                  : copy.creditsUnavailable
+              }
             />
           </dl>
         </header>
@@ -148,7 +162,11 @@ export default async function AiDocumentsPage({
                   href={href("/template-companion/ndis-case-note")}
                   title={copy.caseNoteTitle}
                   description={copy.caseNoteDescription}
-                  status={copy.availableNow}
+                  status={
+                    creditUsage
+                      ? copy.creditToolStatus(creditUsage.remainingCredits)
+                      : copy.creditsUnavailable
+                  }
                   icon={<FileText className="size-5" aria-hidden="true" />}
                 />
                 <DocumentToolRow
@@ -234,7 +252,7 @@ export default async function AiDocumentsPage({
               <p>{copy.boundary}</p>
             </div>
             <Link
-              href={href("/referral-workspace/access")}
+              href={href("/plan-and-usage")}
               className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-brand hover:underline"
             >
               <KeyRound className="size-4" aria-hidden="true" />
@@ -245,6 +263,26 @@ export default async function AiDocumentsPage({
       </div>
     </AppShell>
   );
+}
+
+async function getCreditUsage(
+  userId: string,
+  isSupabaseSession: boolean,
+): Promise<AccountCreditSummary | null> {
+  if (!isSupabaseSession) {
+    return null;
+  }
+
+  try {
+    const usage = await getAccountCreditStore().getUsage({
+      userId,
+      recentLimit: 1,
+    });
+
+    return usage;
+  } catch {
+    return null;
+  }
 }
 
 function DocumentStat({
@@ -402,6 +440,12 @@ function getAiDocumentsCopy(locale: Locale) {
       savedLabel: "已保存文档",
       latestLabel: "最近更新",
       workspaceLabel: "工作区状态",
+      creditsLabel: "本周期 Case Note credits",
+      creditBalance: (remaining: number, limit: number) =>
+        `${remaining} / ${limit} 可用`,
+      creditToolStatus: (remaining: number) =>
+        `剩余 ${remaining} credits · 每次生成使用 1 credit`,
+      creditsUnavailable: "暂时无法读取",
       active: "引导式工具可用",
       freeAccess: "基础访问",
       notYet: "暂无",
@@ -457,6 +501,12 @@ function getAiDocumentsCopy(locale: Locale) {
     savedLabel: "Saved documents",
     latestLabel: "Latest update",
     workspaceLabel: "Workspace status",
+    creditsLabel: "Case Note credits this period",
+    creditBalance: (remaining: number, limit: number) =>
+      `${remaining} of ${limit} available`,
+    creditToolStatus: (remaining: number) =>
+      `${remaining} credits remaining · 1 per generation`,
+    creditsUnavailable: "Temporarily unavailable",
     active: "Guided tools active",
     freeAccess: "Base access",
     notYet: "Not yet",

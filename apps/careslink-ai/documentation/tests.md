@@ -13,6 +13,9 @@
 | Brand typography | Root, document, Tailwind sans/mono, controls and data surfaces use the single CaresLink serif stack | `src/app/brand-font.test.ts` | Automated |
 | Server bypass | After auth, missing attestation/facts and crafted PII return `422` before quota or OpenAI | Same route test | Existing automated |
 | Authenticated quota | Provider account/IP limits return `429`; failed generation still consumes the attempted quota | Route and store tests | Existing automated |
+| Credit entitlement and ledger | Missing persistence fails closed; free monthly summary and metadata mapping are validated; migration contains owner RLS and service-role-only RPC grants | `src/lib/account-credit-store.test.ts` plus migration/grant review | Automated/static/live database |
+| Idempotent generation | Same key replays one owner-bound claim; concurrent replay calls neither quota nor model; exhausted balance blocks; generation/claim failures release credits | NDIS generation route tests | Automated |
+| Plan & Usage | Provider page reads only the current owner and renders EN/zh-Hans metadata without reservation IDs or document content | `src/app/plan-and-usage/page.test.tsx` | Automated |
 | OpenAI contract | Request uses `store:false`, strict schema, bounded output, controlled prompt | `src/lib/openai-ndis-case-note.test.ts` | Existing automated with mocked HTTP |
 | Output safety | Malformed, PII, prohibited conclusions, and bilingual numeric mismatch reject the whole result | `src/lib/ndis-case-note-companion.test.ts` | Existing automated |
 | Claim ownership | Generation immediately binds the claim to provider; expiry and cross-owner use are denied | `src/lib/ndis-case-note-companion-store.test.ts`, generation/save route tests | Existing automated |
@@ -23,7 +26,7 @@
 | Admin isolation | Material usage uses metadata and excludes NDIS case-note details | Admin/material store tests | Existing automated |
 | Responsive product shell | Authenticated task flow, unchecked confirmations, no guest/demo cards | Companion static render plus guarded 1440/390 smoke | Existing automated/manual |
 
-Current local gate result for this owner-delete RC worktree: 73 Vitest files and 471 tests passed, followed by TypeScript, ESLint, and Next build.
+Current local gate result for the Credits / Entitlements V0.1 RC worktree: 75 Vitest files and 485 tests passed, followed by TypeScript, ESLint, and Next build.
 
 ## Release-candidate live checks
 
@@ -34,6 +37,7 @@ Current local gate result for this owner-delete RC worktree: 73 Vitest files and
 | Authenticated Preview generation/save | Guarded live | PII denial `422`; safe generation `200`; provider owns saved draft; second provider cannot read/save it |
 | Preview quota | Guarded live | Authenticated account/IP limit returns `429` |
 | Preview cleanup | Manual/SQL verification | Temporary accounts, claims, drafts, events, and quota rows removed |
+| Credit database transaction | Shared-Supabase synthetic A/B | Fresh grant `3`; reserve/commit/release/replay/exhaustion stable; cross-owner RPC returns not-found; owner RLS hides B; temporary rows removed |
 
 The local live check used only synthetic de-identified facts. Its evidence records statuses, field names and lengths, token counts, and cleanup state; it does not retain input or generated wording. The exact claim, quota, and telemetry rows created by that check were deleted and verified absent afterward.
 
