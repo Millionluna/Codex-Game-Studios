@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { SafeVercelAnalytics } from "@/components/safe-vercel-analytics";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -21,7 +22,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="h-full antialiased">
-      <body className="flex min-h-full flex-col">{children}</body>
+      <body className="flex min-h-full flex-col">
+        {children}
+        <SafeVercelAnalytics />
+      </body>
     </html>
   );
 }
