@@ -28,6 +28,9 @@ provider.
 | Change saved status | Deny | Own record only | Not exposed for case notes | Server record-owner comparison |
 | Write companion telemetry | Deny | Allowlisted metadata events | Deny | Session-first event route, server constructors and schema |
 | View admin material usage | Deny | Deny | Allow | Admin route gate; metadata selectors; case-note exclusion |
+| Sign out | No active session | Clear own session; safe provider return only | Clear own session; safe admin return allowed | Server action plus internal-route allowlist |
+| View privacy notice | Allow | Allow | Allow | Public read-only route; no account data |
+| Request more credits fake door | Deny | Metadata opt-in for own signed-in account | Deny | Provider-only event route; fixed event name; no contact/free-text body; no entitlement mutation |
 
 ## Database controls
 
@@ -35,7 +38,7 @@ provider.
 | --- | --- | --- |
 | `ndis_case_note_companion_claims` | RLS enabled; table grants revoked from `anon`/`authenticated`; service role only | Claim RPC updates only unclaimed/same-user rows and unexpired claims |
 | `template_companion_quota_usage` | RLS enabled; service role only | Atomic security-definer RPC; pseudonymous fingerprint key |
-| `template_companion_events` | RLS enabled; service role only | Event-name database constraint and server allowlist |
+| `template_companion_events` | RLS enabled; service role only | Event-name constraint, allowlisted `surface` constraint and server normalization; client cannot write arbitrary event names or attribution |
 | `generated_material_drafts` | RLS enabled; after migration, `authenticated` receives owner-only `SELECT`/`DELETE`; no end-user `INSERT`/`UPDATE`; service role retains CRUD | Owner policies use `auth.uid() = user_id`; current server reads/writes/deletes still use service role with explicit owner predicates |
 | `generated_material_events` | RLS enabled; service role only | Server-created metadata events; no content column |
 | `account_entitlements` | RLS enabled; `authenticated` and service role receive `SELECT` only | Owner policy uses `auth.uid() = user_id`; creation/configuration occurs only inside service-role RPC/migration |

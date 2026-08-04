@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   createMemoryNdisCaseNoteCompanionStore,
@@ -135,8 +136,11 @@ describe("NDIS case note companion store", () => {
         eventName: "companion_generated",
         visitorHash: "visitor-hash",
         attribution: {
-          source: "ndis-case-note-download",
-          resourceSlug: "ndis-case-note-template",
+          source: "participant-name",
+          resourceSlug: "private-notes",
+          utmSource: "careslink",
+          surface: "core_download_success",
+          utmMedium: "post_download",
           utmCampaign: "ndis_case_note_ai_companion_v01",
           locale: "en",
         },
@@ -145,8 +149,54 @@ describe("NDIS case note companion store", () => {
 
     const [event] = await store.listEvents();
     const serialized = JSON.stringify(event);
+    expect(event.attribution).toMatchObject({
+      source: "ndis-case-note-download",
+      resourceSlug: "ndis-case-note-template",
+      utmSource: "careslink",
+      surface: "core_download_success",
+      utmMedium: "post_download",
+    });
     expect(serialized).toContain("companion_generated");
     expect(serialized).not.toContain("Neutral draft wording");
     expect(serialized).not.toContain("observableFacts");
+  });
+
+  it("drops an unsafe surface/medium pair during store normalization", async () => {
+    const store = createMemoryNdisCaseNoteCompanionStore();
+    await store.recordEvent(
+      createNdisCaseNoteCompanionEvent({
+        eventName: "companion_offer_viewed",
+        userId: "provider-a",
+        attribution: {
+          source: "ndis-case-note-download",
+          resourceSlug: "ndis-case-note-template",
+          surface: "core_product_landing",
+          utmMedium: "post_download",
+          locale: "en",
+        },
+      }),
+    );
+
+    const [event] = await store.listEvents();
+    expect(event.attribution.surface).toBeUndefined();
+    expect(event.attribution.utmMedium).toBeUndefined();
+  });
+
+  it("adds only allowlisted pilot surfaces and metadata event names", () => {
+    const migration = readFileSync(
+      new URL(
+        "../../supabase/migrations/20260804203500_add_companion_pilot_attribution_events.sql",
+        import.meta.url,
+      ),
+      "utf8",
+    );
+
+    expect(migration).toContain("add column if not exists surface text");
+    expect(migration).toContain("core_product_landing");
+    expect(migration).toContain("core_download_success");
+    expect(migration).toContain("companion_offer_viewed");
+    expect(migration).toContain("companion_offer_requested");
+    expect(migration).not.toContain("prompt text");
+    expect(migration).not.toContain("generated_content");
   });
 });

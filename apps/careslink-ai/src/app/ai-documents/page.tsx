@@ -189,6 +189,12 @@ export default async function AiDocumentsPage({
                   <p className="mt-2 max-w-2xl text-xs leading-5 text-muted">
                     {copy.retentionNotice}
                   </p>
+                  <Link
+                    href={withLocale("/privacy", locale)}
+                    className="mt-2 inline-flex text-xs font-semibold text-brand hover:underline"
+                  >
+                    {copy.privacyNotice}
+                  </Link>
                 </div>
                 <span className="text-xs font-semibold text-muted">
                   {copy.savedPrivacy}
@@ -432,6 +438,7 @@ function formatDate(value: string, locale: Locale) {
 function getAiDocumentsCopy(locale: Locale) {
   if (locale === "zh-Hans") {
     return {
+      privacyNotice: "隐私、收集与保留说明",
       eyebrow: "文档工作区",
       title: "创建、复核并保存需要实际使用的文档草稿。",
       description:
@@ -493,6 +500,7 @@ function getAiDocumentsCopy(locale: Locale) {
   }
 
   return {
+    privacyNotice: "Privacy, collection & retention",
     eyebrow: "Document workspace",
     title: "Create, review and save the documents you need to use.",
     description:

@@ -218,7 +218,7 @@ describe("auth server actions", () => {
     expect(redirectTo.searchParams.get("flow")).toBe("oauth");
     expect(redirectTo.searchParams.get("lang")).toBe("zh-Hans");
     expect(redirectTo.searchParams.get("next")).toBe(
-      "/template-companion/ndis-case-note?source=ndis-case-note-download",
+      "/template-companion/ndis-case-note?source=ndis-case-note-download&resourceSlug=ndis-case-note-template",
     );
     expect(navigationMock.redirect).toHaveBeenLastCalledWith(
       "https://project.supabase.co/auth/v1/authorize?provider=google",
@@ -464,6 +464,60 @@ describe("auth server actions", () => {
     expect(authClient.auth.updateUser).not.toHaveBeenCalled();
     expect(navigationMock.redirect).toHaveBeenCalledWith(
       "/auth/update-password?lang=en&error=Passwords+do+not+match.",
+    );
+  });
+
+  it("signs a provider out and preserves a safe provider return route", async () => {
+    const authClient = createAuthClient();
+    supabaseServerMock.createCareslinkServerSupabaseClient.mockResolvedValue(authClient);
+    const { signOutAction } = await import("./actions");
+
+    await signOutAction(
+      createFormData({
+        returnTo: "/template-companion/ndis-case-note?lang=zh-Hans",
+        lang: "zh-Hans",
+      }),
+    );
+
+    expect(authClient.auth.signOut).toHaveBeenCalledOnce();
+    expect(navigationMock.redirect).toHaveBeenCalledWith(
+      "/auth/login?next=%2Ftemplate-companion%2Fndis-case-note%3Fsource%3Dndis-case-note-download%26resourceSlug%3Dndis-case-note-template%26lang%3Dzh-Hans&lang=zh-Hans&notice=signed-out",
+    );
+  });
+
+  it("signs an admin out and preserves a safe admin return route", async () => {
+    const authClient = createAuthClient();
+    supabaseServerMock.createCareslinkServerSupabaseClient.mockResolvedValue(authClient);
+    const { signOutAction } = await import("./actions");
+
+    await signOutAction(
+      createFormData({
+        returnTo: "/admin/material-usage?lang=en",
+        lang: "en",
+      }),
+    );
+
+    expect(authClient.auth.signOut).toHaveBeenCalledOnce();
+    expect(navigationMock.redirect).toHaveBeenCalledWith(
+      "/auth/login?next=%2Fadmin%2Fmaterial-usage%3Flang%3Den&lang=en&notice=signed-out",
+    );
+  });
+
+  it("drops an external sign-out return route", async () => {
+    const authClient = createAuthClient();
+    supabaseServerMock.createCareslinkServerSupabaseClient.mockResolvedValue(authClient);
+    const { signOutAction } = await import("./actions");
+
+    await signOutAction(
+      createFormData({
+        returnTo: "https://evil.example/collect",
+        lang: "en",
+      }),
+    );
+
+    expect(authClient.auth.signOut).toHaveBeenCalledOnce();
+    expect(navigationMock.redirect).toHaveBeenCalledWith(
+      "/auth/login?next=%2Fai-documents&lang=en&notice=signed-out",
     );
   });
 });

@@ -9,6 +9,7 @@ import {
   History,
   Languages,
   LockKeyhole,
+  LogOut,
   Menu,
   Save,
   ShieldCheck,
@@ -17,6 +18,7 @@ import {
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { signOutAction } from "../../auth/actions";
 import { GeneratedDraftCopyButton } from "../../../components/generated-draft-copy-button";
 import { GeneratedDraftDeleteButton } from "../../../components/generated-draft-delete-button";
 import type { AccountCreditSummary } from "../../../lib/account-credit-store";
@@ -132,10 +134,14 @@ export function NdisCaseNoteCompanion({
   const [saveState, setSaveState] = useState<
     "idle" | "saved" | "error"
   >("idle");
+  const [creditOfferState, setCreditOfferState] = useState<
+    "idle" | "requesting" | "requested" | "error"
+  >("idle");
   const [savedDrafts, setSavedDrafts] = useState(initialSavedDrafts);
   const [creditUsage, setCreditUsage] = useState(initialCreditUsage);
   const trackedView = useRef(false);
   const trackedStart = useRef(false);
+  const trackedCreditOfferView = useRef(false);
   const attemptedAutoSave = useRef(false);
   const generationIdempotencyKey = useRef<string | undefined>(undefined);
   const attributionQuery = useMemo(
@@ -151,6 +157,18 @@ export function NdisCaseNoteCompanion({
     trackedView.current = true;
     void trackEvent("companion_viewed", attributionQuery);
   }, [attributionQuery]);
+
+  useEffect(() => {
+    if (
+      creditUsage?.remainingCredits !== 0 ||
+      trackedCreditOfferView.current
+    ) {
+      return;
+    }
+
+    trackedCreditOfferView.current = true;
+    void trackEvent("companion_offer_viewed", attributionQuery);
+  }, [attributionQuery, creditUsage?.remainingCredits]);
 
   const issueByField = useMemo(() => {
     const map = new Map<string, string>();
@@ -284,6 +302,19 @@ export function NdisCaseNoteCompanion({
     resetConfirmations();
     setError("");
     generationIdempotencyKey.current = undefined;
+  }
+
+  async function requestMoreCredits() {
+    if (creditOfferState === "requesting" || creditOfferState === "requested") {
+      return;
+    }
+
+    setCreditOfferState("requesting");
+    const recorded = await trackEvent(
+      "companion_offer_requested",
+      attributionQuery,
+    );
+    setCreditOfferState(recorded ? "requested" : "error");
   }
 
   async function generateDraft(event: React.FormEvent<HTMLFormElement>) {
@@ -492,6 +523,24 @@ export function NdisCaseNoteCompanion({
             >
               {copy.signedIn}
             </Link>
+            <form action={signOutAction} className="hidden md:block">
+              <input name="lang" type="hidden" value={attribution.locale} />
+              <input
+                name="returnTo"
+                type="hidden"
+                value={buildNdisCaseNoteCompanionHref({
+                  attribution,
+                  claimToken,
+                })}
+              />
+              <button
+                type="submit"
+                className="inline-flex min-h-10 items-center gap-2 rounded-md px-3 text-xs font-semibold text-white/72 hover:bg-white/10 hover:text-white"
+              >
+                <LogOut className="size-4" aria-hidden="true" />
+                {copy.signOut}
+              </button>
+            </form>
             <details className="case-note-mobile-menu relative md:hidden">
               <summary aria-label={copy.menu}>
                 <Menu className="size-5" aria-hidden="true" />
@@ -516,6 +565,28 @@ export function NdisCaseNoteCompanion({
                   <Languages className="size-4" aria-hidden="true" />
                   {copy.language}
                 </a>
+                <form action={signOutAction}>
+                  <input
+                    name="lang"
+                    type="hidden"
+                    value={attribution.locale}
+                  />
+                  <input
+                    name="returnTo"
+                    type="hidden"
+                    value={buildNdisCaseNoteCompanionHref({
+                      attribution,
+                      claimToken,
+                    })}
+                  />
+                  <button
+                    type="submit"
+                    className="flex min-h-11 w-full items-center gap-2 rounded-sm border-t border-white/12 px-3 text-sm font-semibold text-white/78 hover:bg-white/10 hover:text-white"
+                  >
+                    <LogOut className="size-4" aria-hidden="true" />
+                    {copy.signOut}
+                  </button>
+                </form>
               </div>
             </details>
           </div>
@@ -952,6 +1023,37 @@ export function NdisCaseNoteCompanion({
                 </div>
               ) : null}
 
+              {creditUsage?.remainingCredits === 0 ? (
+                <section className="rounded-md border border-[#b8ccc2] bg-[#edf5f0] p-4">
+                  <p className="text-sm font-semibold text-foreground">
+                    {copy.creditOfferTitle}
+                  </p>
+                  <p className="mt-1 text-sm leading-6 text-muted">
+                    {copy.creditOfferDetail}
+                  </p>
+                  <button
+                    type="button"
+                    disabled={
+                      creditOfferState === "requesting" ||
+                      creditOfferState === "requested"
+                    }
+                    onClick={requestMoreCredits}
+                    className="mt-3 inline-flex min-h-10 items-center justify-center rounded-md border border-[#0b5c4d] px-3 text-sm font-semibold text-[#0b5c4d] hover:bg-white disabled:cursor-not-allowed disabled:opacity-70"
+                  >
+                    {creditOfferState === "requesting"
+                      ? copy.creditOfferRequesting
+                      : creditOfferState === "requested"
+                        ? copy.creditOfferRequested
+                        : copy.creditOfferCta}
+                  </button>
+                  {creditOfferState === "error" ? (
+                    <p className="mt-2 text-xs leading-5 text-[#963b3b]">
+                      {copy.creditOfferError}
+                    </p>
+                  ) : null}
+                </section>
+              ) : null}
+
               <button
                 type="submit"
                 disabled={
@@ -1092,6 +1194,9 @@ export function NdisCaseNoteCompanion({
                   label={copy.copyAll}
                   copiedLabel={copy.copied}
                   ariaLabel={copy.copyAll}
+                  onCopied={() =>
+                    void trackEvent("companion_copied", attributionQuery)
+                  }
                 />
               ) : null}
             </div>
@@ -1213,6 +1318,9 @@ export function NdisCaseNoteCompanion({
                         generatedMaterialDraftId: draft.id,
                         eventType: "copy_all",
                       }}
+                      onCopied={() =>
+                        void trackEvent("companion_copied", attributionQuery)
+                      }
                     />
                     <GeneratedDraftDeleteButton
                       draftId={draft.id}
@@ -1232,6 +1340,12 @@ export function NdisCaseNoteCompanion({
 
         <footer className="mt-8 flex flex-col gap-3 border-t border-[#bfcfc7] py-6 text-xs leading-5 text-muted sm:flex-row sm:items-center sm:justify-between">
           <span>{copy.footerBoundary}</span>
+          <Link
+            href={`/privacy?lang=${encodeURIComponent(attribution.locale)}`}
+            className="font-semibold text-brand hover:underline"
+          >
+            {copy.privacyNotice}
+          </Link>
         </footer>
       </div>
     </main>
@@ -1628,14 +1742,17 @@ function buildLanguageHref(
 
 async function trackEvent(eventName: string, attributionQuery: string) {
   try {
-    await fetch(`/api/template-companion/events?${attributionQuery}`, {
+    const response = await fetch(`/api/template-companion/events?${attributionQuery}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ eventName }),
       keepalive: true,
     });
+
+    return response.ok;
   } catch {
     // Product telemetry is intentionally non-blocking.
+    return false;
   }
 }
 
@@ -1696,11 +1813,20 @@ function getCompanionCopy(locale: "en" | "zh-Hans") {
       referrals: "转介",
       language: "English",
       signedIn: "返回 AI 文档",
+      signOut: "退出登录",
+      privacyNotice: "隐私、收集与保留说明",
       creditBalance: (remaining: number, limit: number) =>
         `本周期剩余 ${remaining} / ${limit} credits`,
       creditsUnavailable: "暂时无法读取 credits",
       creditCost: "生成一份新草稿使用 1 credit",
       viewCredits: "查看使用量",
+      creditOfferTitle: "需要继续使用？",
+      creditOfferDetail:
+        "价格概念测试：Starter 每月 A$9.99，包含 30 个生成 credits。你可以申请更多 pilot credits 或加入未来的付费测试；当前不会收费，也不会自动增加额度。",
+      creditOfferCta: "申请更多 credits / 加入付费测试",
+      creditOfferRequesting: "正在记录申请…",
+      creditOfferRequested: "已记录申请",
+      creditOfferError: "暂时无法记录申请，请稍后再试。",
       title: "NDIS Case Note AI 助手",
       subtitle:
         "把去标识化的支持事实整理成中性、可复核的 case note 草稿，并保存到当前服务商账号。",
@@ -1846,11 +1972,20 @@ function getCompanionCopy(locale: "en" | "zh-Hans") {
     referrals: "Referrals",
     language: "简体中文",
     signedIn: "Back to AI Documents",
+    signOut: "Sign out",
+    privacyNotice: "Privacy, collection & retention",
     creditBalance: (remaining: number, limit: number) =>
       `${remaining} of ${limit} credits remaining this period`,
     creditsUnavailable: "Credits temporarily unavailable",
     creditCost: "One new draft uses 1 credit",
     viewCredits: "View usage",
+    creditOfferTitle: "Need to keep working?",
+    creditOfferDetail:
+      "Price concept: Starter at A$9.99 per month for 30 generation credits. Request additional pilot credits or join the future paid beta; you will not be charged now and credits are not added automatically.",
+    creditOfferCta: "Request more credits / Join paid beta",
+    creditOfferRequesting: "Recording request…",
+    creditOfferRequested: "Request recorded",
+    creditOfferError: "The request could not be recorded. Please try again.",
     title: "NDIS Case Note AI Companion",
     subtitle:
       "Turn de-identified support facts into neutral case-note wording you can review and save to your provider account.",

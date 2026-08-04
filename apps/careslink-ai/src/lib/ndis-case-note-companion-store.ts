@@ -5,11 +5,23 @@ import {
 } from "node:crypto";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import type { NdisCaseNoteMaterial } from "./ndis-case-note-companion";
+import {
+  getSafeNdisCaseNoteAttributionPair,
+  NDIS_CASE_NOTE_COMPANION_SOURCE,
+  NDIS_CASE_NOTE_RESOURCE_SLUG,
+  NDIS_CASE_NOTE_UTM_CAMPAIGN,
+  NDIS_CASE_NOTE_UTM_SOURCE,
+  type NdisCaseNoteCompanionSurface,
+} from "./ndis-case-note-companion-attribution";
 
 export type NdisCaseNoteCompanionEventName =
   | "companion_viewed"
   | "companion_started"
   | "companion_generated"
+  | "companion_copied"
+  | "companion_credit_exhausted"
+  | "companion_offer_viewed"
+  | "companion_offer_requested"
   | "companion_save_prompt_clicked"
   | "companion_saved";
 
@@ -17,6 +29,7 @@ export type NdisCaseNoteCompanionAttribution = {
   source: string;
   resourceSlug: string;
   utmSource?: string;
+  surface?: NdisCaseNoteCompanionSurface;
   utmMedium?: string;
   utmCampaign?: string;
   locale: "en" | "zh-Hans";
@@ -125,6 +138,7 @@ type CompanionEventRow = {
   source: string;
   resource_slug: string;
   utm_source: string | null;
+  surface: string | null;
   utm_medium: string | null;
   utm_campaign: string | null;
   locale: string;
@@ -137,7 +151,7 @@ const DEFAULT_EVENTS_TABLE = "template_companion_events";
 const CLAIM_COLUMNS =
   "token_hash,material,generation_model,input_token_count,output_token_count,expires_at,claimed_by_user_id,claimed_at,created_at";
 const EVENT_COLUMNS =
-  "id,event_name,user_id,visitor_hash,source,resource_slug,utm_source,utm_medium,utm_campaign,locale,created_at";
+  "id,event_name,user_id,visitor_hash,source,resource_slug,utm_source,surface,utm_medium,utm_campaign,locale,created_at";
 const TOKEN_PATTERN = /^[A-Za-z0-9_-]{32,100}$/;
 const DEFAULT_CLAIM_TTL_MS = 30 * 60 * 1000;
 
@@ -569,12 +583,24 @@ function cloneEvent(record: NdisCaseNoteCompanionEventRecord) {
 function normalizeAttribution(
   attribution: NdisCaseNoteCompanionAttribution,
 ): NdisCaseNoteCompanionAttribution {
+  const attributionPair = getSafeNdisCaseNoteAttributionPair(
+    attribution.surface,
+    attribution.utmMedium,
+  );
+
   return {
-    source: attribution.source.slice(0, 120),
-    resourceSlug: attribution.resourceSlug.slice(0, 160),
-    utmSource: attribution.utmSource?.slice(0, 120) || undefined,
-    utmMedium: attribution.utmMedium?.slice(0, 120) || undefined,
-    utmCampaign: attribution.utmCampaign?.slice(0, 160) || undefined,
+    source: NDIS_CASE_NOTE_COMPANION_SOURCE,
+    resourceSlug: NDIS_CASE_NOTE_RESOURCE_SLUG,
+    utmSource:
+      attribution.utmSource === NDIS_CASE_NOTE_UTM_SOURCE
+        ? NDIS_CASE_NOTE_UTM_SOURCE
+        : undefined,
+    surface: attributionPair.surface,
+    utmMedium: attributionPair.utmMedium,
+    utmCampaign:
+      attribution.utmCampaign === NDIS_CASE_NOTE_UTM_CAMPAIGN
+        ? NDIS_CASE_NOTE_UTM_CAMPAIGN
+        : undefined,
     locale: attribution.locale === "zh-Hans" ? "zh-Hans" : "en",
   };
 }
@@ -666,6 +692,7 @@ function mapEventToRow(record: NdisCaseNoteCompanionEventRecord) {
     source: record.attribution.source,
     resource_slug: record.attribution.resourceSlug,
     utm_source: record.attribution.utmSource ?? null,
+    surface: record.attribution.surface ?? null,
     utm_medium: record.attribution.utmMedium ?? null,
     utm_campaign: record.attribution.utmCampaign ?? null,
     locale: record.attribution.locale,
@@ -683,6 +710,11 @@ function mapRowToEvent(row: CompanionEventRow): NdisCaseNoteCompanionEventRecord
       source: row.source,
       resourceSlug: row.resource_slug,
       utmSource: row.utm_source ?? undefined,
+      surface:
+        row.surface === "core_product_landing" ||
+        row.surface === "core_download_success"
+          ? row.surface
+          : undefined,
       utmMedium: row.utm_medium ?? undefined,
       utmCampaign: row.utm_campaign ?? undefined,
       locale: row.locale === "zh-Hans" ? "zh-Hans" : "en",

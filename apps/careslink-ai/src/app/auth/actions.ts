@@ -95,6 +95,38 @@ export async function continueWithGoogleFromRegisterAction(formData: FormData) {
   return continueWithGoogleAction("/auth/register", formData);
 }
 
+export async function signOutAction(formData: FormData) {
+  const locale = normalizeAuthLocale(getFormString(formData, "lang"));
+  const safeReturnTo =
+    getSafePendingAuthNextHref(getFormString(formData, "returnTo")) ??
+    getSafeAuthRedirectHref(undefined, undefined, "provider");
+  formData.set("next", safeReturnTo);
+
+  const supabase = await createCareslinkServerSupabaseClient();
+
+  if (supabase) {
+    const { error } = await supabase.auth.signOut();
+
+    if (error) {
+      return redirect(
+        getAuthPageRedirectHref("/auth/login", formData, {
+          error: "Unable to sign out. Please try again.",
+        }),
+      );
+    }
+  }
+
+  if (locale) {
+    formData.set("lang", locale);
+  }
+
+  return redirect(
+    getAuthPageRedirectHref("/auth/login", formData, {
+      notice: "signed-out",
+    }),
+  );
+}
+
 async function continueWithGoogleAction(
   returnPath: "/auth/login" | "/auth/register",
   formData: FormData,

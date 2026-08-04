@@ -1,3 +1,8 @@
+import {
+  getSafeNdisCaseNoteCompanionReturnHref,
+  NDIS_CASE_NOTE_COMPANION_PATH,
+} from "./ndis-case-note-companion-navigation";
+
 type SupabasePasswordAuthClient = {
   auth: {
     signInWithPassword(input: {
@@ -56,6 +61,7 @@ const defaultWorkspaceRedirectHref = "/ai-documents";
 const adminWorkspaceRedirectHref = "/referral-workspace";
 const providerAllowedRedirectPrefixes = [
   "/ai-documents",
+  "/plan-and-usage",
   "/referral-workspace",
   "/template-companion/ndis-case-note",
 ];
@@ -72,9 +78,9 @@ export function getSafeAuthRedirectHref(
   role: AuthRedirectRole = "provider",
 ): string {
   const rawNext = next?.trim();
-  const safePath = isSafeInternalWorkspaceHref(rawNext, role)
-    ? rawNext
-    : getDefaultAuthRedirectHref(role);
+  const safePath =
+    getSafeInternalWorkspaceHref(rawNext, role) ??
+    getDefaultAuthRedirectHref(role);
 
   return appendLocale(safePath, locale);
 }
@@ -82,14 +88,10 @@ export function getSafeAuthRedirectHref(
 export function getSafePendingAuthNextHref(next?: string): string | undefined {
   const rawNext = next?.trim();
 
-  if (
-    isSafeInternalWorkspaceHref(rawNext, "provider") ||
-    isSafeInternalWorkspaceHref(rawNext, "admin")
-  ) {
-    return rawNext;
-  }
-
-  return undefined;
+  return (
+    getSafeInternalWorkspaceHref(rawNext, "provider") ??
+    getSafeInternalWorkspaceHref(rawNext, "admin")
+  );
 }
 
 export function getTrustedAuthRedirectRole(
@@ -252,6 +254,23 @@ function appendLocale(href: string, locale?: string) {
   const hash = parsed.hash;
 
   return `${parsed.pathname}${parsed.search}${hash}`;
+}
+
+function getSafeInternalWorkspaceHref(
+  href: string | undefined,
+  role: AuthRedirectRole,
+) {
+  if (!isSafeInternalWorkspaceHref(href, role)) {
+    return undefined;
+  }
+
+  const parsed = new URL(href, "https://careslink.local");
+
+  if (parsed.pathname === NDIS_CASE_NOTE_COMPANION_PATH) {
+    return getSafeNdisCaseNoteCompanionReturnHref(parsed);
+  }
+
+  return `${parsed.pathname}${parsed.search}${parsed.hash}`;
 }
 
 export function normalizeAuthLocale(locale?: string) {

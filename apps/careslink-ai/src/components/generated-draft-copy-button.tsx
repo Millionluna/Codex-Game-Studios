@@ -15,6 +15,7 @@ type GeneratedDraftCopyButtonProps = {
   compact?: boolean;
   telemetryEvent?: GeneratedDraftCopyEvent;
   focusAfterCopyId?: string;
+  onCopied?: () => void;
 };
 
 type GeneratedDraftCopyEvent = {
@@ -121,6 +122,7 @@ export function GeneratedDraftCopyButton({
   compact = false,
   telemetryEvent,
   focusAfterCopyId,
+  onCopied,
 }: GeneratedDraftCopyButtonProps) {
   const [copied, setCopied] = useState(false);
 
@@ -134,6 +136,7 @@ export function GeneratedDraftCopyButton({
     setCopied(true);
     window.setTimeout(() => setCopied(false), 1600);
     focusElementAfterGeneratedDraftCopy(focusAfterCopyId);
+    onCopied?.();
     void recordGeneratedDraftCopyEvent(telemetryEvent);
   }
 

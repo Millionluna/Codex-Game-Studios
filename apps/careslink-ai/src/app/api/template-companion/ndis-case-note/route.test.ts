@@ -533,6 +533,12 @@ describe("provider-only NDIS case note generation route", () => {
     expect(store.consumeQuota).not.toHaveBeenCalled();
     expect(openAiMock.generateNdisCaseNoteDraft).not.toHaveBeenCalled();
     expect(creditStore.commitCredit).not.toHaveBeenCalled();
+    expect(store.recordEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventName: "companion_credit_exhausted",
+        userId: provider.id,
+      }),
+    );
   });
 
   it("releases a reserved credit when claim persistence fails", async () => {

@@ -445,7 +445,225 @@ function assertBilingualNumericFactConsistency(material: NdisCaseNoteMaterial) {
 }
 
 function getNumericFactTokens(value: string) {
-  return (value.match(/\d+(?:[.:/-]\d+)*/g) ?? []).sort();
+  const facts: string[] = [];
+  const consumed = new Uint8Array(value.length);
+
+  const collect = (
+    pattern: RegExp,
+    toFact: (match: RegExpExecArray) => string | undefined,
+  ) => {
+    pattern.lastIndex = 0;
+
+    for (let match = pattern.exec(value); match; match = pattern.exec(value)) {
+      const start = match.index;
+      const end = start + match[0].length;
+
+      if (hasConsumedRange(consumed, start, end)) {
+        continue;
+      }
+
+      const fact = toFact(match);
+
+      if (!fact) {
+        continue;
+      }
+
+      facts.push(fact);
+      consumed.fill(1, start, end);
+    }
+  };
+
+  collect(
+    /\b(\d{1,2})(?:st|nd|rd|th)?\s+(january|february|march|april|may|june|july|august|september|october|november|december)\s*,?\s*(\d{4})\b/gi,
+    (match) => getCanonicalDateFact(match[3], getMonthNumber(match[2]), match[1]),
+  );
+  collect(
+    /\b(january|february|march|april|may|june|july|august|september|october|november|december)\s+(\d{1,2})(?:st|nd|rd|th)?\s*,?\s*(\d{4})\b/gi,
+    (match) => getCanonicalDateFact(match[3], getMonthNumber(match[1]), match[2]),
+  );
+  collect(
+    /(\d{4})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日/g,
+    (match) => getCanonicalDateFact(match[1], match[2], match[3]),
+  );
+  collect(
+    /\b(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})\b/g,
+    (match) => getCanonicalDateFact(match[1], match[2], match[3]),
+  );
+  collect(
+    /\b(\d{1,2})[/-](\d{1,2})[/-](\d{4})\b/g,
+    (match) => getCanonicalDateFact(match[3], match[2], match[1]),
+  );
+  collect(
+    /\b(\d{1,2})(?:st|nd|rd|th)?\s+(january|february|march|april|may|june|july|august|september|october|november|december)\b/gi,
+    (match) => getCanonicalPartialDateFact(getMonthNumber(match[2]), match[1]),
+  );
+  collect(
+    /\b(january|february|march|april|may|june|july|august|september|october|november|december)\s+(\d{1,2})(?:st|nd|rd|th)?\b/gi,
+    (match) => getCanonicalPartialDateFact(getMonthNumber(match[1]), match[2]),
+  );
+  collect(
+    /(\d{1,2})\s*月\s*(\d{1,2})\s*日/g,
+    (match) => getCanonicalPartialDateFact(match[1], match[2]),
+  );
+  collect(
+    /\b(january|february|march|april|may|june|july|august|september|october|november|december)\s+(\d{4})\b/gi,
+    (match) => getCanonicalMonthFact(match[2], getMonthNumber(match[1])),
+  );
+  collect(
+    /(\d{4})\s*年\s*(\d{1,2})\s*月/g,
+    (match) => getCanonicalMonthFact(match[1], match[2]),
+  );
+  collect(
+    /\b(\d{1,2}):(\d{2})\s*(a\.?m\.?|p\.?m\.?)\b/gi,
+    (match) => getCanonicalTimeFact(match[1], match[2], match[3]),
+  );
+  collect(
+    /(上午|下午|晚上|中午|凌晨)\s*(\d{1,2})[:：](\d{2})/g,
+    (match) => getCanonicalTimeFact(match[2], match[3], match[1]),
+  );
+  collect(
+    /\b([01]?\d|2[0-3]):([0-5]\d)\b/g,
+    (match) => getCanonicalTimeFact(match[1], match[2]),
+  );
+
+  const remaining = Array.from(value, (character, index) =>
+    consumed[index] ? " " : character,
+  ).join("");
+  facts.push(...(remaining.match(/\d+(?:[.:/-]\d+)*/g) ?? []));
+
+  return facts.sort();
+}
+
+const MONTH_NUMBERS: Record<string, number> = {
+  january: 1,
+  february: 2,
+  march: 3,
+  april: 4,
+  may: 5,
+  june: 6,
+  july: 7,
+  august: 8,
+  september: 9,
+  october: 10,
+  november: 11,
+  december: 12,
+};
+
+function getMonthNumber(value: string) {
+  return MONTH_NUMBERS[value.toLowerCase()];
+}
+
+function getCanonicalDateFact(
+  yearValue: string,
+  monthValue: string | number | undefined,
+  dayValue: string,
+) {
+  const year = Number(yearValue);
+  const month = Number(monthValue);
+  const day = Number(dayValue);
+
+  if (!isValidCalendarDate(year, month, day)) {
+    return undefined;
+  }
+
+  return `date:${year}-${padTwo(month)}-${padTwo(day)}`;
+}
+
+function getCanonicalPartialDateFact(
+  monthValue: string | number | undefined,
+  dayValue: string,
+) {
+  const month = Number(monthValue);
+  const day = Number(dayValue);
+
+  if (!isValidCalendarDate(2000, month, day)) {
+    return undefined;
+  }
+
+  return `date:--${padTwo(month)}-${padTwo(day)}`;
+}
+
+function getCanonicalMonthFact(
+  yearValue: string,
+  monthValue: string | number | undefined,
+) {
+  const year = Number(yearValue);
+  const month = Number(monthValue);
+
+  if (!Number.isInteger(year) || year < 1900 || year > 2200 || month < 1 || month > 12) {
+    return undefined;
+  }
+
+  return `month:${year}-${padTwo(month)}`;
+}
+
+function getCanonicalTimeFact(
+  hourValue: string,
+  minuteValue: string,
+  periodValue?: string,
+) {
+  let hour = Number(hourValue);
+  const minute = Number(minuteValue);
+  const period = periodValue?.toLowerCase().replaceAll(".", "");
+
+  if (!Number.isInteger(hour) || !Number.isInteger(minute) || minute < 0 || minute > 59) {
+    return undefined;
+  }
+
+  if (period) {
+    if (hour < 1 || hour > 12) {
+      return undefined;
+    }
+
+    if (period === "pm" || period === "下午" || period === "晚上") {
+      hour = hour === 12 ? 12 : hour + 12;
+    } else if (period === "am" || period === "上午" || period === "凌晨") {
+      hour = hour === 12 ? 0 : hour;
+    } else if (period === "中午") {
+      hour = hour < 11 ? hour + 12 : hour;
+    }
+  } else if (hour < 0 || hour > 23) {
+    return undefined;
+  }
+
+  return `time:${padTwo(hour)}:${padTwo(minute)}`;
+}
+
+function isValidCalendarDate(year: number, month: number, day: number) {
+  if (
+    !Number.isInteger(year) ||
+    !Number.isInteger(month) ||
+    !Number.isInteger(day) ||
+    year < 1900 ||
+    year > 2200 ||
+    month < 1 ||
+    month > 12 ||
+    day < 1 ||
+    day > 31
+  ) {
+    return false;
+  }
+
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return (
+    date.getUTCFullYear() === year &&
+    date.getUTCMonth() === month - 1 &&
+    date.getUTCDate() === day
+  );
+}
+
+function hasConsumedRange(consumed: Uint8Array, start: number, end: number) {
+  for (let index = start; index < end; index += 1) {
+    if (consumed[index]) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function padTwo(value: number) {
+  return String(value).padStart(2, "0");
 }
 
 function getString(value: unknown) {

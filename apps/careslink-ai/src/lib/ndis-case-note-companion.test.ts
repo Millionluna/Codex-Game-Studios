@@ -226,6 +226,89 @@ describe("NDIS case note companion boundaries", () => {
     ).toThrow("bilingual drafts did not preserve core numeric facts");
   });
 
+  it.each([
+    [
+      "English month name and Chinese numeric month",
+      "Support was delivered on 4 August 2026.",
+      "支持于2026年8月4日提供。",
+    ],
+    [
+      "month-first English date",
+      "Support was delivered on August 4, 2026.",
+      "支持于2026年8月4日提供。",
+    ],
+    [
+      "numeric Australian date",
+      "Support was delivered on 04/08/2026.",
+      "支持于2026-08-04提供。",
+    ],
+    [
+      "English and Chinese time",
+      "The activity started at 2:30 pm and continued for 25 minutes.",
+      "活动于下午2:30开始，持续25分钟。",
+    ],
+  ])("accepts date-aware bilingual parity for %s", (_label, english, chinese) => {
+    expect(
+      parseNdisCaseNoteMaterial(
+        JSON.stringify({
+          ...validMaterial,
+          englishCaseNoteDraft: english,
+          chineseReviewVersion: chinese,
+        }),
+      ),
+    ).toMatchObject({
+      englishCaseNoteDraft: english,
+      chineseReviewVersion: chinese,
+    });
+  });
+
+  it("preserves non-date numeric facts after date canonicalization", () => {
+    const material = {
+      ...validMaterial,
+      englishCaseNoteDraft:
+        "On 4 August 2026, the participant selected 3 items and waited 25 minutes.",
+      chineseReviewVersion:
+        "2026年8月4日，参与者选择了3件物品，并等待了25分钟。",
+    };
+
+    expect(parseNdisCaseNoteMaterial(JSON.stringify(material))).toMatchObject(
+      material,
+    );
+    expect(() =>
+      parseNdisCaseNoteMaterial(
+        JSON.stringify({
+          ...material,
+          chineseReviewVersion:
+            "2026年8月4日，参与者选择了2件物品，并等待了25分钟。",
+        }),
+      ),
+    ).toThrow("bilingual drafts did not preserve core numeric facts");
+  });
+
+  it("rejects a real date or time difference", () => {
+    expect(() =>
+      parseNdisCaseNoteMaterial(
+        JSON.stringify({
+          ...validMaterial,
+          englishCaseNoteDraft:
+            "Support was delivered on 4 August 2026 at 2:30 pm.",
+          chineseReviewVersion: "支持于2026年8月5日下午2:30提供。",
+        }),
+      ),
+    ).toThrow("bilingual drafts did not preserve core numeric facts");
+
+    expect(() =>
+      parseNdisCaseNoteMaterial(
+        JSON.stringify({
+          ...validMaterial,
+          englishCaseNoteDraft:
+            "Support was delivered on 4 August 2026 at 2:30 pm.",
+          chineseReviewVersion: "支持于2026年8月4日下午3:30提供。",
+        }),
+      ),
+    ).toThrow("bilingual drafts did not preserve core numeric facts");
+  });
+
   it("reads legacy saved drafts only when explicitly allowed", () => {
     const legacy = {
       caseNoteDraft: "Legacy neutral draft wording.",

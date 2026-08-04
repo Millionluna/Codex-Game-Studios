@@ -238,15 +238,27 @@ POST /api/template-companion/ndis-case-note/save
 POST /api/template-companion/events
 ```
 
-Core should use this production handoff contract:
+Core should use one of these two production handoff contracts. The pair must be
+exact; unknown or mismatched `surface` / `utm_medium` values are discarded:
 
 ```text
+# Product landing
+https://ai.careslink.com.au/template-companion/ndis-case-note
+  ?source=ndis-case-note-download
+  &resourceSlug=ndis-case-note-template
+  &utm_source=careslink
+  &utm_medium=product_landing
+  &utm_campaign=ndis_case_note_ai_companion_v01
+  &surface=core_product_landing
+
+# Successful template download
 https://ai.careslink.com.au/template-companion/ndis-case-note
   ?source=ndis-case-note-download
   &resourceSlug=ndis-case-note-template
   &utm_source=careslink
   &utm_medium=post_download
   &utm_campaign=ndis_case_note_ai_companion_v01
+  &surface=core_download_success
 ```
 
 Only non-personal attribution values belong in the URL. Email, participant
@@ -321,6 +333,12 @@ The Responses request sets `store: false`. Standard API abuse-monitoring
 retention can still apply unless the OpenAI project has separately approved
 Zero Data Retention controls.
 
+Bilingual numeric-fact comparison canonicalises English month names, Chinese
+numeric dates, Australian/ISO numeric dates, and English/Chinese time forms.
+Dates and times that describe the same moment therefore do not produce false
+alarms, while unrelated counts and durations remain exact. A genuine date,
+time, or quantity mismatch rejects the complete output.
+
 Companion telemetry is metadata-only. The event names are:
 
 ```text
@@ -328,6 +346,10 @@ companion_viewed
 companion_started
 companion_generated
 companion_saved
+companion_copied
+companion_credit_exhausted
+companion_offer_viewed
+companion_offer_requested
 ```
 
 Historical rows may contain `companion_save_prompt_clicked` from the superseded
@@ -339,6 +361,9 @@ Unauthenticated Companion telemetry is rejected. Existing saved-draft copy
 events remain metadata-only and copying never consumes model quota.
 NDIS case-note drafts and copy events are excluded from the existing raw
 material-usage admin view; only the owning provider can read saved content.
+The optional `surface` event dimension is allowlisted and contains only
+`core_product_landing` or `core_download_success`; it cannot contain arbitrary
+campaign or user text.
 
 Apply the migration before enabling the Core CTA:
 
@@ -346,12 +371,26 @@ Apply the migration before enabling the Core CTA:
 supabase/migrations/20260723113000_create_ndis_case_note_companion.sql
 supabase/migrations/20260804190000_create_account_credit_entitlements.sql
 supabase/migrations/20260804193000_tighten_account_credit_table_privileges.sql
+supabase/migrations/20260804194500_fix_new_entitlement_effective_time.sql
+supabase/migrations/20260804203500_add_companion_pilot_attribution_events.sql
 ```
 
 `/plan-and-usage` reads the current owner's server-side entitlement and
 metadata-only ledger. Privacy review, editing, viewing, saving, copying, and
 downloading use 0 credits. Credits do not roll over, and this release has no
-payment or credit-purchase flow.
+payment or credit-purchase flow. At zero credits, an authenticated provider may
+opt in to a concept test for `Starter A$9.99/month for 30 generation credits`. The action
+collects no free text or new contact details, records metadata only, does not
+charge the account, and does not add credits. Pilot operations and aggregate
+queries are documented in `documentation/pilot-funnel-runbook.md` and
+`documentation/pilot-funnel.sql`.
+
+The server-side Sign out action is available from desktop and mobile account
+surfaces. It clears the Supabase session and returns only through an allowlisted
+internal path; signed-out access immediately restores the provider gate. The
+AI-specific Privacy, Collection & Retention Notice is available at `/privacy`
+from authentication, Companion, Saved Documents, the shared shell, and the
+public AI landing page.
 
 Server-only environment variables:
 

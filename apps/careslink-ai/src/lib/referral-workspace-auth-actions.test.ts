@@ -98,7 +98,8 @@ describe("referral workspace auth actions", () => {
     const next =
       "/template-companion/ndis-case-note?source=ndis-case-note-download" +
       "&resourceSlug=ndis-case-note-template&utm_source=careslink" +
-      "&utm_medium=post_download&utm_campaign=ndis_case_note_ai_companion_v01";
+      "&utm_medium=post_download&utm_campaign=ndis_case_note_ai_companion_v01" +
+      "&caseNoteDraft=private-text&email=person%40example.com";
     const redirectHref = getSafeAuthRedirectHref(next, "zh-Hans", "provider");
 
     expect(redirectHref).toContain(
@@ -107,7 +108,24 @@ describe("referral workspace auth actions", () => {
     expect(redirectHref).not.toContain("claimToken");
     expect(redirectHref).toContain("lang=zh-Hans");
     expect(redirectHref).not.toContain("caseNoteDraft");
+    expect(redirectHref).not.toContain("private-text");
+    expect(redirectHref).not.toContain("email");
     expect(redirectHref).not.toContain("observableFacts");
+    expect(redirectHref).not.toContain("utm_medium");
+  });
+
+  it("preserves only an allowlisted companion surface and medium pair", () => {
+    const safeNext = getSafePendingAuthNextHref(
+      "/template-companion/ndis-case-note?surface=core_product_landing" +
+        "&utm_medium=product_landing&utm_source=careslink" +
+        "&utm_campaign=ndis_case_note_ai_companion_v01&lang=en" +
+        "&unexpected=drop-me",
+    );
+
+    expect(safeNext).toContain("surface=core_product_landing");
+    expect(safeNext).toContain("utm_medium=product_landing");
+    expect(safeNext).not.toContain("unexpected");
+    expect(safeNext).not.toContain("drop-me");
   });
 
   it("returns a form error without calling Supabase when credentials are incomplete", async () => {

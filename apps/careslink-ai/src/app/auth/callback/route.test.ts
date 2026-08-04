@@ -73,7 +73,7 @@ describe("Supabase auth callback", () => {
       "one-time-code",
     );
     expect(response.headers.get("location")).toBe(
-      "https://ai.careslink.com.au/template-companion/ndis-case-note?source=ndis-case-note-download&lang=zh-Hans",
+      "https://ai.careslink.com.au/template-companion/ndis-case-note?source=ndis-case-note-download&resourceSlug=ndis-case-note-template&lang=zh-Hans",
     );
     expect(response.headers.get("location")).not.toContain("code=");
     expect(response.headers.get("location")).not.toContain("access_token");

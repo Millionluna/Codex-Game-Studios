@@ -57,6 +57,8 @@ describe("NDIS case note companion UI", () => {
 
     expect(markup).toContain("2 of 3 credits remaining this period");
     expect(markup).toContain("One new draft uses 1 credit");
+    expect(markup).toContain("Sign out");
+    expect(markup).toContain("Privacy, collection &amp; retention");
     expect(markup).toContain("Do not enter names");
     expect(markup).toContain("Review privacy first");
     expect(markup).toContain("Structured facts");
@@ -75,6 +77,26 @@ describe("NDIS case note companion UI", () => {
     expect(markup).toContain("case-note-mobile-context");
     expect(markup).not.toContain("Access request");
     expect(markup).not.toContain("Demo account");
+  });
+
+  it("shows a concrete, non-charging paid-beta fake door at zero credits", () => {
+    const markup = renderToStaticMarkup(
+      createElement(NdisCaseNoteCompanion, {
+        attribution,
+        autoSave: false,
+        savedDrafts: [],
+        initialCreditUsage: {
+          ...creditUsage,
+          remainingCredits: 0,
+          usedCredits: 3,
+        },
+      }),
+    );
+
+    expect(markup).toContain("A$9.99 per month for 30 generation credits");
+    expect(markup).toContain("Request more credits / Join paid beta");
+    expect(markup).toContain("you will not be charged now");
+    expect(markup).toContain("credits are not added automatically");
   });
 
   it("shows an authenticated reviewable result without a guest save handoff", () => {

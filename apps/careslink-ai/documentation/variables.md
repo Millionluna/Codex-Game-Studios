@@ -37,7 +37,9 @@ there is no memory-credit fallback.
 Google OAuth client ID and secret are configured in Google Cloud and Supabase
 Auth, not as CaresLink AI environment variables.
 `CARESLINK_GOOGLE_OAUTH_ENABLED` is a non-secret, server-only release gate and
-must remain false until provider and callback configuration is verified. Preview callbacks use
+must remain false until provider and callback configuration is verified. Even
+when true, login/register fail closed unless Supabase `/auth/v1/settings`
+confirms the Google provider. Preview callbacks use
 Vercel's deployment-specific `VERCEL_URL`; Supabase must explicitly allow the
 intended Preview URL pattern. No Google access or refresh token is stored by the
 application.
@@ -54,6 +56,8 @@ Only `NEXT_PUBLIC_*` values may be bundled. They must contain public URLs, publi
 - Confirm demo auth and companion memory fallback are not enabled.
 - Confirm the Supabase project has the companion migration.
 - Confirm the account entitlement/ledger migrations, owner RLS, and service-role-only credit RPC grants are present.
+- Confirm the pilot attribution/event migration is present and only the two documented surface/medium pairs persist.
+- Confirm Google is either hidden or has passed real redirect, callback, provider-default-role, cancellation and sign-out checks.
 - Run PII denial before any live generation.
 - Confirm unauthenticated GET enters login and unauthenticated POST returns `401` before quota/OpenAI.
 - Run one authenticated synthetic generation, PII denial, account/IP quota denial, owner-bound claim/save, cross-account denial, metadata-only checks, then delete temporary accounts/data.

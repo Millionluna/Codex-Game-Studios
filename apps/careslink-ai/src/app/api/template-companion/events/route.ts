@@ -20,6 +20,9 @@ type CompanionEventPostBody = {
 const CLIENT_EVENT_NAMES = new Set<NdisCaseNoteCompanionEventName>([
   "companion_viewed",
   "companion_started",
+  "companion_copied",
+  "companion_offer_viewed",
+  "companion_offer_requested",
 ]);
 
 export async function POST(request: Request) {

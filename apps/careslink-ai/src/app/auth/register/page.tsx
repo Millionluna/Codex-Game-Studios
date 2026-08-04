@@ -6,6 +6,7 @@ import {
   UserPlus,
   UserRound,
 } from "lucide-react";
+import Link from "next/link";
 import { AppShell } from "@/components/app-shell";
 import { AuthSubmitButton } from "@/components/auth-submit-button";
 import { GoogleOAuthForm } from "@/components/google-oauth-form";
@@ -131,7 +132,7 @@ export default async function RegisterPage({ searchParams }: RegisterPageProps) 
 
         <CaresLinkWorkspaceMockup locale={locale} />
 
-        <TrustBoundaryStrip copy={copy} />
+        <TrustBoundaryStrip copy={copy} locale={locale} />
       </section>
     </AppShell>
   );
@@ -228,14 +229,28 @@ function CaresLinkWorkspaceMockup({ locale }: { locale: Locale }) {
   );
 }
 
-function TrustBoundaryStrip({ copy }: { copy: AuthPageCopy }) {
+function TrustBoundaryStrip({
+  copy,
+  locale,
+}: {
+  copy: AuthPageCopy;
+  locale: Locale;
+}) {
   return (
     <aside className="surface-card flex flex-col gap-3 p-4 sm:flex-row sm:items-start lg:col-span-2">
       <div className="flex items-center gap-2 text-sm font-semibold text-[#181715] sm:w-56 sm:shrink-0">
         <ShieldAlert className="size-5 text-[#0f766e]" aria-hidden="true" />
         {copy.boundaryHeading}
       </div>
-      <p className="text-sm leading-6 text-[#5d574f]">{copy.boundary}</p>
+      <div>
+        <p className="text-sm leading-6 text-[#5d574f]">{copy.boundary}</p>
+        <Link
+          href={withLocale("/privacy", locale)}
+          className="mt-2 inline-flex text-sm font-semibold text-[#0f766e] underline-offset-4 hover:underline"
+        >
+          {copy.privacyNotice}
+        </Link>
+      </div>
     </aside>
   );
 }
@@ -255,6 +270,7 @@ type AuthPageCopy = ReturnType<typeof getAuthPageCopy>;
 function getAuthPageCopy(locale: Locale) {
   if (locale === "zh-Hans") {
     return {
+      privacyNotice: "查看隐私、收集与保留说明",
       formHeading: "创建账户",
       title: "保存草稿，并开始准备 Referral Pack。",
       description:
@@ -299,6 +315,7 @@ function getAuthPageCopy(locale: Locale) {
   }
 
   return {
+    privacyNotice: "Read the privacy, collection & retention notice",
     formHeading: "Create account",
     title: "Save the draft and prepare your Referral Pack.",
     description:

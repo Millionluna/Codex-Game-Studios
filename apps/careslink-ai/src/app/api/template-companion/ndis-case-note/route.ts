@@ -11,6 +11,7 @@ import {
   getNdisCaseNoteCompanionStore,
   hashCompanionToken,
   type NdisCaseNoteCompanionClaimRecord,
+  type NdisCaseNoteCompanionEventName,
   type NdisCaseNoteCompanionStore,
   type NdisCaseNoteQuotaScope,
 } from "@/lib/ndis-case-note-companion-store";
@@ -196,6 +197,14 @@ export async function POST(request: Request) {
   }
 
   if (credit.reservationStatus === "exhausted") {
+    await recordCompanionEventSafely({
+      store: companionStore,
+      eventName: "companion_credit_exhausted",
+      userId: account.id,
+      visitorHash: identity.visitorHash,
+      request,
+    });
+
     return withCompanionSessionCookie(
       NextResponse.json(
         {
@@ -694,7 +703,7 @@ async function recordCompanionEventSafely({
   request,
 }: {
   store: NdisCaseNoteCompanionStore;
-  eventName: "companion_generated";
+  eventName: NdisCaseNoteCompanionEventName;
   userId?: string;
   visitorHash: string;
   request: Request;

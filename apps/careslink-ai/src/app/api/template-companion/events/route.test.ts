@@ -39,9 +39,9 @@ const provider = {
   email: "provider@example.com",
 };
 
-function createRequest() {
+function createRequest(eventName = "companion_viewed", query = "surface=core_product_landing&utm_medium=product_landing") {
   return new Request(
-    "http://localhost/api/template-companion/events?source=ndis-case-note-download&resourceSlug=ndis-case-note-template&utm_source=careslink",
+    `http://localhost/api/template-companion/events?source=ndis-case-note-download&resourceSlug=ndis-case-note-template&utm_source=careslink&${query}`,
     {
       method: "POST",
       headers: {
@@ -50,7 +50,7 @@ function createRequest() {
         "user-agent": "vitest",
         "x-forwarded-for": "203.0.113.10",
       },
-      body: JSON.stringify({ eventName: "companion_viewed" }),
+      body: JSON.stringify({ eventName }),
     },
   );
 }
@@ -110,10 +110,54 @@ describe("provider-only companion telemetry", () => {
         source: "ndis-case-note-download",
         resourceSlug: "ndis-case-note-template",
         utmSource: "careslink",
+        surface: "core_product_landing",
+        utmMedium: "product_landing",
       },
     });
     expect(JSON.stringify(event)).not.toContain("observableFacts");
     expect(JSON.stringify(event)).not.toContain("caseNoteDraft");
+  });
+
+  it.each([
+    "companion_copied",
+    "companion_offer_viewed",
+    "companion_offer_requested",
+  ])("records the metadata-only pilot offer event %s", async (eventName) => {
+    const { POST } = await import("./route");
+    const response = await POST(createRequest(eventName));
+
+    expect(response.status).toBe(200);
+    expect(mocks.recordEvent.mock.calls[0]?.[0]).toMatchObject({
+      eventName,
+      userId: provider.id,
+    });
+    expect(JSON.stringify(mocks.recordEvent.mock.calls[0]?.[0])).not.toContain(
+      "caseNoteDraft",
+    );
+  });
+
+  it("drops a mismatched surface/medium pair before persistence", async () => {
+    const { POST } = await import("./route");
+    const response = await POST(
+      createRequest(
+        "companion_offer_viewed",
+        "surface=core_product_landing&utm_medium=post_download",
+      ),
+    );
+
+    expect(response.status).toBe(200);
+    expect(mocks.recordEvent.mock.calls[0]?.[0].attribution).toMatchObject({
+      surface: undefined,
+      utmMedium: undefined,
+    });
+  });
+
+  it("rejects an arbitrary client event name", async () => {
+    const { POST } = await import("./route");
+    const response = await POST(createRequest("participant_free_text"));
+
+    expect(response.status).toBe(400);
+    expect(mocks.recordEvent).not.toHaveBeenCalled();
   });
 
   it("rejects an admin before reading event data", async () => {

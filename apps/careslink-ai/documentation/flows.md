@@ -8,11 +8,13 @@
 2. Without a session it redirects to `/auth/login` with a validated internal `next`/`returnTo` containing only allowlisted locale, source, resource, and UTM values. No case-note text is accepted in that URL.
 3. A provider login returns to the same Companion route ready for input. Admin roles fall back to the admin workspace.
 4. A direct unauthenticated generation POST returns `401` before JSON parsing, quota, claim creation, telemetry, or OpenAI.
+5. Sign out runs as a server action. It invalidates the Supabase session, retains only an allowlisted provider/admin return route, and sends the user to login. The next protected GET re-enters the auth gate.
 
 ### Google OAuth
 
 1. Login/Register shows Google only when the server-only release gate is exactly
-   `true`; absent or unverified configuration fails closed and leaves
+   `true` and the Supabase settings endpoint confirms Google is enabled; absent,
+   disabled or unavailable configuration fails closed and leaves
    email/password available.
 2. The server action normalizes locale and reduces `next` to an allowlisted
    provider route before calling `signInWithOAuth({ provider: "google" })`.
@@ -36,7 +38,7 @@
 6. The server validates a required idempotency key and atomically reserves 1 monthly account credit. Existing completed keys recover the same owner-bound claim; concurrent keys return a stable in-progress state without another model call.
 7. Server abuse controls apply a per-minute account rate limit and atomic daily account/IP quota. **Deny:** `429` without OpenAI; the reserved account credit is released.
 8. Server calls OpenAI with strict structured output, `store: false`, bounded tokens, and no tools.
-9. Output parsing rejects the whole response if it is malformed, contains an obvious identifier/prohibited conclusion, or fails bilingual numeric parity.
+9. Output parsing rejects the whole response if it is malformed, contains an obvious identifier/prohibited conclusion, or fails bilingual numeric parity. English month names, Chinese numeric months, numeric dates and 12/24-hour times are canonicalized before all remaining numeric facts are compared.
 10. Server stores only the generated material in a 30-minute claim immediately bound to the current provider. Only then does the credit commit and metadata-only `companion_generated` emit. Generation or claim failure releases the credit without restoring abuse quota already consumed after OpenAI.
 
 ## Privacy and server-bypass denial
@@ -93,9 +95,15 @@ not a formal case-management or statutory record-retention system.
 
 **Actors:** provider events; admin reporting. **Outcome:** operational metrics without participant facts.
 
-- Client event endpoint allowlists `companion_viewed` and `companion_started` and accepts only the event name. Historical save-prompt events are not emitted by the current provider-only flow.
-- Generation/save events are server-created.
-- Attribution values are allowlisted and length-bounded. Visitor/device/IP values are one-way hashes.
+- Client event endpoint allowlists `companion_viewed`, `companion_started`, `companion_copied`, `companion_offer_viewed` and `companion_offer_requested`; its JSON body accepts only the event name. The fake door has no free-text or contact field.
+- Generation, credit-exhaustion and save events are server-created.
+- Attribution is reduced to fixed source/resource/campaign values and two exact surface/medium pairs. Unknown or mismatched values are dropped. Visitor/device/IP values are one-way hashes.
 - Companion telemetry has no input, output, participant-fact, email, or contact columns.
 - Current admin material usage loads generated-draft metadata without `content` and excludes `ndis_case_note` details.
 - `/plan-and-usage` loads only the current provider's entitlement and ledger metadata. It never renders reservation/idempotency references or case-note content.
+
+## Zero-credit pilot offer
+
+1. When remaining credits reaches zero, the provider sees the concept price of Starter A$9.99/month for 30 generation credits.
+2. Viewing and requesting the offer create metadata-only events against the existing authenticated account. The UI collects no free text, email, phone or other contact data.
+3. Requesting does not charge, create a subscription, add credits or bypass the normal reset. Stripe is not connected in this release.

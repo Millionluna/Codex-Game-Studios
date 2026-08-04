@@ -79,6 +79,8 @@ describe("AppShell", () => {
     expect(markup).toContain("AI Documents");
     expect(markup).toContain("Referrals");
     expect(markup).toContain("Saved Documents");
+    expect(markup).toContain("Sign out");
+    expect(markup).toContain('href="/privacy?lang=en"');
     expect(markup).not.toContain("/admin/access-requests");
     expect(markup).not.toContain("/admin/material-usage");
     expect(markup).not.toContain("/demo");
@@ -100,6 +102,7 @@ describe("AppShell", () => {
 
     expect(markup).toContain('href="/admin/access-requests?lang=en"');
     expect(markup).toContain('href="/admin/material-usage?lang=en"');
+    expect(markup).toContain("Sign out");
     expect(markup).not.toContain("/referral-workspace/profile");
     expect(markup).not.toContain("/referral-workspace/materials");
     expect(markup).not.toContain("/plan-and-usage");
@@ -135,6 +138,7 @@ describe("AppShell", () => {
     expect(markup).not.toContain("/providers");
     expect(markup).not.toContain("/dashboard");
     expect(markup).not.toContain("Legacy");
+    expect(markup).not.toContain("Sign out");
   });
 
   it("shows legacy demo navigation for demo accounts when explicitly enabled", () => {

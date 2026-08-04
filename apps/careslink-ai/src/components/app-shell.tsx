@@ -8,6 +8,7 @@ import {
   KeyRound,
   LayoutDashboard,
   Languages,
+  LogOut,
   Menu,
   Network,
   ShieldAlert,
@@ -15,6 +16,7 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
+import { signOutAction } from "../app/auth/actions";
 import {
   DEFAULT_LOCALE,
   SUPPORTED_LOCALES,
@@ -49,6 +51,8 @@ type ShellCopy = {
   materialUsage: string;
   language: string;
   menu: string;
+  privacyNotice: string;
+  signOut: string;
   trustBoundary: string;
   boundary: string;
   subtitle: string;
@@ -101,6 +105,8 @@ export function AppShell({
     isDemoSession &&
     process.env.NEXT_PUBLIC_CARESLINK_SHOW_LEGACY_DEMO_NAV === "true";
   const navigation = getNavigation(workspaceRole, copy);
+  const showSignOut =
+    workspaceSessionSource === "supabase" && Boolean(workspaceRole);
   const currentPath = getPathname(languageSwitcherHref);
   const logoHref =
     workspaceRole === "admin"
@@ -182,11 +188,34 @@ export function AppShell({
       ) : null}
 
       <div className="mt-auto border-t border-white/12 pt-5">
+        {showSignOut ? (
+          <form action={signOutAction} className="mb-5">
+            <input name="lang" type="hidden" value={locale} />
+            <input
+              name="returnTo"
+              type="hidden"
+              value={languageSwitcherHref}
+            />
+            <button
+              type="submit"
+              className="flex min-h-10 w-full items-center gap-3 px-3 text-sm font-semibold text-white/72 hover:bg-white/8 hover:text-white"
+            >
+              <LogOut className="size-4" aria-hidden="true" />
+              {copy.signOut}
+            </button>
+          </form>
+        ) : null}
         <div className="flex items-center gap-2 text-xs font-semibold uppercase text-[#9fe1ca]">
           <ShieldAlert className="size-4" aria-hidden="true" />
           {copy.trustBoundary}
         </div>
         <p className="mt-2 text-xs leading-5 text-white/54">{copy.boundary}</p>
+        <Link
+          href={withLocale("/privacy", locale)}
+          className="mt-3 inline-flex text-xs font-semibold text-white/68 hover:text-white"
+        >
+          {copy.privacyNotice}
+        </Link>
         <div className="mt-5 flex items-center gap-2 text-xs font-semibold text-white/54">
           <Languages className="size-4" aria-hidden="true" />
           <span className="sr-only">{copy.language}</span>
@@ -379,6 +408,8 @@ function getNavigation(
 function getShellCopy(locale: Locale): ShellCopy {
   if (locale === "zh-Hans") {
     return {
+      privacyNotice: "隐私、收集与保留说明",
+      signOut: "退出登录",
       workspace: "工作区",
       manage: "管理",
       administration: "管理后台",
@@ -420,6 +451,8 @@ function getShellCopy(locale: Locale): ShellCopy {
     materialUsage: "Material usage",
     language: "Language",
     menu: "Open navigation",
+    privacyNotice: "Privacy, collection & retention",
+    signOut: "Sign out",
     trustBoundary: "Use boundary",
     boundary:
       "General documentation and operational support only. Every draft requires user review. No clinical, legal, care, regulatory or compliance advice.",

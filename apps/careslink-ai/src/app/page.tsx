@@ -127,9 +127,15 @@ export default async function HomePage({ searchParams }: HomePageProps) {
             height={48}
             className="h-10 w-auto"
           />
-          <p className="max-w-xl text-xs leading-5 text-white/58 sm:text-right">
-            {copy.footerBoundary}
-          </p>
+          <div className="max-w-xl text-xs leading-5 text-white/58 sm:text-right">
+            <p>{copy.footerBoundary}</p>
+            <Link
+              href={withLocale("/privacy", locale)}
+              className="mt-2 inline-flex font-semibold text-white/78 hover:text-white"
+            >
+              {copy.privacyNotice}
+            </Link>
+          </div>
         </div>
       </footer>
     </main>
@@ -474,6 +480,7 @@ function getHomeCompanionAttribution(
 function getHomeCopy(locale: Locale) {
   if (locale === "zh-Hans") {
     return {
+      privacyNotice: "隐私、收集与保留说明",
       skipToContent: "跳至主要内容",
       primaryNavigation: "主要导航",
       mobileNavigation: "移动端导航",
@@ -563,6 +570,7 @@ function getHomeCopy(locale: Locale) {
   }
 
   return {
+    privacyNotice: "Privacy, collection & retention",
     skipToContent: "Skip to main content",
     primaryNavigation: "Primary navigation",
     mobileNavigation: "Mobile navigation",

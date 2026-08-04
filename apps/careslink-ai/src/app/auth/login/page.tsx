@@ -7,6 +7,7 @@ import {
   ShieldAlert,
   UserRound,
 } from "lucide-react";
+import Link from "next/link";
 import { AppShell } from "@/components/app-shell";
 import { GoogleOAuthForm } from "@/components/google-oauth-form";
 import { ButtonLink, FieldLabel, TextInput } from "@/components/ui";
@@ -42,7 +43,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   const registerHref = withAuthHandoffParams("/auth/register", params);
   const forgotPasswordHref = withLocale("/auth/forgot-password", locale);
   const handoff = getProviderGeneratorHandoffContext(params);
-  const message = getAuthMessage(params);
+  const message = getAuthMessage(params, locale);
   const googleOAuthAvailable = await isGoogleOAuthAvailable();
 
   return (
@@ -126,7 +127,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
 
         <CaresLinkWorkspaceMockup locale={locale} />
 
-        <TrustBoundaryStrip copy={copy} />
+        <TrustBoundaryStrip copy={copy} locale={locale} />
       </section>
     </AppShell>
   );
@@ -223,19 +224,36 @@ function CaresLinkWorkspaceMockup({ locale }: { locale: Locale }) {
   );
 }
 
-function TrustBoundaryStrip({ copy }: { copy: AuthPageCopy }) {
+function TrustBoundaryStrip({
+  copy,
+  locale,
+}: {
+  copy: AuthPageCopy;
+  locale: Locale;
+}) {
   return (
     <aside className="surface-card flex flex-col gap-3 p-4 sm:flex-row sm:items-start lg:col-span-2">
       <div className="flex items-center gap-2 text-sm font-semibold text-[#181715] sm:w-56 sm:shrink-0">
         <ShieldAlert className="size-5 text-[#0f766e]" aria-hidden="true" />
         {copy.boundaryHeading}
       </div>
-      <p className="text-sm leading-6 text-[#5d574f]">{copy.boundary}</p>
+      <div>
+        <p className="text-sm leading-6 text-[#5d574f]">{copy.boundary}</p>
+        <Link
+          href={withLocale("/privacy", locale)}
+          className="mt-2 inline-flex text-sm font-semibold text-[#0f766e] underline-offset-4 hover:underline"
+        >
+          {copy.privacyNotice}
+        </Link>
+      </div>
     </aside>
   );
 }
 
-function getAuthMessage(params: AuthSearchParams | undefined) {
+function getAuthMessage(
+  params: AuthSearchParams | undefined,
+  locale: Locale,
+) {
   const error = getSearchParam(params, "error");
 
   if (error) {
@@ -244,7 +262,11 @@ function getAuthMessage(params: AuthSearchParams | undefined) {
 
   const notice = getSearchParam(params, "notice");
 
-  return notice === "confirm-email"
+  return notice === "signed-out"
+    ? locale === "zh-Hans"
+      ? "你已退出登录。"
+      : "You have signed out."
+    : notice === "confirm-email"
     ? "Check your email to confirm your CaresLink AI account."
     : notice === "password-reset-sent"
       ? "If this email is registered, a password reset link has been sent."
@@ -258,6 +280,7 @@ type AuthPageCopy = ReturnType<typeof getAuthPageCopy>;
 function getAuthPageCopy(locale: Locale) {
   if (locale === "zh-Hans") {
     return {
+      privacyNotice: "查看隐私、收集与保留说明",
       formHeading: "使用邮箱登录",
       title: "登录后继续准备 Referral Pack。",
       description:
@@ -300,6 +323,7 @@ function getAuthPageCopy(locale: Locale) {
   }
 
   return {
+    privacyNotice: "Read the privacy, collection & retention notice",
     formHeading: "Provider workspace access",
     title: "Continue your Referral Pack workspace.",
     description:

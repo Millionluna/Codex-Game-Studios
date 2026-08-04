@@ -20,6 +20,7 @@ describe("NDIS case note request metadata", () => {
       source: NDIS_CASE_NOTE_COMPANION_SOURCE,
       resourceSlug: NDIS_CASE_NOTE_RESOURCE_SLUG,
       utmSource: undefined,
+      surface: undefined,
       utmMedium: undefined,
       utmCampaign: undefined,
       locale: "en",
@@ -28,17 +29,43 @@ describe("NDIS case note request metadata", () => {
 
   it("retains only the allowlisted Core attribution values", () => {
     const attribution = getNdisCaseNoteCompanionAttribution(
-      `https://ai.careslink.com.au/template-companion/ndis-case-note?source=${NDIS_CASE_NOTE_COMPANION_SOURCE}&resourceSlug=${NDIS_CASE_NOTE_RESOURCE_SLUG}&utm_source=careslink&utm_medium=post_download&utm_campaign=${NDIS_CASE_NOTE_UTM_CAMPAIGN}&lang=zh-Hans`,
+      `https://ai.careslink.com.au/template-companion/ndis-case-note?source=${NDIS_CASE_NOTE_COMPANION_SOURCE}&resourceSlug=${NDIS_CASE_NOTE_RESOURCE_SLUG}&utm_source=careslink&surface=core_download_success&utm_medium=post_download&utm_campaign=${NDIS_CASE_NOTE_UTM_CAMPAIGN}&lang=zh-Hans`,
     );
 
     expect(attribution).toMatchObject({
       source: NDIS_CASE_NOTE_COMPANION_SOURCE,
       resourceSlug: NDIS_CASE_NOTE_RESOURCE_SLUG,
       utmSource: "careslink",
+      surface: "core_download_success",
       utmMedium: "post_download",
       utmCampaign: NDIS_CASE_NOTE_UTM_CAMPAIGN,
       locale: "zh-Hans",
     });
+  });
+
+  it.each([
+    ["core_product_landing", "product_landing"],
+    ["core_download_success", "post_download"],
+  ])("accepts the allowlisted surface/medium pair %s", (surface, medium) => {
+    const attribution = getNdisCaseNoteCompanionAttribution(
+      `https://ai.careslink.com.au/template-companion/ndis-case-note?surface=${surface}&utm_medium=${medium}`,
+    );
+
+    expect(attribution).toMatchObject({ surface, utmMedium: medium });
+  });
+
+  it.each([
+    ["core_product_landing", "post_download"],
+    ["core_download_success", "product_landing"],
+    ["participant-name", "product_landing"],
+    ["core_product_landing", "free-text"],
+  ])("drops an unknown or mismatched surface/medium pair", (surface, medium) => {
+    const attribution = getNdisCaseNoteCompanionAttribution(
+      `https://ai.careslink.com.au/template-companion/ndis-case-note?surface=${surface}&utm_medium=${medium}`,
+    );
+
+    expect(attribution.surface).toBeUndefined();
+    expect(attribution.utmMedium).toBeUndefined();
   });
 
   it("requires a dedicated fingerprint pepper in production", () => {
@@ -67,6 +94,7 @@ describe("NDIS case note request metadata", () => {
         source: NDIS_CASE_NOTE_COMPANION_SOURCE,
         resourceSlug: NDIS_CASE_NOTE_RESOURCE_SLUG,
         utmSource: "careslink",
+        surface: "core_download_success",
         utmMedium: "post_download",
         utmCampaign: NDIS_CASE_NOTE_UTM_CAMPAIGN,
         locale: "en",
@@ -76,8 +104,30 @@ describe("NDIS case note request metadata", () => {
     });
 
     expect(href).toContain(`claimToken=${"a".repeat(43)}`);
+    expect(href).toContain("surface=core_download_success");
     expect(href).not.toContain("observableFacts");
     expect(href).not.toContain("caseNoteDraft");
+  });
+
+  it("normalizes unsafe attribution objects before building a URL", () => {
+    const href = buildNdisCaseNoteCompanionHref({
+      attribution: {
+        source: "participant-name",
+        resourceSlug: "0412345678",
+        utmSource: "private-contact",
+        surface: "core_product_landing",
+        utmMedium: "post_download",
+        utmCampaign: "participant-facts",
+        locale: "en",
+      },
+    });
+
+    expect(href).toContain("source=ndis-case-note-download");
+    expect(href).toContain("resourceSlug=ndis-case-note-template");
+    expect(href).not.toContain("participant-name");
+    expect(href).not.toContain("0412345678");
+    expect(href).not.toContain("surface=");
+    expect(href).not.toContain("utm_medium=");
   });
 
   it("derives a stable opaque claim token from the owner and credit reservation", () => {
@@ -106,6 +156,7 @@ describe("NDIS case note request metadata", () => {
       source: NDIS_CASE_NOTE_COMPANION_SOURCE,
       resourceSlug: NDIS_CASE_NOTE_RESOURCE_SLUG,
       utmSource: "careslink",
+      surface: "core_download_success",
       utmMedium: "post_download",
       utmCampaign: NDIS_CASE_NOTE_UTM_CAMPAIGN,
       locale: "zh-Hans",
@@ -119,6 +170,7 @@ describe("NDIS case note request metadata", () => {
     expect(next).toContain("source=ndis-case-note-download");
     expect(next).toContain("resourceSlug=ndis-case-note-template");
     expect(next).toContain("utm_source=careslink");
+    expect(next).toContain("surface=core_download_success");
     expect(next).toContain("lang=zh-Hans");
     expect(href).not.toContain("observableFacts");
     expect(href).not.toContain("caseNoteDraft");
