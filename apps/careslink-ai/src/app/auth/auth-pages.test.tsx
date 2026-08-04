@@ -11,6 +11,9 @@ const googleOAuthMock = vi.hoisted(() => ({
 vi.mock("@/lib/google-oauth", () => ({
   isGoogleOAuthAvailable: googleOAuthMock.isGoogleOAuthAvailable,
 }));
+vi.mock("@/lib/auth-page-context", async () =>
+  import("../../lib/auth-page-context"),
+);
 
 vi.mock("@/components/app-shell", async () =>
   import("../../components/app-shell"),
@@ -242,6 +245,82 @@ describe("auth and access gate pages", () => {
     expect(markup).not.toContain(copy.auth.register.waitlistCta);
     expect(markup).not.toContain("account=user-free");
     expect(markup).not.toContain("account=user-waitlist");
+  });
+
+  it("shows Case Note context for an allowlisted companion next route in both locales", async () => {
+    const { default: LoginPage } = await import("./login/page");
+    const { default: RegisterPage } = await import("./register/page");
+    const next =
+      "/template-companion/ndis-case-note?source=ndis-case-note-download&resourceSlug=ndis-case-note-template";
+    const loginEn = await renderPage(LoginPage, { lang: "en", next });
+    const loginZh = await renderPage(LoginPage, { lang: "zh-Hans", next });
+    const registerEn = await renderPage(RegisterPage, { lang: "en", next });
+    const registerZh = await renderPage(RegisterPage, {
+      lang: "zh-Hans",
+      next,
+    });
+
+    expect(loginEn).toContain(
+      "Sign in to continue to the NDIS Case Note Companion.",
+    );
+    expect(loginEn).toContain("AI Documents");
+    expect(loginEn).toContain("NDIS Case Note AI Companion");
+    expect(loginEn).toContain("Review privacy prompts");
+    expect(loginEn).toContain("Sign in and continue");
+    expect(loginEn).not.toContain("Referral Pack");
+
+    expect(loginZh).toContain("登录后继续使用 NDIS Case Note AI 助手。");
+    expect(loginZh).toContain("AI Documents");
+    expect(loginZh).toContain("NDIS Case Note AI 助手");
+    expect(loginZh).toContain("复核隐私提示");
+    expect(loginZh).toContain("登录并继续");
+    expect(loginZh).not.toContain("Referral Pack");
+
+    expect(registerEn).toContain(
+      "Create an account to use the NDIS Case Note Companion.",
+    );
+    expect(registerEn).toContain("AI Documents");
+    expect(registerEn).toContain("NDIS Case Note AI Companion");
+    expect(registerEn).toContain("Review privacy prompts");
+    expect(registerEn).toContain("Create account and continue");
+    expect(registerEn).not.toContain("Referral Pack");
+
+    expect(registerZh).toContain("创建账户后使用 NDIS Case Note AI 助手。");
+    expect(registerZh).toContain("AI Documents");
+    expect(registerZh).toContain("NDIS Case Note AI 助手");
+    expect(registerZh).toContain("复核隐私提示");
+    expect(registerZh).toContain("创建账户并继续");
+    expect(registerZh).not.toContain("Referral Pack");
+
+    for (const markup of [loginEn, loginZh, registerEn, registerZh]) {
+      expect(markup).toContain(
+        'name="next" value="/template-companion/ndis-case-note?source=ndis-case-note-download&amp;resourceSlug=ndis-case-note-template"',
+      );
+    }
+  });
+
+  it("keeps Referral Pack copy for a non-allowlisted Case Note lookalike", async () => {
+    const { default: LoginPage } = await import("./login/page");
+    const { default: RegisterPage } = await import("./register/page");
+    const searchParams = {
+      lang: "en",
+      next: "/template-companion/ndis-case-note-lookalike",
+    };
+    const loginMarkup = await renderPage(LoginPage, searchParams);
+    const registerMarkup = await renderPage(RegisterPage, searchParams);
+
+    expect(loginMarkup).toContain("Continue your Referral Pack workspace.");
+    expect(loginMarkup).toContain("Referral Pack workspace");
+    expect(loginMarkup).not.toContain(
+      "Sign in to continue to the NDIS Case Note Companion.",
+    );
+    expect(registerMarkup).toContain(
+      "Save the draft and prepare your Referral Pack.",
+    );
+    expect(registerMarkup).toContain("Referral Pack workspace");
+    expect(registerMarkup).not.toContain(
+      "Create an account to use the NDIS Case Note Companion.",
+    );
   });
 
   it("shows Google OAuth on login and registration only when Supabase enables it", async () => {

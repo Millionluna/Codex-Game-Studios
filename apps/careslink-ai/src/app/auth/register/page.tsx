@@ -11,6 +11,10 @@ import { AppShell } from "@/components/app-shell";
 import { AuthSubmitButton } from "@/components/auth-submit-button";
 import { GoogleOAuthForm } from "@/components/google-oauth-form";
 import { ButtonLink, FieldLabel, TextInput } from "@/components/ui";
+import {
+  getAuthPageContext,
+  type AuthPageContext,
+} from "@/lib/auth-page-context";
 import { isGoogleOAuthAvailable } from "@/lib/google-oauth";
 import {
   getProviderGeneratorHandoffContext,
@@ -38,9 +42,9 @@ type RegisterPageProps = {
 export default async function RegisterPage({ searchParams }: RegisterPageProps) {
   const params = await searchParams;
   const locale = getLocaleFromSearchParams(params);
-  const copy = getAuthPageCopy(locale);
   const handoff = getProviderGeneratorHandoffContext(params);
   const nextHref = getSafeNextHrefWithHandoff(params);
+  const copy = getAuthPageCopy(locale, getAuthPageContext(nextHref));
   const loginHref = withAuthHandoffParams("/auth/login", params);
   const message = getAuthMessage(params);
   const googleOAuthAvailable = await isGoogleOAuthAvailable();
@@ -130,7 +134,7 @@ export default async function RegisterPage({ searchParams }: RegisterPageProps) 
           </form>
         </div>
 
-        <CaresLinkWorkspaceMockup locale={locale} />
+        <CaresLinkWorkspaceMockup copy={copy} />
 
         <TrustBoundaryStrip copy={copy} locale={locale} />
       </section>
@@ -167,8 +171,7 @@ function AuthMessage({ message }: { message: string }) {
   );
 }
 
-function CaresLinkWorkspaceMockup({ locale }: { locale: Locale }) {
-  const copy = getAuthPageCopy(locale);
+function CaresLinkWorkspaceMockup({ copy }: { copy: AuthPageCopy }) {
   const icons = [UserRound, CircleGauge, FileText, KeyRound];
 
   return (
@@ -267,9 +270,12 @@ function getAuthMessage(params: AuthSearchParams | undefined) {
 
 type AuthPageCopy = ReturnType<typeof getAuthPageCopy>;
 
-function getAuthPageCopy(locale: Locale) {
+function getAuthPageCopy(
+  locale: Locale,
+  context: AuthPageContext = "referral",
+) {
   if (locale === "zh-Hans") {
-    return {
+    const copy = {
       privacyNotice: "查看隐私、收集与保留说明",
       formHeading: "创建账户",
       title: "保存草稿，并开始准备 Referral Pack。",
@@ -312,9 +318,46 @@ function getAuthPageCopy(locale: Locale) {
         ],
       },
     };
+
+    if (context === "ndis-case-note") {
+      return {
+        ...copy,
+        title: "创建账户后使用 NDIS Case Note AI 助手。",
+        description:
+          "注册 AI Documents 后再输入去标识化的支持事实、完成隐私提示复核，并生成或保存待复核草稿。",
+        submit: "创建账户并继续",
+        boundary:
+          "仅提供一般文档与运营支持。草稿需要用户复核，不是完成记录，也不提供临床、法律、照护、监管或合规建议。",
+        mockup: {
+          kicker: "AI Documents",
+          title: "NDIS Case Note AI 助手",
+          status: "需要账户",
+          tabs: ["事实", "隐私", "草稿", "保存"],
+          rows: [
+            {
+              label: "输入去标识化事实",
+              meta: "第 1 步",
+              detail: "只提供草稿所需的支持事实，并移除姓名、号码和联系方式。",
+            },
+            {
+              label: "复核隐私提示",
+              meta: "第 2 步",
+              detail: "处理明显的身份信息提示，并逐项人工复核输入内容。",
+            },
+            {
+              label: "生成、复核或保存草稿",
+              meta: "第 3 步",
+              detail: "检查每项事实后，再复制或保存到当前服务商账号。",
+            },
+          ],
+        },
+      };
+    }
+
+    return copy;
   }
 
-  return {
+  const copy = {
     privacyNotice: "Read the privacy, collection & retention notice",
     formHeading: "Create account",
     title: "Save the draft and prepare your Referral Pack.",
@@ -360,4 +403,44 @@ function getAuthPageCopy(locale: Locale) {
       ],
     },
   };
+
+  if (context === "ndis-case-note") {
+    return {
+      ...copy,
+      title: "Create an account to use the NDIS Case Note Companion.",
+      description:
+        "Register for AI Documents before entering de-identified support facts, reviewing privacy prompts, and generating or saving a reviewable draft.",
+      submit: "Create account and continue",
+      boundary:
+        "General documentation and operational support only. A draft requires your review, is not a completed record, and is not clinical, legal, care, regulatory or compliance advice.",
+      mockup: {
+        kicker: "AI Documents",
+        title: "NDIS Case Note AI Companion",
+        status: "Account required",
+        tabs: ["Facts", "Privacy", "Draft", "Save"],
+        rows: [
+          {
+            label: "Enter de-identified facts",
+            meta: "Step 1",
+            detail:
+              "Include only the support facts needed for the draft, without names, numbers or contact details.",
+          },
+          {
+            label: "Review privacy prompts",
+            meta: "Step 2",
+            detail:
+              "Resolve obvious identifier prompts and review every input yourself.",
+          },
+          {
+            label: "Generate, review or save",
+            meta: "Step 3",
+            detail:
+              "Check every fact before copying or saving the draft to your provider account.",
+          },
+        ],
+      },
+    };
+  }
+
+  return copy;
 }
