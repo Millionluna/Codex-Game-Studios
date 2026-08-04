@@ -101,6 +101,34 @@ const EMPTY_INPUT: NdisCaseNoteCompanionInput = {
   followUp: "",
 };
 
+export function getNdisCaseNoteInputPanelState(
+  inputMode: NdisCaseNoteInputMode,
+  pastePrepared: boolean,
+) {
+  return {
+    showPasteInput: inputMode === "paste",
+    showExtractedFactsContext: inputMode === "paste" && pastePrepared,
+    showStructuredFacts: inputMode === "structured" || pastePrepared,
+  };
+}
+
+export function getNdisCaseNoteConfirmationGate(
+  reviewIsCurrent: boolean,
+  allPrivacyFindingsResolved: boolean,
+  missingMinimumFactCount: number,
+) {
+  if (!reviewIsCurrent) {
+    return { canConfirm: false, reason: "privacy_review" as const };
+  }
+  if (!allPrivacyFindingsResolved) {
+    return { canConfirm: false, reason: "privacy_findings" as const };
+  }
+  if (missingMinimumFactCount > 0) {
+    return { canConfirm: false, reason: "minimum_facts" as const };
+  }
+  return { canConfirm: true, reason: "ready" as const };
+}
+
 export function NdisCaseNoteCompanion({
   attribution,
   initialClaimToken,
@@ -186,7 +214,25 @@ export function NdisCaseNoteCompanion({
         privacyResolutions,
       )
     : false;
-  const canConfirmPrivacy = reviewIsCurrent && allPrivacyFindingsResolved;
+  const confirmationGate = getNdisCaseNoteConfirmationGate(
+    reviewIsCurrent,
+    allPrivacyFindingsResolved,
+    missingMinimumFacts.length,
+  );
+  const canConfirmPrivacy = confirmationGate.canConfirm;
+  const confirmationLockedMessage =
+    confirmationGate.reason === "minimum_facts"
+      ? copy.confirmationMinimumFactsLocked
+      : confirmationGate.reason === "privacy_findings"
+        ? copy.confirmationFindingsLocked
+        : copy.confirmationLocked;
+  const confirmationUnlockHint =
+    confirmationGate.reason === "minimum_facts"
+      ? copy.confirmationMinimumFactsHint
+      : confirmationGate.reason === "privacy_findings"
+        ? copy.confirmationFindingsHint
+        : copy.confirmationUnlockHint;
+  const inputPanels = getNdisCaseNoteInputPanelState(inputMode, pastePrepared);
 
   function updateInput(
     field: keyof NdisCaseNoteCompanionInput,
@@ -757,7 +803,7 @@ export function NdisCaseNoteCompanion({
                 </div>
               </fieldset>
 
-              {inputMode === "paste" && !pastePrepared ? (
+              {inputPanels.showPasteInput ? (
                 <CompanionField
                   fieldId="pastedNotes"
                   label={copy.pastedNotesLabel}
@@ -766,7 +812,7 @@ export function NdisCaseNoteCompanion({
                 >
                   <textarea
                     required
-                    rows={13}
+                    rows={pastePrepared ? 7 : 13}
                     value={pastedNotes}
                     maxLength={6000}
                     onChange={(event) => updatePastedNotes(event.target.value)}
@@ -779,28 +825,43 @@ export function NdisCaseNoteCompanion({
                     {copy.pastedNotesBoundary}
                   </span>
                 </CompanionField>
-              ) : (
-                <>
-                  {inputMode === "paste" ? (
-                    <div className="border-l-2 border-brand bg-[#edf5f0] px-4 py-3 text-sm leading-6 text-[#385249]">
-                      <div className="flex flex-wrap items-center justify-between gap-3">
-                        <span>{copy.structuredProposalReady}</span>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setPastePrepared(false);
-                            setPrivacyReview(undefined);
-                            setReviewIsCurrent(false);
-                            resetConfirmations();
-                          }}
-                          className="font-semibold text-brand hover:underline"
-                        >
-                          {copy.editOriginalPaste}
-                        </button>
-                      </div>
-                    </div>
-                  ) : null}
+              ) : null}
 
+              {inputPanels.showExtractedFactsContext ? (
+                <section
+                  aria-labelledby="case-note-extracted-facts-title"
+                  className="border border-[#b8ccc2] bg-[#edf5f0] p-4"
+                >
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="max-w-2xl">
+                      <h3
+                        id="case-note-extracted-facts-title"
+                        className="text-sm font-semibold text-foreground"
+                      >
+                        {copy.structuredProposalTitle}
+                      </h3>
+                      <p className="mt-1 text-sm leading-6 text-[#385249]">
+                        {copy.structuredProposalReady}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPastePrepared(false);
+                        setPrivacyReview(undefined);
+                        setReviewIsCurrent(false);
+                        resetConfirmations();
+                      }}
+                      className="min-h-10 border border-[#9eb8ab] bg-white px-3 text-sm font-semibold text-brand transition-colors hover:bg-[#f7faf8]"
+                    >
+                      {copy.editOriginalPaste}
+                    </button>
+                  </div>
+                </section>
+              ) : null}
+
+              {inputPanels.showStructuredFacts ? (
+                <>
               <div className="grid gap-4 sm:grid-cols-2">
                 <CompanionField
                   fieldId="supportDateTime"
@@ -951,56 +1012,32 @@ export function NdisCaseNoteCompanion({
                 />
               </CompanionField>
                 </>
-              )}
+              ) : null}
 
-              <fieldset
-                disabled={!canConfirmPrivacy}
-                className={`grid gap-3 border border-[#b8ccc2] bg-[#f3f7f4] p-4 ${
-                  canConfirmPrivacy ? "" : "opacity-55"
-                }`}
-              >
-                  <legend className="px-1 text-sm font-semibold text-foreground">
-                    {copy.confirmationTitle}
-                  </legend>
-                  {!canConfirmPrivacy ? (
-                    <p className="text-xs leading-5 text-muted">
-                      {reviewIsCurrent && !allPrivacyFindingsResolved
-                        ? copy.confirmationFindingsLocked
-                        : copy.confirmationLocked}
-                    </p>
-                  ) : null}
-                  <label className="flex cursor-pointer items-start gap-3 text-sm leading-6 text-[#385249]">
-                    <input
-                      type="checkbox"
-                      checked={confirmations.reviewedNoIdentifiers}
-                      onChange={(event) =>
-                        setConfirmations((current) => ({
-                          ...current,
-                          reviewedNoIdentifiers: event.target.checked,
-                        }))
-                      }
-                      className="mt-1 size-4 shrink-0 accent-[#115c47]"
-                    />
-                    <span>{copy.reviewedNoIdentifiers}</span>
-                  </label>
-                  <label className="flex cursor-pointer items-start gap-3 text-sm leading-6 text-[#385249]">
-                    <input
-                      type="checkbox"
-                      checked={confirmations.processingAuthorityConfirmed}
-                      onChange={(event) =>
-                        setConfirmations((current) => ({
-                          ...current,
-                          processingAuthorityConfirmed: event.target.checked,
-                        }))
-                      }
-                      className="mt-1 size-4 shrink-0 accent-[#115c47]"
-                    />
-                    <span>{copy.processingAuthorityConfirmed}</span>
-                  </label>
-                  <p className="text-xs leading-5 text-muted">
-                    {copy.authorityNotConsent}
-                  </p>
-              </fieldset>
+              <PrivacyConfirmationStep
+                canConfirm={canConfirmPrivacy}
+                title={copy.confirmationTitle}
+                lockedMessage={confirmationLockedMessage}
+                unlockHint={confirmationUnlockHint}
+                confirmations={confirmations}
+                reviewedNoIdentifiers={copy.reviewedNoIdentifiers}
+                processingAuthorityConfirmed={
+                  copy.processingAuthorityConfirmed
+                }
+                authorityNotConsent={copy.authorityNotConsent}
+                onReviewedNoIdentifiersChange={(checked) =>
+                  setConfirmations((current) => ({
+                    ...current,
+                    reviewedNoIdentifiers: checked,
+                  }))
+                }
+                onProcessingAuthorityChange={(checked) =>
+                  setConfirmations((current) => ({
+                    ...current,
+                    processingAuthorityConfirmed: checked,
+                  }))
+                }
+              />
 
               {error ? (
                 <div
@@ -1351,6 +1388,103 @@ export function NdisCaseNoteCompanion({
     </main>
   );
 }
+
+export function PrivacyConfirmationStep({
+  canConfirm,
+  title,
+  lockedMessage,
+  unlockHint,
+  confirmations,
+  reviewedNoIdentifiers,
+  processingAuthorityConfirmed,
+  authorityNotConsent,
+  onReviewedNoIdentifiersChange,
+  onProcessingAuthorityChange,
+}: {
+  canConfirm: boolean;
+  title: string;
+  lockedMessage: string;
+  unlockHint: string;
+  confirmations: NdisCaseNotePrivacyConfirmations;
+  reviewedNoIdentifiers: string;
+  processingAuthorityConfirmed: string;
+  authorityNotConsent: string;
+  onReviewedNoIdentifiersChange: (checked: boolean) => void;
+  onProcessingAuthorityChange: (checked: boolean) => void;
+}) {
+  return (
+    <fieldset className="grid gap-3 border border-[#b8ccc2] bg-[#f3f7f4] p-4">
+      <legend className="px-1 text-sm font-semibold text-foreground">
+        {title}
+      </legend>
+      {!canConfirm ? (
+        <>
+          <div
+            role="status"
+            className="flex gap-3 border-l-2 border-[#8da99c] bg-white/65 px-3 py-3 text-[#385249]"
+          >
+            <LockKeyhole
+              className="mt-0.5 size-4 shrink-0"
+              aria-hidden="true"
+            />
+            <div>
+              <p className="text-sm font-semibold leading-5">
+                {lockedMessage}
+              </p>
+              <p className="mt-1 text-xs leading-5 text-muted">
+                {unlockHint}
+              </p>
+            </div>
+          </div>
+          <ul className="grid gap-2 text-sm leading-6 text-[#597168]">
+            <li className="flex items-start gap-3">
+              <LockKeyhole
+                className="mt-1 size-3.5 shrink-0"
+                aria-hidden="true"
+              />
+              <span>{reviewedNoIdentifiers}</span>
+            </li>
+            <li className="flex items-start gap-3">
+              <LockKeyhole
+                className="mt-1 size-3.5 shrink-0"
+                aria-hidden="true"
+              />
+              <span>{processingAuthorityConfirmed}</span>
+            </li>
+          </ul>
+          <p className="text-xs leading-5 text-muted">{authorityNotConsent}</p>
+        </>
+      ) : (
+        <>
+          <label className="flex cursor-pointer items-start gap-3 text-sm leading-6 text-[#385249]">
+            <input
+              type="checkbox"
+              checked={confirmations.reviewedNoIdentifiers}
+              onChange={(event) =>
+                onReviewedNoIdentifiersChange(event.target.checked)
+              }
+              className="mt-1 size-4 shrink-0 accent-[#115c47]"
+            />
+            <span>{reviewedNoIdentifiers}</span>
+          </label>
+          <label className="flex cursor-pointer items-start gap-3 text-sm leading-6 text-[#385249]">
+            <input
+              type="checkbox"
+              checked={confirmations.processingAuthorityConfirmed}
+              onChange={(event) =>
+                onProcessingAuthorityChange(event.target.checked)
+              }
+              className="mt-1 size-4 shrink-0 accent-[#115c47]"
+            />
+            <span>{processingAuthorityConfirmed}</span>
+          </label>
+          <p className="text-xs leading-5 text-muted">{authorityNotConsent}</p>
+        </>
+      )}
+    </fieldset>
+  );
+}
+
 function CompanionField({
   fieldId,
   label,
@@ -1846,9 +1980,10 @@ function getCompanionCopy(locale: "en" | "zh-Hans") {
         "可粘贴中文记录。建议使用标签：支持类型、场景、提供的支持、可观察事实、采取的行动、后续。请勿粘贴姓名、联系方式、NDIS 号码或其他身份信息。",
       pastedNotesBoundary:
         "原始粘贴文本不会写入网址、本地存储、分析事件、日志或管理页面。完成隐私复核前不会调用 AI。",
+      structuredProposalTitle: "复核提取后的结构化事实",
       structuredProposalReady:
-        "已根据本地隐私检查整理出结构化事实。请逐项复核并补全必填项。",
-      editOriginalPaste: "返回编辑原文",
+        "你仍在“粘贴中文记录”模式。以下内容由当前浏览器本地提取，请逐项核对并补全必填项。",
+      editOriginalPaste: "重新编辑原文",
       fields: {
         pastedNotes: "粘贴的中文记录",
         supportDateTime: "支持日期与大致时间",
@@ -1912,8 +2047,16 @@ function getCompanionCopy(locale: "en" | "zh-Hans") {
       privacyAutomationLimit:
         "自动检查无法识别所有个人信息。提交前请再次人工检查每个字段。",
       confirmationTitle: "生成前确认",
-      confirmationLocked: "完成隐私复核后才能勾选。",
-      confirmationFindingsLocked: "逐项处理隐私提示后才能勾选。",
+      confirmationLocked: "完成隐私复核后会显示两项确认。",
+      confirmationFindingsLocked: "逐项处理隐私提示后会显示两项确认。",
+      confirmationMinimumFactsLocked:
+        "补全最低事实并重新复核后会显示两项确认。",
+      confirmationUnlockHint:
+        "点击下方“先进行隐私复核”。如果之后修改了内容，需要重新复核后再确认。",
+      confirmationFindingsHint:
+        "请在上方或右侧的隐私检查中逐项确认删除、替换、概括或人工复核。",
+      confirmationMinimumFactsHint:
+        "先补全上方标出的必填项，再点击下方“先进行隐私复核”。",
       reviewedNoIdentifiers:
         "我已复核，且未故意包含姓名、联系方式、participant numbers 或其他可识别信息。",
       processingAuthorityConfirmed:
@@ -2005,8 +2148,9 @@ function getCompanionCopy(locale: "en" | "zh-Hans") {
       "Paste Chinese working notes here. Labels such as support type, setting, support delivered, observable facts, action taken and follow-up work best. Do not paste names, contact details, NDIS numbers or other identifiers.",
     pastedNotesBoundary:
       "The original paste is not written to the URL, local storage, analytics, logs or admin views. AI is not called until Privacy Review is complete.",
+    structuredProposalTitle: "Review extracted structured facts",
     structuredProposalReady:
-      "A structured-facts proposal is ready from the local privacy review. Check every field and complete the required facts.",
+      "You are still in Paste Chinese notes mode. These facts were extracted locally in this browser; check every field and complete the required facts.",
     editOriginalPaste: "Edit original paste",
     fields: {
       pastedNotes: "Pasted Chinese notes",
@@ -2071,8 +2215,16 @@ function getCompanionCopy(locale: "en" | "zh-Hans") {
     privacyAutomationLimit:
       "Automated checks cannot identify every type of personal information. Review every field before submitting.",
     confirmationTitle: "Confirm before generating",
-    confirmationLocked: "Complete Privacy Review before selecting these confirmations.",
-    confirmationFindingsLocked: "Resolve every privacy finding before selecting these confirmations.",
+    confirmationLocked: "The two confirmations appear after Privacy Review is complete.",
+    confirmationFindingsLocked: "The two confirmations appear after every privacy finding is resolved.",
+    confirmationMinimumFactsLocked:
+      "The two confirmations appear after the minimum facts are complete and reviewed again.",
+    confirmationUnlockHint:
+      "Choose Review privacy first below. If you edit the facts afterwards, review them again before confirming.",
+    confirmationFindingsHint:
+      "Resolve each remove, replace, generalise or manual-review prompt in the Privacy Review above or beside the form.",
+    confirmationMinimumFactsHint:
+      "Complete the required fields highlighted above, then choose Review privacy first below.",
     reviewedNoIdentifiers:
       "I reviewed the facts and did not intentionally include names, contact details, participant numbers or other identifying information.",
     processingAuthorityConfirmed:

@@ -3,7 +3,12 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { NDIS_CASE_NOTE_DISCLAIMER } from "../../../lib/ndis-case-note-companion";
-import { NdisCaseNoteCompanion } from "./ndis-case-note-companion";
+import {
+  getNdisCaseNoteConfirmationGate,
+  getNdisCaseNoteInputPanelState,
+  NdisCaseNoteCompanion,
+  PrivacyConfirmationStep,
+} from "./ndis-case-note-companion";
 
 const attribution = {
   source: "ndis-case-note-download",
@@ -65,9 +70,9 @@ describe("NDIS case note companion UI", () => {
     expect(markup).toContain("Paste Chinese notes");
     expect(markup).toContain("Support date and approximate time");
     expect(markup).not.toContain("Support date and time (optional)");
-    expect(markup.match(/type="checkbox"/g)).toHaveLength(2);
-    expect(markup).not.toMatch(/type="checkbox"[^>]*checked/);
-    expect(markup).toMatch(/<fieldset disabled=""[^>]*>/);
+    expect(markup).not.toContain('type="checkbox"');
+    expect(markup).not.toMatch(/<fieldset disabled=""[^>]*>/);
+    expect(markup).toContain("Choose Review privacy first below");
     expect(markup).toContain("does not state or replace participant consent");
     expect(markup).toContain("case-note-workspace");
     expect(markup).toContain("Privacy Review");
@@ -77,6 +82,76 @@ describe("NDIS case note companion UI", () => {
     expect(markup).toContain("case-note-mobile-context");
     expect(markup).not.toContain("Access request");
     expect(markup).not.toContain("Demo account");
+  });
+
+  it("keeps pasted notes visible while revealing extracted structured facts", () => {
+    expect(getNdisCaseNoteInputPanelState("paste", false)).toEqual({
+      showPasteInput: true,
+      showExtractedFactsContext: false,
+      showStructuredFacts: false,
+    });
+    expect(getNdisCaseNoteInputPanelState("paste", true)).toEqual({
+      showPasteInput: true,
+      showExtractedFactsContext: true,
+      showStructuredFacts: true,
+    });
+    expect(getNdisCaseNoteInputPanelState("structured", false)).toEqual({
+      showPasteInput: false,
+      showExtractedFactsContext: false,
+      showStructuredFacts: true,
+    });
+  });
+
+  it("shows either a clear locked state or enabled confirmation controls", () => {
+    expect(getNdisCaseNoteConfirmationGate(false, false, 6)).toEqual({
+      canConfirm: false,
+      reason: "privacy_review",
+    });
+    expect(getNdisCaseNoteConfirmationGate(true, false, 6)).toEqual({
+      canConfirm: false,
+      reason: "privacy_findings",
+    });
+    expect(getNdisCaseNoteConfirmationGate(true, true, 5)).toEqual({
+      canConfirm: false,
+      reason: "minimum_facts",
+    });
+    expect(getNdisCaseNoteConfirmationGate(true, true, 0)).toEqual({
+      canConfirm: true,
+      reason: "ready",
+    });
+
+    const commonProps = {
+      title: "Confirm before generating",
+      lockedMessage: "Complete Privacy Review before selecting these confirmations.",
+      unlockHint: "Choose Review privacy first below.",
+      confirmations: {
+        reviewedNoIdentifiers: false,
+        processingAuthorityConfirmed: false,
+      },
+      reviewedNoIdentifiers: "I reviewed the facts.",
+      processingAuthorityConfirmed: "I have processing authority.",
+      authorityNotConsent: "This does not replace participant consent.",
+      onReviewedNoIdentifiersChange: () => undefined,
+      onProcessingAuthorityChange: () => undefined,
+    };
+    const lockedMarkup = renderToStaticMarkup(
+      createElement(PrivacyConfirmationStep, {
+        ...commonProps,
+        canConfirm: false,
+      }),
+    );
+    const unlockedMarkup = renderToStaticMarkup(
+      createElement(PrivacyConfirmationStep, {
+        ...commonProps,
+        canConfirm: true,
+      }),
+    );
+
+    expect(lockedMarkup).toContain('role="status"');
+    expect(lockedMarkup).not.toContain('type="checkbox"');
+    expect(unlockedMarkup.match(/type="checkbox"/g)).toHaveLength(2);
+    expect(unlockedMarkup).not.toContain('disabled=""');
+    expect(unlockedMarkup).not.toMatch(/type="checkbox"[^>]*checked/);
   });
 
   it("shows a concrete, non-charging paid-beta fake door at zero credits", () => {
@@ -163,7 +238,7 @@ describe("NDIS case note companion UI", () => {
     expect(markup).toContain("仅说明处理权限");
     expect(markup).toContain("不代表或替代 participant consent");
     expect(markup).toContain("本周期剩余 2 / 3 credits");
-    expect(markup.match(/type="checkbox"/g)).toHaveLength(2);
-    expect(markup).not.toMatch(/type="checkbox"[^>]*checked/);
+    expect(markup).not.toContain('type="checkbox"');
+    expect(markup).toContain("先进行隐私复核");
   });
 });
