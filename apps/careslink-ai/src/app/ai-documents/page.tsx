@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { AppShell } from "@/components/app-shell";
+import { GeneratedDraftDeleteButton } from "@/components/generated-draft-delete-button";
 import { ReferralWorkspaceLoginGate } from "@/components/referral-workspace-auth-gate";
 import {
   getGeneratedMaterialDraftStore,
@@ -167,6 +168,9 @@ export default async function AiDocumentsPage({
                   <h2 className="mt-2 text-lg font-semibold text-foreground">
                     {copy.savedTitle}
                   </h2>
+                  <p className="mt-2 max-w-2xl text-xs leading-5 text-muted">
+                    {copy.retentionNotice}
+                  </p>
                 </div>
                 <span className="text-xs font-semibold text-muted">
                   {copy.savedPrivacy}
@@ -180,6 +184,7 @@ export default async function AiDocumentsPage({
                       draft={draft}
                       locale={locale}
                       copy={copy}
+                      canDelete={gate.source === "supabase"}
                     />
                   ))}
                 </div>
@@ -299,10 +304,12 @@ function SavedDocumentRow({
   draft,
   locale,
   copy,
+  canDelete,
 }: {
   draft: GeneratedMaterialDraftRecord;
   locale: Locale;
   copy: ReturnType<typeof getAiDocumentsCopy>;
+  canDelete: boolean;
 }) {
   const preview = getSafeDocumentPreview(draft);
   return (
@@ -324,7 +331,12 @@ function SavedDocumentRow({
           <p className="mt-2 text-sm text-muted">{copy.savedMetadataOnly}</p>
         )}
       </div>
-      <span className="workspace-status-pill">{draft.status}</span>
+      <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+        <span className="workspace-status-pill">{draft.status}</span>
+        {canDelete && draft.feature === "ndis_case_note" ? (
+          <GeneratedDraftDeleteButton draftId={draft.id} locale={locale} />
+        ) : null}
+      </div>
     </article>
   );
 }
@@ -406,6 +418,8 @@ function getAiDocumentsCopy(locale: Locale) {
       ownerScoped: "仅本人可见",
       savedTitle: "已保存文档",
       savedPrivacy: "按当前账号读取",
+      retentionNotice:
+        "已保存草稿会保留在此工作区，直到你主动删除。机构需要正式保存的记录，应转入其获授权的记录系统。",
       emptyTitle: "还没有保存的文档。",
       emptyDescription:
         "使用当前账号生成并保存 Case Note 草稿后，它会显示在这里。",
@@ -459,6 +473,8 @@ function getAiDocumentsCopy(locale: Locale) {
     ownerScoped: "Owner scoped",
     savedTitle: "Saved Documents",
     savedPrivacy: "Read for this account only",
+    retentionNotice:
+      "Saved drafts remain in this workspace until you delete them. Move any record your organisation must retain into its authorised record system.",
     emptyTitle: "No saved documents yet.",
     emptyDescription:
       "Generate and save a case-note draft with this account, and it will appear here.",

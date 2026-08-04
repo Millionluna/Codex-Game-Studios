@@ -42,6 +42,11 @@ export type GeneratedMaterialDraftStore = {
   saveGeneratedMaterialDraft(
     record: GeneratedMaterialDraftRecord,
   ): Promise<GeneratedMaterialDraftRecord>;
+  deleteGeneratedMaterialDraftByUser(input: {
+    draftId: string;
+    userId: string;
+    feature: AiUsageFeature;
+  }): Promise<boolean>;
 };
 
 const GLOBAL_GENERATED_MATERIAL_DRAFT_STORE_KEY =
@@ -88,7 +93,31 @@ create index if not exists generated_material_drafts_status_idx
 alter table public.generated_material_drafts enable row level security;
 
 grant select, insert, update, delete on public.generated_material_drafts to service_role;
+revoke all on public.generated_material_drafts from public;
 revoke all on public.generated_material_drafts from anon, authenticated;
+grant select, delete on public.generated_material_drafts to authenticated;
+
+drop policy if exists generated_material_drafts_owner_select
+  on public.generated_material_drafts;
+create policy generated_material_drafts_owner_select
+  on public.generated_material_drafts
+  for select
+  to authenticated
+  using (
+    (select auth.uid()) is not null
+    and (select auth.uid()) = user_id
+  );
+
+drop policy if exists generated_material_drafts_owner_delete
+  on public.generated_material_drafts;
+create policy generated_material_drafts_owner_delete
+  on public.generated_material_drafts
+  for delete
+  to authenticated
+  using (
+    (select auth.uid()) is not null
+    and (select auth.uid()) = user_id
+  );
 `;
 
 type GeneratedMaterialDraftStoreEnv = {
@@ -135,6 +164,7 @@ type SupabaseGeneratedMaterialWriteRow = {
 };
 
 type SupabaseGeneratedMaterialQueryBuilder = {
+  delete(): SupabaseGeneratedMaterialQueryBuilder;
   select(columns: string): SupabaseGeneratedMaterialQueryBuilder;
   eq(column: string, value: string): SupabaseGeneratedMaterialQueryBuilder;
   neq(column: string, value: string): SupabaseGeneratedMaterialQueryBuilder;
@@ -287,6 +317,19 @@ export function createMemoryGeneratedMaterialDraftStore(
 
       return cloneGeneratedMaterialDraft(normalized);
     },
+    async deleteGeneratedMaterialDraftByUser({ draftId, userId, feature }) {
+      const record = records.get(draftId);
+
+      if (
+        !record ||
+        record.userId !== userId ||
+        record.feature !== feature
+      ) {
+        return false;
+      }
+
+      return records.delete(draftId);
+    },
   };
 }
 
@@ -437,6 +480,24 @@ export function createSupabaseGeneratedMaterialDraftStore(
       }
 
       return mapGeneratedMaterialRowToRecord(data);
+    },
+    async deleteGeneratedMaterialDraftByUser({ draftId, userId, feature }) {
+      const builder = supabase.from(
+        tableName,
+      ) as SupabaseGeneratedMaterialQueryBuilder;
+      const { data, error } = await builder
+        .delete()
+        .eq("id", draftId)
+        .eq("user_id", userId)
+        .eq("feature", feature)
+        .select(GENERATED_MATERIAL_DRAFT_METADATA_COLUMNS)
+        .maybeSingle();
+
+      if (error) {
+        throw new Error(formatSupabaseGeneratedMaterialError("delete", error));
+      }
+
+      return Boolean(data);
     },
   };
 }
@@ -643,7 +704,7 @@ function getGeneratedMaterialStatus(
 }
 
 function formatSupabaseGeneratedMaterialError(
-  action: "load" | "save",
+  action: "load" | "save" | "delete",
   error: SupabaseGeneratedMaterialError,
 ) {
   const code = error.code ? ` (${error.code})` : "";

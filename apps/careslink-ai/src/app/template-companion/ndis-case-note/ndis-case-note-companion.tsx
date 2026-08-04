@@ -18,6 +18,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { GeneratedDraftCopyButton } from "../../../components/generated-draft-copy-button";
+import { GeneratedDraftDeleteButton } from "../../../components/generated-draft-delete-button";
 import type {
   GeneratedMaterialDraftStatus,
 } from "../../../lib/generated-material-draft-store";
@@ -1125,6 +1126,9 @@ export function NdisCaseNoteCompanion({
                 <h2 className="mt-2 text-2xl font-semibold">
                   {copy.historyTitle}
                 </h2>
+                <p className="mt-2 max-w-2xl text-xs leading-5 text-muted">
+                  {copy.retentionNotice}
+                </p>
               </div>
               <span className="text-sm text-muted">
                 {savedDrafts.length} {copy.savedCount}
@@ -1149,16 +1153,27 @@ export function NdisCaseNoteCompanion({
                       {draft.material.englishCaseNoteDraft}
                     </p>
                   </div>
-                  <GeneratedDraftCopyButton
-                    text={getNdisCaseNoteMaterialCopyText(draft.material)}
-                    label={copy.copy}
-                    copiedLabel={copy.copied}
-                    ariaLabel={copy.copy}
-                    telemetryEvent={{
-                      generatedMaterialDraftId: draft.id,
-                      eventType: "copy_all",
-                    }}
-                  />
+                  <div className="flex flex-wrap items-start gap-2 sm:justify-end">
+                    <GeneratedDraftCopyButton
+                      text={getNdisCaseNoteMaterialCopyText(draft.material)}
+                      label={copy.copy}
+                      copiedLabel={copy.copied}
+                      ariaLabel={copy.copy}
+                      telemetryEvent={{
+                        generatedMaterialDraftId: draft.id,
+                        eventType: "copy_all",
+                      }}
+                    />
+                    <GeneratedDraftDeleteButton
+                      draftId={draft.id}
+                      locale={attribution.locale}
+                      onDeleted={(draftId) =>
+                        setSavedDrafts((current) =>
+                          current.filter((item) => item.id !== draftId),
+                        )
+                      }
+                    />
+                  </div>
                 </article>
               ))}
             </div>
@@ -1738,6 +1753,8 @@ function getCompanionCopy(locale: "en" | "zh-Hans") {
       historyEyebrow: "账号内文档",
       historyTitle: "最近保存的草稿",
       savedCount: "份已保存",
+      retentionNotice:
+        "已保存草稿会保留在此工作区，直到你主动删除。机构需要正式保存的记录，应转入其获授权的记录系统。",
       footerBoundary:
         "CaresLink AI 仅提供一般文档和运营支持。所有草稿都需要用户复核。",
       requiredField: "生成前必须补充此项。",
@@ -1880,6 +1897,8 @@ function getCompanionCopy(locale: "en" | "zh-Hans") {
     historyEyebrow: "Your account",
     historyTitle: "Recently saved drafts",
     savedCount: "saved",
+    retentionNotice:
+      "Saved drafts remain in this workspace until you delete them. Move any record your organisation must retain into its authorised record system.",
     footerBoundary:
       "CaresLink AI provides general documentation and operational support. Every draft requires user review.",
     requiredField: "Required before a draft can be generated.",

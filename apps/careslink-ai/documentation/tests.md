@@ -17,11 +17,13 @@
 | Output safety | Malformed, PII, prohibited conclusions, and bilingual numeric mismatch reject the whole result | `src/lib/ndis-case-note-companion.test.ts` | Existing automated |
 | Claim ownership | Generation immediately binds the claim to provider; expiry and cross-owner use are denied | `src/lib/ndis-case-note-companion-store.test.ts`, generation/save route tests | Existing automated |
 | Provider save | Signed-out/admin denied; provider save idempotent and owner-scoped | Save route tests | Existing automated |
+| Provider delete | Two-step UI; signed-out/admin denied; one owner-and-feature-scoped delete; cross-owner/wrong-feature/missing share one `404` | Delete route, store and companion UI tests | Automated |
+| Saved-draft owner RLS | Migration revokes broad grants, allows authenticated owner `SELECT`/`DELETE` only, and leaves `INSERT`/`UPDATE` server-controlled | Generated material store/schema tests plus migration review | Automated/static |
 | Telemetry privacy | Events contain metadata and no generated content/input | Store/event route tests | Existing automated |
 | Admin isolation | Material usage uses metadata and excludes NDIS case-note details | Admin/material store tests | Existing automated |
 | Responsive product shell | Authenticated task flow, unchecked confirmations, no guest/demo cards | Companion static render plus guarded 1440/390 smoke | Existing automated/manual |
 
-Current local gate result for this auth-gated RC worktree: 67 Vitest files and 437 tests passed, followed by TypeScript, ESLint, and Next build.
+Current local gate result for this owner-delete RC worktree: 73 Vitest files and 471 tests passed, followed by TypeScript, ESLint, and Next build.
 
 ## Release-candidate live checks
 
@@ -40,7 +42,8 @@ The local live check used only synthetic de-identified facts. Its evidence recor
 | Priority | Gap | Exposure |
 | --- | --- | --- |
 | P1 | Heuristic privacy rules cannot cover every direct or indirect identifier | A user could submit an undetected identifying clue; manual review remains mandatory |
-| P1 | Service-role owner filtering is not enforced by provider-facing RLS because provider roles have no direct table grants | A future server route omitting `user_id` could expose another owner's content |
+| P1 | Current server routes use service role and bypass the new owner RLS | A future server route omitting its explicit owner predicate could expose another owner's content; route tests remain mandatory |
+| P1 | No automatic saved-draft purge policy has been selected | Saved drafts remain until the owner deletes them; required records must live in the organisation's authorised record system |
 | P2 | IP/device quota behavior varies behind shared proxies and privacy tools | False positives or lower abuse resistance |
 | P2 | No end-to-end browser test is currently a repository CI job | UI interaction regressions rely on release smoke |
 | P2 | This repository has no merge-gating workflow for the CaresLink AI test/build commands | Local/preview gates must be run explicitly before merge |

@@ -65,6 +65,29 @@
 3. The service-role store applies `.eq("user_id", userId)` for lists. Direct ID updates and save idempotency also compare `record.userId` in server code.
 4. **Deny:** no session enters auth; an admin receives the admin workspace; a different provider cannot read or save another user's token.
 
+## Owner-controlled saved-draft deletion
+
+**Actor:** signed-in provider. **Outcome:** the provider can permanently remove
+their own saved NDIS case-note draft without exposing whether another account's
+record exists.
+
+1. The UI requires a deliberate second confirmation before issuing `DELETE`.
+2. The route verifies the provider session before using the draft ID. **Deny:**
+   signed-out `401`; admin/non-provider `403`.
+3. The request includes an explicit delete-intent header and a strictly formed
+   NDIS case-note draft ID.
+4. The service-role store performs one database delete constrained by `id`,
+   `user_id` and `feature = ndis_case_note`. Missing, cross-owner and wrong-
+   feature records all return the same `404` response.
+5. Owner `SELECT`/`DELETE` RLS is defence in depth for future authenticated
+   session-client access. The current route's service role bypasses RLS and
+   therefore cannot replace its explicit owner predicate.
+6. The deleted draft disappears from saved history. Companion telemetry remains
+   metadata-only and contains no draft text.
+
+Saved drafts otherwise remain until the provider deletes them. CaresLink AI is
+not a formal case-management or statutory record-retention system.
+
 ## Telemetry and administration
 
 **Actors:** provider events; admin reporting. **Outcome:** operational metrics without participant facts.

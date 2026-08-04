@@ -23,6 +23,7 @@ provider.
 | Read temporary claim | Deny | Same owner only | Deny | Server page session gate and claim owner check |
 | Bind and save claim | Deny | Allow for own account | Deny | Verified session, provider role, claim RPC owner condition |
 | List saved drafts | Deny | Own `user_id` only | No provider-content view | Server query filtered by account ID |
+| Delete saved NDIS case-note draft | Deny | Own record only | Deny | Provider session plus one atomic `id + user_id + feature` delete; missing/cross-owner/wrong-feature records all return `404` |
 | Change saved status | Deny | Own record only | Not exposed for case notes | Server record-owner comparison |
 | Write companion telemetry | Deny | Allowlisted metadata events | Deny | Session-first event route, server constructors and schema |
 | View admin material usage | Deny | Deny | Allow | Admin route gate; metadata selectors; case-note exclusion |
@@ -34,7 +35,13 @@ provider.
 | `ndis_case_note_companion_claims` | RLS enabled; table grants revoked from `anon`/`authenticated`; service role only | Claim RPC updates only unclaimed/same-user rows and unexpired claims |
 | `template_companion_quota_usage` | RLS enabled; service role only | Atomic security-definer RPC; pseudonymous fingerprint key |
 | `template_companion_events` | RLS enabled; service role only | Event-name database constraint and server allowlist |
-| `generated_material_drafts` | RLS enabled; service role only | Server lists by `user_id`; save/idempotency compares owner |
+| `generated_material_drafts` | RLS enabled; after migration, `authenticated` receives owner-only `SELECT`/`DELETE`; no end-user `INSERT`/`UPDATE`; service role retains CRUD | Owner policies use `auth.uid() = user_id`; current server reads/writes/deletes still use service role with explicit owner predicates |
 | `generated_material_events` | RLS enabled; service role only | Server-created metadata events; no content column |
 
-RLS does not itself isolate one provider from another because end-user roles have no direct table access and server queries use the service role. Therefore route/page owner checks and RPC predicates are part of the authorization boundary, not just application convenience.
+The migration revokes broad `public`, `anon` and `authenticated` grants before
+adding the narrow owner policies. They are defence in depth for authenticated
+session-bound table access. Current server queries use the service role, which bypasses RLS;
+therefore route/page owner checks and atomic database predicates remain part of
+the authorization boundary. Apply
+`20260804143000_add_generated_material_owner_read_delete_policies.sql` before
+claiming these owner RLS grants are active in a target environment.

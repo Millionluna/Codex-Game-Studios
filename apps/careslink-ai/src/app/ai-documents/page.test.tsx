@@ -7,6 +7,9 @@ import AiDocumentsPage from "./page";
 vi.mock("@/components/app-shell", async () =>
   import("../../components/app-shell"),
 );
+vi.mock("@/components/generated-draft-delete-button", async () =>
+  import("../../components/generated-draft-delete-button"),
+);
 vi.mock("@/components/referral-workspace-auth-gate", async () => {
   const React = await import("react");
   return {
@@ -30,7 +33,13 @@ vi.mock("@/lib/referral-workspace-session", async () => {
   return {
     getWorkspaceAccessGateWithServerSession: async (
       params: Record<string, string | string[] | undefined>,
-    ) => getWorkspaceAccessGate(params),
+    ) => {
+      const gate = getWorkspaceAccessGate(params);
+
+      return gate.status === "signed_in"
+        ? { ...gate, source: "supabase" as const }
+        : gate;
+    },
   };
 });
 vi.mock("@/lib/referral-workspace-i18n", async () =>
@@ -75,6 +84,15 @@ describe("AI Documents page", () => {
       createdAt: now,
       updatedAt: now,
     });
+    await store.saveGeneratedMaterialDraft({
+      id: "ai-documents-owner-share-card",
+      userId: "user-approved",
+      feature: "share_card",
+      status: "draft",
+      content: { summary: "Owner-scoped non-case-note material." },
+      createdAt: now,
+      updatedAt: now,
+    });
 
     const element = await AiDocumentsPage({
       searchParams: Promise.resolve({
@@ -88,6 +106,12 @@ describe("AI Documents page", () => {
     expect(markup).toContain("Referrals");
     expect(markup).toContain("Create case note draft");
     expect(markup).toContain("Saved Documents");
+    expect(markup).toContain(
+      "Saved drafts remain in this workspace until you delete them.",
+    );
+    expect(markup).toContain("Delete");
+    expect(markup.match(/aria-expanded="false"/g)).toHaveLength(1);
+    expect(markup).toContain("Share card draft");
     expect(markup).toContain("The participant attended a community activity");
     expect(markup).not.toContain("This other account&#x27;s content");
     expect(markup).not.toContain("ai-documents-owner-draft");

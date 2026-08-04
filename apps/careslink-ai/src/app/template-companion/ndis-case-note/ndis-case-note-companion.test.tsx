@@ -104,6 +104,10 @@ describe("NDIS case note companion UI", () => {
     );
 
     expect(markup).toContain("Recently saved drafts");
+    expect(markup).toContain(
+      "Saved drafts remain in this workspace until you delete them.",
+    );
+    expect(markup).toContain("Delete");
     expect(markup).toContain(material.englishCaseNoteDraft);
     expect(markup).not.toContain("ndis-case-note-owner-1");
   });

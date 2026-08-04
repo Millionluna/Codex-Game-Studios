@@ -263,6 +263,41 @@ describe("generated material draft store", () => {
     });
   });
 
+  it("deletes only the exact owner-scoped feature from the memory store", async () => {
+    const store = createMemoryGeneratedMaterialDraftStore([
+      materialDraftRecord,
+    ]);
+
+    await expect(
+      store.deleteGeneratedMaterialDraftByUser({
+        draftId: materialDraftRecord.id,
+        userId: "22222222-2222-4222-8222-222222222222",
+        feature: "share_card",
+      }),
+    ).resolves.toBe(false);
+    await expect(
+      store.deleteGeneratedMaterialDraftByUser({
+        draftId: materialDraftRecord.id,
+        userId: materialDraftRecord.userId,
+        feature: "ndis_case_note",
+      }),
+    ).resolves.toBe(false);
+    await expect(
+      store.getGeneratedMaterialDraft(materialDraftRecord.id),
+    ).resolves.toEqual(materialDraftRecord);
+
+    await expect(
+      store.deleteGeneratedMaterialDraftByUser({
+        draftId: materialDraftRecord.id,
+        userId: materialDraftRecord.userId,
+        feature: "share_card",
+      }),
+    ).resolves.toBe(true);
+    await expect(
+      store.getGeneratedMaterialDraft(materialDraftRecord.id),
+    ).resolves.toBeUndefined();
+  });
+
   it("creates normalized generated material draft records", () => {
     const record = createGeneratedMaterialDraftRecord({
       userId: materialDraftRecord.userId,
@@ -315,7 +350,7 @@ describe("generated material draft store", () => {
     ]);
   });
 
-  it("keeps a Supabase-ready schema with RLS and server-only grants", () => {
+  it("keeps a Supabase-ready schema with owner read/delete policies", () => {
     expect(generatedMaterialDraftSupabaseSchemaSql).toContain(
       "create table if not exists public.generated_material_drafts",
     );
@@ -333,6 +368,24 @@ describe("generated material draft store", () => {
     );
     expect(generatedMaterialDraftSupabaseSchemaSql).toContain(
       "revoke all on public.generated_material_drafts from anon, authenticated",
+    );
+    expect(generatedMaterialDraftSupabaseSchemaSql).toContain(
+      "revoke all on public.generated_material_drafts from public",
+    );
+    expect(generatedMaterialDraftSupabaseSchemaSql).toContain(
+      "grant select, delete on public.generated_material_drafts to authenticated",
+    );
+    expect(generatedMaterialDraftSupabaseSchemaSql).toContain(
+      "drop policy if exists generated_material_drafts_owner_select",
+    );
+    expect(generatedMaterialDraftSupabaseSchemaSql).toContain(
+      "drop policy if exists generated_material_drafts_owner_delete",
+    );
+    expect(generatedMaterialDraftSupabaseSchemaSql).toContain(
+      "and (select auth.uid()) = user_id",
+    );
+    expect(generatedMaterialDraftSupabaseSchemaSql).not.toContain(
+      "grant insert, update on public.generated_material_drafts to authenticated",
     );
     expect(generatedMaterialDraftSupabaseSchemaSql).not.toContain(
       "security definer",
@@ -393,5 +446,60 @@ describe("generated material draft store", () => {
       },
       { onConflict: "id" },
     ]);
+  });
+
+  it("deletes a Supabase draft with one owner-and-feature-scoped query", async () => {
+    const calls: unknown[] = [];
+    const metadataRow = {
+      id: materialDraftRecord.id,
+      user_id: materialDraftRecord.userId,
+      provider_draft_id: materialDraftRecord.providerDraftId,
+      feature: materialDraftRecord.feature,
+      status: materialDraftRecord.status,
+      created_at: materialDraftRecord.createdAt,
+      updated_at: materialDraftRecord.updatedAt,
+    };
+    const supabase = {
+      from(tableName: string) {
+        calls.push(["from", tableName]);
+
+        return {
+          delete() {
+            calls.push(["delete"]);
+            return this;
+          },
+          eq(column: string, value: string) {
+            calls.push(["eq", column, value]);
+            return this;
+          },
+          select(columns: string) {
+            calls.push(["select", columns]);
+            return this;
+          },
+          async maybeSingle() {
+            calls.push(["maybeSingle"]);
+            return { data: metadataRow, error: null };
+          },
+        };
+      },
+    };
+    const store = createSupabaseGeneratedMaterialDraftStore(supabase);
+
+    await expect(
+      store.deleteGeneratedMaterialDraftByUser({
+        draftId: materialDraftRecord.id,
+        userId: materialDraftRecord.userId,
+        feature: "share_card",
+      }),
+    ).resolves.toBe(true);
+
+    expect(calls.slice(0, 5)).toEqual([
+      ["from", "generated_material_drafts"],
+      ["delete"],
+      ["eq", "id", materialDraftRecord.id],
+      ["eq", "user_id", materialDraftRecord.userId],
+      ["eq", "feature", "share_card"],
+    ]);
+    expect(calls.at(-1)).toEqual(["maybeSingle"]);
   });
 });

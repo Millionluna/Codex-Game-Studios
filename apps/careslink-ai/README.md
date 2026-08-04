@@ -120,7 +120,21 @@ supabase/migrations/20260626032304_create_generated_material_drafts.sql
 
 This creates `public.generated_material_drafts` with RLS enabled and
 server-only `service_role` grants. It stores draft JSON output by user,
-provider draft, feature, and review status. It is not exposed to public clients.
+provider draft, feature, and review status.
+
+Before releasing owner draft deletion, also apply:
+
+```text
+supabase/migrations/20260804143000_add_generated_material_owner_read_delete_policies.sql
+```
+
+That migration revokes broad end-user grants, then gives `authenticated` users
+owner-scoped `SELECT` and `DELETE` only. It deliberately does not grant `INSERT`
+or `UPDATE`; generation and status changes remain controlled by server safety
+flows. The current server store still uses the service role and therefore
+bypasses RLS, so its owner-facing delete is additionally constrained in one
+database statement by draft ID, user ID and document feature. Adding the
+migration file to the repository does not apply it to a Supabase project.
 
 Generated material reuse events are stored in a metadata-only table. Apply:
 
@@ -289,6 +303,11 @@ anonymous claim or place a claim in the login URL. The save endpoint persists an
 owner-scoped `generated_material_drafts.feature = ndis_case_note` record. Owner
 binding is never reversed. The temporary claim is deleted after a successful
 save, and expired claims are purged opportunistically before generation/save.
+The provider can permanently delete that saved draft from the product UI.
+Saved drafts otherwise remain in the account until the provider deletes them.
+CaresLink AI is not a formal case-management or statutory record-retention
+system; records an organisation must retain belong in its authorised record
+system.
 
 The Responses request sets `store: false`. Standard API abuse-monitoring
 retention can still apply unless the OpenAI project has separately approved

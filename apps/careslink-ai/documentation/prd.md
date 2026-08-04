@@ -30,6 +30,9 @@ A registered provider can safely turn de-identified structured facts or reviewed
 - Successful generation creates a 30-minute opaque claim already bound to the current provider.
 - The Save endpoint accepts only the same provider and persists `generated_material_drafts.feature = ndis_case_note`.
 - Saved reads remain owner-scoped. Admin surfaces remain metadata-only and exclude case-note content.
+- The owning provider can permanently delete a saved case-note draft after an explicit confirmation. Signed-out, admin, cross-owner and wrong-feature deletion are denied without disclosing another record's existence.
+- Saved drafts remain in the account until the owner deletes them. CaresLink AI is not a formal case-management or statutory record-retention system; no automatic retention period is promised in this release.
+- Owner-only authenticated `SELECT`/`DELETE` RLS is shipped as a migration. Server generation and status mutation retain service-role control; end users receive no direct `INSERT`/`UPDATE` grant.
 - Legacy claim storage can remain for compatibility, but this entry point creates no anonymous claim and performs no post-generation login handoff.
 
 ## Acceptance criteria
@@ -40,3 +43,5 @@ A registered provider can safely turn de-identified structured facts or reviewed
 4. Signed-in provider PII blocking, Privacy Review, structured generation, account/IP quota, copy, owner-only save, and history continue to work.
 5. Admin is denied provider content and generation.
 6. English and Simplified Chinese UI remain responsive at 1440px and 390px.
+7. A provider can confirm and delete their own saved NDIS case-note draft; another account, an admin, an invalid ID and a wrong document feature cannot delete it and receive no existence signal.
+8. Retention copy states that saved drafts remain until user deletion and directs required records to an authorised record system.
