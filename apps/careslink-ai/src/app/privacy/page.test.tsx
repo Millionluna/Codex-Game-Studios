@@ -9,6 +9,12 @@ vi.mock("@/lib/referral-workspace-i18n", async () =>
 );
 
 describe("AI privacy notice", () => {
+  it("lets the root title template add the brand only once", async () => {
+    const { metadata } = await import("./page");
+
+    expect(metadata.title).toBe("Privacy, collection and retention");
+  });
+
   it("renders the English collection and retention contract", async () => {
     const { default: PrivacyNoticePage } = await import("./page");
     const markup = renderToStaticMarkup(

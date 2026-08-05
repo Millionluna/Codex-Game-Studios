@@ -45,6 +45,9 @@ vi.mock("@/lib/ndis-case-note-companion-request", async () => {
 vi.mock("@/lib/ndis-case-note-companion", async () => {
   return vi.importActual("../../../lib/ndis-case-note-companion");
 });
+vi.mock("@/lib/seo-policy", async () => {
+  return vi.importActual("../../../lib/seo-policy");
+});
 
 import NdisCaseNoteCompanionPage from "./page";
 

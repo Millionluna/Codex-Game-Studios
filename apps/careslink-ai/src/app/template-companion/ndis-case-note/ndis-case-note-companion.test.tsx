@@ -42,10 +42,15 @@ const creditUsage = {
 describe("NDIS case note companion UI", () => {
   it("keeps the authenticated companion route out of search indexes", () => {
     const pageSource = readFileSync(new URL("./page.tsx", import.meta.url), "utf8");
+    const policySource = readFileSync(
+      new URL("../../../lib/seo-policy.ts", import.meta.url),
+      "utf8",
+    );
 
-    expect(pageSource).toContain("index: false");
-    expect(pageSource).toContain("follow: false");
-    expect(pageSource).toContain(
+    expect(pageSource).toContain("robots: CARESLINK_AI_NOINDEX_ROBOTS");
+    expect(policySource).toContain("index: false");
+    expect(policySource).toContain("follow: false");
+    expect(pageSource).not.toContain(
       "https://ai.careslink.com.au/template-companion/ndis-case-note",
     );
   });

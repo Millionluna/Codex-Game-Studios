@@ -10,7 +10,7 @@ import {
 type SearchParams = Record<string, string | string[] | undefined>;
 
 export const metadata: Metadata = {
-  title: "Privacy, collection and retention | CaresLink AI",
+  title: "Privacy, collection and retention",
   description:
     "How CaresLink AI handles account information, reviewed document facts, saved drafts and metadata.",
 };

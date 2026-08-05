@@ -14,6 +14,7 @@ vi.mock("@/lib/google-oauth", () => ({
 vi.mock("@/lib/auth-page-context", async () =>
   import("../../lib/auth-page-context"),
 );
+vi.mock("@/lib/seo-policy", async () => import("../../lib/seo-policy"));
 
 vi.mock("@/components/app-shell", async () =>
   import("../../components/app-shell"),
@@ -297,6 +298,48 @@ describe("auth and access gate pages", () => {
         'name="next" value="/template-companion/ndis-case-note?source=ndis-case-note-download&amp;resourceSlug=ndis-case-note-template"',
       );
     }
+  });
+
+  it("shows AI Documents context and noindex metadata for its exact next route", async () => {
+    const loginModule = await import("./login/page");
+    const registerModule = await import("./register/page");
+    const searchParams = { lang: "en", next: "/ai-documents" };
+    const loginMarkup = await renderPage(loginModule.default, searchParams);
+    const registerMarkup = await renderPage(
+      registerModule.default,
+      searchParams,
+    );
+
+    expect(loginMarkup).toContain("Sign in to continue to AI Documents.");
+    expect(loginMarkup).toContain("AI Documents workspace");
+    expect(loginMarkup).toContain("Review privacy prompts");
+    expect(loginMarkup).not.toContain("Referral Pack");
+    expect(registerMarkup).toContain(
+      "Create an account to use AI Documents.",
+    );
+    expect(registerMarkup).toContain("AI Documents workspace");
+    expect(registerMarkup).toContain("Save to your account");
+    expect(registerMarkup).not.toContain("Referral Pack");
+
+    await expect(
+      loginModule.generateMetadata({
+        searchParams: Promise.resolve(searchParams),
+      }),
+    ).resolves.toEqual({
+      title: "Sign in to AI Documents",
+      robots: { index: false, follow: false },
+    });
+    await expect(
+      registerModule.generateMetadata({
+        searchParams: Promise.resolve({
+          lang: "zh-Hans",
+          next: "/ai-documents",
+        }),
+      }),
+    ).resolves.toEqual({
+      title: "注册 AI Documents",
+      robots: { index: false, follow: false },
+    });
   });
 
   it("keeps Referral Pack copy for a non-allowlisted Case Note lookalike", async () => {

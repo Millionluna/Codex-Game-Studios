@@ -19,6 +19,7 @@ import {
   type NdisCaseNoteMaterial,
 } from "@/lib/ndis-case-note-companion";
 import { resolveWorkspaceAccountFromSupabaseSession } from "@/lib/referral-workspace-session";
+import { CARESLINK_AI_NOINDEX_ROBOTS } from "@/lib/seo-policy";
 import { createCareslinkServerSupabaseClient } from "@/lib/supabase-server";
 import {
   NdisCaseNoteCompanion,
@@ -31,14 +32,7 @@ export const metadata: Metadata = {
   title: "NDIS Case Note AI Companion",
   description:
     "Turn de-identified support facts into neutral case-note draft wording for your review.",
-  alternates: {
-    canonical:
-      "https://ai.careslink.com.au/template-companion/ndis-case-note",
-  },
-  robots: {
-    index: false,
-    follow: false,
-  },
+  robots: CARESLINK_AI_NOINDEX_ROBOTS,
   referrer: "no-referrer",
 };
 

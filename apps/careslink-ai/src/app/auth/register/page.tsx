@@ -6,6 +6,7 @@ import {
   UserPlus,
   UserRound,
 } from "lucide-react";
+import type { Metadata } from "next";
 import Link from "next/link";
 import { AppShell } from "@/components/app-shell";
 import { AuthSubmitButton } from "@/components/auth-submit-button";
@@ -26,6 +27,7 @@ import {
   withLocale,
   type Locale,
 } from "@/lib/referral-workspace-i18n";
+import { CARESLINK_AI_NOINDEX_ROBOTS } from "@/lib/seo-policy";
 import {
   continueWithGoogleFromRegisterAction,
   registerWithSupabaseAction,
@@ -38,6 +40,20 @@ type AuthSearchParams = {
 type RegisterPageProps = {
   searchParams?: Promise<AuthSearchParams>;
 };
+
+export async function generateMetadata({
+  searchParams,
+}: RegisterPageProps): Promise<Metadata> {
+  const params = await searchParams;
+  const locale = getLocaleFromSearchParams(params);
+  const nextHref = getSafeNextHrefWithHandoff(params);
+  const context = getAuthPageContext(nextHref);
+
+  return {
+    title: getRegisterPageMetadataTitle(locale, context),
+    robots: CARESLINK_AI_NOINDEX_ROBOTS,
+  };
+}
 
 export default async function RegisterPage({ searchParams }: RegisterPageProps) {
   const params = await searchParams;
@@ -319,6 +335,41 @@ function getAuthPageCopy(
       },
     };
 
+    if (context === "ai-documents") {
+      return {
+        ...copy,
+        title: "创建账户后使用 AI Documents。",
+        description:
+          "创建服务商账户以生成引导式文档草稿、复核隐私提示，并保存仅限账户所有者查看的内容。",
+        submit: "创建账户并继续",
+        boundary:
+          "仅提供一般文档与运营支持。所有草稿都需要用户复核，不是完成记录，也不提供临床、法律、照护、监管或合规建议。",
+        mockup: {
+          kicker: "AI Documents",
+          title: "AI Documents 工作区",
+          status: "需要账户",
+          tabs: ["文档", "隐私", "草稿", "用量"],
+          rows: [
+            {
+              label: "创建引导式草稿",
+              meta: "文档",
+              detail: "从去标识化的支持事实开始，并在生成前检查最低事实要求。",
+            },
+            {
+              label: "复核隐私提示",
+              meta: "隐私",
+              detail: "处理明显身份信息提示，并逐项人工复核输入内容。",
+            },
+            {
+              label: "保存到你的账户",
+              meta: "草稿",
+              detail: "把复核后的草稿保存到仅限当前服务商账户访问的工作区。",
+            },
+          ],
+        },
+      };
+    }
+
     if (context === "ndis-case-note") {
       return {
         ...copy,
@@ -404,6 +455,44 @@ function getAuthPageCopy(
     },
   };
 
+  if (context === "ai-documents") {
+    return {
+      ...copy,
+      title: "Create an account to use AI Documents.",
+      description:
+        "Create a provider account to generate guided document drafts, review privacy prompts, and save owner-only work.",
+      submit: "Create account and continue",
+      boundary:
+        "General documentation and operational support only. Every draft requires user review, is not a completed record, and is not clinical, legal, care, regulatory or compliance advice.",
+      mockup: {
+        kicker: "AI Documents",
+        title: "AI Documents workspace",
+        status: "Account required",
+        tabs: ["Documents", "Privacy", "Drafts", "Usage"],
+        rows: [
+          {
+            label: "Create a guided draft",
+            meta: "Documents",
+            detail:
+              "Start from de-identified support facts and check the minimum fact requirements before generation.",
+          },
+          {
+            label: "Review privacy prompts",
+            meta: "Privacy",
+            detail:
+              "Resolve obvious identifier prompts and review every input yourself.",
+          },
+          {
+            label: "Save to your account",
+            meta: "Drafts",
+            detail:
+              "Keep reviewed drafts in a workspace available only to the current provider account.",
+          },
+        ],
+      },
+    };
+  }
+
   if (context === "ndis-case-note") {
     return {
       ...copy,
@@ -443,4 +532,23 @@ function getAuthPageCopy(
   }
 
   return copy;
+}
+
+function getRegisterPageMetadataTitle(
+  locale: Locale,
+  context: AuthPageContext,
+) {
+  if (locale === "zh-Hans") {
+    return context === "ndis-case-note"
+      ? "注册 NDIS Case Note AI 助手"
+      : context === "ai-documents"
+        ? "注册 AI Documents"
+        : "创建账户";
+  }
+
+  return context === "ndis-case-note"
+    ? "Create an NDIS Case Note Companion account"
+    : context === "ai-documents"
+      ? "Create an AI Documents account"
+      : "Create account";
 }

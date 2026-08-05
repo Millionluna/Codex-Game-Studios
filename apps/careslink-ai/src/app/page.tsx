@@ -29,11 +29,24 @@ type HomePageProps = {
   searchParams?: Promise<{ lang?: string | string[] }>;
 };
 
-export const metadata: Metadata = {
-  title: "AI Documents for aged care and NDIS",
-  description:
-    "Create review-ready document drafts from de-identified support facts, with privacy prompts and bilingual review.",
-};
+export async function generateMetadata({
+  searchParams,
+}: HomePageProps): Promise<Metadata> {
+  const params = await searchParams;
+  const locale = getLocaleFromSearchParams(params);
+
+  return locale === "zh-Hans"
+    ? {
+        title: "养老服务与 NDIS 的 AI 文档工具 | CaresLink AI",
+        description:
+          "使用去标识化的支持事实创建可复核的文档草稿，并在生成前检查隐私提示和中文复核内容。",
+      }
+    : {
+        title: "AI Documents for aged care and NDIS | CaresLink AI",
+        description:
+          "Create review-ready document drafts from de-identified support facts, with privacy prompts and bilingual review.",
+      };
+}
 
 export default async function HomePage({ searchParams }: HomePageProps) {
   const params = await searchParams;

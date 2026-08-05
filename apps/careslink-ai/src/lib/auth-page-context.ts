@@ -1,7 +1,10 @@
 import { NDIS_CASE_NOTE_COMPANION_PATH } from "./ndis-case-note-companion-navigation";
 import { getSafePendingAuthNextHref } from "./referral-workspace-auth-actions";
 
-export type AuthPageContext = "referral" | "ndis-case-note";
+export type AuthPageContext =
+  | "referral"
+  | "ai-documents"
+  | "ndis-case-note";
 
 export function getAuthPageContext(nextHref: string): AuthPageContext {
   const safeNextHref = getSafePendingAuthNextHref(nextHref);
@@ -11,6 +14,10 @@ export function getAuthPageContext(nextHref: string): AuthPageContext {
   }
 
   const { pathname } = new URL(safeNextHref, "https://careslink.local");
+
+  if (pathname === "/ai-documents") {
+    return "ai-documents";
+  }
 
   return pathname === NDIS_CASE_NOTE_COMPANION_PATH
     ? "ndis-case-note"

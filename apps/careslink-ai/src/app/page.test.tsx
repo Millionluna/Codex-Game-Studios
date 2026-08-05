@@ -8,9 +8,30 @@ vi.mock("@/lib/referral-workspace-i18n", async () =>
   import("../lib/referral-workspace-i18n"),
 );
 
-import HomePage from "./page";
+import HomePage, { generateMetadata } from "./page";
 
 describe("public home page", () => {
+  it("localizes public metadata while the app remains globally noindex", async () => {
+    await expect(
+      generateMetadata({
+        searchParams: Promise.resolve({ lang: "en" }),
+      }),
+    ).resolves.toMatchObject({
+      title: "AI Documents for aged care and NDIS | CaresLink AI",
+      description:
+        "Create review-ready document drafts from de-identified support facts, with privacy prompts and bilingual review.",
+    });
+    await expect(
+      generateMetadata({
+        searchParams: Promise.resolve({ lang: "zh-Hans" }),
+      }),
+    ).resolves.toMatchObject({
+      title: "养老服务与 NDIS 的 AI 文档工具 | CaresLink AI",
+      description:
+        "使用去标识化的支持事实创建可复核的文档草稿，并在生成前检查隐私提示和中文复核内容。",
+    });
+  });
+
   it("leads with AI Documents and a provider-only Case Note auth handoff", async () => {
     const element = await HomePage({
       searchParams: Promise.resolve({ lang: "en" }),
