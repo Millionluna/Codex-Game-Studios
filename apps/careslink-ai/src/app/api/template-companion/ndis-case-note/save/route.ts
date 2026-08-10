@@ -14,6 +14,7 @@ import {
 } from "@/lib/ndis-case-note-companion-request";
 import { resolveWorkspaceAccountFromSupabaseSession } from "@/lib/referral-workspace-session";
 import { createCareslinkServerSupabaseClient } from "@/lib/supabase-server";
+import { mirrorSavedNdisDraftToCanonicalShadow } from "@/lib/v1/ndis-shadow-integration.server";
 
 type SaveNdisCaseNotePostBody = {
   claimToken?: unknown;
@@ -115,6 +116,8 @@ export async function POST(request: Request) {
       .completeClaim({ token: claimToken, userId: account.id })
       .catch(() => undefined);
 
+    await mirrorSavedDraftSafely(existing, claim.tokenHash);
+
     return NextResponse.json({
       ok: true,
       feature: "ndis_case_note",
@@ -155,6 +158,8 @@ export async function POST(request: Request) {
       // Saving the owner-scoped draft does not depend on telemetry availability.
     }
 
+    await mirrorSavedDraftSafely(saved, claim.tokenHash);
+
     return NextResponse.json({
       ok: true,
       feature: "ndis_case_note",
@@ -167,6 +172,20 @@ export async function POST(request: Request) {
       { ok: false, error: "Unable to save this draft" },
       { status: 502 },
     );
+  }
+}
+
+async function mirrorSavedDraftSafely(
+  draft: GeneratedMaterialDraftRecord,
+  privacyFingerprint: string,
+) {
+  try {
+    await mirrorSavedNdisDraftToCanonicalShadow({
+      legacyDraft: draft,
+      privacyFingerprint,
+    });
+  } catch {
+    // Legacy remains the only response source and must survive shadow failure.
   }
 }
 

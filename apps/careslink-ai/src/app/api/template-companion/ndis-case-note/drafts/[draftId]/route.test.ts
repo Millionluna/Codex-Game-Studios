@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   resolveAccount: vi.fn(),
   getStore: vi.fn(),
   deleteDraft: vi.fn(),
+  tombstoneDeletedShadow: vi.fn(),
 }));
 
 vi.mock("@/lib/supabase-server", () => ({
@@ -19,6 +20,10 @@ vi.mock("@/lib/generated-material-draft-store", () => ({
   getGeneratedMaterialDraftStore: mocks.getStore,
 }));
 
+vi.mock("@/lib/v1/ndis-shadow-integration.server", () => ({
+  tombstoneDeletedNdisShadowFromCanonical: mocks.tombstoneDeletedShadow,
+}));
+
 const provider = {
   id: "11111111-1111-4111-8111-111111111111",
   role: "provider" as const,
@@ -27,6 +32,14 @@ const provider = {
 };
 
 const draftId = `ndis-case-note-${"a".repeat(32)}`;
+const deletedDraftMetadata = {
+  id: draftId,
+  userId: provider.id,
+  feature: "ndis_case_note" as const,
+  status: "draft" as const,
+  createdAt: "2026-08-09T00:00:00.000Z",
+  updatedAt: "2026-08-09T00:05:00.000Z",
+};
 const privateDraftWording =
   "The participant attended a private support appointment.";
 
@@ -64,7 +77,11 @@ describe("NDIS case note saved-draft deletion route", () => {
     mocks.getStore.mockReturnValue({
       deleteGeneratedMaterialDraftByUser: mocks.deleteDraft,
     });
-    mocks.deleteDraft.mockResolvedValue(true);
+    mocks.deleteDraft.mockResolvedValue(deletedDraftMetadata);
+    mocks.tombstoneDeletedShadow.mockResolvedValue({
+      enabled: false,
+      guardReason: "non_preview_environment",
+    });
   });
 
   it("returns 401 before resolving the draft store for an unauthenticated request", async () => {
@@ -81,6 +98,7 @@ describe("NDIS case note saved-draft deletion route", () => {
     expect(payload).toMatchObject({ ok: false, code: "login_required" });
     expect(mocks.getStore).not.toHaveBeenCalled();
     expect(mocks.deleteDraft).not.toHaveBeenCalled();
+    expect(mocks.tombstoneDeletedShadow).not.toHaveBeenCalled();
   });
 
   it("returns 403 before resolving the draft store for an admin", async () => {
@@ -99,6 +117,7 @@ describe("NDIS case note saved-draft deletion route", () => {
     });
     expect(mocks.getStore).not.toHaveBeenCalled();
     expect(mocks.deleteDraft).not.toHaveBeenCalled();
+    expect(mocks.tombstoneDeletedShadow).not.toHaveBeenCalled();
   });
 
   it("requires an explicit delete intent before reading the draft identifier", async () => {
@@ -117,6 +136,7 @@ describe("NDIS case note saved-draft deletion route", () => {
     expect(params).not.toHaveBeenCalled();
     expect(mocks.getStore).not.toHaveBeenCalled();
     expect(mocks.deleteDraft).not.toHaveBeenCalled();
+    expect(mocks.tombstoneDeletedShadow).not.toHaveBeenCalled();
   });
 
   it("returns the same non-disclosing 404 for an invalid draft identifier", async () => {
@@ -135,6 +155,7 @@ describe("NDIS case note saved-draft deletion route", () => {
     });
     expect(mocks.getStore).not.toHaveBeenCalled();
     expect(mocks.deleteDraft).not.toHaveBeenCalled();
+    expect(mocks.tombstoneDeletedShadow).not.toHaveBeenCalled();
   });
 
   it("atomically deletes only the signed-in provider's NDIS case note draft", async () => {
@@ -153,6 +174,12 @@ describe("NDIS case note saved-draft deletion route", () => {
       userId: provider.id,
       feature: "ndis_case_note",
     });
+    expect(mocks.tombstoneDeletedShadow).toHaveBeenCalledOnce();
+    expect(mocks.tombstoneDeletedShadow).toHaveBeenCalledWith({
+      ownerUserId: provider.id,
+      sourceDraftId: draftId,
+      sourceCreatedAt: deletedDraftMetadata.createdAt,
+    });
     expect(JSON.stringify(payload)).not.toContain("content");
     expect(JSON.stringify(payload)).not.toContain("participant");
   });
@@ -160,7 +187,7 @@ describe("NDIS case note saved-draft deletion route", () => {
   it.each(["missing draft", "another provider's draft"])(
     "returns the same non-disclosing 404 for %s",
     async () => {
-      mocks.deleteDraft.mockResolvedValueOnce(false);
+      mocks.deleteDraft.mockResolvedValueOnce(undefined);
       const { DELETE } = await import("./route");
       const response = await DELETE(
         createRequest({ intent: "delete-generated-draft" }),
@@ -179,8 +206,26 @@ describe("NDIS case note saved-draft deletion route", () => {
         userId: provider.id,
         feature: "ndis_case_note",
       });
+      expect(mocks.tombstoneDeletedShadow).not.toHaveBeenCalled();
     },
   );
+
+  it("keeps the successful legacy response when shadow cleanup fails", async () => {
+    mocks.tombstoneDeletedShadow.mockRejectedValueOnce(
+      new Error(`shadow cleanup unavailable: ${privateDraftWording}`),
+    );
+    const { DELETE } = await import("./route");
+    const response = await DELETE(
+      createRequest({ intent: "delete-generated-draft" }),
+      createContext(),
+    );
+    const payload = await readResponse(response);
+
+    expect(response.status).toBe(200);
+    expect(payload).toEqual({ ok: true, draftId });
+    expect(mocks.deleteDraft).toHaveBeenCalledOnce();
+    expect(mocks.tombstoneDeletedShadow).toHaveBeenCalledOnce();
+  });
 
   it("returns a generic 503 without exposing store errors or draft content", async () => {
     mocks.deleteDraft.mockRejectedValueOnce(
@@ -200,5 +245,6 @@ describe("NDIS case note saved-draft deletion route", () => {
       error: "Draft deletion is temporarily unavailable.",
     });
     expect(JSON.stringify(payload)).not.toContain("database unavailable");
+    expect(mocks.tombstoneDeletedShadow).not.toHaveBeenCalled();
   });
 });

@@ -46,7 +46,7 @@ export type GeneratedMaterialDraftStore = {
     draftId: string;
     userId: string;
     feature: AiUsageFeature;
-  }): Promise<boolean>;
+  }): Promise<GeneratedMaterialDraftMetadataRecord | undefined>;
 };
 
 const GLOBAL_GENERATED_MATERIAL_DRAFT_STORE_KEY =
@@ -325,10 +325,11 @@ export function createMemoryGeneratedMaterialDraftStore(
         record.userId !== userId ||
         record.feature !== feature
       ) {
-        return false;
+        return undefined;
       }
 
-      return records.delete(draftId);
+      records.delete(draftId);
+      return mapGeneratedMaterialRecordToMetadata(record);
     },
   };
 }
@@ -497,7 +498,7 @@ export function createSupabaseGeneratedMaterialDraftStore(
         throw new Error(formatSupabaseGeneratedMaterialError("delete", error));
       }
 
-      return Boolean(data);
+      return data ? mapGeneratedMaterialRowToMetadata(data) : undefined;
     },
   };
 }

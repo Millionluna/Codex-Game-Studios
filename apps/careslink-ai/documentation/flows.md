@@ -1,109 +1,156 @@
-# Security and Data Flows
+# CaresLink AI Flows
 
-## Authentication and safe return
+> Current production flows are separated from the new **inactive shadow** contracts. A shadow artifact is not a served flow.
 
-**Actor:** signed-out visitor. **Outcome:** no Companion form or case-note content is rendered.
+## 1. Authentication
 
-1. The server resolves the Supabase session before rendering `/template-companion/ndis-case-note`.
-2. Without a session it redirects to `/auth/login` with a validated internal `next`/`returnTo` containing only allowlisted locale, source, resource, and UTM values. No case-note text is accepted in that URL.
-3. A provider login returns to the same Companion route ready for input. Admin roles fall back to the admin workspace.
-4. A direct unauthenticated generation POST returns `401` before JSON parsing, quota, claim creation, telemetry, or OpenAI.
-5. Sign out runs as a server action. It invalidates the Supabase session, clears matching local Supabase auth cookies, retains only an allowlisted provider/admin return route, and sends the user to login. Missing auth configuration, remote failure or cookie-cleanup failure returns an error rather than a signed-out success notice. The next protected GET re-enters the auth gate.
+### Current Web flow
 
-### Google OAuth
+1. User opens login/register with an allowlisted internal `next` and optional supported locale/source metadata.
+2. Email/password uses Supabase Auth server actions. Google uses `signInWithOAuth` and a PKCE callback.
+3. Callback exchanges the code for a server session and redirects only to a validated internal path.
+4. The application reads the authenticated user and trusted `app_metadata.role`.
+5. Provider routes deny missing/non-provider sessions; admin routes independently require admin.
+6. Sign out calls Supabase server-side sign-out and then protected pages re-trigger the login gate.
 
-1. Login/Register shows Google only when the server-only release gate is exactly
-   `true` and the Supabase settings endpoint confirms Google is enabled; absent,
-   disabled or unavailable configuration fails closed and leaves
-   email/password available.
-2. The server action normalizes locale and reduces `next` to an allowlisted
-   provider route before calling `signInWithOAuth({ provider: "google" })`.
-3. Supabase returns through `/auth/callback` with a short-lived PKCE code. The
-   route exchanges it, reads the verified user, and strips the code from the
-   final URL.
-4. A trusted `app_metadata` admin may enter an admin destination. A new Google
-   user or user-editable admin claim remains a provider and cannot enter admin.
-5. Cancellation or provider/config errors return a generic page message without
-   forwarding provider details or tokens.
+**Deny cases**: unauthenticated AI POST returns 401 before body parsing/quota/OpenAI; provider cannot open admin content; user metadata cannot self-grant admin; external `next` is discarded; OAuth provider error details/fragments are not carried to the final URL.
 
-## Authenticated draft generation
+**Gaps**: Microsoft/Apple, confirmed identity linking, device/session registry, single-device revoke, native PKCE token storage, email-change reauth and account-wide revocation.
 
-**Actor:** signed-in provider. **Precondition:** no participant identifiers are intentionally supplied. **Outcome:** one short-lived, owner-bound reviewable draft.
+## 2. NDIS Case Note input and Privacy Review
 
-1. The provider enters structured facts or pastes Chinese working notes. Paste text remains in React memory.
-2. Browser Privacy Review identifies matched ranges, creates a cleaned proposal, and requires each blocking or review finding to be resolved.
-3. Minimum facts include support date/approximate time, support type, setting, support delivered, observable facts, and action taken.
-4. The two privacy/processing-authority confirmations start unchecked. No generation request is constructed until all gates close.
-5. The API verifies the provider session, then repeats attestation and identifier/wording validation. **Deny:** signed-out `401`; admin `403`; unsafe input `422`, all before quota or OpenAI.
-6. The server validates a required idempotency key and atomically reserves 1 monthly account credit. Existing completed keys recover the same owner-bound claim; concurrent keys return a stable in-progress state without another model call.
-7. Server abuse controls apply a per-minute account rate limit and atomic daily account/IP quota. **Deny:** `429` without OpenAI; the reserved account credit is released.
-8. Server calls OpenAI with strict structured output, `store: false`, bounded tokens, and no tools.
-9. Output parsing rejects the whole response if it is malformed, contains an obvious identifier/prohibited conclusion, or fails bilingual numeric parity. Month names and explicit Chinese date markers are date facts; numeric slash/ISO-shaped values are canonicalized only beside explicit date semantics. Non-date codes and ratios remain exact. Chinese period-hour ranges are explicit; invalid combinations such as `中午10:30` or `晚上1:30` are consumed as non-equivalent sentinels, while `晚上12:05` maps only to `00:05`.
-10. Server stores only the generated material in an account-bound claim that can be recovered or saved for 30 minutes. Expired claims are unusable and are removed opportunistically by a later generation/save cleanup, not by an exact 30-minute scheduler. Only after claim persistence does the credit commit and metadata-only `companion_generated` emit. Generation or claim failure releases the credit without restoring abuse quota already consumed after OpenAI.
+### Current flow
 
-## Privacy and server-bypass denial
+1. Authenticated provider selects structured facts or paste-Chinese mode.
+2. Raw pasted text remains in current React state; it is not intentionally written to URL, local storage, analytics or admin surfaces.
+3. Browser detector returns findings with matched ranges and a proposed cleaned/structured view.
+4. Blocking findings must be removed/replaced; indirect findings require explicit review.
+5. Two confirmations are unchecked by default: de-identification review and authority to process.
+6. Minimum facts include support date/approximate time, support delivered, observable facts and action taken.
+7. Only cleaned structured facts are used to construct the generation request.
+8. Server repeats minimum-fact, confirmation and obvious-identifier validation and fails closed.
 
-**Actor:** signed-in provider. **Outcome:** unsafe input never reaches OpenAI.
+**Deny cases**: missing facts, unresolved blocking identifiers, missing confirmations, malformed body, unsupported locale, non-provider role. None of these should reserve credit or invoke OpenAI.
 
-- Missing attestation returns `privacy_review_required`.
-- Missing minimum facts or direct/indirect identifier and unsafe wording patterns return `input_review_required` with field-level issues.
-- Browser detector results are not trusted by the server; a crafted request containing a name, phone, NDIS number, address, specific place, diagnostic wording, risk conclusion, goal conclusion, or worker-quality claim is rejected independently.
+**Gaps**: only NDIS is supported; runtime has no persisted hash-bound `privacy_review_id`, five-type privacy schemas, `zh-Hant` or voice/transcript path. The shadow migration and shared contract model a hash-bound proof and three locales, but the migration was tested only on an isolated branch and is not connected to this flow.
 
-## Owner-bound claim and save
+## 3. Generation and legacy credits
 
-**Actor:** signed-in provider. **Precondition:** unexpired claim token already bound to that provider. **Outcome:** one owner-bound saved draft.
+### Current flow
 
-1. The provider selects Save; there is no post-generation login handoff.
-2. Save route verifies provider session before parsing the token. **Deny:** signed-out `401`; admin/non-provider `403`.
-3. Service-role RPC accepts only an unexpired claim owned by the same user. **Deny:** expired or cross-account claim returns `410`.
-4. The server derives a deterministic draft ID from the token hash, rejects an existing record owned by another user, saves the generated material, then deletes the completed claim for that owner.
-5. `companion_saved` records metadata only.
+1. Server validates session, provider role, body, privacy and minimum facts.
+2. Client supplies an idempotency key; server reserves one legacy credit through a service-role RPC.
+3. Server consumes account and IP daily abuse quota.
+4. OpenAI Responses API is called synchronously with a strict JSON schema and `store:false`.
+5. Server parses and safety-validates English draft, Simplified Chinese review, missing facts, neutral wording checks, follow-up prompts and disclaimer.
+6. A 30-minute opaque claim is persisted.
+7. Only after a usable claim exists does the server commit the credit.
+8. Validation/model/network/unsafe-output/claim failures release the credit; abuse quota follows its separate existing policy.
+9. Replaying a completed idempotency key returns the stable completed reservation/claim instead of a second charge/model call.
 
-## Saved-document readback
+**Deny cases**: `login_required`, `provider_required`, privacy/minimum-fact codes, quota/rate limit, `credit_exhausted`, unsafe output, configuration/storage failure. Error bodies do not contain note content.
 
-**Actor:** signed-in provider. **Outcome:** only that account's saved drafts.
+**Conflict with V1**: current plan is 3 credits per monthly period and one credit per generation. V1 requires one-time 300 welcome Points, versioned service rates, point lots and no parallel legacy balance truth.
 
-1. The server resolves the Supabase user with `auth.getUser()`.
-2. `AI Documents` and the companion query `generated_material_drafts` with that user ID.
-3. The service-role store applies `.eq("user_id", userId)` for lists. Direct ID updates and save idempotency also compare `record.userId` in server code.
-4. **Deny:** no session enters auth; an admin receives the admin workspace; a different provider cannot read or save another user's token.
+## 4. Save, history and delete
 
-## Owner-controlled saved-draft deletion
+### Current flow
 
-**Actor:** signed-in provider. **Outcome:** the provider can permanently remove
-their own saved NDIS case-note draft without exposing whether another account's
-record exists.
+1. Generated output is referenced by an opaque claim token; content is never placed in the URL.
+2. Provider save endpoint validates session, provider role and claim ownership.
+3. Result is stored as a `generated_material_drafts` row with `feature='ndis_case_note'`.
+4. On an explicitly guarded isolated Preview only, the server attempts a canonical shadow projection after the legacy save. The response continues to use only the legacy row even when projection, shadow write/read or timeout handling fails; the server records only a content-free status/reason such as `PROJECTION_ERROR`.
+5. AI Documents lists owner rows; provider can copy and delete an owned draft.
+6. Owner RLS denies cross-account SELECT/DELETE, while server routes also check owner and feature.
+7. Admin material usage shows metadata/aggregates, not full content JSON.
 
-1. The UI requires a deliberate second confirmation before issuing `DELETE`.
-2. The route verifies the provider session before using the draft ID. **Deny:**
-   signed-out `401`; admin/non-provider `403`.
-3. The request includes an explicit delete-intent header and a strictly formed
-   NDIS case-note draft ID.
-4. The service-role store performs one database delete constrained by `id`,
-   `user_id` and `feature = ndis_case_note`. Missing, cross-owner and wrong-
-   feature records all return the same `404` response.
-5. Owner `SELECT`/`DELETE` RLS is defence in depth for future authenticated
-   session-client access. The current route's service role bypasses RLS and
-   therefore cannot replace its explicit owner predicate.
-6. The deleted draft disappears from saved history. Companion telemetry remains
-   metadata-only and contains no draft text.
+**Deny cases**: expired/unknown/already-claimed/cross-owner claim; wrong feature; cross-owner draft read/delete; admin/support content browsing.
 
-Saved drafts otherwise remain until the provider deletes them. CaresLink AI is
-not a formal case-management or statutory record-retention system.
+**Gaps**: canonical projection occurs only after explicit Save, not first input. The local Preview slice creates shadow revisions/checkpoints but does not expose them as save acknowledgements or user content. Its hardened migration records the NDIS legacy source generation on the canonical document and requires that exact `(owner, ID, created_at)` generation to remain present for owner reads. After owner deletion, the legacy response stays authoritative while a fail-safe, replay-safe server RPC tombstones exactly the deleted generation; the same ID can later create an independent generation. If cleanup misses, reconciliation reports `SOURCE_DELETE_CLEANUP_PENDING`. Physical purge, an automatic cleanup worker, general editor autosave, user-visible conflict resolution and account-wide deletion remain absent.
 
-## Telemetry and administration
+## 5. Draft sync and recovery
 
-**Actors:** provider events; admin reporting. **Outcome:** operational metrics without participant facts.
+### Current reality
 
-- Client event endpoint allowlists `companion_viewed`, `companion_started`, `companion_copied`, `companion_offer_viewed` and `companion_offer_requested`; its JSON body accepts only the event name. The fake door has no free-text or contact field.
-- Generation, credit-exhaustion and save events are server-created.
-- Attribution is reduced to fixed source/resource/campaign values and two exact surface/medium pairs. Unknown or mismatched values are dropped. Visitor/device/IP values are one-way hashes.
-- Companion telemetry has no input, output, participant-fact, email, or contact columns.
-- Current admin material usage loads generated-draft metadata without `content` and excludes `ndis_case_note` details.
-- `/plan-and-usage` loads only the current provider's entitlement and ledger metadata. It never renders reservation/idempotency references or case-note content.
+- Generated result recovery is an opaque claim plus saved material row.
+- Provider profile generator has a separate draft handoff store.
+- Neither is a canonical AI Note draft/revision protocol.
+- There is no native local UUID mapping, encrypted outbox, server checkpoint, base-revision conflict or cross-device draft recovery.
 
-## Zero-credit pilot offer
+### Local Preview shadow contract
 
-1. When remaining credits reaches zero, the provider sees the concept price of Starter A$9.99/month for 30 generation credits.
-2. Viewing and requesting the offer create metadata-only events against the existing authenticated account. The UI collects no free text, email, phone or other contact data.
-3. Requesting does not charge, create a subscription, add credits or bypass the normal reset. Stripe is not connected in this release.
+`createMemoryCanonicalDocumentShadowStore` proves the domain rules for owner-bound create/read, immutable revisions, idempotency, stale-base rejection, checkpoints, revision-bound self-review and tombstone/purge transitions. The isolated repository/RPC slice persists an NDIS projection after legacy Save and compares hashes server-side. Protected Preview evidence covered `PROJECTED`, `MATCH`, same-key replay, provider B isolation and the master kill switch. No browser receives the canonical payload, and the legacy row remains the only response/reload source.
+
+### Intended runtime / not implemented
+
+First valid input creates a canonical document ID. Each mutation carries idempotency key and base revision. Server returns accepted revision, server time and stable save state. Portal keeps only a PIA-approved short-lived recovery buffer for unacknowledged changes; App uses encrypted local DB/outbox. A 409 creates an explicit conflict workflow rather than last-write-wins.
+
+## 6. Export
+
+### Current reality
+
+Copy actions are available for current result/saved content. There is no DOCX, PDF or TXT renderer, revision-bound export job, artifact TTL, safe filename policy, export history or batch export.
+
+### Inactive shadow contract
+
+The schema draft separates `export_jobs` from append-only `export_events`, binds both to owner/document/revision and defines DOCX/PDF/TXT/COPY terminal states. It contains no renderer, artifact storage, download route or file bytes.
+
+### Intended runtime / not implemented
+
+Export must bind to a specific revision and shared renderer/template version. Record Copy excludes privacy findings, internal facts analysis, Points and model metadata by default. Portal downloads and App Share Sheet use the same artifact profile. External files are static snapshots and never sync changes back.
+
+## 7. Points and entitlements
+
+### Current reality
+
+`account_entitlements` lazily creates a monthly `free` allowance. `credit_ledger` records grant/reserve/commit/release. The client can read only its own entitlement/ledger; service-role RPCs own writes and use transaction/advisory-lock/idempotency controls.
+
+### Inactive shadow contract
+
+The TypeScript shadow store and Production-unapplied migration define wallets, lots, versioned rates, quotes, allocation rows, reservations and an append-only ledger. On a disposable Supabase branch, real service-role RPC tests proved earliest-expiring lot allocation, quote/reserve/commit, quote/reserve/release to original lots, replay safety, conflicting replay rejection, expiry, insufficient balance and cross-owner denial. Real JWT tests proved owner-only reads and denied direct writes/RPC execution to anon, providers and a test-only platform service actor. No welcome lot was automatically granted and the current monthly credit system remains the sole runtime entitlement.
+
+### Intended runtime / not implemented
+
+One wallet owns multiple point lots. A versioned server rate catalog returns a quote before reservation. Reserve allocates from approved lots; successful persisted output commits; no usable result releases to the same lots. Free account receives one-time 300 welcome Points. Pro and top-ups arrive only through normalized entitlements after provider receipt verification. Existing credit history remains immutable and is migration-mapped, not rewritten.
+
+## 8. Billing
+
+### Current reality
+
+No Stripe checkout/customer portal, Apple IAP, Google Play Billing, receipt verification, webhook, restore, refund or reconciliation exists. The old price-interest control is a metadata-only fake door and is not an entitlement or payment implementation.
+
+### Intended / not implemented
+
+Web/Apple/Google purchases normalize to one entitlement service and grant idempotent point lots. Purchase claims and provider events are globally unique and replay-safe. Existing active entitlement blocks duplicate subscription. Refund/revoke removes only eligible unused lots and never deletes existing Notes. Daily reconciliation compares provider cash/receipts, entitlements and ledger.
+
+## 9. Content, Guides and Daily Brief
+
+### Current reality
+
+Core publishes static public resources/articles/updates. The AI app has no canonical Content API, logged-in Library, Save/Follow/read state, Guide progress, Explain service or Daily Brief.
+
+### Intended / not implemented
+
+Core HTML and Web/App feeds consume one versioned content source. Published items carry stable ID/revision/locale/source/checked date/status. Logged-in state syncs Save, Follow and Guide progress. Daily Brief chooses at most three explainable candidates from unread relevant updates, in-progress guides, followed topics and user reminders; Note content is excluded.
+
+## 10. Notifications
+
+### Current reality
+
+There is no app-owned notification preference, push token, in-app inbox, email fallback, digest schedule, quiet hours, frequency suppression or deep-link delivery service.
+
+### Intended / not implemented
+
+Security, reminders, content/digest, Points and marketing are separate preferences. Payloads contain only opaque IDs and safe type. Daily/Weekdays/Weekly/Off is explicit; content push is normally capped at one proactive item per day. Open requires reauthentication and resolves to a safe resource/recovery state.
+
+## 11. Legacy Profile / Readiness / Referrals
+
+These Web routes keep their current profile, access-code, guided material and outreach flow for regression compatibility. They are not part of App parity, do not create canonical AI Note documents and must not grant or debit the personal V1 Points wallet unless a future approved contract explicitly adds that service.
+
+## 12. Legacy NDIS projection (Preview-only shadow)
+
+`projectLegacyNdisDraftToCanonical` parses an existing `feature='ndis_case_note'` saved material through the current safe parser. The guarded server integration uses only that validated projection. It preserves English formal wording and available Simplified Chinese review wording, never invents original structured facts, and always leaves self-review `REQUIRED`; legacy `reviewed` or `archived` never becomes V1 approval.
+
+The sequence is: legacy owner save -> deterministic source-version mutation identity -> service-role projection RPC -> metadata-only outbox -> optional hash comparison. The RPC obtains the source advisory lock before reading and row-locking the current legacy source. Replay is valid only while its projected revision is still current. Same content with a newer source status/timestamp updates mapping metadata without a revision; changed content, including A→B→A under a new source version, appends one revision. Stale source metadata/base returns `STALE`. `FAILED`, timeout, missing and mismatch never alter the legacy HTTP response. Reconciliation is read-only and operator-run; no background worker exists.
+
+Historical isolated database evidence covers first projection, same-key replay, distinct-content concurrent revisions, malformed projection failure, match/mismatch/missing comparisons and reconciliation output. A later protected App Preview also proved legacy response parity, provider isolation and the kill switch. The source-version/CAS/delete hardening added by final pre-commit review postdates that deployment. It was forward-applied to the retained empty branch and passed updated transactional assertions for A→B→A, stale replay, comparison correlation reuse, source-bound owner RLS, strictly idempotent generation-bound tombstoning, same-ID/new-generation ABA, terminal PURGED preservation and metadata-only `SOURCE_DELETE_CLEANUP_PENDING` reporting. A new protected route-level Preview is still required before any Production promotion.

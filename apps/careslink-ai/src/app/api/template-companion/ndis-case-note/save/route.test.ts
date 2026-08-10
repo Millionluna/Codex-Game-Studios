@@ -16,6 +16,10 @@ const supabaseMock = vi.hoisted(() => ({
   createCareslinkServerSupabaseClient: vi.fn(),
 }));
 
+const shadowMock = vi.hoisted(() => ({
+  mirrorSavedNdisDraftToCanonicalShadow: vi.fn(),
+}));
+
 vi.mock("@/lib/ndis-case-note-companion-store", async () => {
   const actual = await vi.importActual<
     typeof import("../../../../../lib/ndis-case-note-companion-store")
@@ -54,6 +58,11 @@ vi.mock("@/lib/referral-workspace-session", () => ({
 vi.mock("@/lib/supabase-server", () => ({
   createCareslinkServerSupabaseClient:
     supabaseMock.createCareslinkServerSupabaseClient,
+}));
+
+vi.mock("@/lib/v1/ndis-shadow-integration.server", () => ({
+  mirrorSavedNdisDraftToCanonicalShadow:
+    shadowMock.mirrorSavedNdisDraftToCanonicalShadow,
 }));
 
 const provider = {
@@ -116,6 +125,7 @@ describe("NDIS case note save route", () => {
     materialStoreMock.getGeneratedMaterialDraftStore.mockReset();
     sessionMock.resolveWorkspaceAccountFromSupabaseSession.mockReset();
     supabaseMock.createCareslinkServerSupabaseClient.mockReset();
+    shadowMock.mirrorSavedNdisDraftToCanonicalShadow.mockReset();
     Object.values(companionStore).forEach((mock) => mock.mockReset());
     Object.values(materialStore).forEach((mock) => mock.mockReset());
 
@@ -139,6 +149,10 @@ describe("NDIS case note save route", () => {
     materialStore.saveGeneratedMaterialDraft.mockImplementation(
       async (record) => record,
     );
+    shadowMock.mirrorSavedNdisDraftToCanonicalShadow.mockResolvedValue({
+      enabled: false,
+      guardReason: "non_preview_environment",
+    });
   });
 
   it("requires sign-in before claim lookup or persistence", async () => {
@@ -182,6 +196,15 @@ describe("NDIS case note save route", () => {
     });
     expect(JSON.stringify(event)).not.toContain(material.englishCaseNoteDraft);
     expect(JSON.stringify(event)).not.toContain(material.chineseReviewVersion);
+    expect(shadowMock.mirrorSavedNdisDraftToCanonicalShadow).toHaveBeenCalledWith({
+      legacyDraft: expect.objectContaining({
+        userId: provider.id,
+        feature: "ndis_case_note",
+      }),
+      privacyFingerprint: claim.tokenHash,
+    });
+    expect(payload).not.toHaveProperty("canonicalDocument");
+    expect(payload).not.toHaveProperty("shadow");
   });
 
   it("does not save an expired or differently owned claim", async () => {
@@ -221,5 +244,25 @@ describe("NDIS case note save route", () => {
     expect(response.status).toBe(200);
     expect(payload.alreadySaved).toBe(true);
     expect(materialStore.saveGeneratedMaterialDraft).not.toHaveBeenCalled();
+    expect(shadowMock.mirrorSavedNdisDraftToCanonicalShadow).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the successful legacy response when shadow projection fails", async () => {
+    shadowMock.mirrorSavedNdisDraftToCanonicalShadow.mockRejectedValueOnce(
+      new Error("shadow unavailable"),
+    );
+    const { POST } = await import("./route");
+    const response = await POST(createSaveRequest());
+    const payload = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(payload).toMatchObject({
+      ok: true,
+      feature: "ndis_case_note",
+      material,
+      alreadySaved: false,
+    });
+    expect(materialStore.saveGeneratedMaterialDraft).toHaveBeenCalledTimes(1);
+    expect(companionStore.completeClaim).toHaveBeenCalledTimes(1);
   });
 });

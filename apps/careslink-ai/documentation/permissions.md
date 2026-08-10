@@ -1,58 +1,123 @@
-# Permissions
+# CaresLink AI Permissions
 
-## Roles and scope derivation
+> Current runtime permissions are separated from the **Production-unapplied V1 shadow policy contract**. The contract has isolated database evidence, but no Production or application-runtime activation.
 
-| Actor | Derived from | Notes |
-| --- | --- | --- |
-| Guest | Absence of a verified Supabase session | May view the separate public Core landing; Companion GET enters auth and API calls are denied |
-| Provider | Verified Supabase user plus server-created workspace account role | May save and read only their own documents |
-| Admin | Verified Supabase user with admin role metadata | May access aggregate/metadata admin pages; cannot use provider save flow |
-| Service role | Server-only Supabase key | Bypasses RLS; never sent to the browser |
+## Identity and claims
 
-Email/password and Google identities share this role model. OAuth profile fields
-are user metadata and cannot grant admin. Only trusted Supabase `app_metadata`
-can identify an existing admin; all other authenticated identities default to
-provider.
+| Identity | Source | Current authority |
+|---|---|---|
+| Anonymous | no Supabase user | public home/auth/static legacy pages; selected metadata-only public conversion insert |
+| Provider | authenticated UUID + trusted `app_metadata.role='provider'` | provider workspace, NDIS generation, own credits and own saved drafts |
+| Admin | authenticated UUID + trusted `app_metadata.role='admin'` | access-request and aggregate/material-usage administration |
+| Demo | query fixture only when non-production demo auth is enabled | local/test behavior; not a production role or authorization source |
+| Service role | server-only Supabase secret | private stores and narrowly exposed database RPCs |
 
-## Resource matrix
+User-editable profile/user metadata is not trusted for admin. A Google-created user defaults to provider through trusted server/auth configuration; OAuth profile fields do not grant elevated access.
 
-| Resource and operation | Guest | Provider | Admin | Enforcement |
-| --- | --- | --- | --- | --- |
-| View Companion form/privacy/result | Deny; redirect to login | Allow | Deny; redirect to admin workspace | Server page session and role gate |
-| Generate a draft | Deny `401` before body parsing | Allow with monthly credit plus account/IP limits | Deny `403` | Session-first API role check, transactional credit RPC, rate limit, abuse quota RPC |
-| View plan and credit usage | Deny | Own entitlement/ledger metadata only | No provider-ledger detail | Provider page gate plus owner-scoped query/RLS |
-| Read temporary claim | Deny | Same owner only | Deny | Server page session gate and claim owner check |
-| Bind and save claim | Deny | Allow for own account | Deny | Verified session, provider role, claim RPC owner condition |
-| List saved drafts | Deny | Own `user_id` only | No provider-content view | Server query filtered by account ID |
-| Delete saved NDIS case-note draft | Deny | Own record only | Deny | Provider session plus one atomic `id + user_id + feature` delete; missing/cross-owner/wrong-feature records all return `404` |
-| Change saved status | Deny | Own record only | Not exposed for case notes | Server record-owner comparison |
-| Write companion telemetry | Deny | Allowlisted metadata events | Deny | Session-first event route, server constructors and schema |
-| View admin material usage | Deny | Deny | Allow | Admin route gate; metadata selectors; case-note exclusion |
-| Sign out | No active session | Clear own session; safe provider return only | Clear own session; safe admin return allowed | Server action, internal-route allowlist, matching local auth-cookie cleanup, fail-closed error state |
-| View privacy notice | Allow | Allow | Allow | Public read-only route; no account data |
-| Request more credits fake door | Deny | Metadata opt-in for own signed-in account | Deny | Provider-only event route; fixed event name; no contact/free-text body; no entitlement mutation |
+## Authorization layers
 
-## Database controls
+1. **Route check**: server resolves Supabase session before reading AI content or incurring cost.
+2. **Role check**: provider/admin routes require the expected trusted role.
+3. **Resource check**: server checks owner UUID, claim state and material feature.
+4. **Database RLS/grants**: authenticated direct access is limited to explicit owner policies.
+5. **Service-role RPC**: ledger/quota/claim writes remain server-only and validate supplied owner/reference.
 
-| Table/function | RLS/grants | Additional owner control |
-| --- | --- | --- |
-| `ndis_case_note_companion_claims` | RLS enabled; table grants revoked from `anon`/`authenticated`; service role only | Claim RPC updates only unclaimed/same-user rows and unexpired claims |
-| `template_companion_quota_usage` | RLS enabled; service role only | Atomic security-definer RPC; pseudonymous fingerprint key |
-| `template_companion_events` | RLS enabled; service role only | Event-name constraint, allowlisted `surface` constraint and server normalization; client cannot write arbitrary event names or attribution |
-| `generated_material_drafts` | RLS enabled; after migration, `authenticated` receives owner-only `SELECT`/`DELETE`; no end-user `INSERT`/`UPDATE`; service role retains CRUD | Owner policies use `auth.uid() = user_id`; current server reads/writes/deletes still use service role with explicit owner predicates |
-| `generated_material_events` | RLS enabled; service role only | Server-created metadata events; no content column |
-| `account_entitlements` | RLS enabled; `authenticated` and service role receive `SELECT` only | Owner policy uses `auth.uid() = user_id`; creation/configuration occurs only inside service-role RPC/migration |
-| `credit_ledger` | RLS enabled; `authenticated` and service role receive `SELECT` only | Owner policy plus append-only constraints; grant/reserve/commit/release writes are security-definer RPC only |
-| `pilot_cohort_members` | RLS enabled; all privileges revoked from `public`/`anon`/`authenticated`; service role only | Fixed cohort/stage constraints and effective membership interval; aggregate reports join UUID internally but never return it |
+All five layers are required where applicable. A code check does not replace RLS, and RLS does not make a service-role route safe by itself.
 
-Credit RPC execution is revoked from `public`, `anon`, and `authenticated` and
-granted only to `service_role`. Their `search_path` is fixed to an empty path,
-and every table reference is schema-qualified.
+## Current resource x action matrix
 
-The migration revokes broad `public`, `anon` and `authenticated` grants before
-adding the narrow owner policies. They are defence in depth for authenticated
-session-bound table access. Current server queries use the service role, which bypasses RLS;
-therefore route/page owner checks and atomic database predicates remain part of
-the authorization boundary. Apply
-`20260804143000_add_generated_material_owner_read_delete_policies.sql` before
-claiming these owner RLS grants are active in a target environment.
+| Resource / action | Anonymous | Provider owner | Other provider | Admin UI | Service role |
+|---|---:|---:|---:|---:|---:|
+| NDIS Companion form | deny/auth gate | allow | n/a | deny as non-provider | n/a |
+| NDIS generation POST | 401 before body/quota/model | allow after validation/limits | n/a | deny | orchestrates stores/model |
+| `account_entitlements` SELECT | deny | own rows | deny | aggregate only through server page | SELECT |
+| `account_entitlements` write | deny | deny | deny | deny | RPC only |
+| `credit_ledger` SELECT | deny | own rows | deny | aggregate only | SELECT |
+| `credit_ledger` write | deny | deny | deny | deny | reserve/commit/release RPC only |
+| NDIS claim read/claim | deny | own opaque claim through server | indistinguishable deny | deny | claim RPC/store |
+| saved draft SELECT | deny | own row | deny | no body viewer | SELECT through owner route/store |
+| saved draft DELETE | deny | own row | deny | no general delete | owner route/store |
+| companion event INSERT | no direct table access | metadata route only | metadata route only | n/a | INSERT |
+| public conversion INSERT | allowlisted metadata only | same | same | aggregate reporting | table policy permits anon INSERT |
+| access request | public/auth flow as implemented | own workflow | no cross-owner view | review metadata | CRUD |
+| provider profile/referral data | route-specific legacy rules | own/claimed context | deny unless explicit public profile | limited legacy admin actions | CRUD stores |
+
+## Current RLS and grants
+
+| Table | RLS | Authenticated grant/policy | Notes |
+|---|---|---|---|
+| `account_entitlements` | enabled | owner SELECT | client cannot write |
+| `credit_ledger` | enabled | owner SELECT | terminal events via service-role RPC |
+| `generated_material_drafts` | enabled | owner SELECT and DELETE | INSERT/save remains server-owned |
+| `ndis_case_note_companion_claims` | enabled | none | opaque claim via server/service role |
+| `template_companion_quota_usage` | enabled | none | server-only pseudonymous counters |
+| `template_companion_events` | enabled | none | metadata-only server inserts |
+| `public_conversion_events` | enabled | anon INSERT | public marketing exception; no private content |
+| legacy provider/referral tables | enabled | generally no broad authenticated CRUD | server stores and domain checks remain material |
+
+The audited schema has RLS enabled on the listed public tables, but RLS is not forced. Service-role behavior bypasses owner policies by design and must stay inside server code.
+
+## Current deny cases
+
+- Missing/invalid session: protected GET redirects to login; protected POST returns 401.
+- Authenticated admin on provider-only Companion: denied.
+- Authenticated provider on admin route: denied without admin content.
+- External or malformed auth `next`: discarded in favor of safe internal default.
+- Cross-owner claim or draft ID: generic not-found/deny response without existence leak.
+- Wrong draft feature: denied even when the caller owns another material ID.
+- Missing privacy confirmation or minimum facts: no credit reserve, quota or model call.
+- Credit exhausted/quota exceeded: no new model call.
+- Missing production Supabase/OpenAI/pepper configuration: fail closed; no memory fallback in production.
+
+## Admin and support boundary
+
+Current admin pages may display access-request metadata, feature counts, statuses and aggregate usage. They must not display full case-note JSON, privacy findings, cleaned facts, prompts, pasted text or generated body. There is no general support impersonation or “view user document” permission.
+
+## V1 shadow permission contract and isolated evidence
+
+`supabase/migrations/20260809120000_create_v1_shadow_foundation.sql` defines the following controls. It was applied only to a disposable `with_data=false` branch and has not been applied to Production Supabase:
+
+| Shadow resource | Authenticated client | Service role | Integrity binding |
+|---|---|---|---|
+| documents, revisions, checkpoints, self-review | owner `SELECT` only | no document write RPC exists yet | composite owner/document/revision foreign keys |
+| privacy proof | owner `SELECT` only | future validated repository | proof reference binds the same owner |
+| generation/export jobs and events | owner `SELECT` only | future orchestrator/worker | job/event references bind owner and document |
+| point wallet/lots/quotes/reservations/allocations/ledger | owner `SELECT` only | five shadow-only grant/quote/reserve/commit/release RPCs | quote, reservation, lot and ledger references bind owner |
+| rate catalog | no authenticated grant | `SELECT` | version and service-code foreign keys |
+| legacy migration batch/items | no authenticated grant | `SELECT` only in this migration | metadata/hash only; target mapping binds source owner |
+| NDIS shadow link/outbox/comparison | no authenticated grant | `SELECT` plus three narrowly granted projection/comparison/audit RPCs | legacy source, owner, canonical document and revision are composite-bound |
+
+All shadow tables enable RLS before integration, and shadow business rows are constrained to `shadow_only=true`. Authenticated users receive no `INSERT`, `UPDATE` or `DELETE`; shadow RPC execute grants are revoked from `public`, `anon` and `authenticated` and granted only to `service_role`.
+
+Isolated guarded-live evidence: 18/18 expected tables existed; all 14 owner resources had RLS, owner-SELECT policies and authenticated SELECT grants; authenticated write grants were 0; all five Points RPCs were executable only by `service_role`. Anon reads/RPCs returned 401. Provider A/B JWTs saw only their own rows and all direct INSERT/PATCH/DELETE/RPC attempts returned 403. A test-only platform service actor saw zero owner rows and had no elevated product permission. Composite owner/document/revision foreign keys and `shadow_only=false` rejected invalid fixtures. The service role could execute Points RPCs but had no direct INSERT/UPDATE/DELETE table grants.
+
+The local NDIS integration migration adds no client write grant and no product Admin role. Provider owner reads of the already-defined canonical document/revision tables remain RLS-scoped, while link/outbox/comparison tables are service-only metadata. The public save route authenticates a provider and legacy claim before the server-only integration can construct a service-role client. The repository is absent from `src/components` and every other application route.
+
+Second integration-gate evidence: the disposable `qkciaecjwidtbujzwzln` branch applied and replayed both migrations. Schema inspection found RLS on all three integration tables, zero `anon`/`authenticated` table privileges, zero public/anon/authenticated execution grants and exactly three service-role execution grants. Anonymous REST returned `401` for canonical/integration reads and `404` for non-exposed RPCs. Service-role SQL proved source-owner FK denial, `shadow_only=false` rejection, idempotent replay, concurrent revision serialization and metadata-only reconciliation. A fresh real provider JWT was not obtained because official branch sign-up required email confirmation; Auth internals were not patched to bypass that control. Therefore this run adds database/service-boundary evidence, not a completed App Preview owner-RLS proof for the integration slice.
+
+The subsequent protected App Preview used confirmed, test-only provider A/B sessions on retained non-default branch `odrdlsrdlmtjczhmsbnj`. Provider A's legacy save projected one owner-bound canonical revision and comparison; provider B could not read or affect A's legacy or canonical data. Same-idempotency replay remained singular, and disabling the master flag left legacy Save available while producing no shadow activity. Test users and all associated rows were then cleared to zero. The branch remains only as an inactive Preview baseline; no V1 Organisation/Admin permission was introduced and Production RLS was not changed.
+
+Final pre-commit hardening adds a narrower legacy-NDIS lifecycle condition to the Production-unapplied owner policies: canonical document/revision/checkpoint rows projected from `generated_material_drafts` are owner-readable only while the matching owner/source row with the same creation identity exists. Source deletion therefore removes owner readability before a best-effort, service-role-only tombstone RPC runs; cleanup failure cannot expose content or change the legacy Delete response, and the service-only audit reports it as `SOURCE_DELETE_CLEANUP_PENDING`. Tombstoning binds the deleted source's `created_at`, persists the first correlation and does not write on replay; a later source with the same ID is a separate generation. Non-legacy owner policies keep their prior owner-only semantics. Forward migrations `20260810072017`, `20260810072952`, `20260810073519`, `20260810073929` and `20260810080048` passed on retained non-default branch `odrdlsrdlmtjczhmsbnj`; they backfilled a real synthetic pre-identity row, tombstoned an unidentifiable orphan, proved a historical PURGED row remains terminal, exposed a simulated missed tombstone without restoring owner access and separated a same-ID/new-generation fixture. Updated transactional assertions passed and zero fixtures remained. Production was not changed, and a new protected route-level Preview remains a promotion gate rather than evidence claimed here.
+
+## Intended V1 matrix (partly codified, not available at runtime)
+
+| Target resource | Owner | Admin/support | Service/backend | Required control |
+|---|---|---|---|---|
+| canonical document/revision/checkpoint | CRUD own | metadata/correlation only | validated mutations | owner RLS, revision conflict, tombstone |
+| privacy review proof | own referenced proof | no excerpt/body | create/validate hash binding | user/type/hash/schema/expiry binding |
+| generation/transcription/export job | own job/status/result | metadata only | worker lifecycle | owner RLS, idempotency, safe cancellation |
+| point wallet/lots/ledger | SELECT own | aggregate/support reference | append-only RPC/provider events | no client write; allocation invariants |
+| entitlement/receipt | SELECT own status | metadata/support state | verified provider event only | global receipt idempotency |
+| content | published public read | editorial roles only | publication workflow | status/revision/locale/source contract |
+| Save/Follow/Guide progress/action/reminder | CRUD own | aggregate only | reminder scheduler | owner RLS, source revision |
+| notification preference/inbox/device | CRUD own | delivery metadata only | scheduler/provider adapter | safe payload, device/session revoke |
+| data export/delete request | own request after reauth | support status only | audited workflow | reauth, legal-hold separation, processor cleanup |
+
+## Permission work required before V1
+
+1. Extend the contract-only Product API into a single implemented role/claim contract shared by Web and native clients.
+2. Treat the completed isolated schema/RLS/RPC gate as migration evidence only; require a separately approved application Preview for dual-write/shadow-read and reconciliation.
+3. Replace broad service-role CRUD patterns with domain RPCs or server repositories that verify owner and idempotency.
+4. Add device/session revocation and high-risk reauthentication.
+5. Add support-safe correlation views rather than正文 access.
+6. Extend the now-covered deleted/tombstoned resource policies with old-client, revoked-session and billing-provider replay tests.

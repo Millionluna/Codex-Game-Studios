@@ -1,0 +1,596 @@
+openapi: 3.1.0
+info:
+  title: CaresLink Product API Shadow Contract
+  version: 1.0.0-shadow.1
+  description: >-
+    Contract-only scaffold for CaresLink Product Baseline V1.0. No path in this
+    document is served by Production. Activation requires a separately approved
+    migration, route implementation, security review, Preview gate and release.
+x-careslink-implementation-status: contract-only-shadow
+x-careslink-rate-catalog-version: 2026-08-09.v1-shadow
+paths:
+  /v1/note-types:
+    get:
+      operationId: listNoteTypes
+      summary: List the versioned five-type Note catalog
+      responses:
+        "200":
+          description: Versioned Note definitions
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [contractVersion, noteTypes]
+                properties:
+                  contractVersion:
+                    const: 1.0.0-shadow.1
+                  noteTypes:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/NoteTypeDefinition"
+  /v1/documents:
+    post:
+      operationId: createDocument
+      summary: Allocate a canonical document after first valid input
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [noteType, sourceLocale]
+              properties:
+                noteType:
+                  $ref: "#/components/schemas/NoteTypeCode"
+                sourceLocale:
+                  $ref: "#/components/schemas/Locale"
+      responses:
+        "201":
+          description: Canonical document identity
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Document"
+        "401":
+          $ref: "#/components/responses/AuthRequired"
+  /v1/documents/{documentId}:
+    parameters:
+      - $ref: "#/components/parameters/DocumentId"
+    get:
+      operationId: getDocument
+      summary: Read one owner-bound canonical document snapshot
+      responses:
+        "200":
+          description: Document, revisions and checkpoint
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [document, revisions, selfReviewStatus]
+                properties:
+                  document:
+                    $ref: "#/components/schemas/Document"
+                  revisions:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/DocumentRevision"
+                  checkpoint:
+                    $ref: "#/components/schemas/DocumentCheckpoint"
+                  selfReviewStatus:
+                    $ref: "#/components/schemas/SelfReviewStatus"
+        "401":
+          $ref: "#/components/responses/AuthRequired"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /v1/documents/{documentId}/revisions:
+    parameters:
+      - $ref: "#/components/parameters/DocumentId"
+    post:
+      operationId: appendDocumentRevision
+      summary: Append a revision using an explicit base revision
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [baseRevisionId, content, contentHash, schemaVersion]
+              properties:
+                baseRevisionId:
+                  type: [string, "null"]
+                privacyReviewId:
+                  type: string
+                content:
+                  $ref: "#/components/schemas/NoteContent"
+                contentHash:
+                  type: string
+                  pattern: "^[a-f0-9]{64}$"
+                schemaVersion:
+                  type: string
+      responses:
+        "201":
+          description: Accepted revision and save acknowledgement
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [revision, serverTime, saveState]
+                properties:
+                  revision:
+                    $ref: "#/components/schemas/DocumentRevision"
+                  serverTime:
+                    type: string
+                    format: date-time
+                  saveState:
+                    const: SERVER_ACKNOWLEDGED
+        "409":
+          description: Base revision is stale
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+  /v1/privacy-reviews:
+    post:
+      operationId: createPrivacyProof
+      summary: Bind a privacy decision to cleaned facts without storing raw paste
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PrivacyProofRequest"
+      responses:
+        "201":
+          description: Hash-bound privacy proof
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PrivacyProof"
+  /v1/points/quotes:
+    post:
+      operationId: createPointQuote
+      summary: Return a server-owned versioned point quote
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [serviceCode, quantity]
+              properties:
+                serviceCode:
+                  $ref: "#/components/schemas/ServiceCode"
+                quantity:
+                  type: integer
+                  minimum: 1
+      responses:
+        "201":
+          description: Point quote
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PointQuote"
+  /v1/points/reservations:
+    post:
+      operationId: reservePoints
+      summary: Atomically reserve point lots for a quote
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [quoteId]
+              properties:
+                quoteId:
+                  type: string
+                  format: uuid
+      responses:
+        "201":
+          description: Point reservation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PointReservation"
+        "409":
+          description: Quote expired or points insufficient
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+  /v1/points/reservations/{reservationId}/commit:
+    post:
+      operationId: commitPoints
+      summary: Commit only after a usable result revision is persisted
+      parameters:
+        - $ref: "#/components/parameters/ReservationId"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [resultRevisionId]
+              properties:
+                resultRevisionId:
+                  type: string
+                  format: uuid
+      responses:
+        "200":
+          description: Committed reservation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PointReservation"
+  /v1/points/reservations/{reservationId}/release:
+    post:
+      operationId: releasePoints
+      summary: Release a failed or cancelled reservation to its original lots
+      parameters:
+        - $ref: "#/components/parameters/ReservationId"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [reasonCode]
+              properties:
+                reasonCode:
+                  type: string
+                  pattern: "^[A-Za-z0-9][A-Za-z0-9._:-]{0,159}$"
+      responses:
+        "200":
+          description: Released reservation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PointReservation"
+components:
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema:
+        type: string
+        pattern: "^[A-Za-z0-9][A-Za-z0-9._:-]{15,127}$"
+    DocumentId:
+      name: documentId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    ReservationId:
+      name: reservationId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+  responses:
+    AuthRequired:
+      description: Authentication is required before body processing
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+    Forbidden:
+      description: The resource is unavailable to this owner
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+  schemas:
+    Locale:
+      type: string
+      enum: [en, zh-Hans, zh-Hant]
+    NoteTypeCode:
+      type: string
+      enum: [communication, handover, progress, ndis, incident_factual]
+    ServiceCode:
+      type: string
+      enum:
+        - note.communication.generate
+        - note.handover.generate
+        - note.progress.generate
+        - note.ndis.generate
+        - note.incident_factual.generate
+        - transcription.device
+        - transcription.cloud
+        - content.explain
+        - note.regenerate.full
+        - note.rewrite.section
+    NoteFieldDefinition:
+      type: object
+      additionalProperties: false
+      required: [code, kind, required, containsParticipantIdentifier]
+      properties:
+        code:
+          type: string
+        kind:
+          type: string
+          enum: [date_time, short_text, long_text, string_list]
+        required:
+          type: boolean
+        containsParticipantIdentifier:
+          const: false
+    NoteTypeDefinition:
+      type: object
+      additionalProperties: false
+      required: [code, schemaVersion, generationServiceCode, fields]
+      properties:
+        code:
+          $ref: "#/components/schemas/NoteTypeCode"
+        schemaVersion:
+          type: string
+        generationServiceCode:
+          $ref: "#/components/schemas/ServiceCode"
+        fields:
+          type: array
+          items:
+            $ref: "#/components/schemas/NoteFieldDefinition"
+    DocumentLifecycleStatus:
+      type: string
+      enum: [IN_PROGRESS, COMPLETED, TOMBSTONED, PURGED]
+    SelfReviewStatus:
+      type: string
+      enum: [REQUIRED, CONFIRMED]
+    SyncStatus:
+      type: string
+      enum:
+        - LOCAL_SAVED
+        - SYNCING
+        - SERVER_ACKNOWLEDGED
+        - PENDING_SYNC
+        - NEEDS_ATTENTION
+    GenerationStatus:
+      type: string
+      enum: [QUEUED, RUNNING, SUCCEEDED, FAILED, CANCELLED]
+    ExportStatus:
+      type: string
+      enum:
+        - REQUESTED
+        - RENDERING
+        - ARTIFACT_READY
+        - DOWNLOADED
+        - SHARED
+        - FAILED
+        - CANCELLED
+        - EXPIRED
+        - PURGED
+    NoteContent:
+      type: object
+      additionalProperties: false
+      required:
+        - englishDraft
+        - reviewVersions
+        - factsSummary
+        - missingFacts
+        - neutralWordingChecks
+        - followUpPrompts
+        - disclaimer
+      properties:
+        englishDraft:
+          type: string
+        reviewVersions:
+          type: object
+          additionalProperties: false
+          properties:
+            zh-Hans:
+              type: string
+            zh-Hant:
+              type: string
+        factsSummary:
+          type: object
+        missingFacts:
+          type: array
+          items: { type: string }
+        neutralWordingChecks:
+          type: array
+          items: { type: string }
+        followUpPrompts:
+          type: array
+          items: { type: string }
+        disclaimer:
+          type: string
+    Document:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - noteType
+        - sourceLocale
+        - lifecycleStatus
+        - currentRevisionNumber
+        - contractVersion
+        - schemaVersion
+        - createdAt
+        - updatedAt
+      properties:
+        id: { type: string, format: uuid }
+        noteType:
+          $ref: "#/components/schemas/NoteTypeCode"
+        sourceLocale:
+          $ref: "#/components/schemas/Locale"
+        lifecycleStatus:
+          $ref: "#/components/schemas/DocumentLifecycleStatus"
+        currentRevisionId: { type: string, format: uuid }
+        currentRevisionNumber: { type: integer, minimum: 0 }
+        contractVersion: { const: 1.0.0-shadow.1 }
+        schemaVersion: { type: string }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    DocumentRevision:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - documentId
+        - revisionNumber
+        - content
+        - contentHash
+        - mutationId
+        - contractVersion
+        - schemaVersion
+        - createdAt
+      properties:
+        id: { type: string, format: uuid }
+        documentId: { type: string, format: uuid }
+        revisionNumber: { type: integer, minimum: 1 }
+        baseRevisionId: { type: string, format: uuid }
+        privacyReviewId: { type: string, format: uuid }
+        content:
+          $ref: "#/components/schemas/NoteContent"
+        contentHash: { type: string, pattern: "^[a-f0-9]{64}$" }
+        mutationId: { type: string }
+        contractVersion: { const: 1.0.0-shadow.1 }
+        schemaVersion: { type: string }
+        createdAt: { type: string, format: date-time }
+    DocumentCheckpoint:
+      type: object
+      additionalProperties: false
+      required: [documentId, currentStep, completedFieldCodes, syncStatus, mutationId, updatedAt]
+      properties:
+        documentId: { type: string, format: uuid }
+        currentStep: { type: string }
+        completedFieldCodes:
+          type: array
+          items: { type: string }
+        activeRevisionId: { type: string, format: uuid }
+        privacyReviewId: { type: string, format: uuid }
+        generationJobId: { type: string, format: uuid }
+        syncStatus:
+          $ref: "#/components/schemas/SyncStatus"
+        mutationId: { type: string }
+        updatedAt: { type: string, format: date-time }
+    PrivacyProofRequest:
+      type: object
+      additionalProperties: false
+      required: [noteType, cleanedFactsHash, schemaVersion, findingDecisions]
+      properties:
+        noteType:
+          $ref: "#/components/schemas/NoteTypeCode"
+        cleanedFactsHash: { type: string, pattern: "^[a-f0-9]{64}$" }
+        schemaVersion: { type: string }
+        findingDecisions:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [findingType, decision]
+            properties:
+              findingType: { type: string }
+              decision:
+                type: string
+                enum: [REMOVED, REPLACED, GENERALISED, RETAINED_CONFIRMED]
+    PrivacyProof:
+      allOf:
+        - $ref: "#/components/schemas/PrivacyProofRequest"
+        - type: object
+          required: [id, status, confirmedAt, expiresAt]
+          properties:
+            id: { type: string, format: uuid }
+            status: { type: string, enum: [CONFIRMED, EXPIRED, REVOKED] }
+            confirmedAt: { type: string, format: date-time }
+            expiresAt: { type: string, format: date-time }
+    PointQuote:
+      type: object
+      additionalProperties: false
+      required: [id, serviceCode, catalogVersion, points, quantity, createdAt, expiresAt]
+      properties:
+        id: { type: string, format: uuid }
+        serviceCode:
+          $ref: "#/components/schemas/ServiceCode"
+        catalogVersion: { const: 2026-08-09.v1-shadow }
+        points: { type: integer, minimum: 0 }
+        quantity: { type: integer, minimum: 1 }
+        createdAt: { type: string, format: date-time }
+        expiresAt: { type: string, format: date-time }
+    PointReservation:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - quoteId
+        - serviceCode
+        - catalogVersion
+        - points
+        - status
+        - reservedAt
+        - expiresAt
+      properties:
+        id: { type: string, format: uuid }
+        quoteId: { type: string, format: uuid }
+        serviceCode:
+          $ref: "#/components/schemas/ServiceCode"
+        catalogVersion: { const: 2026-08-09.v1-shadow }
+        points: { type: integer, minimum: 1 }
+        status:
+          type: string
+          enum: [RESERVED, COMMITTED, RELEASED, EXPIRED]
+        resultRef: { type: string }
+        reasonCode: { type: string }
+        reservedAt: { type: string, format: date-time }
+        expiresAt: { type: string, format: date-time }
+        terminalAt: { type: string, format: date-time }
+    ErrorCode:
+      type: string
+      enum:
+        - AUTH_REQUIRED
+        - SESSION_REVOKED
+        - FORBIDDEN
+        - IDENTITY_LINK_CONFLICT
+        - MINIMUM_FACTS_REQUIRED
+        - PRIVACY_REVIEW_REQUIRED
+        - PRIVACY_REVIEW_STALE
+        - POINTS_INSUFFICIENT
+        - POINT_QUOTE_EXPIRED
+        - PURCHASE_PENDING
+        - STALE_REVISION
+        - RATE_LIMITED
+        - GENERATION_FAILED
+        - TRANSCRIPTION_FAILED
+        - EXPORT_FAILED
+        - EXPORT_EXPIRED
+        - CONTENT_WITHDRAWN
+        - OFFLINE_NOT_SUPPORTED
+        - MIN_CLIENT_VERSION
+        - IDEMPOTENCY_CONFLICT
+        - INVALID_STATE_TRANSITION
+    ErrorEnvelope:
+      type: object
+      additionalProperties: false
+      required: [error]
+      properties:
+        error:
+          type: object
+          additionalProperties: false
+          required: [code, message]
+          properties:
+            code:
+              $ref: "#/components/schemas/ErrorCode"
+            message: { type: string }
+            correlationId: { type: string }
+            fieldCodes:
+              type: array
+              items: { type: string }

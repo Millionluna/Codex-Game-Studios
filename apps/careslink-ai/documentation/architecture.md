@@ -1,114 +1,168 @@
 # CaresLink AI Architecture
 
-## Product boundary
+> Status: **Current-state architecture**, audited 2026-08-09.
+> Delivery phase: **Implementation Readiness / local Preview shadow slice**.
+> This file does not claim that Product Baseline V1.0 is available at runtime.
 
-CaresLink AI provides guided business-document drafting. The provider-authenticated NDIS Case Note Companion turns de-identified, user-entered support facts into an English draft and a Simplified Chinese review version. The public Core landing remains separate. Every output remains a user-reviewed draft. The product does not make clinical, legal, compliance, regulatory, care, risk, qualification, quality, or service-endorsement decisions.
+## Intended-state baseline
 
-## Stack
+The approved product intent is defined by the planning-workspace files:
 
-| Layer | Current implementation |
-| --- | --- |
-| Web | Next.js App Router, React, TypeScript, Tailwind CSS |
-| Authentication | Supabase Auth email/password and Google PKCE session cookies via `@supabase/ssr` |
-| Persistence | Supabase Postgres accessed from server code with the service-role key |
-| AI | OpenAI Responses API with strict JSON Schema and `store: false` |
-| Hosting | Vercel; production and preview use environment-scoped variables |
-| Tests | Vitest, TypeScript, ESLint, Next production build, guarded browser smoke |
+- `docs/2026-08-09-careslink-v1-product-baseline-approval.zh.md`
+- `docs/2026-08-09-careslink-app-v1-requirements-review.zh.md`
+- `docs/2026-08-09-careslink-ai-requirements-review.zh.md`
 
-## Runtime map
+The requirement-by-requirement implementation assessment is in
+`documentation/v1-implementation-readiness-audit.zh.md`.
 
-1. An unauthenticated GET is redirected to login with an allowlisted internal return URL; an admin is redirected to the admin workspace.
-2. The authenticated provider page keeps pasted source text and matched ranges in React memory only.
-3. Browser Privacy Review detects obvious identifiers and unsafe wording, proposes cleaned structured facts, and requires each finding to be resolved.
-4. The browser constructs a generation body only after minimum facts and two unchecked-by-default confirmations are complete.
-5. `POST /api/template-companion/ndis-case-note` verifies a provider session before body parsing, quota, claim, telemetry, or OpenAI, then repeats privacy attestation and input validation.
-6. A server-only RPC lazily creates the monthly free entitlement and grant, then atomically reserves 1 credit against the request idempotency key. Same-key concurrent/replayed requests cannot reserve twice.
-7. OpenAI returns a strict bilingual object. Server parsing rejects malformed, identifying or prohibited output as a whole. Numeric parity canonicalizes month-name and marker-based dates plus numeric dates only when explicit date semantics surround them; non-date slash/code values remain exact. Chinese time periods use explicit ranges: morning 1-11, afternoon 12/1-6, noon only 12, pre-dawn 12/1-5, evening 6-11, and evening 12 maps to 00. Any other period-hour pair becomes a non-equivalent sentinel.
-8. A successful result is stored in a claim already bound to the current provider under a deterministic pepper-derived token hash. It can be recovered or saved for 30 minutes; expired rows are unusable and are deleted by a later generation/save cleanup rather than an exact scheduled deletion. The credit commits only after the claim is available; failed work releases the credit.
-9. The provider may explicitly save the claim to `generated_material_drafts`, later read it or permanently delete it. Saved-document operations always include the current account ID. Admin surfaces expose metadata or aggregates, not case-note content.
+## Current runtime
 
-Login and registration present Google only when the server-side release gate is
-explicitly enabled and the Supabase Auth settings endpoint confirms that the Google provider is active. Any settings failure hides Google and leaves email/password available. The server
-action requests a Supabase PKCE authorization URL, and `/auth/callback` exchanges
-the code before applying the same internal-route allowlist used by password auth.
-Only `app_metadata` may grant an existing account the admin role; a new Google
-account and any role-like `user_metadata` remain provider-scoped.
+```mermaid
+flowchart LR
+  Browser["Web browser"] --> Next["Next.js 16 App Router on Vercel"]
+  Next --> Auth["Supabase Auth"]
+  Next --> DB["Supabase Postgres / RPC"]
+  Next --> OpenAI["OpenAI Responses API"]
+  Browser --> VA["Sanitized Vercel Analytics"]
+  Core["Public CaresLink static site"] -->|"allowlisted metadata handoff"| Next
+```
 
-Authenticated provider and admin shells expose a server-side Sign out action.
-The action clears the Supabase session and preserves only an allowlisted internal
-return route; an external return target is reduced to the provider default. The
-Companion header exposes the same action on desktop and mobile. If the auth
-client is unavailable or remote sign-out fails, the action clears matching local
-Supabase auth cookies and returns an error rather than claiming success.
+- Repository application: `apps/careslink-ai`
+- Production host: `https://ai.careslink.com.au`
+- Audited production code: `f0d994dfc66d7373bbadbe106b3147d847c6c8d3`
+- Production Supabase project: `adocsnwnslxhxcjgbyee`
+- Current clients: responsive Web only. There is no iOS or Android application in the audited repository.
+- Current runtime API surface: Next.js route handlers under `src/app/api`; there is no served shared `/v1` Product API. A contract-only, non-served OpenAPI shadow specification now exists under `contracts/`.
+
+## Current product domains
+
+### Auth and roles
+
+Supabase Auth provides email/password and feature-gated Google OAuth. The Web callback exchanges the PKCE code for a cookie-backed session. Application roles are read from trusted `app_metadata`; user-editable metadata is not accepted as an admin grant.
+
+Current roles are `provider` and `admin`. Demo identities can exist only through the non-production demo flag. There is no Microsoft/Apple identity, identity-linking workflow, device/session registry, native SecureStore contract, or high-risk reauthentication service.
+
+### AI Documents
+
+The only production AI Note workflow is NDIS Case Note Companion:
+
+1. Provider session is checked before request body parsing or cost-bearing work.
+2. Browser performs a first privacy review; pasted source text stays in React state.
+3. Server independently validates minimum facts, confirmations and obvious identifiers.
+4. Server reserves one legacy credit and consumes account/IP abuse quota.
+5. Server calls the OpenAI Responses API with strict structured output and `store:false`.
+6. A short-lived opaque claim is persisted before the credit is committed.
+7. The provider can save the result to `generated_material_drafts` and later read/delete it as owner.
+
+This is a synchronous request flow. It is not a canonical document/revision model and has no durable generation job, editor checkpoint, self-review, DOCX/PDF/TXT export or cross-device outbox.
+
+### Legacy provider and referral workspace
+
+Profile, Readiness, referral materials, outreach and access-code capabilities remain in the same Web application. They are legacy Web domains and are not CaresLink App V1 entitlements. Their material types and access-code quota must remain isolated from the future personal Points wallet.
+
+## Current data stores
+
+| Store | Purpose | Current boundary |
+|---|---|---|
+| Supabase Auth | identities and sessions | trusted UUID and `app_metadata.role` |
+| `generated_material_drafts` | flat saved AI/legacy material JSON | owner SELECT/DELETE; server save |
+| `ndis_case_note_companion_claims` | opaque, short-lived generated-result handoff | service-role only; claim owner binding |
+| `account_entitlements` | legacy free monthly allowance | owner SELECT; plan is currently `free` |
+| `credit_ledger` | legacy grant/reserve/commit/release | append-only RPC writes; owner SELECT |
+| `template_companion_quota_usage` | account/IP abuse counters | service-role only |
+| `template_companion_events` | companion metadata telemetry | service-role only; no note body |
+| provider/referral tables | legacy profile, access and outreach | server-owned paths with domain-specific checks |
+
+All audited public tables have RLS enabled. RLS enabled alone is not proof of the V1 permission model: several target tables do not yet exist, and some legacy tables are accessed only through the service role.
+
+## Implemented V1 shadow foundation
+
+The first implementation-readiness batch is present in source but is deliberately inactive:
+
+| Artifact | Implemented evidence | Runtime / deployment status |
+|---|---|---|
+| Versioned shared contract | `src/lib/v1/shared-contracts.ts` defines three locales, five Note codes/neutral fields, orthogonal states, service/rate codes, error codes and idempotency rules | only the audited NDIS save route may import the new integration entrypoint |
+| Canonical document domain | `src/lib/v1/canonical-document-shadow.ts` models owner-bound documents, immutable revisions, stale-base rejection, checkpoints, revision-bound self-review and tombstone/purge transitions | memory-only test/reference implementation |
+| Points domain | `src/lib/v1/points-shadow.ts` models wallets, lots, versioned quotes, source-lot allocation, reserve/commit/release and append-only ledger entries | memory-only test/reference implementation; legacy credits remain authoritative |
+| Legacy NDIS adapter | `src/lib/v1/legacy-ndis-adapter.ts` projects existing saved NDIS material into a deterministic canonical snapshot and metadata-only migration candidate | read-only; no row is migrated or rewritten |
+| Product API contract | `contracts/careslink-v1-shadow.openapi.yaml` | marked `contract-only-shadow`; no server URL and no implemented endpoint |
+| Additive schema/RPC draft | `supabase/migrations/20260809120000_create_v1_shadow_foundation.sql` | applied and live-tested only on a disposable `with_data=false` Supabase branch; not applied to Production |
+| NDIS integration migration | `supabase/migrations/20260809150000_create_ndis_shadow_preview_integration.sql` adds owner-bound links, metadata-only write outbox/read comparisons and four service-role RPCs, including delete tombstoning | applied and App-Preview-tested only on isolated non-default branches; Production is unchanged |
+| Server repository/orchestrator | `ndis-shadow-repository.server.ts` and `ndis-shadow-integration.server.ts` project only after the legacy draft save succeeds | legacy response/content and monthly credits remain authoritative; shadow failure preserves that response and emits content-free evidence |
+| Activation guard | master, dual-write, read and exact branch-ref checks in `ndis-shadow-guard.ts` | requires `VERCEL_ENV=preview`; known Production ref and every `VERCEL_ENV=production` execution fail closed |
+
+The foundation migration creates only new shadow resources. The integration migration adds one composite uniqueness constraint to `generated_material_drafts(id, user_id)` so the source-owner foreign key is enforceable; it performs no legacy DML, backfill, entitlement change or content rewrite. Neither migration reads or changes `account_entitlements` or `credit_ledger`, issues a welcome grant, or changes production entitlement behavior. Every shadow business row is database-constrained to `shadow_only=true`. Authenticated grants are owner-only `SELECT` on the canonical owner resources; integration link/outbox/comparison tables expose no authenticated table grant. Shadow RPC execution is reserved to `service_role`. Cross-resource foreign keys bind owner and document identities to prevent same-ID/cross-owner composition errors.
+
+Guarded-live evidence was collected on isolated branch ref `jtkicyqwdabhjzhdutve`, whose parent is the Production project but whose branch identity reported `with_data=false`. Two fresh applies succeeded. Legacy table row counts and column/constraint/policy/grant signatures matched before and after. Real password-grant JWTs proved provider A/B owner isolation, while a test-only platform service actor received no product-admin access. Positive Points mutations ran only as the database `service_role` through the five RPCs. After verification, all users/sessions/rows were cleared and the dedicated branch was deleted. This evidence validates the migration contract, not a served application flow.
+
+The approved local integration slice hooks only the existing NDIS Save route and its owner Delete route. A successful `generated_material_drafts` write is projected through a service-role RPC into one canonical document. Mutation identity includes legacy source status, update time and creation generation; replay is accepted only while its revision is still current; same-content metadata updates remain revision-free; and changed content, including A→B→A, creates an immutable revision. The RPC takes a source-level advisory lock before row-locking and validating the current source, preventing an older request from overwriting a newer projection. NDIS canonical documents retain an owner-bound legacy-source generation identity, and owner RLS permits reading their document/revision/checkpoint only while that exact source generation exists. The Delete store atomically returns the deleted generation; the route keeps the legacy response authoritative and invokes a guarded, fail-safe service RPC that tombstones exactly that now owner-inaccessible canonical record. Replaying cleanup is write-free, and reusing the same legacy ID with a new `created_at` creates a separate canonical generation. Physical purge remains a later approved lifecycle action. Outbox and comparison rows contain IDs, timestamps, status, correlation ID and hashes only. There is no retry worker: the read-only reconciliation RPC derives missing/stale/failed work from the legacy source of truth and reports non-terminal legacy canonical rows with a missing source as `SOURCE_DELETE_CLEANUP_PENDING` for operator action.
+
+The integration migration received a second guarded database run on disposable branch `qkciaecjwidtbujzwzln` (`with_data=false`, non-default, parent `adocsnwnslxhxcjgbyee`). Both migrations applied, the branch was reset to parent migration `20260804115230`, and both applied again. Transaction assertions passed twice. Live service-role calls proved one `PROJECTED` plus one `REPLAYED` result under same-idempotency concurrency, serialized distinct-content revisions 2 and 3, metadata-only `FAILED` reconciliation, and `MATCH`/`MISMATCH`/`MISSING` comparison states. Legacy credit and every Point table remained empty. Anonymous REST reads and RPCs were denied.
+
+The later protected App Preview gate completed on non-default `with_data=false` branch `odrdlsrdlmtjczhmsbnj`. A parser-valid synthetic provider save preserved the legacy response while returning `PROJECTED`; metadata-only shadow-read returned `MATCH`; same-idempotency replay created no additional revision; provider B remained isolated; and a replacement Preview with the master flag disabled preserved legacy Save while creating no shadow work. No model call was made. An earlier parser-invalid fixture also exposed a projection-boundary observability gap; the integration now records the content-free code `PROJECTION_ERROR` without logging note content or changing the legacy response.
+
+After the gate, every synthetic Auth/data object was verified at zero, all five test Preview deployments and six activation/test variables were removed, and Production alias/configuration remained unchanged. The owner deliberately retained `odrdlsrdlmtjczhmsbnj` as an inactive schema-only Preview baseline. Final pre-commit review subsequently hardened replay/CAS, correlation reuse, delete visibility and idempotency, source-generation reuse, pre-identity row repair, PURGED terminal-state preservation and missed delete-cleanup reconciliation. Forward migrations `20260810072017_harden_ndis_shadow_projection_and_tombstone.sql`, `20260810072952_fail_close_legacy_ndis_shadow_identity.sql`, `20260810073519_preserve_purged_ndis_shadow_terminal_state.sql`, `20260810073929_reconcile_pending_ndis_delete_cleanup.sql` and `20260810080048_harden_ndis_shadow_tombstone_generations.sql` were then applied only to that retained branch. A real synthetic pre-corrective row was backfilled, an unidentifiable orphan was tombstoned and hidden, a simulated historical PURGED row remained terminal, a simulated missed tombstone appeared as metadata-only `SOURCE_DELETE_CLEANUP_PENDING` while remaining owner-hidden, and a same-ID/new-`created_at` generation remained independent from its immutable predecessor. Cleanup returned all counts to zero, and both credential-free SQL assertion suites passed inside rollback transactions. The branch again matched the committed migration registry with zero Auth, legacy, canonical and Point rows. Its base Preview URL and two existing branch keys remain configured, but the shadow activation flags are absent, so the application guard is off. The earlier protected App Preview predates this final hardening and is not evidence for the revised route bundle.
+
+The forward registry is evidence for the empty, flags-off branch path only. It is not an online-atomic upgrade contract for a database that already contains shadow rows: `20260810072017` and `20260810072952` commit separately, and the latter cannot prove restoration of a historical PURGED row's prior `updated_at` without a snapshot. Production promotion therefore requires zero-target-row preflight, flags off, snapshot, maintenance isolation and post-apply reconciliation, or a separately reviewed transactional/squashed plan when any target data exists.
 
 ## Trust boundaries
 
-| Crossing | Enforcement |
-| --- | --- |
-| Browser to companion API | Verified provider session first; no raw paste field in request type; minimum-fact closure; two attestations; server revalidation |
-| Server to OpenAI | Server-only API key; bounded output; strict schema; `store: false`; no tool calls |
-| Server to Supabase | Service-role client only for claims, quota, events, and material drafts |
-| Credit authorization | Monthly entitlement plus append-only ledger; service-role-only reserve/commit/release RPCs; idempotency key and per-user advisory lock |
-| Claim to account | Opaque token hash plus `claimed_by_user_id` condition in a service-role-only RPC |
-| Saved draft to account | Server resolves Supabase session and filters/checks `user_id`; delete uses one `id + user_id + feature` statement; authenticated owner `SELECT`/`DELETE` RLS is prepared by migration |
-| Admin reporting | Metadata-only selectors; NDIS case-note drafts are excluded from current material-usage detail |
-| Pilot cohort reporting | Service-role-managed UUID allowlist plus enrollment/removal interval; reports expose aggregates only and never join auth email |
+1. **Browser**: untrusted for authorization, quota, role and final privacy validation. Raw pasted notes are intended to remain in current React memory only.
+2. **Next.js server**: authenticates and authorizes before parsing AI content or invoking quota/model work. It owns safe redirects and output validation.
+3. **Supabase authenticated client**: may use only explicit owner policies. It cannot insert/update/delete the legacy credit ledger.
+4. **Supabase service role**: server-only and high impact. Claims, quota, telemetry and credit RPC operations depend on this boundary.
+5. **OpenAI**: receives only server-validated structured facts. `store:false` is configured; this must not be described as a contractual Zero Data Retention guarantee.
+6. **Admin/support**: current product surfaces expose aggregate or metadata views, not a general note-body viewer.
+7. **Core public site**: may send only allowlisted campaign/source metadata. It must not send email, user identity, form values, note text, token or private return URL.
 
-The migration revokes broad `anon`/`authenticated` access and grants
-`authenticated` only owner-scoped `SELECT`/`DELETE` on saved drafts. It does not
-grant end-user `INSERT`/`UPDATE`. Current server code still holds the service
-role and bypasses RLS, so explicit owner predicates are a load-bearing control
-and remain covered by tests. The migration must be applied separately to each
-target Supabase project.
+## Current deployment and operations
 
-## Stored data
+- Vercel production is a Next.js server deployment; the AI subdomain is globally `noindex` so the Core public site remains the SEO canonical surface.
+- Production Supabase migrations currently end at `20260804223000_create_ndis_case_note_pilot_cohort.sql`. Both V1 shadow migrations remain unapplied to Production; their database applications were limited to isolated guarded-live branches. The latest branch is intentionally retained as a clean, inactive Preview baseline.
+- Pre-batch runtime baseline was 79 test files / 546 tests. The current local shadow slice raises repository coverage to 90 files / 653 tests and wires only the audited NDIS save/delete routes behind a Preview-only fail-closed guard; TypeScript, ESLint and Next production build results are recorded in `documentation/tests.md`.
+- Read-only production logs showed a recent cluster of invalid/missing refresh-token errors. Session recovery and stale-cookie cleanup require a separate release fix and negative tests before V1 rollout.
 
-| Store | Content |
-| --- | --- |
-| `ndis_case_note_companion_claims` | Generated material only, token hash, expiry, provider owner for this entry point |
-| `template_companion_quota_usage` | Date, quota scope, pseudonymous fingerprint hash, count |
-| `template_companion_events` | Event name, optional user ID, visitor hash, allowlisted attribution/surface, locale, timestamp |
-| `generated_material_drafts` | Provider-owned saved output and status |
-| `account_entitlements` | Provider owner, free plan status, UTC monthly period, limit, and effective timestamps |
-| `credit_ledger` | Append-only feature/action/event/units/reservation/model/token-count metadata; no prompt, input, output, participant fact, or email |
-| `pilot_cohort_members` | Fixed cohort code, owner UUID, controlled rollout stage and effective membership times; service-role only |
+## Intended V1 architecture (not available at runtime)
 
-Raw pasted notes, matched spans, structured input, and generated content are not written to companion telemetry. There is no participant database or upload surface.
+The approved target requires:
 
-The only persisted Core acquisition pairs are
-`core_product_landing/product_landing` and
-`core_download_success/post_download`. Client product events include view,
-start, copy and zero-credit offer metadata; generation, exhaustion and save are
-server-created. The zero-credit offer uses the signed-in account, accepts no
-free text or new contact details, does not charge, and does not alter credits.
+- one versioned Product API for Web/iOS/Android;
+- a five-type Note catalog with per-type schema, privacy and safety versions;
+- canonical documents, revisions, checkpoints, save acknowledgements, conflict handling and tombstones;
+- asynchronous generation/transcription/export jobs;
+- one Points wallet with lots, versioned rate catalog, quote/reserve/commit/release and unified entitlements;
+- canonical Content API, Library state, Guides, Updates, Daily Brief, actions and notifications;
+- provider-neutral Stripe/Apple/Google billing and receipt reconciliation;
+- explicit `en`, `zh-Hans`, `zh-Hant` locale contracts;
+- native encrypted storage/outbox and secure device session controls.
 
-The public `/privacy` route provides English and Simplified Chinese collection
-and retention notice copy. Login, registration, Companion, Saved Documents,
-the application shell and the public footer link to it.
+The contract/domain/schema portion and a feature-flagged NDIS dual-write/shadow-read application path now exist locally. Production schema/application activation remains absent. Isolated database and protected App Preview evidence for this second migration is tracked separately in `documentation/tests.md`.
 
-Saved drafts remain until the owning provider deletes them; no automatic 30- or
-90-day purge is claimed in this release. CaresLink AI is not the organisation's
-formal record-retention system.
+## Known risks
 
-## Known risks and assumptions
+- Legacy monthly credits conflict with approved one-time welcome Points and paid plan truth.
+- Flat saved material JSON cannot meet revision, recovery or revision-bound export promises.
+- `zh-Hant` is absent and must not silently fall back to `zh-Hans`.
+- Service-role stores are secure only while every server route preserves auth/owner checks; V1 should narrow writes through domain RPCs.
+- Existing real rows require snapshot, mapping and reconciliation; no in-place rewrite or destructive rollback is acceptable.
+- The production refresh-token error cluster can create confusing recovery failures.
+- Content currently lives as Core static repository content, not a versioned canonical Content API.
+- The protected App Preview gate proved the guarded save projection, replay, comparison, owner isolation, failure observability and kill switch. It does not authorize Production schema, enablement or a user canary; those remain separate approval gates.
+- Shadow retry is operator-driven reconciliation only; there is no queue worker, lease or scheduled retry.
+- Supabase's fresh-branch performance advisor reported informational unindexed-foreign-key findings across the shadow schema. The Preview hot paths already have owner/source/update, status/update, owner/created and document/revision indexes; no mechanical bulk index addition was made. FK-cascade and larger-cohort plans must be reviewed before any Production migration, and unused-index findings on a fresh branch are not usage evidence.
 
-- Privacy detection is heuristic and cannot guarantee complete de-identification. Manual review remains mandatory.
-- Date-aware bilingual parity supports audited English month names, Chinese date markers, context-qualified numeric dates and 12/24-hour times. Numeric slash/code strings without date semantics remain exact. New formats require adversarial tests before support is claimed.
-- Account and pepper-derived IP quota identities are abuse controls. Shared networks may share an IP limit.
-- Credits and abuse quota are intentionally separate: failures release credits, while an attempt that reached OpenAI can still consume the daily abuse quota.
-- The short-lived claim token remains a bearer capability inside the authenticated page. Immediate owner binding, `referrer: no-referrer`, 30-minute usability expiry, and hashed storage reduce forwarding risk. Expired rows can remain until the next generation/save cleanup run, but cannot be claimed or saved.
-- Owner isolation for service-role draft access depends on server handlers continuing to apply `user_id` checks; owner RLS applies only to session-bound authenticated queries after its migration is applied.
-- Non-production may use an in-memory fallback. Production fails closed without persistent companion storage unless `CARESLINK_ALLOW_COMPANION_MEMORY_STORE=true` is deliberately set.
-- There is no scheduled work and no automated email in this release, so there are no `cron.md` or `emails.md` documents.
+## Email and scheduled work
 
-## Related documents
+There is no app-owned email delivery service, push service, queue worker, cron configuration or scheduled job in the audited AI application. Supabase Auth may send provider-managed authentication emails, but that is not an application email workflow. Therefore this audit does not create `emails.md` or `cron.md`.
 
-- [flows.md](./flows.md)
-- [permissions.md](./permissions.md)
-- [variables.md](./variables.md)
-- [tests.md](./tests.md)
-- [automation.md](./automation.md)
-- [seo.md](./seo.md)
-- [prd.md](./prd.md)
-- [pilot-funnel-runbook.md](./pilot-funnel-runbook.md)
-- [pilot-funnel.sql](./pilot-funnel.sql)
+## Related Documents
+
+- `documentation/flows.md` - permission-sensitive runtime and shadow flows.
+- `documentation/permissions.md` - current and unapplied shadow access matrix.
+- `documentation/variables.md` - configuration and secret boundaries.
+- `documentation/ndis-shadow-preview-runbook.md` - disposable branch/Preview verification and cleanup sequence.
+- `documentation/tests.md` - existing, proposed and missing verification.
+- `documentation/automation.md` - LLM/RPC automation and activation gates.
+- `documentation/seo.md` - public Companion indexing boundary.
+- `documentation/v1-implementation-readiness-audit.zh.md` - requirement map, implementation delta and approval gates.
+- `documentation/prd.md` - historical NDIS pilot decision with V1 baseline precedence.

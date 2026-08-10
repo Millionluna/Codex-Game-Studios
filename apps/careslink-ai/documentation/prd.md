@@ -1,5 +1,12 @@
 # NDIS Case Note AI Companion Product Decision
 
+> **Historical pilot decision.** Product Baseline V1.0 was approved on
+> 9 August 2026. Where this document refers to monthly credits, one NDIS Note,
+> two locales, old pricing or pilot entitlements, it is no longer the product
+> source of truth. See `documentation/v1-implementation-readiness-audit.zh.md`
+> and the three approved baseline files listed there. Existing production
+> behavior remains unchanged until a separately approved migration is shipped.
+
 **Decision date:** 4 August 2026
 **Status:** Release-candidate requirement
 **Supersedes:** guest-first generation followed by optional login to save

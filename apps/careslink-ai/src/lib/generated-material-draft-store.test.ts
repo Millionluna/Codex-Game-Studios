@@ -274,14 +274,14 @@ describe("generated material draft store", () => {
         userId: "22222222-2222-4222-8222-222222222222",
         feature: "share_card",
       }),
-    ).resolves.toBe(false);
+    ).resolves.toBeUndefined();
     await expect(
       store.deleteGeneratedMaterialDraftByUser({
         draftId: materialDraftRecord.id,
         userId: materialDraftRecord.userId,
         feature: "ndis_case_note",
       }),
-    ).resolves.toBe(false);
+    ).resolves.toBeUndefined();
     await expect(
       store.getGeneratedMaterialDraft(materialDraftRecord.id),
     ).resolves.toEqual(materialDraftRecord);
@@ -292,7 +292,15 @@ describe("generated material draft store", () => {
         userId: materialDraftRecord.userId,
         feature: "share_card",
       }),
-    ).resolves.toBe(true);
+    ).resolves.toEqual({
+      id: materialDraftRecord.id,
+      userId: materialDraftRecord.userId,
+      providerDraftId: materialDraftRecord.providerDraftId,
+      feature: materialDraftRecord.feature,
+      status: materialDraftRecord.status,
+      createdAt: materialDraftRecord.createdAt,
+      updatedAt: materialDraftRecord.updatedAt,
+    });
     await expect(
       store.getGeneratedMaterialDraft(materialDraftRecord.id),
     ).resolves.toBeUndefined();
@@ -491,7 +499,15 @@ describe("generated material draft store", () => {
         userId: materialDraftRecord.userId,
         feature: "share_card",
       }),
-    ).resolves.toBe(true);
+    ).resolves.toEqual({
+      id: materialDraftRecord.id,
+      userId: materialDraftRecord.userId,
+      providerDraftId: materialDraftRecord.providerDraftId,
+      feature: materialDraftRecord.feature,
+      status: materialDraftRecord.status,
+      createdAt: materialDraftRecord.createdAt,
+      updatedAt: materialDraftRecord.updatedAt,
+    });
 
     expect(calls.slice(0, 5)).toEqual([
       ["from", "generated_material_drafts"],
