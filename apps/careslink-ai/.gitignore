@@ -41,3 +41,11 @@ yarn-error.log*
 next-env.d.ts
 
 .vercel
+
+# Generated Preview E2E runtime evidence. The canonical, credential-free
+# policy lives under scripts/preview-e2e; live harnesses stay in private temp.
+/preview-http-e2e-ledger.json
+/vercel-preview-manifest.json
+/vercel-preview-recovery-manifest.json
+/vercel-preview-staging/
+/requests/

@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:preview:e2e:policy": "vitest run scripts/preview-e2e"
   },
   "dependencies": {
     "@supabase/ssr": "0.12.0",

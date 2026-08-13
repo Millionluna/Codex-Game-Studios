@@ -32,6 +32,55 @@ Run against the current uncommitted implementation-readiness worktree. The repos
 
 The source tests prove source/domain contracts. Separate guarded-live runs prove migration/database authorization and the protected NDIS save integration on an isolated Preview. They do not prove a served Product API or any Production V1 activation.
 
+### Mobile V1 protected Product API Preview E2E — 2026-08-14
+
+A protected, non-Production Preview exercised the default-off Product API against
+the reviewed source snapshot with two synthetic password users. No Production
+deployment, alias, database, migration or user data changed.
+
+| Gate | Result |
+|---|---|
+| Protection and Auth | exact protection/bypass contract passed; both users passed create, authoritative pre-sign-in database proof, password sign-in and session-row proof |
+| Five Note types | 5 privacy confirmations and replays, 5 document creates and replays, and 15 unique synthetic mutation identifiers exercised and tracked |
+| Owner isolation | owner B received an empty list, exact initial pull cursor `sync.v1:0`, no owner-A get visibility and fixed cross-owner write denies |
+| Revision and recovery | patch/replay, idempotency conflict, stale base, checkpoint/replay, aggregate recovery, pull/upsert, tombstone/replay and privacy-outbox exclusion passed |
+| Shutdown | the guarded write window closed, all four temporary RPC grants were revoked, both sessions were revoked, and the prior JWT was rejected |
+| Cost and scope | zero model calls, zero Points/Billing activity and zero Production changes |
+
+Permanent, credential-free regression and application checks on the same
+worktree passed after the cleanup policy and evidence were saved:
+
+| Command | Result |
+|---|---|
+| `pnpm test:preview:e2e:policy` | 1 file, 13 tests passed |
+| `pnpm test` | 104 files, 892 tests passed |
+| `pnpm exec tsc --noEmit --incremental false` | passed |
+| `pnpm lint` | passed |
+| `pnpm build` | passed; Next static generation completed 59/59 |
+
+The `5 / 5 / 15` counts are coverage evidence. The 15 identifiers include
+successful, replay and expected conflict/deny paths; they do not mean 15 database
+commits. Generated cleanup identifiers were held in memory or the temporary
+recovery ledger. Synthetic request content passed through the disposable Preview
+and was removed with the test rows; neither identifiers nor payloads are recorded
+here.
+
+The business matrix completed, but the original process then failed closed with
+`E2E_CLEANUP_DEPLOYMENT_INCOMPLETE`. Post-incident review found two overly short
+deployment-observation deadlines and an adjacent subsecond horizon edge case. After
+the request-only retry and horizon policies were independently reviewed and locked,
+one recovery-only action returned `cleanupComplete: true`. Three joint
+deployment-absence samples, three Auth-absence samples and the final global-zero
+audit passed. The ledger, primary manifest, recovery manifest, requests and staging
+artifacts were all absent at the end. This split outcome must not be reported as a
+single `ACTION=run` exit-zero.
+
+This is Preview route evidence, not Production approval. It does not prove native
+Auth, Points/Billing, model generation, cross-device/offline behavior or real-user
+workflows. The repeatable cleanup policy is documented in
+`documentation/mobile-v1-preview-e2e-runbook.md` and locked by credential-free
+tests under `scripts/preview-e2e/`.
+
 ### Post-review hardening boundary
 
 A final pre-commit review found four gaps that the earlier Preview matrix did not

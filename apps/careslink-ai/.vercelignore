@@ -1,0 +1,9 @@
+# Offline Preview E2E policy and generated runtime evidence are never deploy inputs.
+scripts/preview-e2e/
+preview-http-e2e-ledger.json
+vercel-preview-manifest.json
+vercel-preview-recovery-manifest.json
+vercel-preview-staging/
+requests/
+
+documentation/mobile-v1-preview-e2e-runbook.md
