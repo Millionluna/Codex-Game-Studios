@@ -1,6 +1,6 @@
 -- Credential-free transaction test for the isolated NDIS shadow migration.
 -- Run only after 20260809120000, 20260809150000 and forward migrations
--- through 20260810080048 are applied.
+-- through 20260811134719 are applied.
 
 begin;
 
@@ -9,6 +9,8 @@ select set_config('request.jwt.claim.role', 'service_role', true);
 do $$
 declare
   v_count integer;
+  v_expected_columns smallint[];
+  v_revision_trigger text;
 begin
   select count(distinct routine_name) into v_count
   from information_schema.routine_privileges
@@ -61,18 +63,64 @@ begin
     raise exception 'Fail-closed legacy source constraint is missing';
   end if;
 
+  select array_agg(attribute.attnum order by expected.ordinality)
+    into v_expected_columns
+  from unnest(array[
+    'legacy_source_owner_user_id',
+    'legacy_source_draft_id',
+    'created_at'
+  ]) with ordinality as expected(column_name, ordinality)
+  join pg_attribute as attribute
+    on attribute.attrelid = 'public.ai_documents'::regclass
+   and attribute.attname = expected.column_name
+   and attribute.attnum > 0
+   and not attribute.attisdropped;
+
   if exists (
     select 1
     from pg_constraint
     where conrelid = 'public.ai_documents'::regclass
       and conname = 'ai_documents_legacy_source_key'
-  ) or not exists (
-    select 1
-    from pg_constraint
-    where conrelid = 'public.ai_documents'::regclass
-      and conname = 'ai_documents_legacy_source_generation_key'
-      and pg_get_constraintdef(oid) like '%legacy_source_owner_user_id, legacy_source_draft_id, created_at%'
-  ) then
+  )
+    or coalesce(array_length(v_expected_columns, 1), 0) <> 3
+    or (
+      select count(*)
+      from pg_constraint as constraint_record
+      join pg_index as backing_index
+        on backing_index.indexrelid = constraint_record.conindid
+       and backing_index.indrelid = constraint_record.conrelid
+      where constraint_record.conrelid = 'public.ai_documents'::regclass
+        and constraint_record.conname = 'ai_documents_legacy_source_generation_key'
+        and constraint_record.contype = 'u'
+        and constraint_record.conkey = v_expected_columns
+        and constraint_record.convalidated
+        and coalesce(
+          (to_jsonb(constraint_record)->>'conenforced')::boolean,
+          true
+        )
+        and not constraint_record.condeferrable
+        and not constraint_record.condeferred
+        and coalesce(
+          (to_jsonb(constraint_record)->>'conparentid')::oid,
+          0
+        ) = 0
+        and backing_index.indisunique
+        and backing_index.indisvalid
+        and backing_index.indisready
+        and backing_index.indimmediate
+        and not coalesce(
+          (to_jsonb(backing_index)->>'indnullsnotdistinct')::boolean,
+          false
+        )
+        and coalesce(
+          (to_jsonb(backing_index)->>'indnkeyatts')::integer,
+          backing_index.indnatts
+        ) = 3
+        and backing_index.indnatts = 3
+        and backing_index.indexprs is null
+        and backing_index.indpred is null
+    ) <> 1
+  then
     raise exception 'Legacy source generation uniqueness contract is invalid';
   end if;
 
@@ -85,6 +133,21 @@ begin
       and data_type = 'uuid'
   ) then
     raise exception 'Tombstone correlation audit column is missing';
+  end if;
+
+  select lower(pg_get_functiondef(
+    'public.enforce_v1_shadow_revision_privacy_review()'::regprocedure
+  )) into v_revision_trigger;
+  if strpos(
+       v_revision_trigger,
+       'v_document.schema_version <> ''2026-08-09.v1-shadow'''
+     ) = 0
+    or strpos(v_revision_trigger, 'return new;') = 0
+    or strpos(v_revision_trigger, 'perform public.assert_v1_shadow_note_facts(') = 0
+    or strpos(v_revision_trigger, 'return new;')
+      > strpos(v_revision_trigger, 'perform public.assert_v1_shadow_note_facts(')
+  then
+    raise exception 'Legacy NDIS revision bypass moved behind Note validator';
   end if;
 end
 $$;
@@ -892,12 +955,16 @@ set local role authenticated;
 
 do $$
 begin
-  if exists (
-    select 1 from public.ai_documents
-    where id = '7c000000-0000-4000-8000-000000000020'
-  ) then
-    raise exception 'pending delete cleanup row remained owner-readable';
-  end if;
+  begin
+    perform 1
+    from public.ai_documents
+    where id = '7c000000-0000-4000-8000-000000000020';
+    raise exception 'Pending delete cleanup direct authenticated read unexpectedly succeeded';
+  exception
+    -- 42501 is insufficient_privilege: Mobile hardening removes the direct
+    -- authenticated table grant instead of relying on an empty RLS result.
+    when sqlstate '42501' then null;
+  end;
 end;
 $$;
 
@@ -933,32 +1000,26 @@ set local role authenticated;
 
 do $$
 begin
-  if exists (
-    select 1
-    from public.ai_documents
-    where legacy_source_draft_id = 'ndis-case-note-shadow-sql-a'
-      and created_at = '2026-08-09T01:00:00Z'
-  ) or (select count(*)
-        from public.ai_documents
-        where legacy_source_draft_id = 'ndis-case-note-shadow-sql-a'
-          and created_at = '2026-08-09T03:00:00Z') <> 1
-     or (select count(*)
-         from public.ai_document_revisions
-         where owner_user_id = '71000000-0000-4000-8000-000000000001') <> 1
-     or (select count(*)
-         from public.document_checkpoints
-         where owner_user_id = '71000000-0000-4000-8000-000000000001') <> 1 then
-    raise exception 'legacy source generation RLS isolation failed';
-  end if;
+  begin
+    perform 1 from public.ai_documents;
+    raise exception 'ai_documents direct authenticated read unexpectedly succeeded';
+  exception
+    when sqlstate '42501' then null;
+  end;
 
-  if not exists (
-    select 1
-    from public.ai_documents
-    where id = '74000000-0000-4000-8000-000000000018'
-      and owner_user_id = '71000000-0000-4000-8000-000000000001'
-  ) then
-    raise exception 'source-bound RLS hid an unrelated owner document';
-  end if;
+  begin
+    perform 1 from public.ai_document_revisions;
+    raise exception 'ai_document_revisions direct authenticated read unexpectedly succeeded';
+  exception
+    when sqlstate '42501' then null;
+  end;
+
+  begin
+    perform 1 from public.document_checkpoints;
+    raise exception 'document_checkpoints direct authenticated read unexpectedly succeeded';
+  exception
+    when sqlstate '42501' then null;
+  end;
 end;
 $$;
 
