@@ -1,6 +1,6 @@
 # CaresLink AI Test Evidence
 
-> Evidence date: 2026-08-10. This document separates **Existing**, **Proposed**, and **Gaps**. Passing current tests does not mean Product Baseline V1.0 is implemented.
+> Evidence date: 2026-08-14. This document separates **Existing**, **Proposed**, and **Gaps**. Passing current tests does not mean Product Baseline V1.0 is implemented.
 
 ## Existing
 
@@ -32,6 +32,19 @@ Run against the current uncommitted implementation-readiness worktree. The repos
 
 The source tests prove source/domain contracts. Separate guarded-live runs prove migration/database authorization and the protected NDIS save integration on an isolated Preview. They do not prove a served Product API or any Production V1 activation.
 
+### Shared Product API implementation batches (local only)
+
+The historical 90-file / 653-test result above remains the implementation-readiness baseline. The 2026-08-11 pre-E2E shared implementation snapshot added the versioned transport/OpenAPI contract, default-off `/v1` routes including canonical revision append at `PATCH /v1/documents/{documentId}`, canonical `GET /v1/sync/pull?cursor=` and atomic `POST /v1/privacy-reviews`, a request-scoped Supabase adapter, service-only active-session resolver, deterministic privacy scanner and replay/conflict/owner/cursor/tombstone tests, four native-auth routes that return fixed `501` envelopes with capability `false`, and static migration-contract checks. The former `/v1/documents/{documentId}/revisions` HTTP route is not retained. `POST /v1/sync/push` is reserved as an unserved `NOT_IMPLEMENTED` boundary without a frozen batch body:
+
+| Command | Result |
+|---|---|
+| `pnpm test` | 103 files, 831 tests passed; preserves the 90 / 653 historical baseline |
+| `pnpm exec tsc --noEmit --incremental false` | passed |
+| `pnpm lint` | passed |
+| `pnpm build` | passed; Next static generation completed 59/59, including the Product API routes, atomic privacy confirmation and four fixed native-auth `501` boundaries |
+
+The route adapter is not Preview- or Production-served: its master and durable-adapter flags both default off, and runtime target verification accepts only an explicitly matched non-Production Preview Supabase ref. The default runtime now assembles request-scoped persistence and active-session validation, but missing configuration fails closed before any client is created. Mobile uses `Authorization: Bearer`; cookie authentication is an additional Web transport through the same adapter. Web cookie mutations require same-origin HTTPS plus JSON, Bearer mutations remain independent of browser Origin, and sync pull is `GET /v1/sync/pull?cursor=` with no mutation body. Sync push remains unserved and `NOT_IMPLEMENTED`. Privacy confirmation authenticates before body parsing, scans bounded canonical structured facts with policy `2026-08-11.preview.1`, returns locator-only findings, and persists only hash/proof metadata through a dedicated service-only adapter. Its scanner is deterministic, not a guarantee of complete de-identification. Confirmed proofs use a temporary 30-minute Preview TTL; this is not a Production product decision. Create and append bind that proof to owner/type/canonical `factsSummary` hash/schema/status/expiry in the tested adapters; changing only `englishDraft` is valid and changing `factsSummary` is stale. The dedicated Preview privacy secret does not fall back to the generic service-role key. These are source-level guarantees only: this batch does not establish a live database RPC grant or route E2E. The four native routes physically return structured `501` envelopes, while their capability constants remain `false`; this is a fail-closed boundary, not implementation or service evidence. The four mobile-sync document write-RPC execute grants remain withheld pending disposable-database canonical-hash vectors and server-equivalent Note schema validation. Consequently, these source tests do not prove database RLS, revoked-session integration, write availability, native authentication, cross-device sync or end-to-end behavior.
+
 ### Mobile V1 protected Product API Preview E2E — 2026-08-14
 
 A protected, non-Production Preview exercised the default-off Product API against
@@ -47,13 +60,15 @@ deployment, alias, database, migration or user data changed.
 | Shutdown | the guarded write window closed, all four temporary RPC grants were revoked, both sessions were revoked, and the prior JWT was rejected |
 | Cost and scope | zero model calls, zero Points/Billing activity and zero Production changes |
 
-Permanent, credential-free regression and application checks on the same
-worktree passed after the cleanup policy and evidence were saved:
+Permanent, credential-free regression and application checks on the current
+post-review worktree passed after the cleanup policy and evidence were saved.
+They are later source/static evidence and do not imply that the historical
+Preview ran the exact current SQL revision:
 
 | Command | Result |
 |---|---|
 | `pnpm test:preview:e2e:policy` | 1 file, 13 tests passed |
-| `pnpm test` | 104 files, 892 tests passed |
+| `pnpm test` | 104 files, 894 tests passed |
 | `pnpm exec tsc --noEmit --incremental false` | passed |
 | `pnpm lint` | passed |
 | `pnpm build` | passed; Next static generation completed 59/59 |
@@ -94,10 +109,15 @@ then tombstones the retained canonical record without deleting its audit content
 The readiness audit was also consolidated so historical failed Preview
 attempts are not presented as current state.
 
-These post-review changes have not been applied to the retained Supabase branch or
-any deployment. Repository tests and static SQL assertions must pass locally, then
-both migrations and the transactional SQL assertion files must clean-apply on a new
-or rebuilt `with_data=false` branch before another protected Preview. The earlier
+The then-current NDIS revisions implementing the four changes above were applied
+to the retained non-default branch and their then-current transactional assertions
+passed. The later committed SQL additionally adds exact catalog postconditions,
+private-schema ACL/object-set proofs and fresh eligible-provider session checks;
+those later changes have source/contract-test evidence only and have not been
+applied to that branch or any deployment.
+Repository tests and static SQL assertions must pass locally, then the exact current
+migration set and transactional SQL assertion files must clean-apply on a new or
+rebuilt `with_data=false` branch before another protected Preview. The earlier
 Preview evidence remains evidence for the earlier source only; it is not a release
 approval for this hardened migration revision.
 
@@ -184,19 +204,19 @@ This does not prove a live, data-bearing cross-migration upgrade. The `202608100
 | Locale/UI/visual structure | i18n, page, brand font, shell and Companion component tests | current `en`/`zh-Hans` only; V1 `zh-Hant` remains untested/conflicting |
 | SEO boundary | `src/app/seo-policy.test.ts`, page metadata tests | confirms AI noindex and Core SEO ownership; not an App V1 capability |
 | Legacy regression | provider drafts, guided materials, outreach, referral/profile tests | protects Web legacy scope; does not satisfy five Note/App requirements |
-| V1 contract vocabulary | `src/lib/v1/shared-contracts.test.ts`, `openapi-shadow-contract.test.ts` | three locales, five Note codes, orthogonal states, rates, errors and contract-only API vocabulary; no served API |
+| V1 transport, privacy and route contract | `src/lib/v1/shared-contracts.test.ts`, `openapi-shadow-contract.test.ts`, `transport-contract.test.ts`, `product-api-route.server.test.ts`, `privacy-review-scanner.server.test.ts`, `privacy-review-route.server.test.ts`, `privacy-review-memory.test.ts` | three locales, five Note codes, version/min-client/correlation/error headers, scanner/locator/no-leak/proof-binding behavior and default-off routes; no Production-served API |
 | Canonical document shadow | `src/lib/v1/canonical-document-shadow.test.ts` | owner deny, immutable revision sequence, stale base, full-request idempotency, checkpoint, self-review invalidation and tombstone/purge domain rules |
 | Points shadow | `src/lib/v1/points-shadow.test.ts` | lot ordering/expiry, quote boundaries, reserve/commit/release, replay, insufficient balance and cross-owner deny in memory |
 | Legacy NDIS projection | `src/lib/v1/legacy-ndis-adapter.test.ts` | deterministic read-only projection, no approval upgrade, no invented facts and metadata-only migration candidate |
-| Production-unapplied SQL boundary | `src/lib/v1/v1-shadow-migration-contract.test.ts`, isolated guarded-live evidence | additive/no legacy DML, owner-only SELECT, service-role-only RPCs, append-only ledger and composite owner references |
-| Runtime isolation | `src/lib/v1/runtime-boundary.test.ts` | only the audited NDIS save route may import the server-only integration; components/client code and every other route remain excluded |
+| Production-unapplied SQL boundary | `src/lib/v1/v1-shadow-migration-contract.test.ts`, `mobile-sync-migration-contract.test.ts`, isolated historical guarded-live evidence | additive/no legacy DML, owner isolation and explicit grants are source-checked; the new mobile-sync migration/assertions are unapplied and unexecuted |
+| Runtime isolation | `src/lib/v1/runtime-boundary.test.ts` | audited NDIS routes and the new `/v1` adapter are the only allowed server boundaries; `/v1` remains disabled without explicit adapters |
 
 ### Current live/read-only evidence
 
 - Supabase migrations, tables, RLS flags, policies, grants, function grants and aggregate row counts were checked read-only.
 - Vercel production deployment/SHA and runtime error aggregates were checked read-only.
 - Synthetic users and shadow fixtures existed only on isolated branches and were fully cleared; no Production user/data was read or changed.
-- The protected App Preview gate used zero model calls. Temporary Preview flags/deployments were removed afterward; the clean isolated branch was retained by owner decision, and Production remained unchanged. The post-review database hardening now passes on that retained branch, but the route bundle still postdates the protected deployment and must receive a new protected Preview before promotion.
+- The protected App Preview gate used zero model calls. Temporary Preview flags/deployments were removed afterward; the clean isolated branch was retained by owner decision, and Production remained unchanged. The then-current NDIS post-review hardening passed on that retained branch, but the later exact catalog/private-schema/provider-session hardening and route bundle postdate that evidence and must receive a new same-revision protected Preview before promotion.
 
 ## Proposed
 
@@ -218,7 +238,9 @@ The following suites are required before the corresponding V1 slice can be calle
 ### Five Note types and privacy
 
 - Independent schema/minimum/output/facts/safety golden sets for all five types (`AI-TYPE-001-005`, `APP-NOTE-001-005`).
-- `privacy_review_id` binding tests for owner/type/cleaned hash/schema/expiry/revision and tampering (`AI-PRIV-003/004`).
+- Disposable-database and protected-Preview confirmation of the source-tested
+  `privacy_review_id` owner/type/canonical-hash/schema/status/expiry/revision
+  binding and locator-only failure envelopes (`AI-PRIV-003/004`).
 - English/zh-Hans/zh-Hant parity, mixed-language input and explicit fallback tests (`AI-IN-002`, `AI-GEN-005`, `APP-NFR-007`).
 - Incident-specific refusal tests for reportability, safeguarding, blame, risk rating and regulatory conclusions.
 
@@ -256,9 +278,9 @@ The following suites are required before the corresponding V1 slice can be calle
 ## Gaps
 
 1. No native App exists, so no iOS/Android unit, integration, E2E, accessibility, offline, purchase or store tests exist.
-2. A contract-only OpenAPI and TypeScript vocabulary now exist, but there is no served Product API, generated client package, schema registry or previous-version compatibility fixture.
-3. The repository now has 653 tests, but the four additional Note types have only catalog metadata/prohibited-decision contracts, not input/output/privacy/generation golden sets.
-4. Canonical document/revision/checkpoint/export states exist as memory/domain contracts plus isolated schema/RPC and completed NDIS App Preview evidence; there is no Production schema, editor, renderer or cross-device recovery test.
+2. The OpenAPI/TypeScript contract and default-off durable `/v1` route adapter now exist, but there is no Preview- or Production-served Product API, generated client package, schema registry or previous-version compatibility fixture.
+3. The current worktree passes 894 tests across 104 files (with 103 files / 831 tests retained as the prior source-level batch and 90 / 653 as the historical baseline), but the four additional Note types have only catalog metadata/prohibited-decision contracts, not input/output/privacy/generation golden sets.
+4. Canonical document/revision/checkpoint states exist as memory/domain contracts plus historical isolated schema/RPC evidence and a new unapplied mobile-sync migration draft; there is no Production schema activation, editor, renderer or cross-device recovery E2E.
 5. Points lots/rates/reservations passed isolated serial database tests but remain shadow-only. There is no runtime entitlement integration, welcome eligibility decision, concurrent reservation proof or legacy-credit conversion/reconciliation test.
 6. No payment provider sandbox, webhook replay, refund or reconciliation harness exists.
 7. No content editorial state, Guide, Daily Brief, notification or email/cron service exists.
