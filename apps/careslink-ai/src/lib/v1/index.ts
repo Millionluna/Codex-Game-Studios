@@ -3,3 +3,4 @@ export * from "./legacy-ndis-adapter";
 export * from "./points-shadow";
 export * from "./shadow-config";
 export * from "./shared-contracts";
+export * from "./transport-contract";

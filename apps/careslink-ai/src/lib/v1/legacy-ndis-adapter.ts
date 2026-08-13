@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import type { GeneratedMaterialDraftRecord } from "../generated-material-draft-store";
 import { parseNdisCaseNoteMaterial } from "../ndis-case-note-companion";
-import { createCanonicalContentHash } from "./canonical-document-shadow";
+import { stringifyCaresLinkV1CanonicalJson } from "./canonical-json";
 import {
   CARESLINK_V1_CONTRACT_VERSION,
   type CaresLinkV1Document,
@@ -28,7 +28,7 @@ export type LegacyNdisMigrationCandidate = {
 export type LegacyNdisCanonicalProjection = {
   readOnly: true;
   document: CaresLinkV1Document;
-  revision: CaresLinkV1DocumentRevision;
+  revision: LegacyNdisDocumentRevision;
   checkpoint: CaresLinkV1DocumentCheckpoint;
   selfReviewStatus: "REQUIRED";
   migrationCandidate: LegacyNdisMigrationCandidate;
@@ -37,6 +37,24 @@ export type LegacyNdisCanonicalProjection = {
     "SOURCE_LOCALE_ASSUMED_ENGLISH_FORMAL_RECORD",
     "NO_ORIGINAL_STRUCTURED_FACTS_AVAILABLE",
   ];
+};
+
+/**
+ * Read-only legacy payload. It is intentionally not a current V1 Note content
+ * because the source row did not retain the original structured facts.
+ */
+export type LegacyNdisNoteContent = Omit<
+  CaresLinkV1NoteContent,
+  "factsSummary"
+> & {
+  factsSummary: Record<string, never>;
+};
+
+export type LegacyNdisDocumentRevision = Omit<
+  CaresLinkV1DocumentRevision,
+  "content"
+> & {
+  content: LegacyNdisNoteContent;
 };
 
 export function projectLegacyNdisDraftToCanonical(
@@ -59,7 +77,7 @@ export function projectLegacyNdisDraftToCanonical(
   const documentId = `legacy-ndis-doc-${digest}`;
   const revisionId = `legacy-ndis-revision-${digest}`;
   const mutationId = `legacy-ndis-map:${digest}`;
-  const content: CaresLinkV1NoteContent = {
+  const content: LegacyNdisNoteContent = {
     englishDraft: material.englishCaseNoteDraft,
     reviewVersions: {
       "zh-Hans": material.chineseReviewVersion,
@@ -70,7 +88,9 @@ export function projectLegacyNdisDraftToCanonical(
     followUpPrompts: [...material.followUpPrompts],
     disclaimer: material.disclaimer,
   };
-  const contentHash = createCanonicalContentHash(content);
+  const contentHash = createHash("sha256")
+    .update(stringifyCaresLinkV1CanonicalJson(content))
+    .digest("hex");
   const document: CaresLinkV1Document = {
     id: documentId,
     ownerUserId: source.userId,
@@ -84,7 +104,7 @@ export function projectLegacyNdisDraftToCanonical(
     createdAt: source.createdAt,
     updatedAt: source.updatedAt,
   };
-  const revision: CaresLinkV1DocumentRevision = {
+  const revision: LegacyNdisDocumentRevision = {
     id: revisionId,
     documentId,
     ownerUserId: source.userId,

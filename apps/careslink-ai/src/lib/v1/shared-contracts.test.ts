@@ -7,6 +7,9 @@ import {
   CARESLINK_V1_GENERATION_STATUSES,
   CARESLINK_V1_LOCALES,
   CARESLINK_V1_NOTE_CATALOG,
+  CARESLINK_V1_NOTE_TYPE_CODES,
+  CARESLINK_V1_PRIVACY_REVIEW_TTL_SECONDS,
+  CARESLINK_V1_PRIVACY_SCANNER_POLICY_VERSION,
   CARESLINK_V1_RATE_CATALOG_VERSION,
   CARESLINK_V1_SELF_REVIEW_STATUSES,
   CARESLINK_V1_SHADOW_RATE_CATALOG,
@@ -18,7 +21,15 @@ import {
   canTransitionGenerationStatus,
   getCaresLinkV1NoteType,
   isCaresLinkV1Locale,
+  validateCaresLinkV1CleanedFacts,
+  validateCaresLinkV1CleanedFactsForAnyNoteType,
+  type CaresLinkV1ErrorCode,
+  type CaresLinkV1NoteTypeCode,
 } from "./shared-contracts";
+import {
+  CARESLINK_V1_VALID_CLEANED_FACTS,
+  createValidCaresLinkV1CleanedFacts,
+} from "./cleaned-facts-test-fixtures";
 import { isCaresLinkV1ShadowEnabled } from "./shadow-config";
 
 describe("CaresLink V1 shared contracts", () => {
@@ -49,6 +60,194 @@ describe("CaresLink V1 shared contracts", () => {
     ).toBe(true);
     expect(getCaresLinkV1NoteType("incident_factual").prohibitedDecisions).toContain(
       "reportability decision",
+    );
+  });
+
+  it.each(CARESLINK_V1_NOTE_TYPE_CODES)(
+    "accepts and projects the closed %s cleaned-facts schema",
+    (noteType) => {
+      const facts = createValidCaresLinkV1CleanedFacts(noteType);
+      expect(validateCaresLinkV1CleanedFacts(noteType, facts)).toEqual(facts);
+    },
+  );
+
+  it.each(CARESLINK_V1_NOTE_TYPE_CODES)(
+    "rejects missing, extra and wrong-type fields for %s",
+    (noteType) => {
+      const definition = CARESLINK_V1_NOTE_CATALOG.find(
+        (candidate) => candidate.code === noteType,
+      )!;
+      const firstRequired = definition.fields.find((field) => field.required)!;
+      const missing = createValidCaresLinkV1CleanedFacts(noteType) as Record<
+        string,
+        unknown
+      >;
+      delete missing[firstRequired.code];
+      expectContractCode(
+        () => validateCaresLinkV1CleanedFacts(noteType, missing),
+        "MINIMUM_FACTS_REQUIRED",
+      );
+
+      const extra = {
+        ...createValidCaresLinkV1CleanedFacts(noteType),
+        unexpected_field: "not allowed",
+      };
+      expectContractCode(
+        () => validateCaresLinkV1CleanedFacts(noteType, extra),
+        "VALIDATION_ERROR",
+      );
+
+      const wrongType = createValidCaresLinkV1CleanedFacts(
+        noteType,
+      ) as Record<string, unknown>;
+      wrongType[firstRequired.code] = 42;
+      expectContractCode(
+        () => validateCaresLinkV1CleanedFacts(noteType, wrongType),
+        "VALIDATION_ERROR",
+      );
+    },
+  );
+
+  it.each([
+    ["communication", "handover"],
+    ["handover", "communication"],
+    ["progress", "incident_factual"],
+    ["ndis", "communication"],
+    ["incident_factual", "ndis"],
+  ] as const)(
+    "rejects %s cleaned facts copied from the %s schema",
+    (noteType, otherNoteType) => {
+      expectContractCode(
+        () =>
+          validateCaresLinkV1CleanedFacts(
+            noteType,
+            createValidCaresLinkV1CleanedFacts(otherNoteType),
+          ),
+        "VALIDATION_ERROR",
+      );
+    },
+  );
+
+  it.each(CARESLINK_V1_NOTE_TYPE_CODES)(
+    "requires already-trimmed strings and RFC3339-with-timezone dates for %s",
+    (noteType) => {
+      const definition = CARESLINK_V1_NOTE_CATALOG.find(
+        (candidate) => candidate.code === noteType,
+      )!;
+      const textField = definition.fields.find(
+        (field) =>
+          field.required &&
+          (field.kind === "short_text" || field.kind === "long_text"),
+      )!;
+      const paddedText = createValidCaresLinkV1CleanedFacts(
+        noteType,
+      ) as Record<string, unknown>;
+      paddedText[textField.code] = ` ${paddedText[textField.code] as string}`;
+      expectContractCode(
+        () => validateCaresLinkV1CleanedFacts(noteType, paddedText),
+        "VALIDATION_ERROR",
+      );
+
+      const paddedDate = createValidCaresLinkV1CleanedFacts(
+        noteType,
+      ) as Record<string, unknown>;
+      paddedDate.occurred_at = "2026-08-11T10:15:30+10:00 ";
+      expectContractCode(
+        () => validateCaresLinkV1CleanedFacts(noteType, paddedDate),
+        "VALIDATION_ERROR",
+      );
+
+      for (const invalidDate of [
+        "2026-08-11T10:15:30",
+        "2026-02-30T10:15:30Z",
+        "2026-08-11T24:00:00Z",
+        "2026-08-11T10:60:00Z",
+        "2026-08-11T10:15:60Z",
+        "2026-08-11T10:15:30+24:00",
+      ]) {
+        const invalid = createValidCaresLinkV1CleanedFacts(
+          noteType,
+        ) as Record<string, unknown>;
+        invalid.occurred_at = invalidDate;
+        expectContractCode(
+          () => validateCaresLinkV1CleanedFacts(noteType, invalid),
+          "VALIDATION_ERROR",
+        );
+      }
+    },
+  );
+
+  it("requires a non-empty, already-trimmed string_list", () => {
+    for (const partiesByRole of [[], [" "], ["Support worker "]]) {
+      const facts = createValidCaresLinkV1CleanedFacts("communication");
+      facts.parties_by_role = partiesByRole;
+      expectContractCode(
+        () => validateCaresLinkV1CleanedFacts("communication", facts),
+        partiesByRole.length === 0 || partiesByRole[0] === " "
+          ? "MINIMUM_FACTS_REQUIRED"
+          : "VALIDATION_ERROR",
+      );
+    }
+  });
+
+  it("treats an optional field present with undefined as an invalid value", () => {
+    const facts = createValidCaresLinkV1CleanedFacts("ndis");
+    Reflect.set(facts, "follow_up", undefined);
+    expectContractCode(
+      () => validateCaresLinkV1CleanedFacts("ndis", facts),
+      "VALIDATION_ERROR",
+    );
+  });
+
+  it("never echoes an unknown PII-bearing field key or its value", () => {
+    const unknownKey = "Jane Smith";
+    const unknownValue = "worker@example.test";
+    let error: unknown;
+    try {
+      validateCaresLinkV1CleanedFacts("ndis", {
+        ...CARESLINK_V1_VALID_CLEANED_FACTS.ndis,
+        [unknownKey]: unknownValue,
+      });
+    } catch (caught) {
+      error = caught;
+    }
+    expect(error).toBeInstanceOf(CaresLinkV1ContractError);
+    expect((error as CaresLinkV1ContractError).code).toBe("VALIDATION_ERROR");
+    const serialized = JSON.stringify(error);
+    expect(serialized).not.toContain(unknownKey);
+    expect(serialized).not.toContain("Jane");
+    expect(serialized).not.toContain(unknownValue);
+    expect((error as Error).message).toBe(
+      "cleanedFacts contains an unsupported field",
+    );
+  });
+
+  it("preserves minimum-facts semantics at a Note-type-independent read boundary", () => {
+    const missing = createValidCaresLinkV1CleanedFacts("handover");
+    delete (missing as Partial<typeof missing>).current_status;
+    expectContractCode(
+      () => validateCaresLinkV1CleanedFactsForAnyNoteType(missing),
+      "MINIMUM_FACTS_REQUIRED",
+    );
+
+    expectContractCode(
+      () =>
+        validateCaresLinkV1CleanedFactsForAnyNoteType({
+          ...createValidCaresLinkV1CleanedFacts("handover"),
+          "Jane Smith": "worker@example.test",
+        }),
+      "VALIDATION_ERROR",
+    );
+  });
+
+  it("maps an unsupported Note type to validation", () => {
+    expectContractCode(
+      () =>
+        validateCaresLinkV1CleanedFacts(
+          "future_note" as CaresLinkV1NoteTypeCode,
+          CARESLINK_V1_VALID_CLEANED_FACTS.ndis,
+        ),
+      "VALIDATION_ERROR",
     );
   });
 
@@ -151,6 +350,13 @@ describe("CaresLink V1 shared contracts", () => {
     );
   });
 
+  it("freezes the temporary Preview privacy policy and 30-minute proof TTL", () => {
+    expect(CARESLINK_V1_PRIVACY_SCANNER_POLICY_VERSION).toBe(
+      "2026-08-11.preview.1",
+    );
+    expect(CARESLINK_V1_PRIVACY_REVIEW_TTL_SECONDS).toBe(30 * 60);
+  });
+
   it("accepts only bounded transport-safe idempotency keys", () => {
     expect(assertCaresLinkV1IdempotencyKey("note.generate:request-0001")).toBe(
       "note.generate:request-0001",
@@ -173,3 +379,17 @@ describe("CaresLink V1 shared contracts", () => {
     ).toBe(true);
   });
 });
+
+function expectContractCode(
+  action: () => unknown,
+  expectedCode: CaresLinkV1ErrorCode,
+) {
+  let error: unknown;
+  try {
+    action();
+  } catch (caught) {
+    error = caught;
+  }
+  expect(error).toBeInstanceOf(CaresLinkV1ContractError);
+  expect((error as CaresLinkV1ContractError).code).toBe(expectedCode);
+}

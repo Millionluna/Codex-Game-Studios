@@ -4,6 +4,7 @@ import {
   createNdisShadowRepository,
   createNdisShadowRepositoryFromEnv,
 } from "./ndis-shadow-repository.server";
+import { createValidCaresLinkV1CleanedFacts } from "./cleaned-facts-test-fixtures";
 
 vi.mock("server-only", () => ({}));
 
@@ -31,7 +32,7 @@ describe("NDIS shadow Supabase repository", () => {
     const content = {
       englishDraft: "Synthetic observable facts.",
       reviewVersions: { "zh-Hans": "Synthetic review." },
-      factsSummary: {},
+      factsSummary: createValidCaresLinkV1CleanedFacts("ndis"),
       missingFacts: [],
       neutralWordingChecks: [],
       followUpPrompts: [],

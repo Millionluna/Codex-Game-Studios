@@ -2,6 +2,7 @@ import "server-only";
 
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import type { CaresLinkV1NoteContent } from "./shared-contracts";
+import type { LegacyNdisNoteContent } from "./legacy-ndis-adapter";
 
 export type NdisShadowProjectionStatus =
   | "PROJECTED"
@@ -28,7 +29,11 @@ export type NdisShadowProjectionInput = {
   privacyFingerprint: string;
   idempotencyKey: string;
   correlationId: string;
-  content: CaresLinkV1NoteContent;
+  /**
+   * The legacy-only RPC may receive the explicitly read-only legacy payload.
+   * That payload is not a current Product API NoteContent or revision.
+   */
+  content: CaresLinkV1NoteContent | LegacyNdisNoteContent;
   expectedBaseRevisionId?: string;
 };
 

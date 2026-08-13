@@ -3,7 +3,7 @@ import { extname, join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 describe("V1 shadow runtime boundary", () => {
-  it("is imported only by the two audited NDIS server routes", () => {
+  it("is imported only by audited NDIS routes and the default-off Product API", () => {
     const runtimeFiles = ["src/app", "src/components"].flatMap(walkSourceFiles);
     const allowedRuntimeImporters = new Map([
       [
@@ -28,12 +28,24 @@ describe("V1 shadow runtime boundary", () => {
       const importsV1Runtime =
         /(?:@\/lib\/v1|lib\/v1\/|CARESLINK_V1_SHADOW_ENABLED)/.test(source);
       const expectedIntegration = allowedRuntimeImporters.get(file);
+      const isProductApiRoute =
+        file.startsWith(join(process.cwd(), "src/app/v1")) &&
+        file.endsWith("route.ts");
+      const isNativeAuthBoundaryRoute = file.startsWith(
+        join(process.cwd(), "src/app/v1/auth"),
+      );
 
       if (expectedIntegration) {
         expect(source).toContain(
           "@/lib/v1/ndis-shadow-integration.server",
         );
         expect(source).toContain(expectedIntegration);
+      } else if (isNativeAuthBoundaryRoute) {
+        expect(source).toContain("@/lib/v1/native-auth-boundary.server");
+        expect(source).not.toMatch(/SUPABASE_SERVICE_ROLE_KEY|service_role/i);
+      } else if (isProductApiRoute) {
+        expect(source).toContain("@/lib/v1/product-api-route.server");
+        expect(source).not.toMatch(/SUPABASE_SERVICE_ROLE_KEY|service_role/i);
       } else {
         expect(importsV1Runtime, file).toBe(false);
       }
@@ -44,15 +56,31 @@ describe("V1 shadow runtime boundary", () => {
     }
   });
 
-  it("marks both service-role runtime modules as server-only", () => {
+  it("marks privileged and Product API runtime modules as server-only", () => {
     for (const relativePath of [
       "src/lib/v1/ndis-shadow-integration.server.ts",
       "src/lib/v1/ndis-shadow-repository.server.ts",
+      "src/lib/v1/native-auth-boundary.server.ts",
+      "src/lib/v1/privacy-review-scanner.server.ts",
+      "src/lib/v1/product-api-auth.server.ts",
+      "src/lib/v1/product-api-route.server.ts",
+      "src/lib/v1/product-api-runtime.server.ts",
+      "src/lib/v1/product-api-session-status.server.ts",
+      "src/lib/v1/product-api-supabase.server.ts",
     ]) {
       expect(readFileSync(join(process.cwd(), relativePath), "utf8")).toMatch(
         /^import "server-only";/,
       );
     }
+  });
+
+  it("exposes the privacy review as a physical POST-only route", () => {
+    const source = readFileSync(
+      join(process.cwd(), "src/app/v1/privacy-reviews/route.ts"),
+      "utf8",
+    );
+    expect(source).toContain("export async function POST");
+    expect(source).not.toMatch(/export async function (?:DELETE|GET|PATCH|PUT)/);
   });
 
   it("keeps service-role repositories outside the client component tree", () => {
