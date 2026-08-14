@@ -19,6 +19,7 @@ export const CARESLINK_V1_NATIVE_AUTH_BOUNDARY = Object.freeze({
   sessions: "NOT_SERVED",
   devices: "NOT_SERVED",
   revoke: "NOT_SERVED",
+  revokeAll: "NOT_SERVED",
 } as const);
 
 export type CaresLinkV1ProductApiEnv = {

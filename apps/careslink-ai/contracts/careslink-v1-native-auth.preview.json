@@ -1,0 +1,191 @@
+{
+  "kind": "CARESLINK_NATIVE_AUTH_MANIFEST",
+  "title": "CaresLink Native Auth M0 Preview Contract",
+  "contractVersion": "1.0.0-shadow.1",
+  "nativeAuthContractVersion": "2026-08-14.preview.1",
+  "status": "VERSIONED_DRAFT_RUNTIME_DISABLED",
+  "providers": {
+    "email": {
+      "supabaseProvider": "email",
+      "flow": "EMAIL_PASSWORD_SESSION",
+      "pkceRequired": false
+    },
+    "google": {
+      "supabaseProvider": "google",
+      "flow": "OAUTH_PKCE_S256",
+      "pkceRequired": true
+    },
+    "microsoft": {
+      "supabaseProvider": "azure",
+      "flow": "OAUTH_PKCE_S256",
+      "pkceRequired": true
+    },
+    "apple": {
+      "supabaseProvider": "apple",
+      "flow": "OAUTH_PKCE_S256",
+      "pkceRequired": true
+    }
+  },
+  "redirectAllowlist": {
+    "preview": {
+      "ios": [],
+      "android": []
+    },
+    "production": []
+  },
+  "redirectAllowlistStatus": "MOBILE_REDIRECT_URIS_UNCONFIRMED",
+  "pkce": {
+    "method": "S256",
+    "verifierPattern": "^[A-Za-z0-9._~-]{43,128}$",
+    "statePattern": "^[A-Za-z0-9._~-]{43,128}$",
+    "stateEntropyBitsMinimum": 128,
+    "attemptTtlSeconds": 600,
+    "maximumPendingAttemptsPerInstallation": 1,
+    "replacementInvalidatesPriorAttempt": true,
+    "authorizationCodeSingleUse": true,
+    "stateSingleUse": true,
+    "callbackAllowedQueryKeys": ["code", "state", "error", "error_code"],
+    "callbackForbiddenQueryKeys": [
+      "access_token",
+      "refresh_token",
+      "provider_token",
+      "provider_refresh_token"
+    ],
+    "authorizationCodeStorage": "MEMORY_ONLY",
+    "verifierStorage": "SECURESTORE_EPHEMERAL_ONLY",
+    "attemptStorageForbidden": [
+      "SQLCIPHER",
+      "OUTBOX",
+      "DRAFT",
+      "LOG",
+      "ANALYTICS"
+    ],
+    "exchangeOwner": "SUPABASE_NATIVE_SDK",
+    "productApiCallbackEndpoint": "RESERVED_DISABLED_NOT_USED_BY_M0"
+  },
+  "session": {
+    "sessionSource": "SUPABASE_AUTH_VERIFIED_SESSION",
+    "accessTokenTransport": "AUTHORIZATION_BEARER_HEADER_ONLY",
+    "accessTokenPersistence": "SECURESTORE_ONLY",
+    "refreshTokenTransport": "SUPABASE_NATIVE_SDK_ONLY",
+    "refreshTokenPersistence": "SECURESTORE_ONLY",
+    "refreshMode": "SUPABASE_ROTATING_REFRESH_TOKEN",
+    "tokenInUrl": "FORBIDDEN",
+    "tokenInProductApiBody": "FORBIDDEN",
+    "tokenInLogAnalyticsDraftOutbox": "FORBIDDEN",
+    "identityProofEndpoint": "/v1/me",
+    "identityProofMethod": "GET",
+    "requiredProofMatches": ["userId", "sessionId"],
+    "serverEligibilitySources": ["auth.users", "auth.sessions"],
+    "forbiddenEligibilitySources": [
+      "raw_user_metadata",
+      "jwt_user_metadata",
+      "request_body_owner"
+    ],
+    "refreshFailureAction": "SIGN_OUT_WIPE_REBUILD",
+    "accountChangeAction": "SIGN_OUT_WIPE_REBUILD"
+  },
+  "identityLinking": {
+    "linkingAvailability": "DISABLED_M0",
+    "accountAnchor": "SUPABASE_AUTH_USER_UUID",
+    "linkingAuthority": "auth.identities",
+    "automaticEmailMerge": false,
+    "clientSelectedOwnerId": false,
+    "rawUserMetadataAuthorization": false,
+    "linkingRequirements": [
+      "CURRENT_SESSION_FRESH_REAUTH",
+      "PROVIDER_VERIFIED_IDENTITY",
+      "IDENTITY_NOT_LINKED_TO_ANOTHER_USER",
+      "SERVER_DERIVED_CURRENT_USER"
+    ],
+    "applePrivateRelayRule": "NEVER_MERGE_BY_EMAIL_ALONE",
+    "conflictErrorCode": "IDENTITY_LINK_CONFLICT",
+    "unlinkLastIdentity": "FORBIDDEN"
+  },
+  "meIdentityProofUpgrade": {
+    "availability": "BLOCKED_REQUIRES_PRODUCT_CONTRACT_VERSION_BUMP",
+    "currentProductContractVersion": "1.0.0-shadow.1",
+    "requiredServerFields": [
+      "userId",
+      "sessionId",
+      "accessTokenExpiresAt",
+      "sessionNotAfter",
+      "provider",
+      "linkedProviders",
+      "refreshMode",
+      "nativeAuthContractVersion",
+      "capabilities"
+    ],
+    "authoritativeSources": [
+      "verified_access_token_claims",
+      "auth.users",
+      "auth.sessions",
+      "auth.identities"
+    ],
+    "currentMeResponseSatisfiesUpgrade": false
+  },
+  "sessionEndpoints": {
+    "list": {
+      "method": "GET",
+      "path": "/v1/auth/sessions",
+      "availability": "DISABLED_M0"
+    },
+    "revokeOne": {
+      "method": "POST",
+      "path": "/v1/auth/sessions/{sessionId}/revoke",
+      "availability": "DISABLED_M0"
+    },
+    "revokeAll": {
+      "method": "POST",
+      "path": "/v1/auth/sessions/revoke-all",
+      "availability": "DISABLED_M0"
+    }
+  },
+  "m0ReadSequence": [
+    "SUPABASE_PKCE_OR_EMAIL_SESSION",
+    "SECURESTORE_SESSION",
+    "GET_V1_ME_IDENTITY_PROOF",
+    "GET_V1_DOCUMENTS",
+    "GET_V1_SYNC_PULL"
+  ],
+  "m0Capabilities": {
+    "openApiOperationCount": 20,
+    "defaultEnabled": false,
+    "read": ["identity.me.read", "documents.list.read", "sync.pull.read"],
+    "disabled": [
+      "native.auth.callback.disabled",
+      "native.session.list.disabled",
+      "native.device.list.disabled",
+      "native.session.revoke-one.disabled",
+      "native.session.revoke-all.disabled",
+      "notes.catalog.read.disabled",
+      "documents.create.write.disabled",
+      "documents.detail.read.disabled",
+      "documents.revision.write.disabled",
+      "documents.tombstone.write.disabled",
+      "documents.checkpoint.write.disabled",
+      "sync.push.write.disabled",
+      "privacy.review.write.disabled",
+      "points.quote.disabled",
+      "points.reserve.disabled",
+      "points.commit.disabled",
+      "points.release.disabled"
+    ]
+  },
+  "previewActivationGates": [
+    "EXACT_NON_PRODUCTION_SUPABASE_REF",
+    "MOBILE_IOS_AND_ANDROID_REDIRECT_URIS_CONFIRMED",
+    "EXACT_PREVIEW_REDIRECT_ALLOWLIST",
+    "EMAIL_GOOGLE_MICROSOFT_APPLE_PROVIDER_FIXTURES",
+    "PKCE_STATE_MISMATCH_REJECTED",
+    "PKCE_CODE_REPLAY_REJECTED",
+    "CALLBACK_TOKEN_QUERY_REJECTED",
+    "SECURESTORE_ONLY_TOKEN_ASSERTION",
+    "ME_USER_AND_SESSION_MATCH",
+    "FRESH_AUTH_USERS_AND_SESSIONS_ELIGIBILITY",
+    "REVOKED_SESSION_DENIED",
+    "OWNER_A_B_READ_ISOLATION",
+    "DOCUMENT_LIST_AND_SYNC_PULL_READ_ONLY",
+    "CLEANUP_RETURNS_TEST_USERS_SESSIONS_AND_ROWS_TO_ZERO"
+  ]
+}

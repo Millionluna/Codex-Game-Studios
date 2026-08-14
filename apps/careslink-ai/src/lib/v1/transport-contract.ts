@@ -77,6 +77,10 @@ export const CARESLINK_V1_AUTH_BOUNDARIES = {
     path: "/v1/auth/sessions/{sessionId}/revoke",
     availability: "NOT_IMPLEMENTED",
   },
+  revokeAllSessions: {
+    path: "/v1/auth/sessions/revoke-all",
+    availability: "NOT_IMPLEMENTED",
+  },
 } as const;
 
 export const CARESLINK_V1_MUTATION_KINDS = [

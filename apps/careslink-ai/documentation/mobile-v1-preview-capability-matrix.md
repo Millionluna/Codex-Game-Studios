@@ -31,7 +31,7 @@ Nothing in this matrix authorizes a Production migration or deployment.
   joint absence samples and completed the final zero audit. There is no currently
   served Preview base URL; the retained non-Production Supabase schema baseline
   remains default-off and empty of synthetic users and Product data.
-- Four physical native-auth routes return fixed structured `501` envelopes, but
+- Five physical native-auth routes return fixed structured `501` envelopes, but
   their capability constants remain `false`. Native PKCE callback,
   session/device inventory and revoke-one/revoke-all remain disabled boundaries;
   physical routes and session-row checks do not make those capabilities served.
@@ -56,7 +56,7 @@ migration blobs.
 | Owner isolation | Owner is derived from verified auth; transport bodies do not accept `ownerId` | The current draft derives Product ownership from `auth.uid()` and requires a fresh eligible-provider Auth user plus active session; it has not been re-applied | A/B list, pull and get isolation, owner-A proof reuse deny and three cross-owner writes passed on the earlier baseline; both users removed | No new RLS or RPC applied |
 | Authentication transport | Mobile uses Bearer only and keeps the credential in the Authorization header; Web cookie auth is an additional shared-adapter transport with same-origin mutation controls | Both transports reach the same owner-derived RPC surface | Bearer create/proof/sign-in/session/revocation passed; cookie parity was not part of this run | Not served |
 | Atomic privacy confirmation | `POST /v1/privacy-reviews` accepts only user-confirmed cleaned structured facts, canonicalises and hashes them, applies deterministic scanner policy `2026-08-11.preview.1`, and returns locator-only `422 PRIVACY_REVIEW_REQUIRED` findings until every current finding is exactly retained with purpose. It never returns excerpts. The scanner is explicitly not a guarantee of complete de-identification. Confirmed proofs use a temporary 30-minute Preview TTL, not a Production product decision | The service adapter sends only owner/session metadata, hash, versions, confirmations, decisions and mutation ID to the service-only RPC contract | Five Note confirmations/replays, owner-A proof reuse by owner B denied, and outbox exclusion passed; proofs removed | Disabled and not authorized |
-| Native auth/session/device management | Four physical routes return fixed `501` envelopes with capability `false` | No native PKCE exchange, device registry or revoke-one/revoke-all implementation exists | Physical `501` does not mean served; capability disabled | Capability disabled |
+| Native auth/session/device management | Five physical routes return fixed `501` envelopes with capability `false` | No native PKCE exchange, device registry or revoke-one/revoke-all implementation exists | Physical `501` does not mean served; capability disabled | Capability disabled |
 | Points cutover and model calls | Outside this Preview gate | No cutover is authorized by these drafts | Zero model calls and zero Points/Billing activity during the gate | Not authorized |
 
 `handler exists`, `migration drafted` and `source tests pass` must never be

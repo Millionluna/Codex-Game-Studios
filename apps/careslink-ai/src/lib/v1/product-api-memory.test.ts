@@ -80,6 +80,12 @@ describe("CaresLink V1 memory Product API", () => {
       nextCursor: "sync.v1:1",
       hasMore: false,
     });
+    await expect(api.pullChanges({ cursor: "sync.v1:0" })).resolves.toMatchObject(
+      {
+        changes: [{ canonicalId: DOCUMENT_ONE }],
+        nextCursor: "sync.v1:1",
+      },
+    );
   });
 
   it("replays identical create input once and rejects changed input under the same key", async () => {

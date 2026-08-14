@@ -1000,7 +1000,7 @@ function parseSyncCursor(cursor: string | undefined) {
   if (!cursor) {
     return 0;
   }
-  const match = cursor.match(/^sync\.v1:([1-9][0-9]*)$/);
+  const match = cursor.match(/^sync\.v1:(0|[1-9][0-9]*)$/);
   if (!match) {
     throw new CaresLinkV1ProductApiError(
       "VALIDATION_ERROR",

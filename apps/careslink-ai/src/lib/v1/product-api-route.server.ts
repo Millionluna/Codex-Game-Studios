@@ -22,6 +22,7 @@ import {
   CARESLINK_V1_NOTE_SCHEMA_VERSION,
   CARESLINK_V1_NOTE_TYPE_CODES,
   CaresLinkV1ContractError,
+  assertCaresLinkV1IdempotencyKey,
   getCaresLinkV1NoteType,
   validateCaresLinkV1CleanedFacts,
   validateCaresLinkV1CleanedFactsForAnyNoteType,
@@ -236,6 +237,35 @@ export async function handleCaresLinkV1PullChanges(
   });
 }
 
+/**
+ * Fixed fail-closed boundary for the reserved sync-push path. The request is
+ * intentionally opaque because no batch body, auth flow or write semantics are
+ * frozen for this capability.
+ */
+export function handleCaresLinkV1SyncPushDisabledBoundary(
+  request: Request,
+  dependencies: Pick<
+    CaresLinkV1ProductApiRouteDependencies,
+    "createCorrelationId"
+  > = {},
+) {
+  void request;
+  const correlationId = resolveCorrelationId(
+    null,
+    dependencies.createCorrelationId ?? randomUUID,
+  );
+  const headers = createResponseHeaders(correlationId);
+  return jsonResponse(
+    createCaresLinkV1TransportError({
+      code: "NOT_IMPLEMENTED",
+      message: "Sync push is not implemented",
+      correlationId,
+    }),
+    501,
+    headers,
+  );
+}
+
 type ProductApiOperationResult =
   | unknown
   | { body: unknown; status: number };
@@ -423,7 +453,7 @@ function getMutationHeaders(request: Request) {
       "The Idempotency-Key header is required",
     );
   }
-  return { idempotencyKey };
+  return { idempotencyKey: assertCaresLinkV1IdempotencyKey(idempotencyKey) };
 }
 
 function assertMutationTransport(

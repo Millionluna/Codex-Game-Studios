@@ -361,12 +361,18 @@ describe("CaresLink V1 shared contracts", () => {
     expect(assertCaresLinkV1IdempotencyKey("note.generate:request-0001")).toBe(
       "note.generate:request-0001",
     );
-    expect(() => assertCaresLinkV1IdempotencyKey("short")).toThrow(
-      CaresLinkV1ContractError,
-    );
-    expect(() =>
-      assertCaresLinkV1IdempotencyKey("contains private note text 中文"),
-    ).toThrow(CaresLinkV1ContractError);
+    for (const invalid of ["short", "contains private note text 中文"]) {
+      try {
+        assertCaresLinkV1IdempotencyKey(invalid);
+      } catch (error) {
+        expect(error).toBeInstanceOf(CaresLinkV1ContractError);
+        expect((error as CaresLinkV1ContractError).code).toBe(
+          "VALIDATION_ERROR",
+        );
+        continue;
+      }
+      throw new Error("Expected invalid idempotency key to be rejected");
+    }
   });
 
   it("keeps the V1 runtime path off unless the exact server flag is true", () => {

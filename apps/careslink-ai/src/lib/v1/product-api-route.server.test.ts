@@ -6,6 +6,7 @@ import {
   handleCaresLinkV1ListDocuments,
   handleCaresLinkV1PullChanges,
   handleCaresLinkV1SaveCheckpoint,
+  handleCaresLinkV1SyncPushDisabledBoundary,
   handleCaresLinkV1TombstoneDocument,
   type CaresLinkV1ProductApiRouteDependencies,
 } from "./product-api-route.server";
@@ -45,6 +46,28 @@ afterEach(() => {
 });
 
 describe("CaresLink V1 Product API HTTP route boundary", () => {
+  it("returns an opaque fixed 501 for sync push without reflecting credentials or body", async () => {
+    const secret = "sync-push-sensitive-token";
+    const response = handleCaresLinkV1SyncPushDisabledBoundary(
+      new Request(`https://preview.example.test/v1/sync/push?token=${secret}`, {
+        method: "POST",
+        headers: { authorization: `Bearer ${secret}` },
+        body: JSON.stringify({ accessToken: secret, mutations: [secret] }),
+      }),
+      { createCorrelationId: () => CORRELATION_ID },
+    );
+    expect(response.status).toBe(501);
+    expect(response.headers.get(CARESLINK_V1_HEADER_NAMES.contractVersion)).toBe(
+      CARESLINK_V1_CONTRACT_VERSION,
+    );
+    expect(response.headers.get(CARESLINK_V1_HEADER_NAMES.correlationId)).toBe(
+      CORRELATION_ID,
+    );
+    const body = await response.json();
+    expect(body).toMatchObject({ error: { code: "NOT_IMPLEMENTED" } });
+    expect(JSON.stringify(body)).not.toContain(secret);
+  });
+
   it("fails closed with the real default feature flag and no persistence adapter", async () => {
     vi.stubEnv("CARESLINK_V1_PRODUCT_API_ENABLED", "");
 
@@ -60,6 +83,56 @@ describe("CaresLink V1 Product API HTTP route boundary", () => {
         message: "The Product API is not enabled",
       },
     });
+  });
+
+  it("does not read mutation bodies after a fail-closed operation decision", async () => {
+    const resolveAuth = vi.fn(async () => ({
+      ok: false as const,
+      reason: "feature_disabled" as const,
+      status: 503 as const,
+    }));
+    const getProductApi = vi.fn();
+    const dependencies: CaresLinkV1ProductApiRouteDependencies = {
+      resolveAuth,
+      getProductApi,
+      createCorrelationId: () => CORRELATION_ID,
+    };
+
+    for (const [request, handle] of [
+      [
+        createDocumentRequest("mutation:disabled:01", createBody()),
+        (candidate: Request) =>
+          handleCaresLinkV1CreateDocument(candidate, dependencies),
+      ],
+      [
+        versionedRequest(`/v1/documents/${DOCUMENT_ID}`, {
+          method: "DELETE",
+          headers: {
+            "content-type": "application/json",
+            origin: "https://portal.example.test",
+            [CARESLINK_V1_HEADER_NAMES.idempotencyKey]:
+              "mutation:disabled:02",
+          },
+          body: JSON.stringify({ baseRevisionId: REVISION_ID }),
+        }),
+        (candidate: Request) =>
+          handleCaresLinkV1TombstoneDocument(
+            candidate,
+            DOCUMENT_ID,
+            dependencies,
+          ),
+      ],
+    ] as const) {
+      const readBody = vi.fn(() => {
+        throw new Error("disabled mutation body was read");
+      });
+      Object.defineProperty(request, "text", { value: readBody });
+      const response = await handle(request);
+      expect(response.status).toBe(503);
+      expect(readBody).not.toHaveBeenCalled();
+    }
+    expect(resolveAuth).toHaveBeenCalledTimes(2);
+    expect(getProductApi).not.toHaveBeenCalled();
   });
 
   it("rejects unsupported versions before auth and returns version and correlation headers", async () => {
@@ -445,6 +518,33 @@ describe("CaresLink V1 Product API HTTP route boundary", () => {
         message: "The Idempotency-Key header is required",
       },
     });
+  });
+
+  it("rejects a malformed idempotency header before invoking persistence", async () => {
+    const store = deterministicStore([]);
+    const api = store.forPrincipal({
+      userId: USER_ID,
+      sessionId: SESSION_ID,
+      transport: "BEARER",
+    });
+    const createDocument = vi.fn(api.createDocument);
+    const response = await handleCaresLinkV1CreateDocument(
+      createDocumentRequest("short", createBody()),
+      {
+        resolveAuth: async () => ({
+          ok: true,
+          identity: { userId: USER_ID, sessionId: SESSION_ID, source: "bearer" },
+        }),
+        getProductApi: () => ({ ...api, createDocument }),
+        createCorrelationId: () => CORRELATION_ID,
+      },
+    );
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({
+      error: { code: "VALIDATION_ERROR", correlationId: CORRELATION_ID },
+    });
+    expect(createDocument).not.toHaveBeenCalled();
   });
 
   it("rejects note upload without the frozen privacy review proof field", async () => {

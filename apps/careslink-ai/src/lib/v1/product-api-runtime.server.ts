@@ -35,11 +35,23 @@ export const CARESLINK_V1_PRODUCT_API_DURABLE_ADAPTER_FLAG =
   "CARESLINK_V1_PRODUCT_API_DURABLE_ADAPTER_ENABLED" as const;
 export const CARESLINK_V1_PRODUCT_API_EXPECTED_SUPABASE_REF_FLAG =
   "CARESLINK_V1_PRODUCT_API_EXPECTED_SUPABASE_REF" as const;
+export const CARESLINK_V1_PRODUCT_API_M0_READ_FLAG =
+  "CARESLINK_V1_PRODUCT_API_M0_READ_ENABLED" as const;
+export const CARESLINK_V1_PRODUCT_API_DOCUMENT_DETAIL_FLAG =
+  "CARESLINK_V1_PRODUCT_API_DOCUMENT_DETAIL_ENABLED" as const;
+export const CARESLINK_V1_PRODUCT_API_PRIVACY_REVIEW_FLAG =
+  "CARESLINK_V1_PRODUCT_API_PRIVACY_REVIEW_ENABLED" as const;
+export const CARESLINK_V1_PRODUCT_API_DOCUMENT_WRITE_FLAG =
+  "CARESLINK_V1_PRODUCT_API_DOCUMENT_WRITE_ENABLED" as const;
 
 export type CaresLinkV1ProductApiRuntimeEnv = CaresLinkV1ProductApiEnv &
   CaresLinkV1SessionStatusEnv & {
     CARESLINK_V1_PRODUCT_API_DURABLE_ADAPTER_ENABLED?: string;
     CARESLINK_V1_PRODUCT_API_EXPECTED_SUPABASE_REF?: string;
+    CARESLINK_V1_PRODUCT_API_M0_READ_ENABLED?: string;
+    CARESLINK_V1_PRODUCT_API_DOCUMENT_DETAIL_ENABLED?: string;
+    CARESLINK_V1_PRODUCT_API_PRIVACY_REVIEW_ENABLED?: string;
+    CARESLINK_V1_PRODUCT_API_DOCUMENT_WRITE_ENABLED?: string;
     CARESLINK_V1_PRIVACY_REVIEW_PREVIEW_SERVICE_ROLE_KEY?: string;
     VERCEL_ENV?: string;
   };
@@ -105,6 +117,71 @@ export function isCaresLinkV1ProductApiPreviewTargetAllowed(
   );
 }
 
+export type CaresLinkV1ProductApiOperationCapability =
+  | "M0_READ"
+  | "DOCUMENT_DETAIL"
+  | "PRIVACY_REVIEW"
+  | "DOCUMENT_WRITE";
+
+export function getCaresLinkV1ProductApiOperationCapability(
+  request: Request,
+): CaresLinkV1ProductApiOperationCapability | undefined {
+  let pathname: string;
+  try {
+    pathname = new URL(request.url).pathname;
+  } catch {
+    return undefined;
+  }
+  const method = request.method.toUpperCase();
+  if (
+    method === "GET" &&
+    (pathname === CARESLINK_V1_PRODUCT_API_PATHS.me ||
+      pathname === CARESLINK_V1_PRODUCT_API_PATHS.documents ||
+      pathname === CARESLINK_V1_PRODUCT_API_PATHS.syncPull)
+  ) {
+    return "M0_READ";
+  }
+  if (method === "GET" && /^\/v1\/documents\/[^/]+$/.test(pathname)) {
+    return "DOCUMENT_DETAIL";
+  }
+  if (
+    method === "POST" &&
+    pathname === CARESLINK_V1_PRODUCT_API_PATHS.privacyReviews
+  ) {
+    return "PRIVACY_REVIEW";
+  }
+  if (
+    (method === "POST" &&
+      pathname === CARESLINK_V1_PRODUCT_API_PATHS.documents) ||
+    ((method === "PATCH" || method === "DELETE") &&
+      /^\/v1\/documents\/[^/]+$/.test(pathname)) ||
+    (method === "PUT" &&
+      /^\/v1\/documents\/[^/]+\/checkpoint$/.test(pathname))
+  ) {
+    return "DOCUMENT_WRITE";
+  }
+  return undefined;
+}
+
+export function isCaresLinkV1ProductApiOperationEnabled(
+  request: Request,
+  env: CaresLinkV1ProductApiRuntimeEnv =
+    process.env as CaresLinkV1ProductApiRuntimeEnv,
+) {
+  switch (getCaresLinkV1ProductApiOperationCapability(request)) {
+    case "M0_READ":
+      return env.CARESLINK_V1_PRODUCT_API_M0_READ_ENABLED === "true";
+    case "DOCUMENT_DETAIL":
+      return env.CARESLINK_V1_PRODUCT_API_DOCUMENT_DETAIL_ENABLED === "true";
+    case "PRIVACY_REVIEW":
+      return env.CARESLINK_V1_PRODUCT_API_PRIVACY_REVIEW_ENABLED === "true";
+    case "DOCUMENT_WRITE":
+      return env.CARESLINK_V1_PRODUCT_API_DOCUMENT_WRITE_ENABLED === "true";
+    default:
+      return false;
+  }
+}
+
 /**
  * Request-scoped runtime assembly. The master API flag, durable-adapter flag,
  * service-only active-session check and database flag are independent gates.
@@ -125,7 +202,8 @@ export function createCaresLinkV1ProductApiRuntime(
       if (
         !isCaresLinkV1ProductApiEnabled(env) ||
         !isCaresLinkV1DurableProductApiEnabled(env) ||
-        !isCaresLinkV1ProductApiPreviewTargetAllowed(env)
+        !isCaresLinkV1ProductApiPreviewTargetAllowed(env) ||
+        !isCaresLinkV1ProductApiOperationEnabled(request, env)
       ) {
         return {
           ok: false,
@@ -147,7 +225,8 @@ export function createCaresLinkV1ProductApiRuntime(
       if (
         !isCaresLinkV1ProductApiEnabled(env) ||
         !isCaresLinkV1DurableProductApiEnabled(env) ||
-        !isCaresLinkV1ProductApiPreviewTargetAllowed(env)
+        !isCaresLinkV1ProductApiPreviewTargetAllowed(env) ||
+        !isCaresLinkV1ProductApiOperationEnabled(request, env)
       ) {
         return undefined;
       }

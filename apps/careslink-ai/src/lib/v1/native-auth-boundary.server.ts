@@ -20,7 +20,7 @@ export const CARESLINK_V1_NATIVE_AUTH_EXPECTED_SUPABASE_REF_FLAG =
   "CARESLINK_V1_NATIVE_AUTH_EXPECTED_SUPABASE_REF" as const;
 
 /**
- * This compile-time latch deliberately has no environment override. The four
+ * This compile-time latch deliberately has no environment override. The five
  * native-auth routes may describe their boundary and return 501, but no code in
  * this module can exchange a PKCE code, enumerate sessions/devices, or revoke a
  * session until a later reviewed implementation changes this constant.
@@ -29,11 +29,11 @@ export const CARESLINK_V1_NATIVE_AUTH_IMPLEMENTATION_READY = false as const;
 
 export const CARESLINK_V1_NATIVE_AUTH_SECURITY_POLICY = {
   accessTokenTransport: "AUTHORIZATION_BEARER_HEADER_ONLY",
-  refreshTokenTransport: "NOT_SUPPORTED_BY_THIS_CONTRACT",
+  refreshTokenTransport: "SUPABASE_NATIVE_SDK_ONLY",
   authorizationCodeReceipt: "NATIVE_DEEP_LINK_CALLBACK_MEMORY_ONLY",
-  authorizationCodeForwarding: "EPHEMERAL_JSON_BODY_ONLY",
+  authorizationCodeForwarding: "SUPABASE_NATIVE_SDK_ONLY",
   authorizationCodeUse: "SINGLE_USE",
-  codeVerifierTransport: "EPHEMERAL_JSON_BODY_ONLY",
+  codeVerifierStorage: "SECURESTORE_EPHEMERAL_ONLY",
   accessOrRefreshTokenInUrl: "FORBIDDEN",
   accessOrRefreshTokenInBody: "FORBIDDEN",
   credentialLoggingOrAnalytics: "FORBIDDEN",
@@ -43,26 +43,26 @@ export const CARESLINK_V1_NATIVE_AUTH_SECURITY_POLICY = {
 } as const;
 
 /**
- * Every item must be frozen and independently reviewed before the compile-time
- * implementation latch may change. These values are design blockers, not
- * environment configuration.
+ * The M0 protocol draft is versioned in native-auth-contract.ts. These are
+ * remaining implementation/evidence gates; none can be satisfied by
+ * environment values.
  */
-export const CARESLINK_V1_NATIVE_AUTH_UNFROZEN_BLOCKERS = {
-  stateValidation: "UNFROZEN",
-  redirectUriAllowlist: "UNFROZEN",
-  pkceS256Verification: "UNFROZEN",
-  authorizationCodeReplayStorage: "UNFROZEN",
-  tokenHandoff: "UNFROZEN_ACCESS_REFRESH_TOKEN_BODY_FORBIDDEN",
+export const CARESLINK_V1_NATIVE_AUTH_IMPLEMENTATION_BLOCKERS = {
+  providerConfiguration: "PREVIEW_FIXTURES_NOT_PROVEN",
+  redirectUriRegistration: "PREVIEW_ALLOWLIST_NOT_PROVEN",
+  stateAndReplayEvidence: "PREVIEW_E2E_NOT_RUN",
+  secureStoreHandoff: "MOBILE_E2E_NOT_RUN",
+  sessionInventoryAndRevocation: "NOT_IMPLEMENTED",
 } as const;
 
 export const CARESLINK_V1_NATIVE_AUTH_ENDPOINT_DESIGN = {
   nativePkceCallback: {
     path: CARESLINK_V1_AUTH_BOUNDARIES.nativePkceCallback.path,
     method: "POST",
-    authentication: "PKCE_PROOF_IN_EPHEMERAL_JSON",
-    request: "CaresLinkV1NativePkceCallbackRequest",
+    authentication: "NONE_DISABLED_BOUNDARY",
+    request: "NO_M0_PRODUCT_API_REQUEST",
     response: "NOT_IMPLEMENTED_ERROR_ENVELOPE_ONLY",
-    successResponse: "UNFROZEN_NO_TOKEN_BODY_ALLOWED",
+    successResponse: "NONE_M0_USES_SUPABASE_NATIVE_SDK",
     capability: false,
   },
   sessions: {
@@ -89,23 +89,17 @@ export const CARESLINK_V1_NATIVE_AUTH_ENDPOINT_DESIGN = {
     response: "CaresLinkV1NativeRevokeSessionResponse",
     capability: false,
   },
+  revokeAllSessions: {
+    path: CARESLINK_V1_AUTH_BOUNDARIES.revokeAllSessions.path,
+    method: "POST",
+    authentication: "BEARER_HEADER_ONLY",
+    request: "NO_BODY",
+    response: "CaresLinkV1NativeRevokeAllSessionsResponse",
+    capability: false,
+  },
 } as const;
 
 export type CaresLinkV1NativePlatform = "ios" | "android";
-
-/**
- * Future design only. A single-use authorization code may first arrive at the
- * native app's OS-controlled deep-link callback, then be forwarded with the
- * verifier in an ephemeral JSON request. Neither value may be logged or
- * persisted. This exception never applies to access or refresh tokens.
- */
-export type CaresLinkV1NativePkceCallbackRequest = Readonly<{
-  authorizationCode: string;
-  codeVerifier: string;
-  redirectUri: string;
-  state: string;
-  platform: CaresLinkV1NativePlatform;
-}>;
 
 export type CaresLinkV1NativeSessionSummary = Readonly<{
   sessionId: string;
@@ -150,6 +144,14 @@ export type CaresLinkV1NativeRevokeSessionResponse =
         revokedCurrentSession: false;
         clientCleanup: "NONE";
       }>);
+
+export type CaresLinkV1NativeRevokeAllSessionsResponse = Readonly<{
+  scope: "ALL";
+  status: "REVOKED";
+  revokedAt: string;
+  revokedCurrentSession: true;
+  clientCleanup: "SIGN_OUT_WIPE_REBUILD";
+}>;
 
 export type CaresLinkV1NativeAuthPreviewEnv = Readonly<{
   VERCEL_ENV?: string;

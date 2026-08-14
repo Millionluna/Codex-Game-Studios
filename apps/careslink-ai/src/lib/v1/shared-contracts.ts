@@ -755,7 +755,7 @@ export function isCaresLinkV1Locale(
 export function assertCaresLinkV1IdempotencyKey(value: string) {
   if (!/^[A-Za-z0-9][A-Za-z0-9._:-]{15,127}$/.test(value)) {
     throw new CaresLinkV1ContractError(
-      "IDEMPOTENCY_CONFLICT",
+      "VALIDATION_ERROR",
       "Idempotency key must be 16-128 safe characters",
     );
   }

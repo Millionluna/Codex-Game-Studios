@@ -58,6 +58,15 @@ describe("V1 shadow OpenAPI contract", () => {
     expect(contract).toContain(
       "x-careslink-mobile-auth-transport: bearer-authorization-header-only",
     );
+    expect(contract).toContain(
+      "x-careslink-native-auth-contract-version: 2026-08-14.preview.1",
+    );
+    expect(contract).toContain(
+      "x-careslink-native-auth-contract-status: versioned-draft-runtime-disabled",
+    );
+    expect(contract).toContain(
+      "x-careslink-native-auth-exchange-owner: supabase-native-sdk",
+    );
     expect(contract).toContain(`version: ${CARESLINK_V1_CONTRACT_VERSION}`);
     expect(contract).toContain(
       `x-careslink-minimum-client-version: ${CARESLINK_V1_MINIMUM_CLIENT_VERSION}`,
@@ -106,17 +115,54 @@ describe("V1 shadow OpenAPI contract", () => {
     }
   });
 
+  it("marks every operation default-off and generates only the M0 read allowlist", () => {
+    const operationCount = contract.match(/operationId:/g)?.length ?? 0;
+    expect(operationCount).toBeGreaterThan(0);
+    expect(contract.match(/x-careslink-capability-id:/g)).toHaveLength(
+      operationCount,
+    );
+    expect(contract.match(/x-careslink-default-enabled: false/g)).toHaveLength(
+      operationCount,
+    );
+    expect(contract.match(/x-careslink-sdk-target: mobile-m0/g)).toHaveLength(3);
+    for (const operationId of ["getMe", "listDocuments", "pullChanges"]) {
+      expect(getOperationIdBlock(operationId)).toContain(
+        "x-careslink-sdk-target: mobile-m0",
+      );
+      expect(getOperationIdBlock(operationId)).toContain(
+        "x-careslink-runtime-flag: CARESLINK_V1_PRODUCT_API_M0_READ_ENABLED",
+      );
+    }
+    for (const operationId of [
+      "createDocument",
+      "getDocument",
+      "appendDocumentRevision",
+      "saveCheckpoint",
+      "tombstoneDocument",
+      "confirmPrivacyReview",
+      "pushChangesBoundary",
+    ]) {
+      expect(getOperationIdBlock(operationId)).toContain(
+        "x-careslink-sdk-target: disabled-boundary",
+      );
+    }
+  });
+
   it("keeps native session, device and revoke boundaries Bearer-only", () => {
     expect(getPathBlock("/v1/auth/native/callback")).toContain("security: []");
     for (const path of [
       "/v1/auth/sessions",
       "/v1/auth/devices",
       "/v1/auth/sessions/{sessionId}/revoke",
+      "/v1/auth/sessions/revoke-all",
     ]) {
       const block = getPathBlock(path);
       expect(block).toContain("security:\n        - BearerAuth: []");
       expect(block).not.toContain("CookieSession");
     }
+    expect(getPathBlock("/v1/auth/native/callback")).toContain(
+      "x-careslink-m0-client-usage: forbidden",
+    );
   });
 
   it("keeps identity and tokens out of Product API request schemas", () => {
@@ -346,13 +392,13 @@ describe("V1 shadow OpenAPI contract", () => {
   });
 
   it("documents disabled and unavailable capabilities without claiming service", () => {
-    expect(contract.match(/x-careslink-availability: not-implemented/g)).toHaveLength(
-      5,
-    );
+    expect(
+      contract.match(/x-careslink-availability: not-implemented/g),
+    ).toHaveLength(6);
     expect(
       contract.match(/x-careslink-availability: contract-only-shadow/g),
     ).toHaveLength(5);
-    expect(contract.match(/x-careslink-served: false/g)).toHaveLength(10);
+    expect(contract.match(/x-careslink-served: false/g)).toHaveLength(11);
     expect(contract).toContain("PRODUCT_API_DISABLED");
     expect(contract).toContain("NOT_IMPLEMENTED");
     expect(contract).toContain("SESSION_REVOKED");
@@ -371,6 +417,11 @@ describe("V1 shadow OpenAPI contract", () => {
     for (const errorCode of CARESLINK_V1_ERROR_CODES) {
       expect(contract).toContain(errorCode);
     }
+    const noteTypeDefinition = getSchemaBlock("NoteTypeDefinition");
+    expect(noteTypeDefinition).toMatch(
+      /required:[\s\S]*prohibitedDecisions/,
+    );
+    expect(noteTypeDefinition).toContain("prohibitedDecisions:");
   });
 });
 
@@ -401,6 +452,18 @@ function getOperationBlock(path: string, method: string) {
   return nextOperation === -1
     ? pathBlock.slice(start)
     : pathBlock.slice(start, afterStart + nextOperation);
+}
+
+function getOperationIdBlock(operationId: string) {
+  const marker = `      operationId: ${operationId}\n`;
+  const start = contract.indexOf(marker);
+  expect(start).toBeGreaterThanOrEqual(0);
+  const remainder = contract.slice(start + marker.length);
+  const nextOperation = remainder.search(/^      operationId:/m);
+  const nextPath = remainder.search(/^  \/v1\//m);
+  const candidates = [nextOperation, nextPath].filter((value) => value >= 0);
+  const end = candidates.length === 0 ? remainder.length : Math.min(...candidates);
+  return contract.slice(start, start + marker.length + end);
 }
 
 function getPathBlock(path: string) {

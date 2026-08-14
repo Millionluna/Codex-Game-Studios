@@ -346,6 +346,7 @@ describe("CaresLink V1 Product API auth", () => {
       sessions: "NOT_SERVED",
       devices: "NOT_SERVED",
       revoke: "NOT_SERVED",
+      revokeAll: "NOT_SERVED",
     });
 
     const source = readFileSync(

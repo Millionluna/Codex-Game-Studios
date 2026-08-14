@@ -10,13 +10,15 @@ import {
   CARESLINK_V1_NATIVE_AUTH_FEATURE_FLAG,
   CARESLINK_V1_NATIVE_AUTH_IMPLEMENTATION_READY,
   CARESLINK_V1_NATIVE_AUTH_SECURITY_POLICY,
-  CARESLINK_V1_NATIVE_AUTH_UNFROZEN_BLOCKERS,
+  CARESLINK_V1_NATIVE_AUTH_IMPLEMENTATION_BLOCKERS,
   handleCaresLinkV1NativeAuthDisabledBoundary,
   resolveCaresLinkV1NativeAuthPreviewGuard,
-  type CaresLinkV1NativePkceCallbackRequest,
   type CaresLinkV1NativeRevokeSessionResponse,
 } from "./native-auth-boundary.server";
 import { CARESLINK_V1_CONTRACT_VERSION } from "./shared-contracts";
+import {
+  CARESLINK_V1_NATIVE_PKCE_POLICY,
+} from "./native-auth-contract";
 import {
   CARESLINK_V1_HEADER_NAMES,
   CARESLINK_V1_MINIMUM_CLIENT_VERSION,
@@ -31,7 +33,7 @@ afterEach(() => {
 });
 
 describe("CaresLink V1 native-auth Preview boundary", () => {
-  it("freezes all four capabilities as disabled design-only endpoints", () => {
+  it("freezes all five capabilities as disabled design-only endpoints", () => {
     expect(CARESLINK_V1_NATIVE_AUTH_IMPLEMENTATION_READY).toBe(false);
     expect(CARESLINK_V1_NATIVE_AUTH_FEATURE_FLAG).toBe(
       "CARESLINK_V1_NATIVE_AUTH_ENABLED",
@@ -44,7 +46,8 @@ describe("CaresLink V1 native-auth Preview boundary", () => {
         path: "/v1/auth/native/callback",
         method: "POST",
         response: "NOT_IMPLEMENTED_ERROR_ENVELOPE_ONLY",
-        successResponse: "UNFROZEN_NO_TOKEN_BODY_ALLOWED",
+        request: "NO_M0_PRODUCT_API_REQUEST",
+        successResponse: "NONE_M0_USES_SUPABASE_NATIVE_SDK",
         capability: false,
       },
       sessions: {
@@ -63,6 +66,12 @@ describe("CaresLink V1 native-auth Preview boundary", () => {
         path: "/v1/auth/sessions/{sessionId}/revoke",
         method: "POST",
         request: "SESSION_ID_PATH_ONLY_NO_BODY",
+        capability: false,
+      },
+      revokeAllSessions: {
+        path: "/v1/auth/sessions/revoke-all",
+        method: "POST",
+        request: "NO_BODY",
         capability: false,
       },
     });
@@ -92,23 +101,13 @@ describe("CaresLink V1 native-auth Preview boundary", () => {
   });
 
   it("distinguishes the single-use PKCE code from access and refresh tokens", () => {
-    const callback: CaresLinkV1NativePkceCallbackRequest = {
-      authorizationCode: "single-use-code",
-      codeVerifier: "memory-only-verifier",
-      redirectUri: "careslink://auth/callback",
-      state: "state-bound-to-native-attempt",
-      platform: "ios",
-    };
-
-    expect(callback).not.toHaveProperty("accessToken");
-    expect(callback).not.toHaveProperty("refreshToken");
     expect(CARESLINK_V1_NATIVE_AUTH_SECURITY_POLICY).toEqual({
       accessTokenTransport: "AUTHORIZATION_BEARER_HEADER_ONLY",
-      refreshTokenTransport: "NOT_SUPPORTED_BY_THIS_CONTRACT",
+      refreshTokenTransport: "SUPABASE_NATIVE_SDK_ONLY",
       authorizationCodeReceipt: "NATIVE_DEEP_LINK_CALLBACK_MEMORY_ONLY",
-      authorizationCodeForwarding: "EPHEMERAL_JSON_BODY_ONLY",
+      authorizationCodeForwarding: "SUPABASE_NATIVE_SDK_ONLY",
       authorizationCodeUse: "SINGLE_USE",
-      codeVerifierTransport: "EPHEMERAL_JSON_BODY_ONLY",
+      codeVerifierStorage: "SECURESTORE_EPHEMERAL_ONLY",
       accessOrRefreshTokenInUrl: "FORBIDDEN",
       accessOrRefreshTokenInBody: "FORBIDDEN",
       credentialLoggingOrAnalytics: "FORBIDDEN",
@@ -116,21 +115,19 @@ describe("CaresLink V1 native-auth Preview boundary", () => {
       credentialErrorReflection: "FORBIDDEN",
       revokeCleanup: "CURRENT_SESSION_ONLY_SIGN_OUT_WIPE_REBUILD",
     });
+    expect(CARESLINK_V1_NATIVE_AUTH_SECURITY_POLICY.codeVerifierStorage).toBe(
+      CARESLINK_V1_NATIVE_PKCE_POLICY.verifierStorage,
+    );
   });
 
-  it("keeps unresolved PKCE security decisions as explicit enablement blockers", () => {
-    expect(CARESLINK_V1_NATIVE_AUTH_UNFROZEN_BLOCKERS).toEqual({
-      stateValidation: "UNFROZEN",
-      redirectUriAllowlist: "UNFROZEN",
-      pkceS256Verification: "UNFROZEN",
-      authorizationCodeReplayStorage: "UNFROZEN",
-      tokenHandoff: "UNFROZEN_ACCESS_REFRESH_TOKEN_BODY_FORBIDDEN",
+  it("keeps Preview evidence and missing revocation runtime as enablement blockers", () => {
+    expect(CARESLINK_V1_NATIVE_AUTH_IMPLEMENTATION_BLOCKERS).toEqual({
+      providerConfiguration: "PREVIEW_FIXTURES_NOT_PROVEN",
+      redirectUriRegistration: "PREVIEW_ALLOWLIST_NOT_PROVEN",
+      stateAndReplayEvidence: "PREVIEW_E2E_NOT_RUN",
+      secureStoreHandoff: "MOBILE_E2E_NOT_RUN",
+      sessionInventoryAndRevocation: "NOT_IMPLEMENTED",
     });
-    expect(
-      Object.values(CARESLINK_V1_NATIVE_AUTH_UNFROZEN_BLOCKERS).every((value) =>
-        value.startsWith("UNFROZEN"),
-      ),
-    ).toBe(true);
     expect(CARESLINK_V1_NATIVE_AUTH_IMPLEMENTATION_READY).toBe(false);
   });
 
@@ -296,6 +293,7 @@ describe("CaresLink V1 native-auth Preview boundary", () => {
       ["src/app/v1/auth/sessions/route.ts", "GET"],
       ["src/app/v1/auth/devices/route.ts", "GET"],
       ["src/app/v1/auth/sessions/[sessionId]/revoke/route.ts", "POST"],
+      ["src/app/v1/auth/sessions/revoke-all/route.ts", "POST"],
     ] as const) {
       const source = readFileSync(join(process.cwd(), relativePath), "utf8");
       expect(source).toContain("handleCaresLinkV1NativeAuthDisabledBoundary");
@@ -325,6 +323,8 @@ describe("CaresLink V1 native-auth Preview boundary", () => {
     expect(implementation).not.toMatch(
       /exchangeCodeForSession|setSession|signOut|auth\.admin|\.rpc\(|fetch\(/,
     );
+    expect(implementation).not.toContain("CaresLinkV1NativePkceCallbackRequest");
+    expect(implementation).not.toContain("EPHEMERAL_JSON_BODY_ONLY");
   });
 });
 

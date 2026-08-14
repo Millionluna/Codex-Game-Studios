@@ -1,9 +1,15 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   CARESLINK_V1_PRODUCT_API_DURABLE_ADAPTER_FLAG,
+  CARESLINK_V1_PRODUCT_API_DOCUMENT_DETAIL_FLAG,
+  CARESLINK_V1_PRODUCT_API_DOCUMENT_WRITE_FLAG,
   CARESLINK_V1_PRODUCT_API_EXPECTED_SUPABASE_REF_FLAG,
+  CARESLINK_V1_PRODUCT_API_M0_READ_FLAG,
+  CARESLINK_V1_PRODUCT_API_PRIVACY_REVIEW_FLAG,
   createCaresLinkV1ProductApiRuntime,
+  getCaresLinkV1ProductApiOperationCapability,
   isCaresLinkV1DurableProductApiEnabled,
+  isCaresLinkV1ProductApiOperationEnabled,
   isCaresLinkV1ProductApiPreviewTargetAllowed,
 } from "./product-api-runtime.server";
 import type {
@@ -23,6 +29,53 @@ const principal = {
 };
 
 describe("CaresLink V1 Product API runtime", () => {
+  it("gates the M0 read slice independently before any auth or RPC client", async () => {
+    const env = {
+      ...enabledEnv(),
+      [CARESLINK_V1_PRODUCT_API_DOCUMENT_DETAIL_FLAG]: undefined,
+      [CARESLINK_V1_PRODUCT_API_PRIVACY_REVIEW_FLAG]: undefined,
+      [CARESLINK_V1_PRODUCT_API_DOCUMENT_WRITE_FLAG]: undefined,
+    };
+    const createSessionStatusResolver = vi.fn();
+    const createBearerRpcClient = vi.fn(() => rpcClient());
+    const runtime = createCaresLinkV1ProductApiRuntime({
+      env,
+      createSessionStatusResolver,
+      createBearerRpcClient,
+    });
+
+    for (const path of ["/v1/me", "/v1/documents", "/v1/sync/pull"]) {
+      const request = requestWithBearer(path);
+      expect(getCaresLinkV1ProductApiOperationCapability(request)).toBe(
+        "M0_READ",
+      );
+      expect(isCaresLinkV1ProductApiOperationEnabled(request, env)).toBe(true);
+      await expect(runtime.getProductApi(principal, request)).resolves.toBeDefined();
+    }
+
+    for (const [path, method, capability] of [
+      ["/v1/documents", "POST", "DOCUMENT_WRITE"],
+      ["/v1/documents/document-a", "GET", "DOCUMENT_DETAIL"],
+      ["/v1/documents/document-a", "PATCH", "DOCUMENT_WRITE"],
+      ["/v1/documents/document-a/checkpoint", "PUT", "DOCUMENT_WRITE"],
+      ["/v1/privacy-reviews", "POST", "PRIVACY_REVIEW"],
+    ] as const) {
+      const request = requestWithBearer(path, method);
+      expect(getCaresLinkV1ProductApiOperationCapability(request)).toBe(
+        capability,
+      );
+      expect(isCaresLinkV1ProductApiOperationEnabled(request, env)).toBe(false);
+      await expect(runtime.resolveAuth(request)).resolves.toEqual({
+        ok: false,
+        reason: "feature_disabled",
+        status: 503,
+      });
+      await expect(runtime.getProductApi(principal, request)).resolves.toBeUndefined();
+    }
+    expect(createSessionStatusResolver).not.toHaveBeenCalled();
+    expect(createBearerRpcClient).toHaveBeenCalledTimes(3);
+  });
+
   it("keeps the durable adapter behind an independent exact-true flag", async () => {
     expect(isCaresLinkV1DurableProductApiEnabled({})).toBe(false);
     expect(
@@ -97,7 +150,7 @@ describe("CaresLink V1 Product API runtime", () => {
     await expect(
       runtime.getProductApi(
         principal,
-        requestWithBearer("/v1/privacy-reviews"),
+        requestWithBearer("/v1/privacy-reviews", "POST"),
       ),
     ).resolves.toBeDefined();
     expect(createPrivacyReviewRpcClient).toHaveBeenCalledWith(
@@ -120,7 +173,7 @@ describe("CaresLink V1 Product API runtime", () => {
     await expect(
       runtime.getProductApi(
         principal,
-        requestWithBearer("/v1/privacy-reviews"),
+        requestWithBearer("/v1/privacy-reviews", "POST"),
       ),
     ).resolves.toBeDefined();
     expect(createPrivacyReviewRpcClient).not.toHaveBeenCalled();
@@ -173,7 +226,7 @@ describe("CaresLink V1 Product API runtime", () => {
       await expect(
         runtime.getProductApi(
           principal,
-          requestWithBearer("/v1/privacy-reviews"),
+          requestWithBearer("/v1/privacy-reviews", "POST"),
         ),
       ).resolves.toBeUndefined();
       expect(createSessionStatusResolver).not.toHaveBeenCalled();
@@ -296,14 +349,19 @@ function enabledEnv() {
     CARESLINK_V1_PRODUCT_API_ENABLED: "true",
     CARESLINK_V1_PRODUCT_API_DURABLE_ADAPTER_ENABLED: "true",
     CARESLINK_V1_PRODUCT_API_EXPECTED_SUPABASE_REF: "previewproject",
+    [CARESLINK_V1_PRODUCT_API_M0_READ_FLAG]: "true",
+    CARESLINK_V1_PRODUCT_API_DOCUMENT_DETAIL_ENABLED: "true",
+    CARESLINK_V1_PRODUCT_API_PRIVACY_REVIEW_ENABLED: "true",
+    CARESLINK_V1_PRODUCT_API_DOCUMENT_WRITE_ENABLED: "true",
     NEXT_PUBLIC_SUPABASE_URL: "https://previewproject.supabase.co",
     NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "publishable-key",
     VERCEL_ENV: "preview",
   };
 }
 
-function requestWithBearer(path = "/v1/me") {
+function requestWithBearer(path = "/v1/me", method = "GET") {
   return new Request(`https://portal.example.test${path}`, {
+    method,
     headers: { authorization: `Bearer ${ACCESS_TOKEN}` },
   });
 }

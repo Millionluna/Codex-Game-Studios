@@ -27,6 +27,13 @@ x-careslink-owner-source: authenticated-server-session-only
 x-careslink-request-body-owner-fields: forbidden
 x-careslink-bearer-handling: authorization-header-only
 x-careslink-mobile-auth-transport: bearer-authorization-header-only
+x-careslink-native-auth-contract-version: 2026-08-14.preview.1
+x-careslink-native-auth-contract-status: versioned-draft-runtime-disabled
+x-careslink-native-auth-exchange-owner: supabase-native-sdk
+x-careslink-native-auth-redirect-preview: unconfirmed-empty-allowlist
+x-careslink-native-auth-product-api-callback: reserved-disabled-not-used-by-m0
+x-careslink-native-auth-identity-proof: bearer-get-v1-me-user-and-session-match
+x-careslink-native-auth-identity-linking: disabled-m0-no-email-auto-merge
 x-careslink-cookie-mutation-origin: same-origin-https-required
 x-careslink-mutation-content-type: application/json
 security:
@@ -36,6 +43,10 @@ paths:
   /v1/me:
     get:
       operationId: getMe
+      x-careslink-capability-id: identity.me.read
+      x-careslink-sdk-target: mobile-m0
+      x-careslink-default-enabled: false
+      x-careslink-runtime-flag: CARESLINK_V1_PRODUCT_API_M0_READ_ENABLED
       summary: Resolve the authenticated user and server session
       x-careslink-availability: feature-disabled-shadow
       parameters:
@@ -67,9 +78,13 @@ paths:
   /v1/auth/native/callback:
     post:
       operationId: nativePkceCallbackBoundary
-      summary: Explicit boundary; native PKCE callback is not implemented
+      x-careslink-capability-id: native.auth.callback.disabled
+      x-careslink-sdk-target: disabled-boundary
+      x-careslink-default-enabled: false
+      summary: Reserved disabled boundary; M0 uses the Supabase native SDK exchange
       x-careslink-availability: not-implemented
       x-careslink-served: false
+      x-careslink-m0-client-usage: forbidden
       security: []
       responses:
         "501":
@@ -77,6 +92,9 @@ paths:
   /v1/auth/sessions:
     get:
       operationId: listSessionsBoundary
+      x-careslink-capability-id: native.session.list.disabled
+      x-careslink-sdk-target: disabled-boundary
+      x-careslink-default-enabled: false
       summary: Explicit boundary; session registry is not implemented
       x-careslink-availability: not-implemented
       x-careslink-served: false
@@ -88,6 +106,9 @@ paths:
   /v1/auth/devices:
     get:
       operationId: listDevicesBoundary
+      x-careslink-capability-id: native.device.list.disabled
+      x-careslink-sdk-target: disabled-boundary
+      x-careslink-default-enabled: false
       summary: Explicit boundary; device registry is not implemented
       x-careslink-availability: not-implemented
       x-careslink-served: false
@@ -101,7 +122,24 @@ paths:
       - $ref: "#/components/parameters/SessionId"
     post:
       operationId: revokeSessionBoundary
+      x-careslink-capability-id: native.session.revoke-one.disabled
+      x-careslink-sdk-target: disabled-boundary
+      x-careslink-default-enabled: false
       summary: Explicit boundary; remote session revoke is not implemented
+      x-careslink-availability: not-implemented
+      x-careslink-served: false
+      security:
+        - BearerAuth: []
+      responses:
+        "501":
+          $ref: "#/components/responses/NotImplemented"
+  /v1/auth/sessions/revoke-all:
+    post:
+      operationId: revokeAllSessionsBoundary
+      x-careslink-capability-id: native.session.revoke-all.disabled
+      x-careslink-sdk-target: disabled-boundary
+      x-careslink-default-enabled: false
+      summary: Explicit boundary; account-wide session revoke is not implemented
       x-careslink-availability: not-implemented
       x-careslink-served: false
       security:
@@ -112,6 +150,9 @@ paths:
   /v1/note-types:
     get:
       operationId: listNoteTypes
+      x-careslink-capability-id: notes.catalog.read.disabled
+      x-careslink-sdk-target: disabled-boundary
+      x-careslink-default-enabled: false
       summary: List the versioned five-type Note catalog
       x-careslink-availability: contract-only-shadow
       x-careslink-served: false
@@ -137,6 +178,10 @@ paths:
       - $ref: "#/components/parameters/CorrelationId"
     get:
       operationId: listDocuments
+      x-careslink-capability-id: documents.list.read
+      x-careslink-sdk-target: mobile-m0
+      x-careslink-default-enabled: false
+      x-careslink-runtime-flag: CARESLINK_V1_PRODUCT_API_M0_READ_ENABLED
       summary: List owner-bound canonical documents using an opaque cursor
       x-careslink-availability: feature-disabled-shadow
       parameters:
@@ -166,6 +211,10 @@ paths:
           $ref: "#/components/responses/ProductApiDisabled"
     post:
       operationId: createDocument
+      x-careslink-capability-id: documents.create.write.disabled
+      x-careslink-sdk-target: disabled-boundary
+      x-careslink-default-enabled: false
+      x-careslink-runtime-flag: CARESLINK_V1_PRODUCT_API_DOCUMENT_WRITE_ENABLED
       summary: Atomically create a canonical document and its first revision
       description: >-
         Owner identity is derived from the authenticated server session and is
@@ -224,6 +273,10 @@ paths:
       - $ref: "#/components/parameters/CorrelationId"
     get:
       operationId: getDocument
+      x-careslink-capability-id: documents.detail.read.disabled
+      x-careslink-sdk-target: disabled-boundary
+      x-careslink-default-enabled: false
+      x-careslink-runtime-flag: CARESLINK_V1_PRODUCT_API_DOCUMENT_DETAIL_ENABLED
       summary: Read one owner-bound canonical document snapshot
       x-careslink-availability: feature-disabled-shadow
       responses:
@@ -252,6 +305,10 @@ paths:
           $ref: "#/components/responses/ProductApiDisabled"
     patch:
       operationId: appendDocumentRevision
+      x-careslink-capability-id: documents.revision.write.disabled
+      x-careslink-sdk-target: disabled-boundary
+      x-careslink-default-enabled: false
+      x-careslink-runtime-flag: CARESLINK_V1_PRODUCT_API_DOCUMENT_WRITE_ENABLED
       summary: Append a revision using an explicit base revision
       x-careslink-availability: feature-disabled-shadow
       x-careslink-write-rpc-grant: withheld
@@ -316,6 +373,10 @@ paths:
           $ref: "#/components/responses/ProductApiDisabled"
     delete:
       operationId: tombstoneDocument
+      x-careslink-capability-id: documents.tombstone.write.disabled
+      x-careslink-sdk-target: disabled-boundary
+      x-careslink-default-enabled: false
+      x-careslink-runtime-flag: CARESLINK_V1_PRODUCT_API_DOCUMENT_WRITE_ENABLED
       summary: Tombstone one owner-bound document without hard deletion
       x-careslink-availability: feature-disabled-shadow
       x-careslink-write-rpc-grant: withheld
@@ -363,6 +424,10 @@ paths:
       - $ref: "#/components/parameters/CorrelationId"
     put:
       operationId: saveCheckpoint
+      x-careslink-capability-id: documents.checkpoint.write.disabled
+      x-careslink-sdk-target: disabled-boundary
+      x-careslink-default-enabled: false
+      x-careslink-runtime-flag: CARESLINK_V1_PRODUCT_API_DOCUMENT_WRITE_ENABLED
       summary: Save owner-bound workflow progress against a base revision
       x-careslink-availability: feature-disabled-shadow
       x-careslink-write-rpc-grant: withheld
@@ -405,6 +470,10 @@ paths:
   /v1/sync/pull:
     get:
       operationId: pullChanges
+      x-careslink-capability-id: sync.pull.read
+      x-careslink-sdk-target: mobile-m0
+      x-careslink-default-enabled: false
+      x-careslink-runtime-flag: CARESLINK_V1_PRODUCT_API_M0_READ_ENABLED
       summary: Pull owner-bound document changes using an opaque cursor
       description: >-
         The cursor is opaque and scoped to the authenticated owner. Tombstones
@@ -445,10 +514,14 @@ paths:
   /v1/sync/push:
     post:
       operationId: pushChangesBoundary
+      x-careslink-capability-id: sync.push.write.disabled
+      x-careslink-sdk-target: disabled-boundary
+      x-careslink-default-enabled: false
       summary: Explicit boundary; sync push is not implemented
       description: >-
         The Mobile V1 PRD reserves this route. No batch body or write behavior
-        is frozen, no route is served, and no database execute grant is implied.
+        is frozen, only a fixed 501 boundary exists, and no database execute
+        grant is implied.
       x-careslink-availability: not-implemented
       x-careslink-served: false
       responses:
@@ -457,6 +530,10 @@ paths:
   /v1/privacy-reviews:
     post:
       operationId: confirmPrivacyReview
+      x-careslink-capability-id: privacy.review.write.disabled
+      x-careslink-sdk-target: disabled-boundary
+      x-careslink-default-enabled: false
+      x-careslink-runtime-flag: CARESLINK_V1_PRODUCT_API_PRIVACY_REVIEW_ENABLED
       summary: Confirm a privacy review against cleaned structured facts
       description: >-
         Authenticated, atomic Preview-only confirmation. The request contains
@@ -509,6 +586,9 @@ paths:
   /v1/points/quotes:
     post:
       operationId: createPointQuote
+      x-careslink-capability-id: points.quote.disabled
+      x-careslink-sdk-target: disabled-boundary
+      x-careslink-default-enabled: false
       summary: Return a server-owned versioned point quote
       x-careslink-availability: contract-only-shadow
       x-careslink-served: false
@@ -538,6 +618,9 @@ paths:
   /v1/points/reservations:
     post:
       operationId: reservePoints
+      x-careslink-capability-id: points.reserve.disabled
+      x-careslink-sdk-target: disabled-boundary
+      x-careslink-default-enabled: false
       summary: Atomically reserve point lots for a quote
       x-careslink-availability: contract-only-shadow
       x-careslink-served: false
@@ -571,6 +654,9 @@ paths:
   /v1/points/reservations/{reservationId}/commit:
     post:
       operationId: commitPoints
+      x-careslink-capability-id: points.commit.disabled
+      x-careslink-sdk-target: disabled-boundary
+      x-careslink-default-enabled: false
       summary: Commit only after a usable result revision is persisted
       x-careslink-availability: contract-only-shadow
       x-careslink-served: false
@@ -599,6 +685,9 @@ paths:
   /v1/points/reservations/{reservationId}/release:
     post:
       operationId: releasePoints
+      x-careslink-capability-id: points.release.disabled
+      x-careslink-sdk-target: disabled-boundary
+      x-careslink-default-enabled: false
       summary: Release a failed or cancelled reservation to its original lots
       x-careslink-availability: contract-only-shadow
       x-careslink-served: false
@@ -1137,7 +1226,8 @@ components:
     NoteTypeDefinition:
       type: object
       additionalProperties: false
-      required: [code, schemaVersion, generationServiceCode, fields]
+      required:
+        [code, schemaVersion, generationServiceCode, fields, prohibitedDecisions]
       properties:
         code:
           $ref: "#/components/schemas/NoteTypeCode"
@@ -1149,6 +1239,9 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/NoteFieldDefinition"
+        prohibitedDecisions:
+          type: array
+          items: { type: string, minLength: 1, maxLength: 500 }
     DocumentLifecycleStatus:
       type: string
       enum: [IN_PROGRESS, COMPLETED, TOMBSTONED, PURGED]
