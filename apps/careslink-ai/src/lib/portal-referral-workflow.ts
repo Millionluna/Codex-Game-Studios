@@ -119,6 +119,30 @@ export type PortalReferralView = Readonly<{
   updatedAt: string;
 }>;
 
+export type PortalReferralListItem = Readonly<{
+  referralId: string;
+  region: string;
+  serviceType: string;
+  currentStatus: PortalReferralStatus;
+  rowVersion: number;
+  updatedAt: string;
+}>;
+
+export type PortalReferralOfferListItem = Readonly<{
+  matchId: string;
+  referralId: string;
+  region: string;
+  serviceType: string;
+  matchStatus: "OFFERED" | "ACCEPTED";
+  currentStatus: PortalReferralStatus;
+  rowVersion: number;
+}>;
+
+export type PortalReferralProviderCandidate = Readonly<{
+  providerId: string;
+  displayName: string;
+}>;
+
 export type PortalReferralMutationAck = Readonly<{
   referralId: string;
   matchId: string | null;
@@ -135,7 +159,7 @@ export type PortalReferralAuditEvent = Readonly<{
   mutationKind: PortalReferralMutationKind;
   fromStatus: PortalReferralStatus | null;
   toStatus: PortalReferralStatus;
-  mutationId: string;
+  mutationIdHash: string;
   occurredAt: string;
   metadata: Readonly<Record<string, string | number | boolean | null>>;
 }>;
@@ -189,18 +213,19 @@ type MutationReceipt = {
   response: PortalReferralMutationAck;
 };
 
-type WorkflowOptions = Readonly<{
+export type PortalReferralWorkflowOptions = Readonly<{
   createId?: () => string;
   now?: () => string;
   isProviderEligible?: (providerId: string) => boolean;
+  providerCandidates?: readonly PortalReferralProviderCandidate[];
 }>;
 
-type MutationMetadata = Readonly<{
+export type PortalReferralMutationMetadata = Readonly<{
   mutationId: string;
 }>;
 
 export function createMemoryPortalReferralWorkflow(
-  options: WorkflowOptions = {},
+  options: PortalReferralWorkflowOptions = {},
 ) {
   const referrals = new Map<string, StoredReferral>();
   const matches = new Map<string, StoredMatch>();
@@ -208,7 +233,17 @@ export function createMemoryPortalReferralWorkflow(
   const receipts = new Map<string, MutationReceipt>();
   const createId = options.createId ?? (() => globalThis.crypto.randomUUID());
   const now = options.now ?? (() => new Date().toISOString());
-  const isProviderEligible = options.isProviderEligible ?? (() => false);
+  const providerCandidates = (options.providerCandidates ?? []).map(
+    (candidate) =>
+      Object.freeze({
+        providerId: requiredId(candidate.providerId, "providerId"),
+        displayName: requiredText(candidate.displayName, "displayName", 200),
+      }),
+  );
+  const isProviderEligible =
+    options.isProviderEligible ??
+    ((providerId: string) =>
+      providerCandidates.some((candidate) => candidate.providerId === providerId));
 
   function createReferral(
     actor: PortalReferralActor,
@@ -218,7 +253,7 @@ export function createMemoryPortalReferralWorkflow(
       serviceType: string;
       contact: PortalReferralContact;
     }>,
-    mutation: MutationMetadata,
+    mutation: PortalReferralMutationMetadata,
   ) {
     assertActiveActor(actor, ["referral_source"]);
     assertAllowedKeys(request, ["summary", "region", "serviceType", "contact"]);
@@ -265,7 +300,7 @@ export function createMemoryPortalReferralWorkflow(
     actor: PortalReferralActor,
     referralId: string,
     expectedVersion: number,
-    mutation: MutationMetadata,
+    mutation: PortalReferralMutationMetadata,
   ) {
     assertOperator(actor);
     ownedReferralForOperator(actor, referralId);
@@ -287,7 +322,7 @@ export function createMemoryPortalReferralWorkflow(
       providerId: string;
       expectedVersion: number;
     }>,
-    mutation: MutationMetadata,
+    mutation: PortalReferralMutationMetadata,
   ) {
     assertOperator(actor);
     assertAllowedKeys(request, ["referralId", "providerId", "expectedVersion"]);
@@ -341,7 +376,7 @@ export function createMemoryPortalReferralWorkflow(
       expectedVersion: number;
       decision: "ACCEPT" | "DECLINE";
     }>,
-    mutation: MutationMetadata,
+    mutation: PortalReferralMutationMetadata,
   ) {
     assertActiveActor(actor, ["provider_member"]);
     if (!actor.providerId) {
@@ -409,7 +444,7 @@ export function createMemoryPortalReferralWorkflow(
       expectedVersion: number;
       outcomeCode: PortalReferralFollowUpOutcomeCode;
     }>,
-    mutation: MutationMetadata,
+    mutation: PortalReferralMutationMetadata,
   ) {
     assertAllowedKeys(request, ["referralId", "expectedVersion", "outcomeCode"]);
     const command = {
@@ -443,7 +478,7 @@ export function createMemoryPortalReferralWorkflow(
       canonicalDocumentId: string;
       expectedVersion: number;
     }>,
-    mutation: MutationMetadata,
+    mutation: PortalReferralMutationMetadata,
   ) {
     assertAllowedKeys(request, [
       "referralId",
@@ -479,7 +514,7 @@ export function createMemoryPortalReferralWorkflow(
       exportJobId: string;
       expectedVersion: number;
     }>,
-    mutation: MutationMetadata,
+    mutation: PortalReferralMutationMetadata,
   ) {
     assertAllowedKeys(request, ["referralId", "exportJobId", "expectedVersion"]);
     const command = {
@@ -505,7 +540,7 @@ export function createMemoryPortalReferralWorkflow(
     actor: PortalReferralActor,
     referralId: string,
     expectedVersion: number,
-    mutation: MutationMetadata,
+    mutation: PortalReferralMutationMetadata,
   ) {
     assertCanWorkReferral(actor, referralId);
     return transition(
@@ -524,6 +559,85 @@ export function createMemoryPortalReferralWorkflow(
     return viewReferral(actor, requiredReferral(referralId));
   }
 
+  function listReferrals(actor: PortalReferralActor) {
+    assertActiveActor(actor, PORTAL_MEMBERSHIP_ROLES);
+    const items: PortalReferralListItem[] = [];
+    for (const referral of referrals.values()) {
+      try {
+        const view = viewReferral(actor, referral);
+        items.push(
+          Object.freeze({
+            referralId: view.referralId,
+            region: view.region,
+            serviceType: view.serviceType,
+            currentStatus: view.currentStatus,
+            rowVersion: view.rowVersion,
+            updatedAt: view.updatedAt,
+          }),
+        );
+      } catch (error) {
+        if (
+          error instanceof PortalReferralWorkflowError &&
+          error.code === "NOT_FOUND"
+        ) {
+          continue;
+        }
+        throw error;
+      }
+    }
+    return items.sort((left, right) =>
+      left.referralId.localeCompare(right.referralId),
+    );
+  }
+
+  function listMyOffers(actor: PortalReferralActor) {
+    assertActiveActor(actor, ["provider_member"]);
+    if (!actor.providerId) {
+      throw new PortalReferralWorkflowError(
+        "FORBIDDEN",
+        "Provider membership is not bound to a provider",
+      );
+    }
+    const items: PortalReferralOfferListItem[] = [];
+    for (const match of matches.values()) {
+      if (
+        match.providerId !== actor.providerId ||
+        (match.status !== "OFFERED" && match.status !== "ACCEPTED")
+      ) {
+        continue;
+      }
+      const referral = requiredReferral(match.referralId);
+      items.push(
+        Object.freeze({
+          matchId: match.matchId,
+          referralId: referral.referralId,
+          region: referral.region,
+          serviceType: referral.serviceType,
+          matchStatus: match.status,
+          currentStatus: referral.currentStatus,
+          rowVersion: referral.rowVersion,
+        }),
+      );
+    }
+    return items.sort((left, right) => left.matchId.localeCompare(right.matchId));
+  }
+
+  function listProviderCandidates(
+    actor: PortalReferralActor,
+    referralId: string,
+  ) {
+    assertOperator(actor);
+    const referral = ownedReferralForOperator(
+      actor,
+      requiredId(referralId, "referralId"),
+    );
+    assertTransition(referral, ["TRIAGED"]);
+    return providerCandidates
+      .filter((candidate) => isProviderEligible(candidate.providerId))
+      .map(clone)
+      .sort((left, right) => left.providerId.localeCompare(right.providerId));
+  }
+
   function getAudit(actor: PortalReferralActor, referralId: string) {
     assertOperator(actor);
     ownedReferralForOperator(actor, referralId);
@@ -534,7 +648,7 @@ export function createMemoryPortalReferralWorkflow(
     actor: PortalReferralActor,
     referralId: string,
     expectedVersion: number,
-    mutation: MutationMetadata,
+    mutation: PortalReferralMutationMetadata,
     mutationKind: PortalReferralMutationKind,
     from: readonly PortalReferralStatus[],
     to: PortalReferralStatus,
@@ -562,7 +676,7 @@ export function createMemoryPortalReferralWorkflow(
 
   function replayOrRun<T>(
     actor: PortalReferralActor,
-    mutation: MutationMetadata,
+    mutation: PortalReferralMutationMetadata,
     kind: PortalReferralMutationKind,
     command: unknown,
     run: () => T,
@@ -578,7 +692,8 @@ export function createMemoryPortalReferralWorkflow(
         "mutationId must be 16-128 safe characters",
       );
     }
-    const key = `${actor.userId}:${mutationId}`;
+    const mutationIdHash = createPortalReferralMutationIdHash(mutationId);
+    const key = `${actor.userId}:${mutationIdHash}`;
     const payloadHash = createPortalReferralMutationPayloadHash({
       actor: {
         organizationId: actor.organizationId,
@@ -648,7 +763,7 @@ export function createMemoryPortalReferralWorkflow(
       mutationKind,
       fromStatus,
       toStatus: referral.currentStatus,
-      mutationId,
+      mutationIdHash: createPortalReferralMutationIdHash(mutationId),
       occurredAt: now(),
       metadata: clone(metadata),
     });
@@ -662,18 +777,6 @@ export function createMemoryPortalReferralWorkflow(
     const isSource =
       actor.role === "referral_source" &&
       actor.organizationId === referral.sourceOrganizationId;
-    const isOfferedProvider =
-      actor.role === "provider_member" &&
-      !!actor.providerId &&
-      [...matches.values()].some(
-        (match) =>
-          match.referralId === referral.referralId &&
-          match.providerId === actor.providerId &&
-          ["OFFERED", "ACCEPTED"].includes(match.status),
-      );
-    if (!isOperator && !isSource && !isOfferedProvider) {
-      throw new PortalReferralWorkflowError("NOT_FOUND", "Referral was not found");
-    }
     const providerMaySeeContact =
       actor.providerId === referral.assignedProviderId &&
       [
@@ -683,20 +786,19 @@ export function createMemoryPortalReferralWorkflow(
         "EXPORTED",
         "COMPLETED",
       ].includes(referral.currentStatus);
+    if (!isOperator && !isSource && !providerMaySeeContact) {
+      throw new PortalReferralWorkflowError("NOT_FOUND", "Referral was not found");
+    }
     return clone({
       referralId: referral.referralId,
       sourceOrganizationId: referral.sourceOrganizationId,
-      summary:
-        isOperator || isSource || providerMaySeeContact
-          ? referral.summary
-          : null,
+      summary: referral.summary,
       region: referral.region,
       serviceType: referral.serviceType,
       currentStatus: referral.currentStatus,
       assignedProviderId: referral.assignedProviderId,
       rowVersion: referral.rowVersion,
-      contact:
-        isOperator || isSource || providerMaySeeContact ? referral.contact : null,
+      contact: referral.contact,
       canonicalDocumentId: referral.canonicalDocumentId,
       exportJobId: referral.exportJobId,
       createdAt: referral.createdAt,
@@ -780,10 +882,17 @@ export function createMemoryPortalReferralWorkflow(
     linkDocument,
     recordExport,
     completeReferral,
+    listReferrals,
+    listMyOffers,
+    listProviderCandidates,
     getReferral,
     getAudit,
   });
 }
+
+export type PortalReferralWorkflowPort = ReturnType<
+  typeof createMemoryPortalReferralWorkflow
+>;
 
 function assertActiveActor(
   actor: PortalReferralActor,
@@ -820,7 +929,6 @@ function assertAllowedKeys(value: object, allowed: readonly string[]) {
     throw new PortalReferralWorkflowError(
       "VALIDATION_ERROR",
       "Request contains forbidden fields",
-      { fieldCodes: unexpected.sort() },
     );
   }
 }
@@ -981,4 +1089,8 @@ export function createPortalReferralMutationPayloadHash(value: unknown) {
   return createHash("sha256")
     .update(stringifyCaresLinkV1CanonicalJson(value), "utf8")
     .digest("hex");
+}
+
+export function createPortalReferralMutationIdHash(value: string) {
+  return createHash("sha256").update(value, "utf8").digest("hex");
 }

@@ -89,6 +89,10 @@ describe("Portal referral workflow contract", () => {
       mutation("triage-referral-0001"),
     );
     expect(triaged).toMatchObject({ currentStatus: "TRIAGED", rowVersion: 2 });
+    expect(workflow.listProviderCandidates(ADMIN, created.referralId)).toEqual([
+      { providerId: "provider-a", displayName: "Provider A" },
+      { providerId: "provider-b", displayName: "Provider B" },
+    ]);
 
     const offered = workflow.offerReferral(
       ADMIN,
@@ -103,12 +107,25 @@ describe("Portal referral workflow contract", () => {
       currentStatus: "OFFERED",
       rowVersion: 3,
     });
-    expect(workflow.getReferral(PROVIDER_A, created.referralId)).toMatchObject({
-      summary: null,
-      region: "VIC_MELBOURNE",
-      serviceType: "SUPPORT_COORDINATION",
-      contact: null,
-    });
+    expectError(
+      () => workflow.getReferral(PROVIDER_A, created.referralId),
+      "NOT_FOUND",
+    );
+    const offeredList = workflow.listMyOffers(PROVIDER_A);
+    expect(offeredList).toEqual([
+      {
+        matchId: offered.matchId,
+        referralId: created.referralId,
+        region: "VIC_MELBOURNE",
+        serviceType: "SUPPORT_COORDINATION",
+        matchStatus: "OFFERED",
+        currentStatus: "OFFERED",
+        rowVersion: 3,
+      },
+    ]);
+    expect(JSON.stringify(offeredList)).not.toMatch(
+      /summary|contact|phone|email|sourceOrganizationId|Person A|0400000000/,
+    );
 
     const accepted = workflow.respondToOffer(
       PROVIDER_A,
@@ -203,6 +220,10 @@ describe("Portal referral workflow contract", () => {
     expect(JSON.stringify(audit)).not.toContain("0400000000");
     expect(JSON.stringify(audit)).not.toContain("Person A");
     expect(JSON.stringify(audit)).not.toContain("Daily living support");
+    expect(JSON.stringify(audit)).not.toContain("create-referral-0001");
+    expect(audit.every((event) => /^[a-f0-9]{64}$/.test(event.mutationIdHash))).toBe(
+      true,
+    );
 
     const secondFollowUpWorkflow = createWorkflow();
     const acceptedReferral = createAcceptedReferral(secondFollowUpWorkflow);
@@ -258,7 +279,10 @@ describe("Portal referral workflow contract", () => {
       () => workflow.getReferral(PROVIDER_B, created.referralId),
       "NOT_FOUND",
     );
-    expect(workflow.getReferral(PROVIDER_A, created.referralId).contact).toBeNull();
+    expectError(
+      () => workflow.getReferral(PROVIDER_A, created.referralId),
+      "NOT_FOUND",
+    );
     expectError(
       () =>
         workflow.respondToOffer(
@@ -775,6 +799,10 @@ function createWorkflow() {
     now: () => `2026-08-14T00:00:${String(tick++).padStart(2, "0")}.000Z`,
     isProviderEligible: (providerId) =>
       ["provider-a", "provider-b"].includes(providerId),
+    providerCandidates: [
+      { providerId: "provider-a", displayName: "Provider A" },
+      { providerId: "provider-b", displayName: "Provider B" },
+    ],
   });
 }
 

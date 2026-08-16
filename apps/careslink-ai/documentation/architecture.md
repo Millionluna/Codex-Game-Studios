@@ -1,6 +1,6 @@
 # CaresLink AI Architecture
 
-> Status: **Current-state architecture**, audited 2026-08-14.
+> Status: **Current-state architecture**, audited 2026-08-16.
 > Delivery phase: **Implementation Readiness / local Preview shadow slice**.
 > This file does not claim that Product Baseline V1.0 is available in Production.
 
@@ -121,7 +121,7 @@ The forward registry is evidence for the empty, flags-off branch path only. It i
 
 - Vercel production is a Next.js server deployment; the AI subdomain is globally `noindex` so the Core public site remains the SEO canonical surface.
 - Production Supabase migrations currently end at `20260804223000_create_ndis_case_note_pilot_cohort.sql`. All later V1 shadow migrations remain unapplied to Production; live applications of earlier reviewed revisions were limited to isolated guarded-live branches. The retained branch is clean and inactive but does not contain the exact current hardening revision.
-- Pre-batch runtime baseline was 79 test files / 546 tests, and the completed implementation-readiness baseline was 90 files / 653 tests. The 2026-08-11 shared-contract snapshot passed 103 files / 831 tests. Committed HEAD on 2026-08-14 retains the 104-file / 894-test and 59/59 build evidence. The current Portal-first source snapshot passes 107 files / 938 tests, TypeScript, ESLint and a Next build with static generation 61/61. It adds the fifth fixed native `501` boundary, an unserved fixed sync-push `501`, the machine capability crosswalk and the local-only Referral foundation while keeping every new capability disabled. These source results are not database execution, current serving or cross-device E2E evidence; the earlier protected Preview and cleanup outcome is recorded separately in `documentation/tests.md`, and the exact current migrations remain unapplied.
+- Pre-batch runtime baseline was 79 test files / 546 tests, and the completed implementation-readiness baseline was 90 files / 653 tests. The 2026-08-11 shared-contract snapshot passed 103 files / 831 tests. Committed HEAD on 2026-08-14 retains the 104-file / 894-test and 59/59 build evidence. The current Portal-first source snapshot passes 112 files / 983 tests, TypeScript, ESLint and a Next build with static generation 63/63. It retains the five fixed native `501` boundaries, the unserved fixed sync-push `501` and machine capability crosswalk, then adds a dependency-injected Portal Referral route/page slice over the local contract and unapplied RLS foundation. The Referral runtime readiness latch is compile-time `false`, no durable adapter is registered and legacy mock IDs are never promoted into canonical mutations. These source results are not database execution, current serving or cross-device E2E evidence; the earlier protected Preview and cleanup outcome is recorded separately in `documentation/tests.md`, and the exact current migrations remain unapplied.
 - Read-only production logs showed a recent cluster of invalid/missing refresh-token errors. Session recovery and stale-cookie cleanup require a separate release fix and negative tests before V1 rollout.
 
 ## Intended V1 architecture (not Production-available)

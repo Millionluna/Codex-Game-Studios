@@ -155,8 +155,6 @@ create table public.portal_referral_matches (
   provider_id uuid not null
     references public.portal_providers(id) on delete restrict,
   score integer check (score is null or score between 0 and 100),
-  reasons jsonb not null default '[]'::jsonb check (jsonb_typeof(reasons) = 'array'),
-  gaps jsonb not null default '[]'::jsonb check (jsonb_typeof(gaps) = 'array'),
   status text not null default 'CANDIDATE' check (
     status in ('CANDIDATE', 'OFFERED', 'ACCEPTED', 'DECLINED', 'WITHDRAWN', 'EXPIRED')
   ),
@@ -164,7 +162,6 @@ create table public.portal_referral_matches (
   offered_at timestamptz,
   responded_by uuid references auth.users(id) on delete restrict,
   responded_at timestamptz,
-  response_reason_code text,
   row_version bigint not null default 1 check (row_version > 0),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
@@ -200,9 +197,6 @@ create table public.portal_referral_followups (
       'SERVICE_COMMENCED',
       'NO_RESPONSE'
     )
-  ),
-  restricted_note text check (
-    restricted_note is null or char_length(restricted_note) <= 4000
   ),
   next_due_at timestamptz,
   created_at timestamptz not null default now()
@@ -259,8 +253,8 @@ create index portal_exports_created_by_idx
 create table public.portal_mutation_receipts (
   id uuid primary key default gen_random_uuid(),
   actor_user_id uuid not null references auth.users(id) on delete restrict,
-  mutation_id text not null check (
-    mutation_id ~ '^[A-Za-z0-9][A-Za-z0-9._:-]{15,127}$'
+  mutation_id_hash text not null check (
+    mutation_id_hash ~ '^[a-f0-9]{64}$'
   ),
   mutation_kind text not null check (
     mutation_kind in (
@@ -297,7 +291,7 @@ create table public.portal_mutation_receipts (
   foreign key (response_match_id, response_referral_id)
     references public.portal_referral_matches(id, referral_id)
     on delete restrict,
-  unique (actor_user_id, mutation_id)
+  unique (actor_user_id, mutation_id_hash)
 );
 
 create index portal_receipts_response_referral_idx
@@ -344,12 +338,12 @@ create table public.portal_audit_events (
       'NOTE_LINKED', 'EXPORTED', 'COMPLETED', 'CLOSED'
     )
   ),
-  mutation_id text not null check (
-    mutation_id ~ '^[A-Za-z0-9][A-Za-z0-9._:-]{15,127}$'
+  mutation_id_hash text not null check (
+    mutation_id_hash ~ '^[a-f0-9]{64}$'
   ),
-  correlation_id text check (
-    correlation_id is null
-    or correlation_id ~ '^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$'
+  correlation_id_hash text check (
+    correlation_id_hash is null
+    or correlation_id_hash ~ '^[a-f0-9]{64}$'
   ),
   metadata jsonb not null default '{}'::jsonb check (
     jsonb_typeof(metadata) = 'object'
@@ -417,7 +411,7 @@ create table public.portal_audit_events (
 create index portal_audit_referral_time_idx
   on public.portal_audit_events(referral_id, occurred_at, id);
 create unique index portal_audit_mutation_kind_idx
-  on public.portal_audit_events(actor_user_id, mutation_id, mutation_kind);
+  on public.portal_audit_events(actor_user_id, mutation_id_hash, mutation_kind);
 
 create or replace function careslink_portal_private.current_session_is_eligible()
 returns boolean
@@ -610,7 +604,7 @@ as $$
         careslink_portal_private.is_platform_admin()
         or careslink_portal_private.has_active_membership(
           referral.source_organization_id,
-          array['partner_operator', 'referral_source']::text[]
+          array['partner_operator']::text[]
         )
       )
   );
@@ -674,7 +668,7 @@ as $$
         careslink_portal_private.is_platform_admin()
         or careslink_portal_private.has_active_membership(
           referral.source_organization_id,
-          array['partner_operator', 'referral_source']::text[]
+          array['partner_operator']::text[]
         )
       )
   );

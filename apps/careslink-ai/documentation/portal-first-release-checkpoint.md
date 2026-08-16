@@ -233,3 +233,35 @@ Do not provide a base URL to App/Main until all are true at the same revision:
 
 The historical protected Preview evidence remains useful but does not satisfy
 these exact-current-revision gates and is not Production approval.
+
+## 8. Pre-database Portal route/page slice — 2026-08-16
+
+The next local batch connected the Referral contract to an actor-bound server
+adapter, nine physical route surfaces under `/api/portal/referrals*` and
+`/api/portal/referral-offers*`, plus shared Web controls. It is deliberately a
+pre-database slice:
+
+- the default runtime has no memory or Supabase adapter and a compile-time
+  readiness latch fixed to `false`;
+- all three non-secret environment settings default off and cannot bypass that
+  latch;
+- Preview target validation requires an explicit exact non-Production project
+  ref and rejects Production;
+- mutations resolve the request-scoped API before reading JSON, require
+  same-origin HTTPS, `application/json`, a bounded body and a valid
+  idempotency key;
+- responses use a server-generated correlation ID, generic structured errors
+  and metadata-only ACKs; client correlation, token, contact, summary and raw
+  mutation IDs are not reflected;
+- list, offer and audit DTOs are role-specific, and declined providers disappear
+  from offer/detail reads while exact retry returns only the original ACK;
+- pages never turn legacy mock IDs into canonical route IDs. Intake remains
+  disabled, and actions needing a canonical UUID/row version render an explicit
+  database-identity boundary.
+
+Local evidence at this checkpoint is 7 focused files / 73 tests, full 112 files
+/ 983 tests, TypeScript, ESLint and Next static generation 63/63. The migration
+and transactional SQL assertions remain unexecuted. The memory arbitration test
+does not prove Postgres row-lock behavior. No Preview URL can be handed to the
+App or Main Website until the entry criteria above pass on one exact disposable
+Preview revision.

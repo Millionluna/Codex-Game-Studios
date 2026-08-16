@@ -96,6 +96,11 @@ describe("Portal referral workflow migration contract", () => {
 
   it("stores replay receipts as explicit metadata-only references", () => {
     const receipt = tableBlock("public.portal_mutation_receipts");
+    expect(receipt).toContain("mutation_id_hash text not null");
+    expect(receipt).toContain("mutation_id_hash ~ '^[a-f0-9]{64}$'");
+    expect(receipt).toContain("unique (actor_user_id, mutation_id_hash)");
+    expect(receipt).not.toMatch(/\bmutation_id\s+text/);
+    expect(receipt).not.toMatch(/\bcorrelation_id\s+text/);
     for (const column of [
       "response_referral_id uuid",
       "response_match_id uuid",
@@ -190,9 +195,8 @@ describe("Portal referral workflow migration contract", () => {
     const match = functionBlock(
       "careslink_portal_private.can_read_match(\n  p_referral_id uuid\n)",
     );
-    expect(match).toContain(
-      "array['partner_operator', 'referral_source']::text[]",
-    );
+    expect(match).toContain("array['partner_operator']::text[]");
+    expect(match).not.toContain("'referral_source'");
     expect(match).not.toContain("current_provider_id");
     expect(match).not.toMatch(/p_provider_id|p_match_status|provider_id|status/);
 
@@ -224,9 +228,8 @@ describe("Portal referral workflow migration contract", () => {
     const audit = functionBlock(
       "careslink_portal_private.can_read_audit(\n  p_referral_id uuid\n)",
     );
-    expect(audit).toContain(
-      "array['partner_operator', 'referral_source']::text[]",
-    );
+    expect(audit).toContain("array['partner_operator']::text[]");
+    expect(audit).not.toContain("'referral_source'");
     expect(audit).not.toContain("current_provider_id");
     expect(policyBlock("portal_audit_visible_select")).toContain(
       "can_read_audit(referral_id)",
@@ -238,6 +241,9 @@ describe("Portal referral workflow migration contract", () => {
   });
 
   it("constrains outcomes, audit transitions and audit metadata", () => {
+    const matches = tableBlock("public.portal_referral_matches");
+    expect(matches).not.toMatch(/\b(?:reasons|gaps|response_reason_code)\b/);
+
     const followups = tableBlock("public.portal_referral_followups");
     for (const outcome of [
       "CONTACT_CONFIRMED",
@@ -251,8 +257,15 @@ describe("Portal referral workflow migration contract", () => {
     expect(followups).not.toContain(
       "char_length(btrim(outcome_code)) between 1 and 100",
     );
+    expect(followups).not.toContain("restricted_note");
 
     const audit = tableBlock("public.portal_audit_events");
+    expect(audit).toContain("mutation_id_hash text not null");
+    expect(audit).toContain("mutation_id_hash ~ '^[a-f0-9]{64}$'");
+    expect(audit).toContain("correlation_id_hash text");
+    expect(audit).toContain("correlation_id_hash ~ '^[a-f0-9]{64}$'");
+    expect(audit).not.toMatch(/\bmutation_id\s+text/);
+    expect(audit).not.toMatch(/\bcorrelation_id\s+text/);
     for (const mutationKind of [
       "CREATE_REFERRAL",
       "TRIAGE_REFERRAL",
@@ -404,6 +417,7 @@ describe("Portal referral workflow migration contract", () => {
       "Suspended source organization retained visibility",
       "Suspended PLATFORM admin retained visibility",
       "Mutation receipt redaction failed",
+      "Portal free-text or raw transport metadata leaked",
       "Referral region allowlist failed",
       "Referral service allowlist failed",
       "PHONE_0400000000",

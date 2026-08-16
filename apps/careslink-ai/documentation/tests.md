@@ -45,26 +45,43 @@ The historical 90-file / 653-test result above remains the implementation-readin
 
 The route adapter is not Preview- or Production-served: its master and durable-adapter flags both default off, and runtime target verification accepts only an explicitly matched non-Production Preview Supabase ref. The default runtime now assembles request-scoped persistence and active-session validation, but missing configuration fails closed before any client is created. Mobile uses `Authorization: Bearer`; cookie authentication is an additional Web transport through the same adapter. Web cookie mutations require same-origin HTTPS plus JSON, Bearer mutations remain independent of browser Origin, and sync pull is `GET /v1/sync/pull?cursor=` with no mutation body. Sync push remains unserved and `NOT_IMPLEMENTED`. Privacy confirmation authenticates before body parsing, scans bounded canonical structured facts with policy `2026-08-11.preview.1`, returns locator-only findings, and persists only hash/proof metadata through a dedicated service-only adapter. Its scanner is deterministic, not a guarantee of complete de-identification. Confirmed proofs use a temporary 30-minute Preview TTL; this is not a Production product decision. Create and append bind that proof to owner/type/canonical `factsSummary` hash/schema/status/expiry in the tested adapters; changing only `englishDraft` is valid and changing `factsSummary` is stale. The dedicated Preview privacy secret does not fall back to the generic service-role key. These are source-level guarantees only: this batch does not establish a live database RPC grant or route E2E. The five native routes physically return structured `501` envelopes, while their capability constants remain `false`; this is a fail-closed boundary, not implementation or service evidence. The four mobile-sync document write-RPC execute grants remain withheld pending disposable-database canonical-hash vectors and server-equivalent Note schema validation. Consequently, these source tests do not prove database RLS, revoked-session integration, write availability, native authentication, cross-device sync or end-to-end behavior.
 
-### Portal-first M0/M1 local checkpoint — 2026-08-14
+### Portal-first M0/M1 local checkpoint — updated 2026-08-16
 
-The current Portal-first source snapshot adds the native M0 machine capability
-crosswalk, an opaque fixed sync-push `501`, per-operation read/write gates and a
-local-only Referral contract plus unapplied default-off/RLS foundation. The
-Referral tests cover metadata-only replay hashes, role/organization/provider
-eligibility, offered/declined provider isolation, fixed non-PII catalog codes,
-repeated follow-up, stale state, failure rollback and sequential competing
-decisions. They do not prove database transaction concurrency.
+The current Portal-first source snapshot retains the native M0 machine
+capability crosswalk, fixed native/sync-push `501` boundaries and Product API
+operation gates. It now adds a local actor-bound Referral adapter, physical
+Portal route wrappers, default-disabled page controls and a complete
+dependency-injected intake → triage/offer → accept/decline → follow-up/audit
+test path. The route runtime has no default durable adapter and its compile-time
+readiness latch is `false`, so the physical routes fail with `503` before auth
+or body parsing rather than serving mock or process-memory data.
+
+Referral tests cover metadata-only replay hashes and ACKs,
+role/organization/provider eligibility, Source A/B and Provider A/B isolation,
+offered/declined visibility, fixed non-PII catalog codes, repeated follow-up,
+stale state, same-key replay, changed-payload conflict, failed-audit rollback,
+an injected cookie/Bearer transport-mapping fixture and two different-key offer
+decisions. The transport fixture uses synthetic credentials and does not prove
+real Supabase cookie/Bearer identity parity. Page
+tests prove invalid demo IDs do not fall back to another fixture and legacy
+mock IDs are not promoted into canonical route calls. The apparent concurrent
+decision test runs against the synchronous memory adapter and is not Postgres
+transaction-concurrency evidence.
 
 | Command | Result |
 |---|---|
-| `pnpm test` | 107 files, 938 tests passed; preserves the 90 / 653 historical baseline |
+| focused Portal Referral gate | 7 files, 73 tests passed |
+| `pnpm test` | 112 files, 983 tests passed; preserves the 90 / 653 historical baseline |
 | `pnpm exec tsc --noEmit --incremental false` | passed |
 | `pnpm lint` | passed |
-| `pnpm build` | passed; Next static generation completed 61/61 |
+| `pnpm build` | passed; Next static generation completed 63/63 |
 
 The Portal migration and transactional assertion script were not applied or
 executed. There is no current disposable Preview base URL, no native redirect
-allowlist authority and no served Referral route/page replacement.
+allowlist authority and no served Referral persistence. Five Portal pages now
+show fail-closed local controls or explicit database-identity boundaries, but
+their surrounding legacy demo sections remain mock and are not represented as
+canonical Referral data.
 
 ### Mobile V1 protected Product API Preview E2E — 2026-08-14
 
@@ -298,9 +315,9 @@ The following suites are required before the corresponding V1 slice can be calle
 
 ## Gaps
 
-1. No native App exists, so no iOS/Android unit, integration, E2E, accessibility, offline, purchase or store tests exist.
+1. The native App exists in a separate repository and is outside this task; this AI repository does not execute or attest its iOS/Android, offline, purchase or store gates.
 2. The OpenAPI/TypeScript contract and default-off durable `/v1` route adapter now exist, but there is no Preview- or Production-served Product API, generated client package, schema registry or previous-version compatibility fixture.
-3. The current worktree passes 938 tests across 107 files (with 104 / 894 and 103 / 831 retained as prior source-level batches and 90 / 653 as the historical baseline), but the four additional Note types have only catalog metadata/prohibited-decision contracts, not input/output/privacy/generation golden sets.
+3. The current worktree passes 983 tests across 112 files (with 107 / 938, 104 / 894 and 103 / 831 retained as prior source-level batches and 90 / 653 as the historical baseline), but the four additional Note types have only catalog metadata/prohibited-decision contracts, not input/output/privacy/generation golden sets.
 4. Canonical document/revision/checkpoint states exist as memory/domain contracts plus historical isolated schema/RPC evidence and a new unapplied mobile-sync migration draft; there is no Production schema activation, editor, renderer or cross-device recovery E2E.
 5. Points lots/rates/reservations passed isolated serial database tests but remain shadow-only. There is no runtime entitlement integration, welcome eligibility decision, concurrent reservation proof or legacy-credit conversion/reconciliation test.
 6. No payment provider sandbox, webhook replay, refund or reconciliation harness exists.

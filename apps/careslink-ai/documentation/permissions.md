@@ -75,6 +75,33 @@ Current admin pages may display access-request metadata, feature counts, statuse
 
 ## V1 shadow permission contract and isolated evidence
 
+### Portal Referral foundation (local and unapplied)
+
+The Portal Referral foundation introduces organization membership, provider,
+referral, separately protected contact, match, follow-up, receipt, audit,
+document-link and export tables in an unapplied migration. It does not grant
+authenticated table access or any state-changing RPC. A future adapter must
+derive the actor, organization, role and provider identity from a freshly
+validated session and current database membership; none may be accepted from a
+request body.
+
+The local actor-bound test adapter enforces Source A/B, Provider A/B and
+partner-operator tenant isolation. Providers receive only frozen region/service
+codes before accepting their own offer; summary/contact become visible only to
+the exact accepted and still-approved provider. Decline or eligibility
+revocation removes access. Mutation acknowledgements contain IDs, status,
+version and timestamp only; receipts/audit use SHA-256 identifiers and do not
+copy contact, summary, client correlation or raw idempotency values. Raw match
+and audit rows are limited to platform admin or the tenant partner operator in
+the draft RLS contract.
+
+These are source/static guarantees. The route runtime has no default durable
+adapter and a non-configurable `false` readiness latch, so physical
+`/api/portal/referrals*` and `/api/portal/referral-offers*` handlers return a
+metadata-only `503` before body parsing. The migration and rollback-only SQL
+assertions have not run against a database; real RLS, ACL, active-session and
+concurrent transaction behavior remain disposable-Preview gates.
+
 `supabase/migrations/20260809120000_create_v1_shadow_foundation.sql` defines the following controls. It was applied only to a disposable `with_data=false` branch and has not been applied to Production Supabase:
 
 | Shadow resource | Authenticated client | Service role | Integrity binding |

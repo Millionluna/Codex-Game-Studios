@@ -1,6 +1,8 @@
 import { CheckCircle2, CircleAlert } from "lucide-react";
+import { notFound } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { PageHeader } from "@/components/page-header";
+import { PortalReferralWorkflowBoundary } from "@/components/portal-referral-workflow-controls";
 import { Card } from "@/components/ui";
 import { displayArea, displayList, displayService } from "@/lib/display";
 import { providers, referrals } from "@/lib/mock-data";
@@ -12,7 +14,8 @@ export default async function ReferralMatchingPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const referral = referrals.find((item) => item.id === id) ?? referrals[0];
+  const referral = referrals.find((item) => item.id === id);
+  if (!referral) notFound();
   const matches = matchReferralToProviders(referral, providers);
 
   return (
@@ -20,8 +23,15 @@ export default async function ReferralMatchingPage({
       <PageHeader
         eyebrow="AI 匹配"
         title={`${displayArea(referral.clientArea)} ${displayService(referral.needType)}推荐服务商`}
-        description="MVP 阶段使用透明规则匹配：区域、服务类型、语言、是否接新客户、是否紧急可接单、资金路径。运营方联系服务商前可以看到推荐理由和缺口。"
+        description="这是旧版 demo fixture 的本地评分演示，不是 Preview 数据库分配。透明规则只用于展示区域、服务类型、语言、容量和资金路径的排序依据。"
       />
+
+      <Card className="mb-4 p-4">
+        <p className="mb-3 text-sm leading-6 text-[#5d6d68]">
+          评分只提供本地排序参考，不代表 provider 已拒绝，也不会自动改变 referral 状态。
+        </p>
+        <PortalReferralWorkflowBoundary operation="triage" />
+      </Card>
 
       <div className="grid gap-4">
         {matches.map((match) => {
@@ -69,6 +79,9 @@ export default async function ReferralMatchingPage({
                     )}
                   </ul>
                 </div>
+              </div>
+              <div className="mt-4 border-t border-[#e5eee9] pt-4">
+                <PortalReferralWorkflowBoundary operation="offer" />
               </div>
             </Card>
           );

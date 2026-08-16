@@ -6,26 +6,23 @@ import {
   CalendarClock,
   ClipboardCheck,
   FilePenLine,
-  MessageSquareReply,
   Share2,
   SlidersHorizontal,
   Sparkles,
 } from "lucide-react";
-import Link from "next/link";
 import { AppShell } from "@/components/app-shell";
 import { MobileAppFrame } from "@/components/mobile-app-frame";
 import { PageHeader } from "@/components/page-header";
+import { PortalReferralWorkflowBoundary } from "@/components/portal-referral-workflow-controls";
 import { ShareCardPreview } from "@/components/share-card";
 import {
   ButtonLink,
   Card,
   MetricCard,
   ProviderStatusBadge,
-  ReferralStatusBadge,
 } from "@/components/ui";
 import {
   displayArea,
-  displayFundingType,
   displayLanguage,
   displayList,
   displayService,
@@ -44,13 +41,13 @@ export default function ProviderPortalPage() {
     provider,
     profile,
     shareCard,
-    visibleReferrals,
-    actions,
     nextSteps,
   } = getProviderPortalData("provider-harbour");
 
-  const urgentCount = visibleReferrals.filter((referral) => referral.urgent).length;
-  const firstReferral = visibleReferrals[0];
+  // The real list must come from the request-scoped, provider-bound adapter.
+  // Legacy mock matches are deliberately not promoted into this workflow.
+  const previewReferralCount = 0;
+  const urgentPreviewReferralCount = 0;
   const revenueEngines = getRevenueEngines();
   const providerTools = revenueEngines.find((engine) => engine.id === "provider_tools");
   const trainingEngine = revenueEngines.find((engine) => engine.id === "training");
@@ -92,8 +89,8 @@ export default function ProviderPortalPage() {
         />
         <MetricCard
           label="Referral 机会"
-          value={String(visibleReferrals.length)}
-          detail={`${urgentCount} 个为紧急需求`}
+          value={String(previewReferralCount)}
+          detail={`${urgentPreviewReferralCount} 个为紧急需求`}
           tone="amber"
         />
         <MetricCard
@@ -148,56 +145,16 @@ export default function ProviderPortalPage() {
                   这里不展示所有 referral，只展示和当前 provider / 个人有关的机会。
                 </p>
               </div>
-              <Link
-                href="/referrals/referral-001/matches"
-                className="text-sm font-semibold text-[#0f766e]"
-              >
-                查看匹配原因
-              </Link>
+              <span className="text-sm font-semibold text-[#66736f]">
+                Preview 数据未连接
+              </span>
             </div>
             <div className="mt-4 grid gap-3">
-              {visibleReferrals.map((referral) => (
-                <div
-                  key={referral.id}
-                  className="rounded-lg border border-[#dce8e2] p-4"
-                >
-                  <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                    <div>
-                      <h3 className="font-semibold">
-                        {displayArea(referral.clientArea)} · {displayService(referral.needType)}
-                      </h3>
-                      <p className="mt-2 text-sm leading-6 text-[#40504b]">
-                        {referral.summary}
-                      </p>
-                    </div>
-                    <ReferralStatusBadge status={referral.status} />
-                  </div>
-                  <div className="mt-3 flex flex-wrap gap-2 text-xs font-semibold">
-                    <span className="rounded-md bg-[#edf5ff] px-2 py-1 text-[#19518d]">
-                      {displayFundingType(referral.fundingType)}
-                    </span>
-                    <span className="rounded-md bg-[#e6f7f2] px-2 py-1 text-[#0f766e]">
-                      {displayList(referral.languageRequirements, displayLanguage)}
-                    </span>
-                    {referral.urgent ? (
-                      <span className="rounded-md bg-[#fff7df] px-2 py-1 text-[#925b00]">
-                        紧急
-                      </span>
-                    ) : null}
-                  </div>
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    {actions.map((action) => (
-                      <button
-                        key={action}
-                        type="button"
-                        className="inline-flex h-9 items-center gap-2 rounded-lg border border-[#cfded8] bg-white px-3 text-sm font-semibold text-[#263834]"
-                      >
-                        <MessageSquareReply className="size-4" /> {action}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ))}
+              <p className="rounded-lg bg-[#f7faf8] p-3 text-sm leading-6 text-[#5d6d68]">
+                No database-scoped offer is available in the frozen Victorian Preview catalog.
+                Legacy mock referrals are intentionally not shown here.
+              </p>
+              <PortalReferralWorkflowBoundary operation="respond" />
             </div>
           </Card>
 
@@ -297,25 +254,10 @@ export default function ProviderPortalPage() {
             status="只显示匹配给我的机会"
             tabs={["机会", "容量", "资料"]}
           >
-            {firstReferral ? (
-              <div className="rounded-lg border border-[#dce8e2] bg-white p-3">
-                <p className="text-xs font-semibold text-[#66736f]">新机会</p>
-                <h3 className="mt-2 text-base font-semibold">
-                  {displayArea(firstReferral.clientArea)} · {displayService(firstReferral.needType)}
-                </h3>
-                <p className="mt-2 text-sm leading-6 text-[#40504b]">
-                  {firstReferral.summary}
-                </p>
-                <div className="mt-3 flex gap-2">
-                  <button className="h-9 flex-1 rounded-lg bg-[#0f766e] text-sm font-semibold text-white">
-                    可接
-                  </button>
-                  <button className="h-9 flex-1 rounded-lg border border-[#cfded8] bg-white text-sm font-semibold text-[#263834]">
-                    需资料
-                  </button>
-                </div>
-              </div>
-            ) : null}
+            <p className="rounded-lg border border-[#dce8e2] bg-white p-3 text-sm text-[#5d6d68]">
+              Preview offers remain unavailable while the workflow capability is disabled.
+            </p>
+            <PortalReferralWorkflowBoundary operation="respond" />
             <div className="rounded-lg border border-[#dce8e2] bg-white p-3">
               <p className="flex items-center gap-2 text-sm font-semibold">
                 <CalendarClock className="size-4 text-[#925b00]" /> 本周容量

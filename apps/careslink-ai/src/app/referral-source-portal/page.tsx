@@ -4,22 +4,17 @@ import {
   Handshake,
   MapPin,
   MessageSquareText,
-  SearchCheck,
-  Send,
   TimerReset,
 } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { MobileAppFrame } from "@/components/mobile-app-frame";
 import { PageHeader } from "@/components/page-header";
+import { PortalReferralIntakeControls } from "@/components/portal-referral-workflow-controls";
 import {
   ButtonLink,
   Card,
-  FieldLabel,
   MetricCard,
   ReferralStatusBadge,
-  SelectInput,
-  TextArea,
-  TextInput,
 } from "@/components/ui";
 import {
   displayArea,
@@ -29,7 +24,7 @@ import {
   displayService,
 } from "@/lib/display";
 import { getRevenueEngines } from "@/lib/demo-strategy";
-import { referralSources, referrals, sourceChannels } from "@/lib/mock-data";
+import { referralSources, referrals } from "@/lib/mock-data";
 import {
   getAssessmentPipeline,
   getSourceReadinessMap,
@@ -69,6 +64,16 @@ export default function ReferralSourcePortalPage() {
           </>
         }
       />
+
+      <Card className="mb-4 border-[#f0d28a] bg-[#fffaf0] p-4">
+        <p className="text-sm font-semibold text-[#7a4b00]">
+          Legacy demo data / 旧版演示数据
+        </p>
+        <p className="mt-1 text-sm leading-6 text-[#6c5a38]">
+          本页现有数量、列表和手机卡片来自本地 mock，不是 Preview
+          数据库记录。新的 intake 控件保持关闭，不会提交或保存资料。
+        </p>
+      </Card>
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <MetricCard
@@ -114,56 +119,9 @@ export default function ReferralSourcePortalPage() {
               </span>
             </div>
 
-            <form className="mt-5 grid gap-4">
-              <div className="grid gap-4 md:grid-cols-2">
-                <FieldLabel>
-                  客户所在区域
-                  <TextInput defaultValue="Parramatta / 帕拉马塔" />
-                </FieldLabel>
-                <FieldLabel>
-                  需求类型
-                  <SelectInput defaultValue="Support Coordination">
-                    {source.commonReferralTypes.map((type) => (
-                      <option key={type} value={type}>
-                        {displayService(type)}
-                      </option>
-                    ))}
-                  </SelectInput>
-                </FieldLabel>
-                <FieldLabel>
-                  语言要求
-                  <TextInput defaultValue="普通话，家属可英语沟通" />
-                </FieldLabel>
-                <FieldLabel>
-                  来源渠道
-                  <SelectInput defaultValue={source.sourceGroupName}>
-                    {sourceChannels.map((channel) => (
-                      <option key={channel.id} value={channel.name}>
-                        {channel.name}
-                      </option>
-                    ))}
-                  </SelectInput>
-                </FieldLabel>
-              </div>
-              <FieldLabel>
-                简要说明
-                <TextArea defaultValue="Participant 刚获批 NDIS plan，需要普通话支持协调。家属希望本周内先电话联系。" />
-              </FieldLabel>
-              <div className="flex flex-wrap gap-3">
-                <button
-                  type="button"
-                  className="inline-flex h-10 items-center gap-2 rounded-lg bg-[#0f766e] px-4 text-sm font-semibold text-white"
-                >
-                  <Send className="size-4" /> 发给运营方匹配
-                </button>
-                <button
-                  type="button"
-                  className="inline-flex h-10 items-center gap-2 rounded-lg border border-[#cfded8] bg-white px-4 text-sm font-semibold text-[#263834]"
-                >
-                  <SearchCheck className="size-4" /> 先查相似需求
-                </button>
-              </div>
-            </form>
+            <div className="mt-5">
+              <PortalReferralIntakeControls />
+            </div>
           </Card>
 
           <Card className="overflow-x-auto p-5">
@@ -222,7 +180,11 @@ export default function ReferralSourcePortalPage() {
               <p className="mt-2 rounded-lg bg-[#f7faf8] p-3 text-sm leading-6 text-[#40504b]">
                 帕拉马塔，普通话，急需支持协调，本周可联系家属。
               </p>
-              <button className="mt-3 h-9 w-full rounded-lg bg-[#0f766e] text-sm font-semibold text-white">
+              <button
+                type="button"
+                disabled
+                className="mt-3 h-9 w-full rounded-lg bg-[#0f766e] text-sm font-semibold text-white opacity-50"
+              >
                 生成 referral 草稿
               </button>
             </div>

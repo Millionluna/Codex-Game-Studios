@@ -192,7 +192,7 @@ begin
     from information_schema.columns
     where table_schema = 'public'
       and table_name = 'portal_mutation_receipts'
-      and column_name = 'response_envelope'
+      and column_name in ('response_envelope', 'mutation_id', 'correlation_id')
   )
     or not exists (
       select 1
@@ -200,8 +200,51 @@ begin
       where table_schema = 'public'
         and table_name = 'portal_mutation_receipts'
         and column_name = 'response_referral_id'
+    )
+    or not exists (
+      select 1
+      from information_schema.columns
+      where table_schema = 'public'
+        and table_name = 'portal_mutation_receipts'
+        and column_name = 'mutation_id_hash'
     ) then
     raise exception 'mutation receipt is not metadata-only';
+  end if;
+
+  if exists (
+    select 1
+    from information_schema.columns
+    where table_schema = 'public'
+      and (
+        (
+          table_name = 'portal_referral_matches'
+          and column_name in ('reasons', 'gaps', 'response_reason_code')
+        )
+        or (
+          table_name = 'portal_referral_followups'
+          and column_name = 'restricted_note'
+        )
+        or (
+          table_name = 'portal_audit_events'
+          and column_name in ('mutation_id', 'correlation_id')
+        )
+      )
+  )
+    or not exists (
+      select 1
+      from information_schema.columns
+      where table_schema = 'public'
+        and table_name = 'portal_audit_events'
+        and column_name = 'mutation_id_hash'
+    )
+    or not exists (
+      select 1
+      from information_schema.columns
+      where table_schema = 'public'
+        and table_name = 'portal_audit_events'
+        and column_name = 'correlation_id_hash'
+    ) then
+    raise exception 'Portal free-text or raw transport metadata leaked';
   end if;
 end
 $$;
@@ -468,13 +511,12 @@ insert into public.portal_referral_matches (
   );
 
 insert into public.portal_referral_followups (
-  id, referral_id, actor_user_id, outcome_code, restricted_note
+  id, referral_id, actor_user_id, outcome_code
 ) values (
   '99000000-0000-4000-8000-000000000001',
   '97000000-0000-4000-8000-000000000001',
   '91000000-0000-4000-8000-000000000001',
-  'FOLLOW_UP_SCHEDULED',
-  'Restricted workflow detail'
+  'FOLLOW_UP_SCHEDULED'
 );
 
 insert into public.ai_documents (
@@ -538,22 +580,22 @@ insert into public.portal_referral_exports (
 );
 
 insert into public.portal_mutation_receipts (
-  id, actor_user_id, mutation_id, mutation_kind, payload_hash,
+  id, actor_user_id, mutation_id_hash, mutation_kind, payload_hash,
   response_referral_id, response_match_id, response_status,
   response_row_version, response_updated_at
 ) values
   (
     '9a000000-0000-4000-8000-000000000001',
     '91000000-0000-4000-8000-000000000001',
-    'portal.receipt.0001', 'OFFER_REFERRAL', repeat('a', 64),
+    repeat('a', 64), 'CREATE_REFERRAL', repeat('a', 64),
     '97000000-0000-4000-8000-000000000001',
-    '98000000-0000-4000-8000-000000000001',
-    'OFFERED', 1, now()
+    null,
+    'SUBMITTED', 1, now()
   ),
   (
     '9a000000-0000-4000-8000-000000000002',
     '93000000-0000-4000-8000-000000000003',
-    'portal.receipt.0002', 'RESPOND_TO_OFFER', repeat('b', 64),
+    repeat('b', 64), 'RESPOND_TO_OFFER', repeat('b', 64),
     '97000000-0000-4000-8000-000000000001',
     '98000000-0000-4000-8000-000000000001',
     'OFFERED', 1, now()
@@ -561,13 +603,13 @@ insert into public.portal_mutation_receipts (
 
 insert into public.portal_audit_events (
   id, referral_id, actor_user_id, actor_role, mutation_kind,
-  from_status, to_status, mutation_id, correlation_id, metadata
+  from_status, to_status, mutation_id_hash, correlation_id_hash, metadata
 ) values (
   '9b000000-0000-4000-8000-000000000001',
   '97000000-0000-4000-8000-000000000001',
-  '91000000-0000-4000-8000-000000000001',
-  'referral_source', 'OFFER_REFERRAL', 'TRIAGED', 'OFFERED',
-  'portal.audit.0001', 'portal-correlation-1',
+  '90000000-0000-4000-8000-000000000006',
+  'partner_operator', 'OFFER_REFERRAL', 'TRIAGED', 'OFFERED',
+  repeat('c', 64), repeat('d', 64),
   '{"matchId":"98000000-0000-4000-8000-000000000001","providerId":"96000000-0000-4000-8000-000000000003"}'::jsonb
 );
 
@@ -588,12 +630,12 @@ begin
   begin
     insert into public.portal_audit_events (
       referral_id, actor_user_id, actor_role, mutation_kind,
-      from_status, to_status, mutation_id, metadata
+      from_status, to_status, mutation_id_hash, metadata
     ) values (
       '97000000-0000-4000-8000-000000000001',
       '91000000-0000-4000-8000-000000000001',
       'referral_source', 'RECORD_FOLLOW_UP', 'OFFERED', 'OFFERED',
-      'portal.audit.unsafe1',
+      repeat('e', 64),
       '{"contactPhone":"0400000001"}'::jsonb
     );
     raise exception 'Audit metadata contact-key allowlist failed';
@@ -636,12 +678,12 @@ begin
     or (select count(*) from public.portal_providers) <> 0
     or (select count(*) from public.portal_referrals) <> 1
     or (select count(*) from careslink_portal_private.portal_referral_contacts) <> 1
-    or (select count(*) from public.portal_referral_matches) <> 2
+    or (select count(*) from public.portal_referral_matches) <> 0
     or (select count(*) from public.portal_referral_followups) <> 1
     or (select count(*) from public.portal_referral_document_links) <> 1
     or (select count(*) from public.portal_referral_exports) <> 1
     or (select count(*) from public.portal_mutation_receipts) <> 1
-    or (select count(*) from public.portal_audit_events) <> 1 then
+    or (select count(*) from public.portal_audit_events) <> 0 then
     raise exception 'Source A referral isolation failed';
   end if;
 
