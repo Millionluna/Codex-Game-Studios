@@ -285,9 +285,11 @@ ownership, effective default ACLs, columns, constraint/index names and actions,
 then uses
 transaction-only owner access to exercise state/hash/time/composite-owner and
 single-running-attempt failures. That temporary test access is restored before
-the final rollback and is not part of the migration. The SQL file has not run
-against Postgres; the TypeScript source test additionally locks exact index and
-foreign-key definitions.
+the final rollback and is not part of the migration. The former
+`information_schema` body ran on PostgreSQL 17 and rolled back at its constraint
+catalog check; the current `pg_constraint` revision has not yet run. The
+TypeScript source test additionally locks exact index and foreign-key
+definitions.
 
 | Command | Result |
 |---|---|
@@ -300,8 +302,8 @@ foreign-key definitions.
 | focused ESLint and `git diff --check` | passed |
 
 This is still source evidence, not a durable database implementation. There is
-no local Supabase configuration/stack, successful clean apply, database lint,
-pgTAP run, successful Preview assertion run, function, RPC, payload
+no local Supabase configuration/stack, completed clean-apply-plus-assertion
+gate, database lint, pgTAP run, successful Preview assertion run, function, RPC, payload
 metadata/grant, vault, purge outbox, worker registration, runtime flag, model
 call, Points call or Production change. The next database phase must separately
 implement and prove those boundaries; this schema-only checkpoint does not
@@ -331,9 +333,30 @@ failure and cleanup evidence, not a successful Preview proof.
 The source fix now uses the temporary non-inheriting membership to `SET ROLE`
 to the dedicated owner, changes that owner's global default ACL as itself,
 `RESET ROLE`s before object creation, and avoids a redundant schema revoke
-after ownership transfer. This repaired revision still requires a fresh
-disposable `r2` branch, an exact clean apply and the rollback-only assertion in
-one session before any Preview-success claim.
+after ownership transfer.
+
+### Second durable-metadata disposable Preview attempt — 2026-08-21
+
+A fresh non-default `with_data=false` PostgreSQL 17 branch repeated the same
+zero-data and absent-target preflight. All 13 exact source migrations then
+applied successfully in order, including the hosted-safe metadata migration;
+the earlier `42501` did not recur. This proves the migration repair against the
+hosted actor, but it did not complete the full Preview gate.
+
+The rollback-only assertion was sent as one 28,445-byte SQL request with its
+own `BEGIN` and final `ROLLBACK`. It failed at the exact settings-constraint
+catalog check because PostgreSQL 17's `information_schema.table_constraints`
+also reports generated NOT NULL names such as `*_not_null`. A transaction-local
+diagnostic showed that `pg_constraint` contained exactly the declared named
+constraints. No assertion fixture or temporary role/RLS change persisted; the
+branch was deleted and its absence verified. Production was not used as the SQL
+target.
+
+The assertion now reads the three table constraint sets from `pg_constraint`
+joined to `pg_class` and `pg_namespace`, without filtering away unexpected real
+constraints. That revised assertion has not yet run on a fresh branch. A new
+disposable `r3` must repeat 13/13 apply and pass the entire same-request
+rollback assertion before any Preview-success claim.
 
 ### Mobile V1 protected Product API Preview E2E — 2026-08-14
 
@@ -498,7 +521,7 @@ This does not prove a live, data-bearing cross-migration upgrade. The `202608100
 | Canonical document shadow | `src/lib/v1/canonical-document-shadow.test.ts` | owner deny, immutable revision sequence, stale base, full-request idempotency, checkpoint, self-review invalidation and tombstone/purge domain rules |
 | Points shadow | `src/lib/v1/points-shadow.test.ts` | lot ordering/expiry, quote boundaries, reserve/commit/release, replay, insufficient balance and cross-owner deny in memory |
 | Legacy NDIS projection | `src/lib/v1/legacy-ndis-adapter.test.ts` | deterministic read-only projection, no approval upgrade, no invented facts and metadata-only migration candidate |
-| Production-unapplied SQL boundary | `src/lib/v1/v1-shadow-migration-contract.test.ts`, `mobile-sync-migration-contract.test.ts`, isolated historical guarded-live evidence | additive/no legacy DML, owner isolation and explicit grants are source-checked; the new mobile-sync migration/assertions are unapplied and unexecuted |
+| Production-unapplied SQL boundary | `src/lib/v1/v1-shadow-migration-contract.test.ts`, `mobile-sync-migration-contract.test.ts`, isolated historical guarded-live evidence | additive/no legacy DML, owner isolation and explicit grants are source-checked; the mobile-sync migration clean-applied only on a deleted disposable branch, while its exact assertion suite remains unexecuted for the current full gate |
 | Runtime isolation | `src/lib/v1/runtime-boundary.test.ts` | audited NDIS routes and the new `/v1` adapter are the only allowed server boundaries; `/v1` remains disabled without explicit adapters |
 
 ### Current live/read-only evidence
@@ -569,8 +592,8 @@ The following suites are required before the corresponding V1 slice can be calle
 
 1. The native App exists in a separate repository and is outside this task; this AI repository does not execute or attest its iOS/Android, offline, purchase or store gates.
 2. The OpenAPI/TypeScript contract and default-off durable `/v1` route adapter now exist, but there is no Preview- or Production-served Product API, generated client package, schema registry or previous-version compatibility fixture.
-3. The current worktree passes 1,294 tests across 121 files (with 120 / 1,284, 119 / 1,236, 118 / 1,193, 115 / 1,089, 114 / 1,051, 112 / 983, 107 / 938, 104 / 894 and 103 / 831 retained as prior source-level batches and 90 / 653 as the historical baseline). All five Note types share a source-only generation/output/job foundation plus default-off durable, worker-policy, provider-evidence, payload-lifecycle, registered-worker and strict database/vault adapter contracts and a Production-unapplied schema-only metadata migration. Its first disposable Preview attempt failed atomically and was cleaned up; the hosted-safe repair still needs a fresh clean apply. The five types still lack an implemented database repository/RPC layer, deployed worker, real provider/STT integration and complete per-type input/output/privacy/semantic golden sets.
-4. Canonical document/revision/checkpoint states exist as memory/domain contracts plus historical isolated schema/RPC evidence and a new unapplied mobile-sync migration draft; there is no Production schema activation, editor, renderer or cross-device recovery E2E.
+3. The current worktree passes 1,294 tests across 121 files (with 120 / 1,284, 119 / 1,236, 118 / 1,193, 115 / 1,089, 114 / 1,051, 112 / 983, 107 / 938, 104 / 894 and 103 / 831 retained as prior source-level batches and 90 / 653 as the historical baseline). All five Note types share a source-only generation/output/job foundation plus default-off durable, worker-policy, provider-evidence, payload-lifecycle, registered-worker and strict database/vault adapter contracts and a Production-unapplied schema-only metadata migration. Its hosted-safe repair clean-applied on the second disposable Preview; the PG17-safe assertion revision still needs a fresh complete gate. The five types still lack an implemented database repository/RPC layer, deployed worker, real provider/STT integration and complete per-type input/output/privacy/semantic golden sets.
+4. Canonical document/revision/checkpoint states exist as memory/domain contracts plus historical isolated schema/RPC evidence and a Production-unapplied mobile-sync migration draft that was clean-applied only on a deleted disposable branch; there is no retained schema activation, editor, renderer or cross-device recovery E2E.
 5. Points lots/rates/reservations passed isolated serial database tests but remain shadow-only. There is no runtime entitlement integration, welcome eligibility decision, concurrent reservation proof or legacy-credit conversion/reconciliation test.
 6. No payment provider sandbox, webhook replay, refund or reconciliation harness exists.
 7. No content editorial state, Guide, Daily Brief, notification or email/cron service exists.

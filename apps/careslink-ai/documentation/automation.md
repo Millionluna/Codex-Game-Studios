@@ -55,7 +55,7 @@ Source-only worker/provider policy schemas now define immutable digests, explici
 
 ## Inactive shadow automation contracts
 
-- The contract and schema draft define generation/export job states. Source-only memory contracts now model leases, recovery, retry policy, provider evidence and single-use payload grants, and the registered-worker v2 facade composes those boundaries without a payload locator. The private schema, owner/executor role topology, forced-off settings and metadata-only jobs/attempts now exist only in an unapplied schema migration. The adjacent RPC/vault adapter remains an injected source contract: no transaction-clock scheduler, function, execute grant, payload vault/table, one-time database grant, purge outbox, queue, deployed worker, live retry loop or cancellation endpoint exists.
+- The contract and schema draft define generation/export job states. Source-only memory contracts now model leases, recovery, retry policy, provider evidence and single-use payload grants, and the registered-worker v2 facade composes those boundaries without a payload locator. The private schema, owner/executor role topology, forced-off settings and metadata-only jobs/attempts exist in a Production-unapplied migration that clean-applied only on a deleted disposable Preview. The adjacent RPC/vault adapter remains an injected source contract: no transaction-clock scheduler, function, execute grant, payload vault/table, one-time database grant, purge outbox, queue, deployed worker, live retry loop or cancellation endpoint exists.
 - The memory Points reference store proves quote/reserve/commit/release semantics. The SQL draft exposes five `security definer` shadow RPCs only to `service_role`; those RPCs passed isolated branch tests for settlement, replay/conflict, source-lot release, expiry, insufficient balance and cross-owner denial. The migration remains unapplied to Production and no server route calls it.
 - The legacy NDIS adapter remains pure. The server-only NDIS integration invokes it only after a successful legacy Save on an explicitly verified Preview. The RPC creates an owner-bound shadow revision and metadata-only outbox; optional read comparison records `MATCH/MISMATCH/MISSING/ERROR`. No call invokes OpenAI or settles Points.
 - There is no automatic retry worker. `audit_ndis_shadow_reconciliation` is a service-role-only, read-only operator surface that reports IDs/status/timestamps/hashes. Live legacy rows remain the projection retry source; a legacy-schema canonical document whose source has disappeared while the lifecycle is still non-terminal is reported as `SOURCE_DELETE_CLEANUP_PENDING` for operator cleanup.
@@ -67,7 +67,7 @@ Source-only worker/provider policy schemas now define immutable digests, explici
 
 | Capability | Current status |
 |---|---|
-| generation worker/queue | absent at runtime; the schema-only migration is unapplied, contains no RPC, and the source-only registry is empty with worker/database-adapter factories restricted to `TEST_ONLY` |
+| generation worker/queue | absent at runtime; the schema-only migration is Production-unapplied and exists on no retained Preview, contains no RPC, and the source-only registry is empty with worker/database-adapter factories restricted to `TEST_ONLY` |
 | transcription worker | absent |
 | export worker/artifact cleanup | absent |
 | claim cleanup cron | absent; expired rows become unclaimable and are opportunistically cleaned |

@@ -1,7 +1,8 @@
 # V1 Note generation durable design handoff
 
-> Status: source-only, default-off design plus an unapplied schema-only
-> migration foundation. This document records the next database and worker
+> Status: source-only, default-off design plus a Production-unapplied
+> schema-only migration foundation that clean-applied only on a deleted
+> disposable Preview. This document records the next database and worker
 > boundary; it does not claim that a durable repository, worker, route, RPC,
 > Preview capability, model call or Production capability exists.
 
@@ -438,10 +439,20 @@ successful Preview evidence.
 
 The repaired source now has the dedicated owner alter its global defaults
 inside a temporary `SET ROLE` / `RESET ROLE` window and does not repeat the
-schema revoke after the migration actor transfers ownership. The rollback-only
-SQL assertion has still not run. The exact repaired revision requires a fresh
-disposable `r2` clean apply and same-session assertion before the Preview gate
-can pass.
+schema revoke after the migration actor transfers ownership. A second fresh
+branch clean-applied all 13 exact source migrations; the earlier `42501` did not
+recur, so that hosted repair is now execution evidence rather than source-only
+inference.
+
+The rollback-only assertion then failed inside its transaction because
+PostgreSQL 17's `information_schema.table_constraints` includes generated NOT
+NULL names as well as the declared constraint names. A transaction-local
+comparison showed the expected declared set in `pg_constraint`. The assertion
+rolled back and the exact disposable branch was deleted. Production was not
+used as the SQL target. The assertion now uses `pg_constraint` with exact
+schema/table/ordinary-table filtering, but this revised body has not yet run.
+A fresh disposable `r3` must repeat the complete apply and assertion before the
+Preview gate can pass.
 
 The source-only registered-worker database adapter may validate a composite
 atomic acknowledgement, but that acknowledgement is not proof that a database

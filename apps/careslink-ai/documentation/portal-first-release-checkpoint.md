@@ -16,8 +16,11 @@ local Referral foundation and source-only five-Note generation contracts. It
 does not modify the native App, Main Website, Native Auth/M0 implementation or
 served shared Product API routes. Those are prerequisites recorded in the
 existing versioned contract documentation. All new Referral and Note
-generation capabilities remain local, default-off and unapplied. No database,
-Preview deployment or Production system was contacted.
+generation capabilities remain local, default-off, Production-unapplied and
+absent from retained Preview runtime. Two disposable Preview databases were
+used only for the isolated migration/assertion gates recorded below and then
+deleted; no Preview application deployment or Production database was used as
+the SQL target.
 
 ## 1. Portal reality matrix
 
@@ -40,7 +43,7 @@ availability.
 | NDIS Case Note | real legacy server flow plus local shared-job evidence | Legacy generate/save only | Uses synchronous model and old credits; the new shared job is source-only and does not call it | Preserve legacy; keep the shared provider and canonical write default-off |
 | Other four Note types | catalog plus local shared-job/durable-contract evidence | No | Communication, Handover, Progress and Incident Factual share the dispatcher/output boundary and a default-off durable internal contract/memory fake, but have no database-backed repository, registered worker, served route, real provider or golden safety set | Implement the reviewed database/worker boundary, then validate each type without forking orchestration |
 | `/ai-documents` | real legacy generated drafts | Delete only | Not canonical documents; store errors can appear as an empty list; no revision/export | Feature-gated canonical list only after current Preview evidence |
-| Shared `/v1` documents/sync | local durable adapter | Default-off | Exact current migrations are unapplied; write grants withheld; no current base URL | M0 permits only me/list/pull after all identity/RLS gates pass |
+| Shared `/v1` documents/sync | local durable adapter | Default-off | Exact current migrations are Production-unapplied and exist on no retained Preview; write grants withheld; no current base URL | M0 permits only me/list/pull after all identity/RLS gates pass |
 | Library/Guides/Updates | absent | No | No page, store, content version or API | After referral + Notes/documents/export |
 | Account export/delete | absent | No | No request/status/recovery flow | Later privacy/account slice |
 
@@ -249,7 +252,8 @@ Referral foundation included in this batch:
   access removal, multi-follow-up, role/provider eligibility, contact-summary
   rejection, frozen Preview catalog codes, sequential competing-decision
   rejection and failure rollback tests;
-- unapplied Portal referral foundation migration with RLS and all writes withheld;
+- Production-unapplied Portal referral foundation migration, clean-applied only
+  on a deleted disposable Preview, with RLS and all writes withheld;
 - rollback-only SQL assertions for A/B, contact visibility, revoked session and
   direct-write denial.
 
@@ -519,9 +523,10 @@ races, canonical atomicity and purge behavior.
 The official Supabase CLI workflow was reverified and CLI 2.115.0 generated
 `20260820135834_add_v1_note_generation_durable_shadow.sql`; no timestamp was
 invented. This is the first database-shaped layer for the five shared Note
-types, but it remains inert and Production-unapplied. Its first disposable
-Preview clean-apply attempt failed atomically; it has not passed the Preview
-gate.
+types, but it remains inert and Production-unapplied. A second disposable
+Preview clean-applied the complete 13-file source manifest, while the
+rollback-only assertion exposed a PostgreSQL 17 catalog-compatibility bug and
+rolled back. The complete Preview gate has not passed.
 
 The migration creates dedicated owner/executor roles with `NOLOGIN`,
 `NOSUPERUSER` and `NOBYPASSRLS`, the private
@@ -567,9 +572,18 @@ Preview evidence.
 
 The hosted-safe source repair changes the dedicated owner's global defaults
 inside a temporary `SET ROLE` / `RESET ROLE` window and performs the only schema
-revoke before ownership transfer. The manual rollback-only SQL assertion has
-still not run. A fresh disposable `r2` branch must clean-apply the exact repaired
-revision and run that assertion before this gate can pass. There is still no
+revoke before ownership transfer. On a second fresh branch, all 13 exact source
+migrations applied successfully and the earlier `42501` did not recur. The
+rollback assertion then failed safely because PostgreSQL 17's
+`information_schema.table_constraints` included generated NOT NULL constraint
+names in addition to the declared constraints. Its transaction rolled back;
+the branch was deleted and its absence verified. Production was not used as the
+SQL target.
+
+The assertion now uses `pg_constraint` joined to `pg_class` and `pg_namespace`
+for the three exact declared-constraint sets. This revision has not yet run. A
+fresh disposable `r3` branch must repeat 13/13 apply and pass the complete
+same-request assertion before this gate can pass. There is still no
 payload metadata/grant, vault/KMS/retention decision, purge outbox,
 provider-evidence detail store, transaction-clock scheduler,
 claim/heartbeat/fence/commit/settle RPC, registered worker, model/STT call,

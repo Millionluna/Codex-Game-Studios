@@ -402,7 +402,23 @@ describe("V1 Note durable generation foundation migration contract", () => {
 
   it("ships rollback-only catalog and negative assertions without overstating runtime semantics", () => {
     expect(assertions).toMatch(/^-- Manual rollback-only assertions/);
-    expect(assertions).toContain("has not been run against a database");
+    expect(assertions).toContain(
+      "A 2026-08-21 PostgreSQL 17 r2 run",
+    );
+    expect(assertions).toContain(
+      "information_schema exposed generated NOT NULL constraint names",
+    );
+    expect(assertions).toContain(
+      "This pg_constraint-based revision has not yet been rerun on a fresh Preview",
+    );
+    expect(assertions).not.toContain("has not been run against a database");
+    expect(assertions).not.toContain("information_schema.table_constraints");
+    expect(
+      assertions.match(/^  from pg_constraint as constraint_metadata$/gm),
+    ).toHaveLength(3);
+    expect(
+      assertions.match(/^    and relation\.relkind = 'r'$/gm),
+    ).toHaveLength(3);
     expect(assertions).toContain("\\set ON_ERROR_STOP on");
     expect(assertions).toContain(
       "durable generation foundation requires PostgreSQL 16 or newer",

@@ -1,5 +1,8 @@
 -- Manual rollback-only assertions for a fresh disposable Preview database.
--- This file is not executed by pnpm test and has not been run against a database.
+-- This file is not executed by pnpm test. A 2026-08-21 PostgreSQL 17 r2 run
+-- reached the constraint-catalog check and rolled back after
+-- information_schema exposed generated NOT NULL constraint names.
+-- This pg_constraint-based revision has not yet been rerun on a fresh Preview.
 -- Run it only after a clean apply of the exact migration revision. It verifies
 -- the metadata schema foundation and does not prove SKIP LOCKED, worker RPCs or atomic canonical persistence.
 -- Invoke it explicitly with psql; it intentionally lives outside
@@ -442,11 +445,19 @@ begin
     raise exception 'durable generation sensitive column leaked';
   end if;
 
-  select array_agg(constraint_name order by constraint_name)
+  select array_agg(
+    constraint_metadata.conname::text
+    order by constraint_metadata.conname
+  )
   into v_actual
-  from information_schema.table_constraints
-  where constraint_schema = 'careslink_v1_generation'
-    and table_name = 'settings';
+  from pg_constraint as constraint_metadata
+  join pg_class as relation
+    on relation.oid = constraint_metadata.conrelid
+  join pg_namespace as namespace
+    on namespace.oid = relation.relnamespace
+  where namespace.nspname = 'careslink_v1_generation'
+    and relation.relkind = 'r'
+    and relation.relname = 'settings';
 
   if v_actual is distinct from array[
     'settings_capability_check', 'settings_enabled_check', 'settings_pkey',
@@ -455,11 +466,19 @@ begin
     raise exception 'durable generation constraint scope drifted: settings';
   end if;
 
-  select array_agg(constraint_name order by constraint_name)
+  select array_agg(
+    constraint_metadata.conname::text
+    order by constraint_metadata.conname
+  )
   into v_actual
-  from information_schema.table_constraints
-  where constraint_schema = 'careslink_v1_generation'
-    and table_name = 'jobs';
+  from pg_constraint as constraint_metadata
+  join pg_class as relation
+    on relation.oid = constraint_metadata.conrelid
+  join pg_namespace as namespace
+    on namespace.oid = relation.relnamespace
+  where namespace.nspname = 'careslink_v1_generation'
+    and relation.relkind = 'r'
+    and relation.relname = 'jobs';
 
   if v_actual is distinct from array[
     'jobs_admission_transport_check', 'jobs_attempt_count_check',
@@ -478,11 +497,19 @@ begin
     raise exception 'durable generation constraint scope drifted: jobs';
   end if;
 
-  select array_agg(constraint_name order by constraint_name)
+  select array_agg(
+    constraint_metadata.conname::text
+    order by constraint_metadata.conname
+  )
   into v_actual
-  from information_schema.table_constraints
-  where constraint_schema = 'careslink_v1_generation'
-    and table_name = 'attempts';
+  from pg_constraint as constraint_metadata
+  join pg_class as relation
+    on relation.oid = constraint_metadata.conrelid
+  join pg_namespace as namespace
+    on namespace.oid = relation.relnamespace
+  where namespace.nspname = 'careslink_v1_generation'
+    and relation.relkind = 'r'
+    and relation.relname = 'attempts';
 
   if v_actual is distinct from array[
     'attempts_failure_reason_check', 'attempts_fence_shape_check',
