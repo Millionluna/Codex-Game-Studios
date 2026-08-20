@@ -7,11 +7,14 @@ Base HEAD inspected: `fe5b708c488853418bfec3822369429e8fe9ff8f`
 
 Current five-Note local batch base: `63c10ea2e94ee4efdba7ffdbeb5aabbee6fcfa3b`
 
-This checkpoint covers the AI Web Portal reality audit, release sequencing and
-the local Referral workflow foundation. It does not modify the native App,
-Main Website, Native Auth/M0 implementation or shared Product API routes. Those
-are prerequisites recorded in the existing versioned contract documentation.
-All Referral capabilities remain local, default-off and unapplied. No database,
+Current durable generation local batch base: `4bf34ee0955a958c64e6865faa8bde2f2d1664a7`
+
+This checkpoint covers the AI Web Portal reality audit, release sequencing,
+local Referral foundation and source-only five-Note generation contracts. It
+does not modify the native App, Main Website, Native Auth/M0 implementation or
+served shared Product API routes. Those are prerequisites recorded in the
+existing versioned contract documentation. All new Referral and Note
+generation capabilities remain local, default-off and unapplied. No database,
 Preview deployment or Production system was contacted.
 
 ## 1. Portal reality matrix
@@ -33,7 +36,7 @@ availability.
 | Admin access requests/material usage | real/mixed | Yes | Manages AI access/metadata, not providers or referrals | Reuse its auth-first action pattern, not its business schema |
 | `/plan-and-usage` | legacy credits | Read-only | Runtime is still 3 legacy credits although the 300-Point/Pro product baseline is approved | Do not show both systems; implement and reconcile the approved wallet before cutover |
 | NDIS Case Note | real legacy server flow plus local shared-job evidence | Legacy generate/save only | Uses synchronous model and old credits; the new shared job is source-only and does not call it | Preserve legacy; keep the shared provider and canonical write default-off |
-| Other four Note types | catalog plus local shared-job evidence | No | Communication, Handover, Progress and Incident Factual now share a tested fake dispatcher/output boundary, but have no durable worker, served route, real provider or golden safety set | Complete one shared durable pipeline, then validate each type without forking orchestration |
+| Other four Note types | catalog plus local shared-job/durable-contract evidence | No | Communication, Handover, Progress and Incident Factual share the dispatcher/output boundary and a default-off durable internal contract/memory fake, but have no database-backed repository, registered worker, served route, real provider or golden safety set | Implement the reviewed database/worker boundary, then validate each type without forking orchestration |
 | `/ai-documents` | real legacy generated drafts | Delete only | Not canonical documents; store errors can appear as an empty list; no revision/export | Feature-gated canonical list only after current Preview evidence |
 | Shared `/v1` documents/sync | local durable adapter | Default-off | Exact current migrations are unapplied; write grants withheld; no current base URL | M0 permits only me/list/pull after all identity/RLS gates pass |
 | Library/Guides/Updates | absent | No | No page, store, content version or API | After referral + Notes/documents/export |
@@ -171,20 +174,25 @@ only the product meaning of `QUEUED`, not a sixth wire state. The server injects
 the reviewed facts and disclaimer, rejects provider-owned facts and obvious
 identifier/prohibited-decision output, and returns metadata-only acknowledgements.
 
-This is source/offline evidence, not a usable Note service. The readiness latch
-is `false`; there is no HTTP route, durable generation repository, worker
-lease/timeout/recovery, real provider/model, STT, database transaction, Points
-settlement, export renderer or Portal generation UI. The existing NDIS flow
-remains a separate legacy path and is not registered as the new provider.
+This is source/offline evidence, not a usable Note service. The original job
+readiness latch, durable readiness latch and payload-retention readiness latch
+are all `false`. A server-internal durable repository contract and `TEST_ONLY`
+memory fake now model attempts, leases, authorization, bounded recovery and
+response-loss, but there is no HTTP route, database-backed durable repository,
+registered worker, payload vault, real provider/model, STT, live Auth/privacy
+transaction, Points settlement, export renderer or Portal generation UI. The
+existing NDIS flow remains a separate legacy path and is not registered as the
+new provider.
 
 Next implementation order is:
 
-1. freeze provider/model, retention, lease/timeout and per-type golden safety
-   decisions;
-2. implement the durable transaction that revalidates the initiating session
-   and exact privacy proof while atomically persisting job success, canonical
-   document and revision 1;
-3. add a default-off served job route/worker and recovery/cancel semantics;
+1. freeze provider/model, payload-vault retention, lease/timeout/backoff and
+   per-type golden safety decisions;
+2. implement the database durable repository and transaction that fresh-reads
+   the initiating session and exact privacy proof while atomically persisting
+   job success, canonical document and revision 1;
+3. add a default-off served job route and registered worker using the reviewed
+   claim/authorization/recovery contract;
 4. bind Points only after a usable canonical result revision exists;
 5. implement revision-bound DOCX/PDF/TXT export and Portal UI.
 
@@ -320,12 +328,13 @@ The current local batch adds two server-only modules and their tests:
   late-result handling and a fake atomic job + document + revision-1 store.
 
 The fake store proves local state-machine and atomicity semantics only. A
-future durable implementation must revalidate the active initiating session
-and exact owner/type/facts-hash/schema/status/expiry privacy proof inside the
-same transaction that creates the canonical result and marks the job
+future database durable implementation must revalidate the active initiating
+session and exact owner/type/facts-hash/schema/status/expiry privacy proof
+inside the same transaction that creates the canonical result and marks the job
 `SUCCEEDED`. No current migration or SQL assertion implements that transaction.
-Provider timeout/lease/recovery, semantic golden sets, real model/STT, Points,
-export and served Portal UI remain activation blockers.
+Approved runtime timeout/lease/backoff policy, database recovery, semantic
+golden sets, real model/STT, Points, export and served Portal UI remain
+activation blockers.
 
 Local evidence for this batch:
 
@@ -339,3 +348,50 @@ Local evidence for this batch:
 
 These results execute no model, STT, Points, database, Preview or Production
 operation.
+
+## 10. Durable generation source contract — 2026-08-20
+
+The next local batch adds:
+
+- `src/lib/v1/note-generation-durable.ts`, a server-internal durable repository
+  contract and explicitly `TEST_ONLY` memory fake;
+- `src/lib/v1/note-generation-durable.test.ts`, covering claim, authorization,
+  lease/recovery, stale-worker fencing, replay, owner-safe views, retention and
+  canonical revision-1 invariants;
+- `documentation/v1-note-generation-durable-design.md`, the default-off handoff
+  for a future private database schema, transaction and worker.
+
+The source contract models owner-scoped idempotent enqueue, concurrent claim,
+lease renewal/expiry, explicit bounded recovery, cancellation and terminal
+invariants. Claim returns no payload handle. A separate worker-private
+payload-use operation requires exact same-attempt/lease session and privacy
+bindings before it returns the test handle and records authorization. Canonical
+commit requires that authorization, rechecks the bindings, validates the
+complete server-owned Note output, writes one document plus revision 1 in the
+memory atomic region, and supports exact success response-loss replay. Changed
+replay input conflicts; expired/recovered leases fence old workers; a recovered
+attempt does not inherit payload authorization.
+
+Only `getOwnerView` is serializable to an owner. It excludes initiating session,
+privacy proof, facts/idempotency/payload/lease hashes and worker metadata. The
+private record may retain the initiating session UUID solely so a future
+database transaction can fresh-read eligibility; access/refresh tokens, raw
+facts and provider output are absent from job/attempt metadata.
+
+Local evidence for this batch:
+
+| Command | Result |
+|---|---|
+| focused durable generation tests | 1 file / 38 tests passed |
+| adjacent Note generation tests | 3 files / 106 tests passed |
+| `pnpm test` | 115 files / 1,089 tests passed; preserves 114 / 1,051 and the 90 / 653 historical baseline |
+| `pnpm exec tsc --noEmit --incremental false` | passed |
+| `pnpm lint` | passed |
+| `pnpm build` | passed; Next static generation 63/63 |
+
+`CARESLINK_V1_NOTE_GENERATION_DURABLE_READY` and
+`CARESLINK_V1_NOTE_GENERATION_PAYLOAD_RETENTION_READY` remain `false`. No route,
+database migration/repository, registered worker, payload vault, model/STT,
+Points or deployment was added. Memory session/privacy binding tests are not
+live `auth.sessions`/privacy-row E2E and cannot authorize Preview or Production
+activation.

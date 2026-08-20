@@ -110,10 +110,50 @@ complete semantic/model golden sets.
 | `pnpm lint` | passed |
 | `pnpm build` | passed; Next static generation completed 63/63 |
 
-`CARESLINK_V1_NOTE_GENERATION_READY` remains compile-time `false`. There is no
-served route, durable job table/repository, worker lease/timeout/recovery,
-model/STT call, database write, Points port, export renderer or generation UI.
-No migration or SQL assertion was added or executed in this batch.
+`CARESLINK_V1_NOTE_GENERATION_READY` remains compile-time `false`. At this
+historical checkpoint there was no served route, database durable job
+table/repository, registered worker, model/STT call, database write, Points
+port, export renderer or generation UI. No migration or SQL assertion was
+added or executed in that batch.
+
+### Durable Note generation internal contract checkpoint — 2026-08-20
+
+`src/lib/v1/note-generation-durable.ts` and its test add a source-only,
+server-internal repository contract plus an explicitly `TEST_ONLY` memory fake.
+`documentation/v1-note-generation-durable-design.md` records the future private
+database and worker boundary. The source evidence covers metadata-only enqueue
+and owner-scoped replay, concurrent attempt claim, lease renewal and expiry,
+explicit bounded recovery, stale-worker fencing, cancellation/terminal
+invariants, response-loss replay, and atomic canonical document plus revision-1
+success.
+
+Claim does not expose the payload handle. A separate worker-private payload-use
+operation requires exact current memory session/privacy bindings for the same
+job, attempt and lease before returning the test handle and recording
+`payloadAuthorizedAt`. Missing authorization blocks canonical commit; failed
+bindings close the attempt/job and remove payload availability; recovered
+attempts do not inherit authorization. Canonical success revalidates the
+binding, server-owned output shape/disclaimer, reviewed-facts hash, mutation
+identity, canonical UTF-8 hash and monotonic transaction time. Owner-safe views
+exclude session, privacy, idempotency, payload, lease and worker metadata.
+
+| Command | Result |
+|---|---|
+| focused durable generation gate | 1 file, 38 tests passed |
+| adjacent Note generation gate | 3 files, 106 tests passed |
+| `pnpm test` | 115 files, 1,089 tests passed; preserves 114 / 1,051 and the 90 / 653 historical baseline |
+| `pnpm exec tsc --noEmit --incremental false` | passed |
+| `pnpm lint` | passed |
+| `pnpm build` | passed; Next static generation completed 63/63 |
+
+`CARESLINK_V1_NOTE_GENERATION_DURABLE_READY` and
+`CARESLINK_V1_NOTE_GENERATION_PAYLOAD_RETENTION_READY` remain `false`. There is
+no served route, database migration/repository, registered worker, payload
+vault/retention policy, real model/STT call, Points integration or deployment.
+The memory binding tests do not fresh-read live `auth.sessions`, `auth.users` or
+privacy rows and are not Preview/Production revocation E2E evidence. A future
+database implementation must prove those checks and canonical persistence in
+one transaction on a disposable Preview before activation.
 
 ### Mobile V1 protected Product API Preview E2E — 2026-08-14
 
@@ -349,7 +389,7 @@ The following suites are required before the corresponding V1 slice can be calle
 
 1. The native App exists in a separate repository and is outside this task; this AI repository does not execute or attest its iOS/Android, offline, purchase or store gates.
 2. The OpenAPI/TypeScript contract and default-off durable `/v1` route adapter now exist, but there is no Preview- or Production-served Product API, generated client package, schema registry or previous-version compatibility fixture.
-3. The current worktree passes 1,051 tests across 114 files (with 112 / 983, 107 / 938, 104 / 894 and 103 / 831 retained as prior source-level batches and 90 / 653 as the historical baseline). All five Note types now share a source-only generation/output/job foundation, but still lack durable workers, real provider/STT integration and complete per-type input/output/privacy/semantic golden sets.
+3. The current worktree passes 1,089 tests across 115 files (with 114 / 1,051, 112 / 983, 107 / 938, 104 / 894 and 103 / 831 retained as prior source-level batches and 90 / 653 as the historical baseline). All five Note types share a source-only generation/output/job foundation and a default-off durable internal contract/memory fake, but still lack a database-backed durable repository, registered worker, real provider/STT integration and complete per-type input/output/privacy/semantic golden sets.
 4. Canonical document/revision/checkpoint states exist as memory/domain contracts plus historical isolated schema/RPC evidence and a new unapplied mobile-sync migration draft; there is no Production schema activation, editor, renderer or cross-device recovery E2E.
 5. Points lots/rates/reservations passed isolated serial database tests but remain shadow-only. There is no runtime entitlement integration, welcome eligibility decision, concurrent reservation proof or legacy-credit conversion/reconciliation test.
 6. No payment provider sandbox, webhook replay, refund or reconciliation harness exists.
