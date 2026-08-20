@@ -83,6 +83,38 @@ show fail-closed local controls or explicit database-identity boundaries, but
 their surrounding legacy demo sections remain mock and are not represented as
 canonical Referral data.
 
+### Five-Note generation source/offline checkpoint — 2026-08-20
+
+Communication, Handover, Progress, NDIS and Incident Factual now share one
+server-only catalog dispatcher, one provider port and one canonical output
+builder. The fake job unit of work proves `QUEUED`, `RUNNING`, `SUCCEEDED`,
+`FAILED` and `CANCELLED`; owner-scoped replay and changed-payload conflict;
+response-loss recovery; cancel/late-output handling; canonical document plus
+revision-1 success; and zero canonical result on provider or atomic-store
+failure. Admission validates a fresh session, bounded cleaned facts and an
+exact privacy-proof binding, then checks the initiating session and proof again
+before commit. The durable port contract requires those checks to run inside
+the future database transaction.
+
+Output tests cover all five adjacent schemas, exact provider-owned fields,
+server-injected facts/disclaimer, canonical UTF-8 hash, bounds, obvious
+identifier rejection, catalog prohibited-decision literals and runtime
+revalidation of the read-only legacy NDIS material adapter. These are not
+complete semantic/model golden sets.
+
+| Command | Result |
+|---|---|
+| focused Note generation gate | 2 files, 68 tests passed |
+| `pnpm test` | 114 files, 1,051 tests passed; preserves the 90 / 653 historical baseline |
+| `pnpm exec tsc --noEmit --incremental false` | passed |
+| `pnpm lint` | passed |
+| `pnpm build` | passed; Next static generation completed 63/63 |
+
+`CARESLINK_V1_NOTE_GENERATION_READY` remains compile-time `false`. There is no
+served route, durable job table/repository, worker lease/timeout/recovery,
+model/STT call, database write, Points port, export renderer or generation UI.
+No migration or SQL assertion was added or executed in this batch.
+
 ### Mobile V1 protected Product API Preview E2E — 2026-08-14
 
 A protected, non-Production Preview exercised the default-off Product API against
@@ -317,7 +349,7 @@ The following suites are required before the corresponding V1 slice can be calle
 
 1. The native App exists in a separate repository and is outside this task; this AI repository does not execute or attest its iOS/Android, offline, purchase or store gates.
 2. The OpenAPI/TypeScript contract and default-off durable `/v1` route adapter now exist, but there is no Preview- or Production-served Product API, generated client package, schema registry or previous-version compatibility fixture.
-3. The current worktree passes 983 tests across 112 files (with 107 / 938, 104 / 894 and 103 / 831 retained as prior source-level batches and 90 / 653 as the historical baseline), but the four additional Note types have only catalog metadata/prohibited-decision contracts, not input/output/privacy/generation golden sets.
+3. The current worktree passes 1,051 tests across 114 files (with 112 / 983, 107 / 938, 104 / 894 and 103 / 831 retained as prior source-level batches and 90 / 653 as the historical baseline). All five Note types now share a source-only generation/output/job foundation, but still lack durable workers, real provider/STT integration and complete per-type input/output/privacy/semantic golden sets.
 4. Canonical document/revision/checkpoint states exist as memory/domain contracts plus historical isolated schema/RPC evidence and a new unapplied mobile-sync migration draft; there is no Production schema activation, editor, renderer or cross-device recovery E2E.
 5. Points lots/rates/reservations passed isolated serial database tests but remain shadow-only. There is no runtime entitlement integration, welcome eligibility decision, concurrent reservation proof or legacy-credit conversion/reconciliation test.
 6. No payment provider sandbox, webhook replay, refund or reconciliation harness exists.

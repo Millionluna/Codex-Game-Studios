@@ -1,9 +1,11 @@
 # Portal-first release checkpoint
 
-Date: 2026-08-14
+Date: 2026-08-20
 
 Branch: `codex/careslink-ai-mobile-sync-v1`
 Base HEAD inspected: `fe5b708c488853418bfec3822369429e8fe9ff8f`
+
+Current five-Note local batch base: `63c10ea2e94ee4efdba7ffdbeb5aabbee6fcfa3b`
 
 This checkpoint covers the AI Web Portal reality audit, release sequencing and
 the local Referral workflow foundation. It does not modify the native App,
@@ -29,9 +31,9 @@ availability.
 | `/referral-workspace/*` | mixed real access/material/outreach stores | Yes, for those tools | These are AI access and outreach tools, not the referral pipeline; some stores have memory fallback | Preserve and later link by canonical referral ID |
 | `/admin`, `/dashboard` | mock global metrics | No | Core pages have no real referral permission gate; must not receive real data yet | Add membership gate, then replace only the assignment queue |
 | Admin access requests/material usage | real/mixed | Yes | Manages AI access/metadata, not providers or referrals | Reuse its auth-first action pattern, not its business schema |
-| `/plan-and-usage` | legacy credits | Read-only | Current product is 3 legacy credits, not a 300-Point wallet | Do not show both systems; freeze 300-Point product rule before cutover |
-| NDIS Case Note | real legacy server flow | Generate/save | Uses synchronous model and old credits; saved draft is flat JSON and canonical projection is best-effort | Preserve legacy while canonical write remains default-off |
-| Other four Note types | catalog/contract only | No | Communication, Handover, Progress and Incident Factual lack complete server jobs and golden sets | Implement one type-specific job at a time after M0/M1 |
+| `/plan-and-usage` | legacy credits | Read-only | Runtime is still 3 legacy credits although the 300-Point/Pro product baseline is approved | Do not show both systems; implement and reconcile the approved wallet before cutover |
+| NDIS Case Note | real legacy server flow plus local shared-job evidence | Legacy generate/save only | Uses synchronous model and old credits; the new shared job is source-only and does not call it | Preserve legacy; keep the shared provider and canonical write default-off |
+| Other four Note types | catalog plus local shared-job evidence | No | Communication, Handover, Progress and Incident Factual now share a tested fake dispatcher/output boundary, but have no durable worker, served route, real provider or golden safety set | Complete one shared durable pipeline, then validate each type without forking orchestration |
 | `/ai-documents` | real legacy generated drafts | Delete only | Not canonical documents; store errors can appear as an empty list; no revision/export | Feature-gated canonical list only after current Preview evidence |
 | Shared `/v1` documents/sync | local durable adapter | Default-off | Exact current migrations are unapplied; write grants withheld; no current base URL | M0 permits only me/list/pull after all identity/RLS gates pass |
 | Library/Guides/Updates | absent | No | No page, store, content version or API | After referral + Notes/documents/export |
@@ -162,29 +164,68 @@ breaking contract change requires an impact fixture before App handoff.
 ### AI Notes
 
 The five shared codes are Communication, Handover, Progress, NDIS and Incident
-Factual. Only the legacy NDIS flow currently has a real server generation/save
-path. The other four are catalog contracts, not usable server jobs. After M0
-and the referral persistence slice, implementation order is:
+Factual. They now enter one local typed catalog/dispatcher, provider port,
+output validator and fake atomic job/document/revision unit of work. The job
+uses the frozen `QUEUED/RUNNING/SUCCEEDED/FAILED/CANCELLED` states; “pending” is
+only the product meaning of `QUEUED`, not a sixth wire state. The server injects
+the reviewed facts and disclaimer, rejects provider-owned facts and obvious
+identifier/prohibited-decision output, and returns metadata-only acknowledgements.
 
-1. one type-specific async Note job with privacy proof and recovery;
-2. canonical first/result revision and checkpoint;
-3. revision-bound DOCX/PDF/TXT export;
-4. repeat with golden input/output/privacy sets for each remaining type.
+This is source/offline evidence, not a usable Note service. The readiness latch
+is `false`; there is no HTTP route, durable generation repository, worker
+lease/timeout/recovery, real provider/model, STT, database transaction, Points
+settlement, export renderer or Portal generation UI. The existing NDIS flow
+remains a separate legacy path and is not registered as the new provider.
+
+Next implementation order is:
+
+1. freeze provider/model, retention, lease/timeout and per-type golden safety
+   decisions;
+2. implement the durable transaction that revalidates the initiating session
+   and exact privacy proof while atomically persisting job success, canonical
+   document and revision 1;
+3. add a default-off served job route/worker and recovery/cancel semantics;
+4. bind Points only after a usable canonical result revision exists;
+5. implement revision-bound DOCX/PDF/TXT export and Portal UI.
 
 No real model call is authorized in this task.
 
-### 300 Points
+### Approved commercial baseline and Points
 
-The live Portal source currently displays a legacy allowance of 3 credits. The
-shadow Points model does not currently define or grant a 300-Point welcome or
-monthly balance. “300 Points” therefore remains a product decision requiring
-one precise definition: eligibility, one-time versus recurring, expiry,
-refund/revoke behavior and rate catalog. Until that is frozen and reconciled:
+The product rules are approved, but their SQL/API/payment implementation is
+not live. Free is A$0 with a one-time 300-Point welcome grant for an eligible
+verified canonical account. Individual Pro is A$19.99 monthly or A$199 yearly;
+both grant 2,000 subscription Points after each successful monthly entitlement
+cycle, never 24,000 up front. Subscription Points do not roll over, while
+purchased 500/2,000/5,000-Point top-ups do not expire and are available to
+both Free and Pro users. Cancellation stops future cycle grants. V1 remains
+individual only: Web, iOS and Android share one canonical user, entitlement,
+wallet and append-only ledger.
 
-- do not cut over;
-- do not show old credits and new Points together;
-- do not grant 300 Points in a migration;
-- keep all Points operations contract-only/default-off.
+The approved base rates are Communication 20, Handover 25, Progress 35, NDIS
+50 and Incident Factual 60 Points. Device STT is 0; cloud STT is 10/minute;
+Content Explain is 10; paragraph rewrite is 10; later full rewrites quote
+20-40. Login, input, privacy review, edit, save, sync, export, delete, failed or
+cancelled work cost 0. The first full generation and first same-facts full
+rewrite are included in the base Note price.
+
+The current Portal runtime still exposes the legacy three-credits-per-UTC-month
+allowance and charges one legacy credit for NDIS. The Points wallet, lot,
+entitlement and payment paths remain shadow/default-off. No code currently
+serves an automatic welcome-300 grant, renews Pro lots, sells top-ups or
+reconciles Stripe, Apple or Google events. Therefore:
+
+- do not cut over or show two balances;
+- do not grant Points in a migration or from a payment redirect;
+- do not enable quote/reserve/commit/release before the canonical revision,
+  RLS, concurrency and reconciliation gates pass;
+- preserve product truth while implementation decisions remain open: exact
+  welcome eligibility/existing-user treatment/expiry, legacy conversion,
+  top-up AUD/GST/product IDs, refund debt handling, renewal/grace/channel
+  switching, past-due and duplicate-subscription behavior, 15-versus-10-minute
+  reservation expiry, first-rewrite catalog representation, database-unique
+  welcome ownership and a commit contract bound to the persisted canonical
+  `resultRevisionId` rather than a generic result reference.
 
 Library, Guides, Updates, notifications and account export/delete follow the
 Notes/document/export slice and use the same versioned contract, not Portal-only
@@ -265,3 +306,36 @@ and transactional SQL assertions remain unexecuted. The memory arbitration test
 does not prove Postgres row-lock behavior. No Preview URL can be handed to the
 App or Main Website until the entry criteria above pass on one exact disposable
 Preview revision.
+
+## 9. Five-Note source/offline generation foundation — 2026-08-20
+
+The current local batch adds two server-only modules and their tests:
+
+- `src/lib/v1/note-generation-output.ts` freezes the provider candidate shape,
+  server-owned facts/disclaimer, output bounds, identifier/prohibited-decision
+  guard, canonical JSON hash and a revalidated read-only legacy NDIS adapter;
+- `src/lib/v1/note-generation-job.ts` freezes one five-type dispatcher and
+  provider port, version-bound jobs, hashed idempotency, metadata-only ACKs,
+  owner isolation, session/privacy admission and commit-time bindings, cancel
+  late-result handling and a fake atomic job + document + revision-1 store.
+
+The fake store proves local state-machine and atomicity semantics only. A
+future durable implementation must revalidate the active initiating session
+and exact owner/type/facts-hash/schema/status/expiry privacy proof inside the
+same transaction that creates the canonical result and marks the job
+`SUCCEEDED`. No current migration or SQL assertion implements that transaction.
+Provider timeout/lease/recovery, semantic golden sets, real model/STT, Points,
+export and served Portal UI remain activation blockers.
+
+Local evidence for this batch:
+
+| Command | Result |
+|---|---|
+| focused five-Note generation tests | 2 files / 68 tests passed |
+| `pnpm test` | 114 files / 1,051 tests passed; preserves the 90 / 653 historical baseline |
+| `pnpm exec tsc --noEmit --incremental false` | passed |
+| `pnpm lint` | passed |
+| `pnpm build` | passed; Next static generation 63/63 |
+
+These results execute no model, STT, Points, database, Preview or Production
+operation.
