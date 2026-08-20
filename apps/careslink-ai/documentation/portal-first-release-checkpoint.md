@@ -436,3 +436,37 @@ behavior, and telemetry/cost-retention policy. The implementation must then add
 a private durable database adapter, registered worker, server transaction clock,
 live `auth.users`/`auth.sessions` and privacy-proof reads, and disposable-Preview
 concurrency/revocation/purge tests. None of those decisions is guessed here.
+
+## 12. Registered Note worker v2 source contract — 2026-08-20
+
+This batch adds `note-generation-registered-worker.ts` and its test. It does not
+deploy or register a runtime worker. Readiness remains `false`, the production
+registry is frozen empty, and the only factory requires the literal
+`TEST_ONLY` capability.
+
+The registration digest binds the worker identity, contract/schema, immutable
+worker policy, all five Note provider policies and the payload-policy snapshot.
+The parameterless worker surface then proves this order: claim; authorize and
+single-consume reviewed facts; enforce grant lifetime, provider deadline and
+heartbeats; validate content-free provider evidence; reject non-completed
+results; build canonical content; fence the lease; and call one atomic success
+boundary for canonical document/revision 1, sync change, mutation receipt and
+payload logical revoke. Exact retry/jitter/max-attempt rules and response-loss
+resolution are also fail-closed.
+
+Local evidence for this batch:
+
+| Command | Result |
+|---|---|
+| focused registered-worker tests | 1 file / 43 tests passed |
+| adjacent Note generation tests | 7 files / 253 tests passed |
+| `pnpm test` | 119 files / 1,236 tests passed; preserves 118 / 1,193 and the 90 / 653 historical baseline |
+| `pnpm exec tsc --noEmit --incremental false` | passed |
+| `pnpm lint` | passed |
+| `pnpm build` | passed; Next static generation 63/63 |
+
+Independent source/test review found no current P0/P1. This remains control-flow
+evidence only. A real durable store, database transaction clock, scheduler,
+fresh session/privacy database reads, encrypted payload backend, approved
+provider/model policies and disposable-Preview concurrency/recovery gates are
+still required before any runtime registry entry or user traffic can exist.
