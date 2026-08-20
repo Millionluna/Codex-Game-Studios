@@ -396,9 +396,41 @@ describe("Portal referral workflow migration contract", () => {
 
   it("ships rollback-only ACL, lifecycle, A/B, decline and redaction assertions", () => {
     expect(assertions).toMatch(/^-- Manual rollback-only assertions/);
-    expect(assertions).toContain("has not been run against a DB");
+    expect(assertions).toContain(
+      "prior fixture revision ran on the deleted r3 Preview",
+    );
+    expect(assertions).toContain(
+      "privacy-bound revision has not yet been rerun on a fresh Preview",
+    );
     expect(assertions).toContain("begin;");
     expect(assertions.trimEnd()).toMatch(/rollback;$/);
+    expect(assertions).toContain("insert into public.privacy_reviews");
+    expect(assertions).toContain(
+      "'communication', public.v1_shadow_content_sha256(v_facts)",
+    );
+    expect(assertions).toContain(
+      "v_confirmed_at + interval '30 minutes'",
+    );
+    expect(assertions).toContain(
+      "v_confirmed_at timestamptz := clock_timestamp()",
+    );
+    expect(assertions).toContain(
+      "'2026-08-11.preview.1', 1",
+    );
+    expect(assertions).toContain(
+      "'9b000000-0000-4000-8000-000000000001'",
+    );
+    expect(assertions).toMatch(
+      /insert into public\.ai_document_revisions \([\s\S]*?revision_number, privacy_review_id,[\s\S]*?'9b000000-0000-4000-8000-000000000001',[\s\S]*?v_content, public\.v1_shadow_content_sha256\(v_content\)/,
+    );
+    expect(assertions).toContain("'factsSummary', v_facts");
+    expect(assertions).toContain(
+      "v_content, public.v1_shadow_content_sha256(v_content)",
+    );
+    expect(assertions).not.toContain("1, '{}'::jsonb, repeat('c', 64)");
+    expect(assertions).not.toMatch(
+      /(?:disable trigger|drop trigger|session_replication_role)/i,
+    );
     for (const marker of [
       "private schema ACL is unsafe",
       "unsafe SECURITY DEFINER/search_path",

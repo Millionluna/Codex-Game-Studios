@@ -432,10 +432,10 @@ at its owner default-ACL step.
 
 Read-only post-failure checks found neither the generation schema nor either
 generation role, confirming atomic rollback of the failed migration. The exact
-disposable branch was deleted and its absence verified. The Production database
-was never connected to, queried, migrated or modified, and no runtime
-capability or execute grant was enabled. This is failure/cleanup evidence, not
-successful Preview evidence.
+disposable branch was deleted and its absence verified. Production was not used
+as the SQL target, and no deployment, runtime capability or execute grant was
+added or enabled. This is failure/cleanup evidence, not successful Preview
+evidence.
 
 The repaired source now has the dedicated owner alter its global defaults
 inside a temporary `SET ROLE` / `RESET ROLE` window and does not repeat the
@@ -449,10 +449,30 @@ PostgreSQL 17's `information_schema.table_constraints` includes generated NOT
 NULL names as well as the declared constraint names. A transaction-local
 comparison showed the expected declared set in `pg_constraint`. The assertion
 rolled back and the exact disposable branch was deleted. Production was not
-used as the SQL target. The assertion now uses `pg_constraint` with exact
-schema/table/ordinary-table filtering, but this revised body has not yet run.
-A fresh disposable `r3` must repeat the complete apply and assertion before the
-Preview gate can pass.
+used as the SQL target.
+
+The repaired assertion uses `pg_constraint` with exact schema/table/ordinary-
+table filtering. A third fresh non-default `with_data=false` PostgreSQL 17
+branch clean-applied all 13 exact source migrations and passed that full
+same-request rollback assertion. Post-rollback inspection also passed the
+expected `NOLOGIN`/non-privileged role topology, bootstrap membership edges,
+forced-RLS/default-ACL checks, forced-off settings row, zero fixture/business
+rows and absence of private-schema policies, functions, views, non-internal
+triggers and API/executor privilege leaks. The security and performance advisor
+review had no generation warning/error; only the expected informational
+RLS-with-no-policy and zero-row unused-index findings remained.
+
+Four adjacent rollback suites then passed: V1 shadow, NDIS integration, mobile
+sync and privacy review. The Portal Referral rollback suite failed with
+`VALIDATION_ERROR` because its older canonical-revision fixture lacks the
+privacy proof/facts binding required by the newer trigger; its transaction
+rolled back. The isolated durable-metadata gate therefore passed, but the
+complete exact-revision cross-domain gate remains incomplete. The local
+privacy-bound fixture repair now passes its source contract without weakening
+that trigger, but has not run against a database; the sequence must be repeated
+on a fresh disposable `r4`. The `r3` branch was deleted and its absence was
+verified. Production was not used as the SQL target, and no deployment, runtime
+flag, capability or API/executor grant was added or enabled.
 
 The source-only registered-worker database adapter may validate a composite
 atomic acknowledgement, but that acknowledgement is not proof that a database

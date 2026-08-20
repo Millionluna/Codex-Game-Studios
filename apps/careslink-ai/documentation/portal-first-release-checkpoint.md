@@ -17,7 +17,7 @@ does not modify the native App, Main Website, Native Auth/M0 implementation or
 served shared Product API routes. Those are prerequisites recorded in the
 existing versioned contract documentation. All new Referral and Note
 generation capabilities remain local, default-off, Production-unapplied and
-absent from retained Preview runtime. Two disposable Preview databases were
+absent from retained Preview runtime. Three disposable Preview databases were
 used only for the isolated migration/assertion gates recorded below and then
 deleted; no Preview application deployment or Production database was used as
 the SQL target.
@@ -267,8 +267,10 @@ Formal local gates passed:
 | `pnpm lint` | passed |
 | `pnpm build` | passed; Next static generation 61/61 |
 
-The SQL assertion script has not been executed because no authorized fresh
-disposable Preview target or credentials are present.
+The original Portal assertion revision ran on deleted disposable `r3` and
+rolled back when its pre-privacy canonical revision fixture hit the current
+privacy trigger. The privacy-bound local repair below has not yet run; a fresh
+disposable `r4` remains required before this SQL gate can pass.
 
 ## 7. Disposable Preview entry criteria
 
@@ -566,9 +568,9 @@ exact local source SQL files applied in order, while this thirteenth migration
 failed with `42501 permission denied to change default privileges`. Read-only
 post-failure checks confirmed its schema and two roles were absent, proving the
 failed migration rolled back atomically; the disposable branch was then deleted
-and its absence verified. The Production database was not connected to,
-queried, migrated or modified. This is failure/cleanup evidence, not successful
-Preview evidence.
+and its absence verified. Production was not used as the SQL target, and no
+Production migration, deployment, capability or grant was changed. This is
+failure/cleanup evidence, not successful Preview evidence.
 
 The hosted-safe source repair changes the dedicated owner's global defaults
 inside a temporary `SET ROLE` / `RESET ROLE` window and performs the only schema
@@ -581,11 +583,31 @@ the branch was deleted and its absence verified. Production was not used as the
 SQL target.
 
 The assertion now uses `pg_constraint` joined to `pg_class` and `pg_namespace`
-for the three exact declared-constraint sets. This revision has not yet run. A
-fresh disposable `r3` branch must repeat 13/13 apply and pass the complete
-same-request assertion before this gate can pass. There is still no
-payload metadata/grant, vault/KMS/retention decision, purge outbox,
-provider-evidence detail store, transaction-clock scheduler,
+for the three exact declared-constraint sets. On a third fresh non-default
+`with_data=false` PostgreSQL 17 branch, all 13 exact source migrations applied
+in order and that complete same-request durable assertion passed. Post-rollback
+checks also passed the dedicated role topology, forced RLS, default ACL and
+privilege-denial contract; the sole settings row remained forced off, all
+generation/Auth/session/privacy/assertion fixture counts returned to zero, and
+no policy, function, view, non-internal trigger or API/executor privilege was
+present in the private schema. Security and performance advisors reported no
+generation-schema warning/error: only the expected informational RLS-with-no-
+policy and zero-row unused-index findings remained.
+
+The first four adjacent rollback suites—V1 shadow, NDIS integration, mobile
+sync and privacy review—also passed. The fifth, Portal Referral, failed with
+`VALIDATION_ERROR` because its older canonical-revision fixture lacks the
+current privacy proof/facts binding; its transaction rolled back. Therefore the
+durable metadata foundation's isolated `r3` gate passed, but the complete exact-
+revision cross-domain gate did not. The privacy-bound fixture repair now exists
+locally and passes its source contract without weakening the trigger, but has
+not run against a database. A
+fresh disposable `r4` must run the complete sequence. The `r3` branch was
+deleted and its absence verified. Production was not used as the SQL target,
+and no deployment, runtime flag or API/executor grant was added or enabled.
+
+There is still no payload metadata/grant, vault/KMS/retention decision, purge
+outbox, provider-evidence detail store, transaction-clock scheduler,
 claim/heartbeat/fence/commit/settle RPC, registered worker, model/STT call,
-Points call, runtime flag or Production change. Those remain separate
-activation gates, not hidden defaults in this schema.
+Points call or runtime capability. Those remain separate activation gates, not
+hidden defaults in this schema.

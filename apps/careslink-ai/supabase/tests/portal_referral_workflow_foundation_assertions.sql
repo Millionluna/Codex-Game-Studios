@@ -1,5 +1,7 @@
 -- Manual rollback-only assertions for a fresh disposable Preview database.
--- This file is not executed by pnpm test and has not been run against a DB.
+-- The prior fixture revision ran on the deleted r3 Preview and rolled back when
+-- the current privacy trigger rejected its pre-privacy empty revision fixture.
+-- This privacy-bound revision has not yet been rerun on a fresh Preview.
 -- It must be run only after a clean apply of the exact migration revision.
 
 begin;
@@ -519,32 +521,74 @@ insert into public.portal_referral_followups (
   'FOLLOW_UP_SCHEDULED'
 );
 
-insert into public.ai_documents (
-  id, owner_user_id, note_type, source_locale, lifecycle_status,
-  schema_version, contract_version
-) values (
-  '9c000000-0000-4000-8000-000000000001',
-  '93000000-0000-4000-8000-000000000003',
-  'communication', 'en', 'IN_PROGRESS',
-  '2026-08-09.v1-shadow', '1.0.0-shadow.1'
-);
+do $$
+declare
+  v_facts jsonb := '{
+    "occurred_at":"2026-08-21T00:00:00Z",
+    "contact_channel":"secure portal",
+    "parties_by_role":["provider"],
+    "observable_facts":"Referral record linked for rollback-only access assertions.",
+    "action_taken":"Canonical document fixture created."
+  }'::jsonb;
+  v_content jsonb;
+  v_confirmed_at timestamptz := clock_timestamp();
+begin
+  v_content := jsonb_build_object(
+    'englishDraft', 'Referral linkage fixture.',
+    'reviewVersions', '{}'::jsonb,
+    'factsSummary', v_facts,
+    'missingFacts', '[]'::jsonb,
+    'neutralWordingChecks', '[]'::jsonb,
+    'followUpPrompts', '[]'::jsonb,
+    'disclaimer', 'Draft for review.'
+  );
 
-insert into public.ai_document_revisions (
-  id, document_id, owner_user_id, revision_number, content, content_hash,
-  mutation_id, schema_version, contract_version
-) values (
-  '9d000000-0000-4000-8000-000000000001',
-  '9c000000-0000-4000-8000-000000000001',
-  '93000000-0000-4000-8000-000000000003',
-  1, '{}'::jsonb, repeat('c', 64), 'portal.revision.0001',
-  '2026-08-09.v1-shadow', '1.0.0-shadow.1'
-);
+  insert into public.privacy_reviews (
+    id, owner_user_id, note_type, cleaned_facts_hash, schema_version,
+    status, finding_decisions, confirmed_at, expires_at, contract_version,
+    scanner_policy_version, review_revision, mutation_id,
+    request_fingerprint, deidentification_confirmed,
+    authority_to_process_confirmed, shadow_only
+  ) values (
+    '9b000000-0000-4000-8000-000000000001',
+    '93000000-0000-4000-8000-000000000003',
+    'communication', public.v1_shadow_content_sha256(v_facts),
+    '2026-08-09.v1-shadow', 'CONFIRMED', '[]'::jsonb,
+    v_confirmed_at, v_confirmed_at + interval '30 minutes',
+    '1.0.0-shadow.1', '2026-08-11.preview.1', 1,
+    'portal.privacy.0001', repeat('b', 64), true, true, true
+  );
 
-update public.ai_documents
-set current_revision_id = '9d000000-0000-4000-8000-000000000001',
-    current_revision_number = 1,
-    updated_at = now()
-where id = '9c000000-0000-4000-8000-000000000001';
+  insert into public.ai_documents (
+    id, owner_user_id, note_type, source_locale, lifecycle_status,
+    schema_version, contract_version
+  ) values (
+    '9c000000-0000-4000-8000-000000000001',
+    '93000000-0000-4000-8000-000000000003',
+    'communication', 'en', 'IN_PROGRESS',
+    '2026-08-09.v1-shadow', '1.0.0-shadow.1'
+  );
+
+  insert into public.ai_document_revisions (
+    id, document_id, owner_user_id, revision_number, privacy_review_id,
+    content, content_hash, mutation_id, schema_version, contract_version
+  ) values (
+    '9d000000-0000-4000-8000-000000000001',
+    '9c000000-0000-4000-8000-000000000001',
+    '93000000-0000-4000-8000-000000000003', 1,
+    '9b000000-0000-4000-8000-000000000001',
+    v_content, public.v1_shadow_content_sha256(v_content),
+    'portal.revision.0001',
+    '2026-08-09.v1-shadow', '1.0.0-shadow.1'
+  );
+
+  update public.ai_documents
+  set current_revision_id = '9d000000-0000-4000-8000-000000000001',
+      current_revision_number = 1,
+      updated_at = now()
+  where id = '9c000000-0000-4000-8000-000000000001';
+end
+$$;
 
 insert into public.export_jobs (
   id, owner_user_id, document_id, revision_id, format, status,
