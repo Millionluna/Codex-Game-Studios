@@ -262,6 +262,51 @@ The composite acknowledgement becomes meaningful only after the exact future
 migration passes clean-apply, role, RLS, concurrency, revocation, replay,
 atomic-failure and purge-outbox assertions on a disposable Preview.
 
+### Durable Note metadata schema-only checkpoint — 2026-08-21
+
+The next local batch rechecked current official Supabase migration, Data API,
+RLS, role and function-security guidance, then used Supabase CLI 2.115.0 to
+generate
+`supabase/migrations/20260820135834_add_v1_note_generation_durable_shadow.sql`.
+The migration creates only two dedicated non-login roles, the private
+`careslink_v1_generation` schema, one forced-off settings row, metadata-only
+jobs/attempts and ten supporting indexes. All three tables enable and force
+RLS, define no policy and expose no privilege to `PUBLIC`, `anon`,
+`authenticated`, `service_role` or the future executor.
+On PostgreSQL 16+, a non-superuser role creator retains only the automatic
+bootstrap-granted admin edge for each dedicated role; the assertions require
+`INHERIT=false` and `SET=false`, and reject every API-role, executor-member or
+other membership edge. The temporary non-inheriting `SET` edge used for object
+ownership is grantor-scoped and revoked by the migration.
+
+`supabase/assertions/v1_note_generation_durable_foundation_assertions.sql` is a
+manual rollback-only assertion source. It freezes exact objects, roles,
+ownership, effective default ACLs, columns, constraint/index names and actions,
+then uses
+transaction-only owner access to exercise state/hash/time/composite-owner and
+single-running-attempt failures. That temporary test access is restored before
+the final rollback and is not part of the migration. The SQL file has not run
+against Postgres; the TypeScript source test additionally locks exact index and
+foreign-key definitions.
+
+| Command | Result |
+|---|---|
+| focused migration contract | 1 file / 10 tests passed |
+| adjacent Note generation tests | 9 files / 311 tests passed |
+| `pnpm test` | 121 files / 1,294 tests passed; preserves 120 / 1,284, 119 / 1,236 and the 90 / 653 historical baseline |
+| `pnpm exec tsc --noEmit --incremental false` | passed |
+| `pnpm lint` | passed |
+| `pnpm build` | passed; Next static generation completed 63/63 |
+| focused ESLint and `git diff --check` | passed |
+
+This is still source evidence, not a durable database implementation. There is
+no local Supabase configuration/stack, clean apply, database lint, pgTAP run,
+Preview execution, function, RPC, payload metadata/grant, vault, purge outbox,
+worker registration, runtime flag, model call, Points call or Production
+change. The next database phase must separately implement and prove those
+boundaries; this schema-only checkpoint does not prove `SKIP LOCKED`, live
+session/privacy checks or atomic canonical persistence.
+
 ### Mobile V1 protected Product API Preview E2E — 2026-08-14
 
 A protected, non-Production Preview exercised the default-off Product API against
@@ -496,7 +541,7 @@ The following suites are required before the corresponding V1 slice can be calle
 
 1. The native App exists in a separate repository and is outside this task; this AI repository does not execute or attest its iOS/Android, offline, purchase or store gates.
 2. The OpenAPI/TypeScript contract and default-off durable `/v1` route adapter now exist, but there is no Preview- or Production-served Product API, generated client package, schema registry or previous-version compatibility fixture.
-3. The current worktree passes 1,284 tests across 120 files (with 119 / 1,236, 118 / 1,193, 115 / 1,089, 114 / 1,051, 112 / 983, 107 / 938, 104 / 894 and 103 / 831 retained as prior source-level batches and 90 / 653 as the historical baseline). All five Note types share a source-only generation/output/job foundation plus default-off durable, worker-policy, provider-evidence, payload-lifecycle, registered-worker and strict database/vault adapter contracts, but still lack an implemented database repository/migration, deployed worker, real provider/STT integration and complete per-type input/output/privacy/semantic golden sets.
+3. The current worktree passes 1,294 tests across 121 files (with 120 / 1,284, 119 / 1,236, 118 / 1,193, 115 / 1,089, 114 / 1,051, 112 / 983, 107 / 938, 104 / 894 and 103 / 831 retained as prior source-level batches and 90 / 653 as the historical baseline). All five Note types share a source-only generation/output/job foundation plus default-off durable, worker-policy, provider-evidence, payload-lifecycle, registered-worker and strict database/vault adapter contracts and an unapplied schema-only metadata migration, but still lack an implemented database repository/RPC layer, deployed worker, real provider/STT integration and complete per-type input/output/privacy/semantic golden sets.
 4. Canonical document/revision/checkpoint states exist as memory/domain contracts plus historical isolated schema/RPC evidence and a new unapplied mobile-sync migration draft; there is no Production schema activation, editor, renderer or cross-device recovery E2E.
 5. Points lots/rates/reservations passed isolated serial database tests but remain shadow-only. There is no runtime entitlement integration, welcome eligibility decision, concurrent reservation proof or legacy-credit conversion/reconciliation test.
 6. No payment provider sandbox, webhook replay, refund or reconciliation harness exists.

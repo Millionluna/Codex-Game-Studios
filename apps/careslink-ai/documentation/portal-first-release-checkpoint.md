@@ -513,3 +513,50 @@ next database batch must begin with the CLI-generated filename and remain
 blocked until a disposable Preview proves the distinct non-bypass executor
 role, FORCE RLS, exact ACLs, database clock, concurrent claims, revocation
 races, canonical atomicity and purge behavior.
+
+## 14. Durable Note metadata schema-only foundation — 2026-08-21
+
+The official Supabase CLI workflow was reverified and CLI 2.115.0 generated
+`20260820135834_add_v1_note_generation_durable_shadow.sql`; no timestamp was
+invented. This is the first database-shaped layer for the five shared Note
+types, but it remains inert and unapplied.
+
+The migration creates dedicated owner/executor roles with `NOLOGIN`,
+`NOSUPERUSER` and `NOBYPASSRLS`, the private
+`careslink_v1_generation` schema, a settings row constrained permanently off,
+metadata-only jobs/attempts and ten indexes. All three tables enable and force
+RLS and have zero policies. API roles and the future executor receive no schema
+or object privilege. On PostgreSQL 16+, only the creator's automatic admin-only
+edges may remain; assertions require `INHERIT=false` and `SET=false`, while the
+temporary ownership `SET` edge is grantor-scoped and revoked. There is no raw
+idempotency key, facts, canonical content,
+provider output, transcript, token, URL, locator, arbitrary error text, JSON or
+binary content column.
+
+The adjacent rollback-only SQL source freezes catalog, ownership, role,
+effective default-ACL, column, constraint/index names and actions and contains
+negative fixtures for invalid settings, state/hash/time/owner bindings and
+multiple active attempts. It deliberately contains no function or
+`SKIP LOCKED` claim and states that it does not prove an RPC or atomic canonical
+transaction. The TypeScript source test separately locks exact index and
+foreign-key definitions.
+
+Local evidence for this batch:
+
+| Command | Result |
+|---|---|
+| focused migration contract | 1 file / 10 tests passed |
+| adjacent Note generation tests | 9 files / 311 tests passed |
+| `pnpm test` | 121 files / 1,294 tests passed; preserves 120 / 1,284 and the 90 / 653 historical baseline |
+| `pnpm exec tsc --noEmit --incremental false` | passed |
+| `pnpm lint` | passed |
+| `pnpm build` | passed; Next static generation 63/63 |
+| focused ESLint and `git diff --check` | passed |
+
+No database was started, linked or contacted; the migration and manual SQL
+assertion have not been executed. There is still no payload metadata/grant,
+vault/KMS/retention decision, purge outbox, provider-evidence detail store,
+transaction-clock scheduler, claim/heartbeat/fence/commit/settle RPC,
+registered worker, model/STT call, Points call, runtime flag, Preview evidence
+or Production change. Those remain separate activation gates, not hidden
+defaults in this schema.

@@ -1,8 +1,9 @@
 # V1 Note generation durable design handoff
 
-> Status: source-only, default-off design. This document records the next
-> database and worker boundary; it does not claim that a durable worker, route,
-> migration, Preview capability, model call or Production capability exists.
+> Status: source-only, default-off design plus an unapplied schema-only
+> migration foundation. This document records the next database and worker
+> boundary; it does not claim that a durable repository, worker, route, RPC,
+> Preview capability, model call or Production capability exists.
 
 ## 1. Scope and non-goals
 
@@ -13,7 +14,7 @@ persist a usable canonical result.
 
 This handoff does not authorize or implement:
 
-- a migration or database connection;
+- a database connection, migration apply or private worker RPC;
 - a served route, worker deployment or feature activation;
 - raw cleaned-facts persistence;
 - a real model or STT call;
@@ -65,13 +66,21 @@ may be an API role. The executor must be `NOLOGIN`, `NOSUPERUSER` and
 reviewed definer functions. The schema grants no `USAGE` or `CREATE` to
 `PUBLIC`, `anon`, `authenticated` or `service_role`.
 
-The proposed private object set is:
+The first schema-only object set is deliberately smaller than the eventual
+durable repository:
 
-1. a single default-off settings row;
-2. a metadata-only `jobs` table;
-3. a metadata-only `attempts` table;
-4. only the minimum private helper functions needed by reviewed public
-   wrappers.
+1. two dedicated `NOLOGIN`, `NOSUPERUSER`, `NOBYPASSRLS` roles, one owner and
+   one future executor;
+2. a single default-off `settings` row;
+3. a metadata-only `jobs` table;
+4. a metadata-only `attempts` table;
+5. only their required constraints and indexes.
+
+It creates no function, view, trigger or RLS policy. The future payload
+metadata, one-time grants, provider-evidence detail, purge outbox and nine
+reviewed worker RPCs are a separate additive phase. They must exist before the
+atomic transaction in section 7 can be implemented; the current three-table
+foundation must never be described as that transaction.
 
 No enum type is required; bounded text checks keep migration and rollback
 inspection explicit. Every foreign-key column used for lookup or cascade must
@@ -288,15 +297,22 @@ lots.
 
 ## 8. ACL, RLS and RPC exposure
 
-Both private tables must enable **and force** RLS as defence in depth and define
-no client owner policy. `FORCE ROW LEVEL SECURITY` makes the table owner subject
+All three private tables enable **and force** RLS as defence in depth and define
+no policy in the schema-only phase. `FORCE ROW LEVEL SECURITY` makes the table owner subject
 to policies, but it does not constrain a superuser or a role with
 `BYPASSRLS`. Therefore the schema/table owner is distinct from the reviewed
 definer executor, and the executor must be `NOLOGIN`, `NOSUPERUSER` and
-`NOBYPASSRLS`. Private policies name only that exact executor and permit only
-the operations required by the reviewed wrappers. Schema and table privileges
+`NOBYPASSRLS`. Future private policies may name only that exact executor and
+permit only the operations required by reviewed wrappers. Schema and table privileges
 are revoked from `PUBLIC`, `anon`, `authenticated` and `service_role`; API
 roles receive neither private schema usage nor direct table access.
+
+On PostgreSQL 16+, a non-superuser creator with `CREATEROLE` automatically
+retains an admin-only edge to each new dedicated role. That edge is not runtime
+authority: the migration and assertions require `INHERIT=false` and
+`SET=false`. The separate non-inheriting `SET` edge needed for ownership
+transfer is scoped to the migration grantor and revoked before completion;
+API roles and the executor are forbidden as members.
 
 Every privileged function must be narrowly typed, owned by the reviewed
 non-login executor role, declared `SECURITY DEFINER`, and use
@@ -316,36 +332,55 @@ The existing authenticated direct SELECT on historical
 as live data. User-facing job reads must go through a fresh-session-validating,
 metadata-only adapter rather than direct PostgREST table access.
 
-## 9. Future migration creation boundary
+## 9. Schema-only migration boundary
 
-No migration file is created by this design handoff. When the blockers are
-resolved and Supabase CLI is available, the file must first be generated with:
+Supabase CLI 2.115.0 was used locally to generate the filename with:
 
 ```text
 supabase migration new add_v1_note_generation_durable_shadow
 ```
 
-Implementation must edit the exact filename returned by that command. It must
-not invent a timestamp or manually create a migration filename. The migration
-must remain default-off, additive, Production-unapplied and free of top-level
-transaction syntax when the active migration runner owns the transaction.
+The exact returned file is
+`supabase/migrations/20260820135834_add_v1_note_generation_durable_shadow.sql`.
+It remains additive, default-off, Production-unapplied and free of top-level
+transaction syntax because the migration runner owns the transaction.
+
+This first migration contains only the private metadata foundation described
+in section 3. It grants no schema/table/function privilege to the future
+executor, `PUBLIC`, `anon`, `authenticated` or `service_role`. It deliberately
+contains no lease duration, retry budget, provider/model selection, payload
+TTL, vault/KMS choice or purge SLA. A later migration must be generated by the
+same CLI workflow and separately reviewed before adding any function or grant.
 
 ## 10. Disposable Preview assertion gate
 
 Before any execute grant, route, worker or model integration, the exact source
-revision must clean-apply to a new disposable non-Production Preview and pass
-rollback-only assertions covering:
+revision must clean-apply to a new disposable non-Production Preview. The
+schema-only foundation must first pass rollback-only assertions covering:
 
+- `server_version_num >= 160000`; this migration intentionally uses the
+  PostgreSQL 16+ role-membership option syntax and has no pre-16 compatibility
+  branch;
 - namespace absence preflight, distinct expected schema/table owner and
-  executor roles, exact ACL/default ACL and exact private object set;
+  executor roles, safe admin-only creator edges with no `SET`/`INHERIT`, exact
+  ACL/default ACL and exact private object set;
 - `relrowsecurity=true` and `relforcerowsecurity=true` on every private table,
-  zero schema/table privileges for all API roles, executor
-  `rolcanlogin=false`, `rolsuper=false` and `rolbypassrls=false`, and only the
-  reviewed executor exercising the explicitly tested internal write path;
-- no raw facts, content, provider output, transcript, token, Authorization,
-  URL, raw idempotency key or arbitrary error text column;
-- no unsafe public overload and no `PUBLIC`, anon, authenticated or
-  `service_role` execute privilege;
+  zero schema/table privileges for all API roles and the future executor, and
+  executor `rolcanlogin=false`, `rolsuper=false` and `rolbypassrls=false`;
+- exactly zero private or public wrapper functions, views, triggers and
+  policies, and no `PUBLIC`, anon, authenticated, `service_role` or executor
+  schema/table/function privilege;
+- exact metadata-only columns, state/hash/time constraints, composite owner
+  foreign keys, one active-attempt index and deterministic claim-order index;
+- no raw facts, canonical content, provider output, transcript, token, URL,
+  locator, raw idempotency key, arbitrary error text or `jsonb` column;
+- the default-off settings row and absence of operational policy values;
+- invalid hashes, states, terminal shapes, owner bindings, duplicate attempt
+  ordinals and duplicate active attempts fail closed;
+
+The later RPC/payload migration must then extend those assertions to cover:
+
+- no unsafe public overload and no unreviewed execute privilege;
 - every definer function has a fixed empty search path and allowlisted owner;
 - owner A/B isolation and metadata-only acknowledgements;
 - initiating-session UUID mismatch, missing/revoked/expired session, deleted or
@@ -380,13 +415,14 @@ promotion evidence for this design.
 
 ## 11. Current evidence boundary
 
-This handoff and its adjacent source-only adapter contract were produced from a
-local offline audit of the current source. No Supabase changelog or online
-documentation was fetched because this batch was explicitly offline. No
-migration was generated or applied, no SQL assertion was executed, no database
-or Preview was contacted, and no runtime capability was enabled. Supabase CLI
-availability and current external platform behaviour must be reverified before
-database implementation.
+The earlier source-only handoff was produced offline. This schema batch
+rechecked the current official Supabase CLI, migration, Data API, RLS,
+Postgres-role and function-security documentation before implementation.
+Supabase CLI 2.115.0 generated the local filename, but no local stack or remote
+database was started, linked or contacted. The migration is unapplied; the SQL
+assertion is rollback-only source and has not run; no runtime capability or
+execute grant was enabled. Current platform behaviour and the custom-role
+ownership transfer still require a disposable Preview clean apply.
 
 The source-only registered-worker database adapter may validate a composite
 atomic acknowledgement, but that acknowledgement is not proof that a database
