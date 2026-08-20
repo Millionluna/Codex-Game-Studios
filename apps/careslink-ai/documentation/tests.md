@@ -300,12 +300,40 @@ foreign-key definitions.
 | focused ESLint and `git diff --check` | passed |
 
 This is still source evidence, not a durable database implementation. There is
-no local Supabase configuration/stack, clean apply, database lint, pgTAP run,
-Preview execution, function, RPC, payload metadata/grant, vault, purge outbox,
-worker registration, runtime flag, model call, Points call or Production
-change. The next database phase must separately implement and prove those
-boundaries; this schema-only checkpoint does not prove `SKIP LOCKED`, live
-session/privacy checks or atomic canonical persistence.
+no local Supabase configuration/stack, successful clean apply, database lint,
+pgTAP run, successful Preview assertion run, function, RPC, payload
+metadata/grant, vault, purge outbox, worker registration, runtime flag, model
+call, Points call or Production change. The next database phase must separately
+implement and prove those boundaries; this schema-only checkpoint does not
+prove `SKIP LOCKED`, live session/privacy checks or atomic canonical
+persistence.
+
+### First durable-metadata disposable Preview attempt — 2026-08-21
+
+A fresh non-default Supabase branch reported `with_data=false`, PostgreSQL 17
+(`server_version_num=170006`) and zero rows in the checked Auth and legacy
+tables. The parent branch migration history was not a strict prefix of this
+repository, so no automatic migration-history suffix was assumed. The reviewed
+13-file local suffix was submitted individually in source order rather than
+repairing or resetting remote history. The first 12 source files applied
+successfully on the disposable branch. The thirteenth,
+`20260820135834_add_v1_note_generation_durable_shadow.sql`, failed with
+PostgreSQL `42501 permission denied to change default privileges` at the owner
+default-ACL step.
+
+The failed thirteenth migration was atomic: read-only checks found neither the
+`careslink_v1_generation` schema nor either dedicated generation role after the
+error. The exact disposable branch was then deleted and its absence was
+verified. The Production database was never connected to, queried, migrated or
+modified; no capability, grant, route or user traffic was enabled. This is
+failure and cleanup evidence, not a successful Preview proof.
+
+The source fix now uses the temporary non-inheriting membership to `SET ROLE`
+to the dedicated owner, changes that owner's global default ACL as itself,
+`RESET ROLE`s before object creation, and avoids a redundant schema revoke
+after ownership transfer. This repaired revision still requires a fresh
+disposable `r2` branch, an exact clean apply and the rollback-only assertion in
+one session before any Preview-success claim.
 
 ### Mobile V1 protected Product API Preview E2E — 2026-08-14
 
@@ -541,7 +569,7 @@ The following suites are required before the corresponding V1 slice can be calle
 
 1. The native App exists in a separate repository and is outside this task; this AI repository does not execute or attest its iOS/Android, offline, purchase or store gates.
 2. The OpenAPI/TypeScript contract and default-off durable `/v1` route adapter now exist, but there is no Preview- or Production-served Product API, generated client package, schema registry or previous-version compatibility fixture.
-3. The current worktree passes 1,294 tests across 121 files (with 120 / 1,284, 119 / 1,236, 118 / 1,193, 115 / 1,089, 114 / 1,051, 112 / 983, 107 / 938, 104 / 894 and 103 / 831 retained as prior source-level batches and 90 / 653 as the historical baseline). All five Note types share a source-only generation/output/job foundation plus default-off durable, worker-policy, provider-evidence, payload-lifecycle, registered-worker and strict database/vault adapter contracts and an unapplied schema-only metadata migration, but still lack an implemented database repository/RPC layer, deployed worker, real provider/STT integration and complete per-type input/output/privacy/semantic golden sets.
+3. The current worktree passes 1,294 tests across 121 files (with 120 / 1,284, 119 / 1,236, 118 / 1,193, 115 / 1,089, 114 / 1,051, 112 / 983, 107 / 938, 104 / 894 and 103 / 831 retained as prior source-level batches and 90 / 653 as the historical baseline). All five Note types share a source-only generation/output/job foundation plus default-off durable, worker-policy, provider-evidence, payload-lifecycle, registered-worker and strict database/vault adapter contracts and a Production-unapplied schema-only metadata migration. Its first disposable Preview attempt failed atomically and was cleaned up; the hosted-safe repair still needs a fresh clean apply. The five types still lack an implemented database repository/RPC layer, deployed worker, real provider/STT integration and complete per-type input/output/privacy/semantic golden sets.
 4. Canonical document/revision/checkpoint states exist as memory/domain contracts plus historical isolated schema/RPC evidence and a new unapplied mobile-sync migration draft; there is no Production schema activation, editor, renderer or cross-device recovery E2E.
 5. Points lots/rates/reservations passed isolated serial database tests but remain shadow-only. There is no runtime entitlement integration, welcome eligibility decision, concurrent reservation proof or legacy-credit conversion/reconciliation test.
 6. No payment provider sandbox, webhook replay, refund or reconciliation harness exists.

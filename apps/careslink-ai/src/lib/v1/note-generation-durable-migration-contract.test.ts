@@ -120,21 +120,85 @@ describe("V1 Note durable generation foundation migration contract", () => {
     );
   });
 
-  it("revokes direct and default access from every API role and the executor", () => {
+  it("revokes direct/default access through the hosted-safe owner SET window", () => {
     const deniedRoles =
       "public, anon, authenticated, service_role,\\s+careslink_v1_generation_executor";
-    expect(migration).toMatch(
-      new RegExp(`revoke all on schema ${schemaName}\\s+from ${deniedRoles};`, "g"),
+    const normalizedMigration = normalizeSql(migration);
+    const ownerSet = `set role careslink_v1_generation_owner;`;
+    const ownerReset = `reset role;`;
+    const ownerSetStart = normalizedMigration.indexOf(ownerSet);
+    const ownerSetEnd = normalizedMigration.indexOf(ownerReset, ownerSetStart);
+    const firstTable = normalizedMigration.indexOf(
+      `create table ${schemaName}.settings`,
+    );
+    const schemaTransfer = normalizedMigration.indexOf(
+      `alter schema ${schemaName} owner to careslink_v1_generation_owner;`,
+    );
+    const lastOwnershipTransfer = normalizedMigration.indexOf(
+      `alter table ${schemaName}.attempts owner to careslink_v1_generation_owner;`,
+    );
+    const finalMembershipRevoke = normalizedMigration.indexOf(
+      `revoke careslink_v1_generation_owner from current_user granted by current_user;`,
+    );
+
+    expect(
+      migration.match(/^set role careslink_v1_generation_owner;$/gm),
+    ).toHaveLength(1);
+    expect(migration.match(/^reset role;$/gm)).toHaveLength(1);
+    expect(migration).not.toMatch(
+      /alter default privileges\s+for role\s+careslink_v1_generation_owner/i,
+    );
+    expect(ownerSetStart).toBeGreaterThan(
+      normalizedMigration.indexOf(
+        `grant careslink_v1_generation_owner to current_user`,
+      ),
+    );
+    expect(ownerSetEnd).toBeGreaterThan(ownerSetStart);
+    expect(firstTable).toBeGreaterThan(ownerSetEnd);
+    expect(schemaTransfer).toBeGreaterThan(firstTable);
+    expect(lastOwnershipTransfer).toBeGreaterThan(schemaTransfer);
+    expect(finalMembershipRevoke).toBeGreaterThan(lastOwnershipTransfer);
+    expect(migration.match(/^alter default privileges\b/gm)).toHaveLength(8);
+    expect(
+      normalizedMigration.slice(schemaTransfer, finalMembershipRevoke),
+    ).not.toMatch(/\b(?:alter default privileges|revoke all on)\b/);
+
+    expect(
+      migration.match(
+        new RegExp(
+          `revoke all on schema ${schemaName}\\s+from ${deniedRoles};`,
+          "g",
+        ),
+      ),
+    ).toHaveLength(1);
+    expect(
+      normalizedMigration.indexOf(`revoke all on schema ${schemaName}`),
+    ).toBeLessThan(schemaTransfer);
+
+    const ownerDefaults = normalizedMigration
+      .slice(ownerSetStart, ownerSetEnd)
+      .trim();
+    expect(ownerDefaults).toBe(
+      normalizeSql(`
+        set role careslink_v1_generation_owner;
+        alter default privileges revoke all on tables
+          from public, anon, authenticated, service_role,
+            careslink_v1_generation_executor;
+        alter default privileges revoke all on sequences
+          from public, anon, authenticated, service_role,
+            careslink_v1_generation_executor;
+        alter default privileges revoke all on functions
+          from public, anon, authenticated, service_role,
+            careslink_v1_generation_executor;
+        alter default privileges revoke all on types
+          from public, anon, authenticated, service_role,
+            careslink_v1_generation_executor;
+      `),
     );
     for (const objectKind of ["tables", "sequences", "functions", "types"]) {
       expect(migration).toMatch(
         new RegExp(
           `alter default privileges in schema ${schemaName}\\s+revoke all on ${objectKind}\\s+from ${deniedRoles};`,
-        ),
-      );
-      expect(migration).toMatch(
-        new RegExp(
-          `alter default privileges for role careslink_v1_generation_owner\\s+revoke all on ${objectKind}\\s+from ${deniedRoles};`,
         ),
       );
     }

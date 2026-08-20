@@ -311,8 +311,11 @@ On PostgreSQL 16+, a non-superuser creator with `CREATEROLE` automatically
 retains an admin-only edge to each new dedicated role. That edge is not runtime
 authority: the migration and assertions require `INHERIT=false` and
 `SET=false`. The separate non-inheriting `SET` edge needed for ownership
-transfer is scoped to the migration grantor and revoked before completion;
-API roles and the executor are forbidden as members.
+transfer and owner-default-ACL hardening is scoped to the migration grantor and
+revoked before completion. A hosted non-superuser migration actor enters a
+bounded `SET ROLE` window so the dedicated owner alters its own global defaults,
+then `RESET ROLE`s before table creation. API roles and the executor are
+forbidden as members.
 
 Every privileged function must be narrowly typed, owned by the reviewed
 non-login executor role, declared `SECURITY DEFINER`, and use
@@ -418,11 +421,27 @@ promotion evidence for this design.
 The earlier source-only handoff was produced offline. This schema batch
 rechecked the current official Supabase CLI, migration, Data API, RLS,
 Postgres-role and function-security documentation before implementation.
-Supabase CLI 2.115.0 generated the local filename, but no local stack or remote
-database was started, linked or contacted. The migration is unapplied; the SQL
-assertion is rollback-only source and has not run; no runtime capability or
-execute grant was enabled. Current platform behaviour and the custom-role
-ownership transfer still require a disposable Preview clean apply.
+Supabase CLI 2.115.0 generated the local filename. A first clean-apply attempt
+then used a fresh non-default `with_data=false` Supabase branch on PostgreSQL 17
+(`server_version_num=170006`). Because the parent migration history was not a
+strict repository prefix, 13 exact local source SQL files were submitted
+individually in source order. The first 12 succeeded; this metadata migration
+failed with PostgreSQL `42501 permission denied to change default privileges`
+at its owner default-ACL step.
+
+Read-only post-failure checks found neither the generation schema nor either
+generation role, confirming atomic rollback of the failed migration. The exact
+disposable branch was deleted and its absence verified. The Production database
+was never connected to, queried, migrated or modified, and no runtime
+capability or execute grant was enabled. This is failure/cleanup evidence, not
+successful Preview evidence.
+
+The repaired source now has the dedicated owner alter its global defaults
+inside a temporary `SET ROLE` / `RESET ROLE` window and does not repeat the
+schema revoke after the migration actor transfers ownership. The rollback-only
+SQL assertion has still not run. The exact repaired revision requires a fresh
+disposable `r2` clean apply and same-session assertion before the Preview gate
+can pass.
 
 The source-only registered-worker database adapter may validate a composite
 atomic acknowledgement, but that acknowledgement is not proof that a database

@@ -519,7 +519,9 @@ races, canonical atomicity and purge behavior.
 The official Supabase CLI workflow was reverified and CLI 2.115.0 generated
 `20260820135834_add_v1_note_generation_durable_shadow.sql`; no timestamp was
 invented. This is the first database-shaped layer for the five shared Note
-types, but it remains inert and unapplied.
+types, but it remains inert and Production-unapplied. Its first disposable
+Preview clean-apply attempt failed atomically; it has not passed the Preview
+gate.
 
 The migration creates dedicated owner/executor roles with `NOLOGIN`,
 `NOSUPERUSER` and `NOBYPASSRLS`, the private
@@ -553,10 +555,23 @@ Local evidence for this batch:
 | `pnpm build` | passed; Next static generation 63/63 |
 | focused ESLint and `git diff --check` | passed |
 
-No database was started, linked or contacted; the migration and manual SQL
-assertion have not been executed. There is still no payload metadata/grant,
-vault/KMS/retention decision, purge outbox, provider-evidence detail store,
-transaction-clock scheduler, claim/heartbeat/fence/commit/settle RPC,
-registered worker, model/STT call, Points call, runtime flag, Preview evidence
-or Production change. Those remain separate activation gates, not hidden
-defaults in this schema.
+The first clean-apply attempt used a fresh non-default Supabase branch with
+`with_data=false` on PostgreSQL 17 (`server_version_num=170006`). The first 12
+exact local source SQL files applied in order, while this thirteenth migration
+failed with `42501 permission denied to change default privileges`. Read-only
+post-failure checks confirmed its schema and two roles were absent, proving the
+failed migration rolled back atomically; the disposable branch was then deleted
+and its absence verified. The Production database was not connected to,
+queried, migrated or modified. This is failure/cleanup evidence, not successful
+Preview evidence.
+
+The hosted-safe source repair changes the dedicated owner's global defaults
+inside a temporary `SET ROLE` / `RESET ROLE` window and performs the only schema
+revoke before ownership transfer. The manual rollback-only SQL assertion has
+still not run. A fresh disposable `r2` branch must clean-apply the exact repaired
+revision and run that assertion before this gate can pass. There is still no
+payload metadata/grant, vault/KMS/retention decision, purge outbox,
+provider-evidence detail store, transaction-clock scheduler,
+claim/heartbeat/fence/commit/settle RPC, registered worker, model/STT call,
+Points call, runtime flag or Production change. Those remain separate
+activation gates, not hidden defaults in this schema.

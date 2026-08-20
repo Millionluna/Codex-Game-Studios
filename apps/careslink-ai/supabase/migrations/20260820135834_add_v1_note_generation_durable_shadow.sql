@@ -50,23 +50,30 @@ alter default privileges in schema careslink_v1_generation
 
 -- The owner is dedicated to this namespace. Close its global defaults because
 -- PostgreSQL schema-local revokes cannot subtract a privilege granted by a
--- global default ACL (notably PUBLIC function execution and type usage).
-alter default privileges for role careslink_v1_generation_owner
+-- global default ACL (notably PUBLIC function execution and type usage). The
+-- hosted migration actor is not a superuser, so exercise the temporary SET
+-- membership and have the owner alter its own defaults rather than using FOR
+-- ROLE as the migration actor.
+set role careslink_v1_generation_owner;
+
+alter default privileges
   revoke all on tables
   from public, anon, authenticated, service_role,
     careslink_v1_generation_executor;
-alter default privileges for role careslink_v1_generation_owner
+alter default privileges
   revoke all on sequences
   from public, anon, authenticated, service_role,
     careslink_v1_generation_executor;
-alter default privileges for role careslink_v1_generation_owner
+alter default privileges
   revoke all on functions
   from public, anon, authenticated, service_role,
     careslink_v1_generation_executor;
-alter default privileges for role careslink_v1_generation_owner
+alter default privileges
   revoke all on types
   from public, anon, authenticated, service_role,
     careslink_v1_generation_executor;
+
+reset role;
 
 create table careslink_v1_generation.settings (
   capability text primary key,
@@ -488,9 +495,9 @@ alter table careslink_v1_generation.jobs
 alter table careslink_v1_generation.attempts
   owner to careslink_v1_generation_owner;
 
-revoke all on schema careslink_v1_generation
-  from public, anon, authenticated, service_role,
-    careslink_v1_generation_executor;
+-- The schema and object ACLs were closed above while the migration actor still
+-- owned them. Ownership transfer changes the implicit owner privileges only;
+-- do not repeat the schema REVOKE here as a non-owner migration actor.
 
 revoke careslink_v1_generation_owner from current_user
   granted by current_user;
