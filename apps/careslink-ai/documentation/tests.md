@@ -155,6 +155,43 @@ privacy rows and are not Preview/Production revocation E2E evidence. A future
 database implementation must prove those checks and canonical persistence in
 one transaction on a disposable Preview before activation.
 
+### Note worker, provider and payload policy checkpoint — 2026-08-20
+
+Three server-only modules extend the default-off Note design without enabling a
+worker or model. The worker policy has no approved runtime entry and requires a
+complete digest-bound definition for queue age, lease, heartbeat, attempt/provider
+deadline, commit margin, retry vector, retry outcomes, recovery batch and
+jitter. The provider policy has no configured provider or model. It binds all
+five Note types to exact provider/model/revision, prompt, golden-set, parser,
+service and rate-catalog versions; an actual digest-verified `APPROVED` worker policy is
+the only deadline authority. Missing usage and cost remain explicitly
+`UNAVAILABLE` rather than zero, and provider cost cannot alter the approved
+Points rate.
+
+The payload contract has no current retention policy or backend. Its explicit
+`TEST_ONLY` memory fake validates all five canonical fact shapes, clamps expiry
+to the privacy proof, issues an attempt-bound single-consumption grant, and
+rechecks RUNNING job/attempt plus current session/privacy bindings before facts
+are released. It models logical revoke, idempotent physical-purge evidence and
+owner-safe views, but is intentionally plaintext and non-durable. Its tests are
+binding evidence only: they do not live-read Auth/privacy rows or prove
+encryption, KMS, deletion, backups or restore non-resurrection.
+
+| Command | Result |
+|---|---|
+| focused policy/payload gate | 3 files, 104 tests passed |
+| adjacent Note generation gate | 6 files, 210 tests passed |
+| `pnpm test` | 118 files, 1,193 tests passed; preserves 115 / 1,089 and the 90 / 653 historical baseline |
+| `pnpm exec tsc --noEmit --incremental false` | passed |
+| `pnpm lint` | passed |
+| `pnpm build` | passed; Next static generation completed 63/63 |
+
+Activation remains blocked until approved worker values, provider/model and
+governance versions, retention/purge values, vault/KMS/region/backup decisions,
+a registered worker, a database transaction clock, live session/privacy checks
+and disposable-Preview negative tests all exist. No network, model, STT,
+database, Points, Preview or Production action is evidence of this checkpoint.
+
 ### Mobile V1 protected Product API Preview E2E — 2026-08-14
 
 A protected, non-Production Preview exercised the default-off Product API against
@@ -389,7 +426,7 @@ The following suites are required before the corresponding V1 slice can be calle
 
 1. The native App exists in a separate repository and is outside this task; this AI repository does not execute or attest its iOS/Android, offline, purchase or store gates.
 2. The OpenAPI/TypeScript contract and default-off durable `/v1` route adapter now exist, but there is no Preview- or Production-served Product API, generated client package, schema registry or previous-version compatibility fixture.
-3. The current worktree passes 1,089 tests across 115 files (with 114 / 1,051, 112 / 983, 107 / 938, 104 / 894 and 103 / 831 retained as prior source-level batches and 90 / 653 as the historical baseline). All five Note types share a source-only generation/output/job foundation and a default-off durable internal contract/memory fake, but still lack a database-backed durable repository, registered worker, real provider/STT integration and complete per-type input/output/privacy/semantic golden sets.
+3. The current worktree passes 1,193 tests across 118 files (with 115 / 1,089, 114 / 1,051, 112 / 983, 107 / 938, 104 / 894 and 103 / 831 retained as prior source-level batches and 90 / 653 as the historical baseline). All five Note types share a source-only generation/output/job foundation plus default-off durable, worker-policy, provider-evidence and payload-lifecycle contracts, but still lack a database-backed durable repository, registered worker, real provider/STT integration and complete per-type input/output/privacy/semantic golden sets.
 4. Canonical document/revision/checkpoint states exist as memory/domain contracts plus historical isolated schema/RPC evidence and a new unapplied mobile-sync migration draft; there is no Production schema activation, editor, renderer or cross-device recovery E2E.
 5. Points lots/rates/reservations passed isolated serial database tests but remain shadow-only. There is no runtime entitlement integration, welcome eligibility decision, concurrent reservation proof or legacy-credit conversion/reconciliation test.
 6. No payment provider sandbox, webhook replay, refund or reconciliation harness exists.

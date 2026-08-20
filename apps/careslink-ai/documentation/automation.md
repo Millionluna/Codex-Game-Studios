@@ -51,11 +51,11 @@ Profile rewrite, share card, referral message, bilingual intro and handover chec
 | V1 shadow master + dual-write flags | both exact `true`, Preview environment and exact non-Production Supabase branch ref are required | disabling either immediately prevents new shadow calls after redeploy; legacy save remains available |
 | V1 shadow-read flag | enables only metadata hash/status comparison after successful projection | cannot enable write or replace the legacy response |
 
-There is no versioned model-policy registry, per-service budget threshold, validated fallback model switch, job cancellation control or central incident dashboard.
+Source-only worker/provider policy schemas now define immutable digests, explicit timing/retry fields and content-free model usage/cost evidence, but their production catalogs are empty and readiness is false. There is still no approved runtime model-policy registry, per-service budget threshold, validated fallback model switch, registered job cancellation control or central incident dashboard.
 
 ## Inactive shadow automation contracts
 
-- The contract and schema draft define generation/export job states, but no queue, worker, lease, retry loop or cancellation endpoint exists.
+- The contract and schema draft define generation/export job states. Source-only memory contracts now model leases, recovery, retry policy, provider evidence and single-use payload grants, but no queue, registered worker, durable database scheduler, retry loop or cancellation endpoint exists.
 - The memory Points reference store proves quote/reserve/commit/release semantics. The SQL draft exposes five `security definer` shadow RPCs only to `service_role`; those RPCs passed isolated branch tests for settlement, replay/conflict, source-lot release, expiry, insufficient balance and cross-owner denial. The migration remains unapplied to Production and no server route calls it.
 - The legacy NDIS adapter remains pure. The server-only NDIS integration invokes it only after a successful legacy Save on an explicitly verified Preview. The RPC creates an owner-bound shadow revision and metadata-only outbox; optional read comparison records `MATCH/MISMATCH/MISSING/ERROR`. No call invokes OpenAI or settles Points.
 - There is no automatic retry worker. `audit_ndis_shadow_reconciliation` is a service-role-only, read-only operator surface that reports IDs/status/timestamps/hashes. Live legacy rows remain the projection retry source; a legacy-schema canonical document whose source has disappeared while the lifecycle is still non-terminal is reported as `SOURCE_DELETE_CLEANUP_PENDING` for operator cleanup.

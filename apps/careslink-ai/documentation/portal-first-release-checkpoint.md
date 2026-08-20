@@ -395,3 +395,44 @@ database migration/repository, registered worker, payload vault, model/STT,
 Points or deployment was added. Memory session/privacy binding tests are not
 live `auth.sessions`/privacy-row E2E and cannot authorize Preview or Production
 activation.
+
+## 11. Worker, provider and sensitive-payload policy contracts — 2026-08-20
+
+This local batch adds three source-only contracts and their tests:
+
+- `note-generation-worker-policy.ts` requires a complete immutable digest-bound
+  policy for queue, lease, heartbeat, hard attempt/provider deadlines, commit
+  margin, explicit retry vector/outcomes, recovery batch and jitter;
+- `note-generation-provider-policy.ts` requires exact provider, model/revision,
+  prompt, golden-set, parser, service/rate-catalog and cost-evidence versions,
+  and binds its timeout to the actual digest-verified `APPROVED` worker policy;
+- `note-generation-payload-contract.ts` models canonical reviewed-facts
+  staging, single-use attempt grants, fresh session/privacy binding at both
+  authorization and consumption, logical revoke, purge retry/receipt and
+  owner-safe status through an explicitly plaintext `TEST_ONLY` memory fake.
+
+The production worker catalog is empty, provider policy is undefined, payload
+retention policy is undefined, and all readiness values remain `false`. Missing
+model usage/cost is recorded as `UNAVAILABLE`, never invented as zero. Provider
+cost evidence is separate from the approved 20/25/35/50/60 user Points catalog.
+No real model, provider, vault, KMS, queue, database, Points settlement or route
+was connected.
+
+Local evidence for this batch:
+
+| Command | Result |
+|---|---|
+| focused worker/provider/payload tests | 3 files / 104 tests passed |
+| adjacent Note generation tests | 6 files / 210 tests passed |
+| `pnpm test` | 118 files / 1,193 tests passed; preserves 115 / 1,089 and the 90 / 653 historical baseline |
+| `pnpm exec tsc --noEmit --incremental false` | passed |
+| `pnpm lint` | passed |
+| `pnpm build` | passed; Next static generation 63/63 |
+
+Before any Preview activation, owners must approve the exact worker durations
+and retry budget, provider/model/region and prompt/golden governance, payload
+TTL and purge SLA, encryption/KMS/data residency, backup/restore deletion
+behavior, and telemetry/cost-retention policy. The implementation must then add
+a private durable database adapter, registered worker, server transaction clock,
+live `auth.users`/`auth.sessions` and privacy-proof reads, and disposable-Preview
+concurrency/revocation/purge tests. None of those decisions is guessed here.
