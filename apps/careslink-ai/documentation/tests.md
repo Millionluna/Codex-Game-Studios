@@ -224,6 +224,44 @@ fresh `auth.users`/`auth.sessions` and privacy-proof reads in the same short
 authorization transaction; approved worker identity/policies; a real scheduler;
 and disposable-Preview lease, recovery, revocation and response-loss evidence.
 
+### Registered-worker database/vault adapter source checkpoint — 2026-08-20
+
+`src/lib/v1/note-generation-registered-worker-adapter.server.ts` adds a
+source-only, default-off composite adapter for the v2 registered-worker ports.
+It defines nine exact abstract privileged RPC calls and one injected one-time
+vault-consume port. No Supabase client, URL, credential, environment lookup,
+route or runtime registry is present, and the only factory remains
+`TEST_ONLY`.
+
+The adapter rejects caller-supplied owner/session/time/retry/facts/locator
+authority; binds each claim to a cleaned-facts hash; compares database-derived
+Note type, contract/schema and facts hash before decrypting; and revalidates
+typed, bounded canonical facts before provider use. Canonical success and
+response-loss replay strictly rebuild NoteContent and provider evidence, then
+require one composite acknowledgement for revision 1, sync, a
+`CREATE_DOCUMENT` mutation receipt, job/attempt terminal bindings, payload
+logical revocation and purge enqueue. Failure/retry acknowledgements bind the
+approved retry policy, exact provider-evidence hash and the shared payload and
+attempt status vocabularies.
+
+| Command | Result |
+|---|---|
+| focused adapter gate | 1 file, 46 tests passed |
+| worker + adapter gate | 2 files, 91 tests passed |
+| adjacent Note generation gate | 8 files, 301 tests passed |
+| `pnpm test` | 120 files, 1,284 tests passed; preserves 119 / 1,236, 118 / 1,193 and the 90 / 653 historical baseline |
+| `pnpm exec tsc --noEmit --incremental false` | passed |
+| `pnpm lint` | passed |
+| `pnpm build` | passed; Next static generation completed 63/63 |
+
+This is parser/control-flow evidence, not a database transaction attestation.
+Supabase CLI was unavailable and the task remained offline, so no migration was
+generated, no SQL or rollback assertion ran, no RLS/ACL role topology was
+created, no database/vault/Preview was contacted and no execute grant was made.
+The composite acknowledgement becomes meaningful only after the exact future
+migration passes clean-apply, role, RLS, concurrency, revocation, replay,
+atomic-failure and purge-outbox assertions on a disposable Preview.
+
 ### Mobile V1 protected Product API Preview E2E — 2026-08-14
 
 A protected, non-Production Preview exercised the default-off Product API against
@@ -458,7 +496,7 @@ The following suites are required before the corresponding V1 slice can be calle
 
 1. The native App exists in a separate repository and is outside this task; this AI repository does not execute or attest its iOS/Android, offline, purchase or store gates.
 2. The OpenAPI/TypeScript contract and default-off durable `/v1` route adapter now exist, but there is no Preview- or Production-served Product API, generated client package, schema registry or previous-version compatibility fixture.
-3. The current worktree passes 1,236 tests across 119 files (with 118 / 1,193, 115 / 1,089, 114 / 1,051, 112 / 983, 107 / 938, 104 / 894 and 103 / 831 retained as prior source-level batches and 90 / 653 as the historical baseline). All five Note types share a source-only generation/output/job foundation plus default-off durable, worker-policy, provider-evidence, payload-lifecycle and registered-worker control-flow contracts, but still lack a database-backed durable repository, deployed worker, real provider/STT integration and complete per-type input/output/privacy/semantic golden sets.
+3. The current worktree passes 1,284 tests across 120 files (with 119 / 1,236, 118 / 1,193, 115 / 1,089, 114 / 1,051, 112 / 983, 107 / 938, 104 / 894 and 103 / 831 retained as prior source-level batches and 90 / 653 as the historical baseline). All five Note types share a source-only generation/output/job foundation plus default-off durable, worker-policy, provider-evidence, payload-lifecycle, registered-worker and strict database/vault adapter contracts, but still lack an implemented database repository/migration, deployed worker, real provider/STT integration and complete per-type input/output/privacy/semantic golden sets.
 4. Canonical document/revision/checkpoint states exist as memory/domain contracts plus historical isolated schema/RPC evidence and a new unapplied mobile-sync migration draft; there is no Production schema activation, editor, renderer or cross-device recovery E2E.
 5. Points lots/rates/reservations passed isolated serial database tests but remain shadow-only. There is no runtime entitlement integration, welcome eligibility decision, concurrent reservation proof or legacy-credit conversion/reconciliation test.
 6. No payment provider sandbox, webhook replay, refund or reconciliation harness exists.

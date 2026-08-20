@@ -9,6 +9,8 @@ Current five-Note local batch base: `63c10ea2e94ee4efdba7ffdbeb5aabbee6fcfa3b`
 
 Current durable generation local batch base: `4bf34ee0955a958c64e6865faa8bde2f2d1664a7`
 
+Current registered-worker adapter local batch base: `ec30b9342164d893f096cc0942b09d64fd457a73`
+
 This checkpoint covers the AI Web Portal reality audit, release sequencing,
 local Referral foundation and source-only five-Note generation contracts. It
 does not modify the native App, Main Website, Native Auth/M0 implementation or
@@ -470,3 +472,44 @@ evidence only. A real durable store, database transaction clock, scheduler,
 fresh session/privacy database reads, encrypted payload backend, approved
 provider/model policies and disposable-Preview concurrency/recovery gates are
 still required before any runtime registry entry or user traffic can exist.
+
+## 13. Registered-worker database/vault adapter contract — 2026-08-20
+
+This batch adds `note-generation-registered-worker-adapter.server.ts` and its
+test, plus the minimum adjacent worker binding needed to carry the
+metadata-only cleaned-facts hash and exact provider-evidence replay hash. The
+adapter exposes no route and discovers no Supabase client, credential,
+environment or runtime registration. Its readiness latch remains `false`; the
+only constructor requires `TEST_ONLY` and injected abstract RPC/vault ports.
+
+The adapter freezes nine RPC names and forbids owner, session, caller time,
+duration, retry budget, raw facts and vault locator arguments. A payload may be
+consumed only after a database-derived type/version/hash binding matches the
+claim and the decrypted facts pass the shared typed, bounded canonical-hash
+gate. Success, failure and response-loss parsing require complete composite
+transaction acknowledgements; a bare result or settlement is rejected. The
+success acknowledgement binds canonical revision 1, sync, `CREATE_DOCUMENT`
+receipt, provider evidence, terminal job/attempt, payload revocation and purge
+enqueue before returning metadata-only IDs and hashes.
+
+Local evidence for this batch:
+
+| Command | Result |
+|---|---|
+| focused adapter tests | 1 file / 46 tests passed |
+| registered worker + adapter | 2 files / 91 tests passed |
+| adjacent Note generation tests | 8 files / 301 tests passed |
+| `pnpm test` | 120 files / 1,284 tests passed; preserves 119 / 1,236, 118 / 1,193 and the 90 / 653 historical baseline |
+| `pnpm exec tsc --noEmit --incremental false` | passed |
+| `pnpm lint` | passed |
+| `pnpm build` | passed; Next static generation 63/63 |
+
+No migration was generated: the Supabase CLI is unavailable and this task was
+explicitly offline, so inventing a timestamped migration would violate the
+reviewed migration workflow. No database, RLS/ACL, fresh Auth/privacy row,
+vault, purge outbox or transaction was exercised. The composite acknowledgement
+is therefore a fail-closed source contract, not proof of those effects. The
+next database batch must begin with the CLI-generated filename and remain
+blocked until a disposable Preview proves the distinct non-bypass executor
+role, FORCE RLS, exact ACLs, database clock, concurrent claims, revocation
+races, canonical atomicity and purge behavior.

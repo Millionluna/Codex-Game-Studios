@@ -59,8 +59,11 @@ lock that schema to an exact function-only object set.
 
 The migration preflight must fail when the new namespace already exists or its
 owner, ACL, default privileges or object set differs from the expected state.
-The schema must be owned by the migration role and grant no `USAGE` or `CREATE`
-to `PUBLIC`, `anon`, `authenticated` or `service_role`.
+The schema/table owner and the reviewed executor role must be separate. Neither
+may be an API role. The executor must be `NOLOGIN`, `NOSUPERUSER` and
+`NOBYPASSRLS`, and may receive only the table operations required by the
+reviewed definer functions. The schema grants no `USAGE` or `CREATE` to
+`PUBLIC`, `anon`, `authenticated` or `service_role`.
 
 The proposed private object set is:
 
@@ -95,7 +98,9 @@ The private `jobs` blueprint contains only bounded orchestration metadata:
 - contract and schema versions;
 - privacy-review UUID and canonical cleaned-facts SHA-256;
 - owner-scoped idempotency SHA-256 and canonical request SHA-256;
-- an opaque payload-vault handle once that contract is approved;
+- a payload UUID plus immutable payload-policy version and SHA-256 binding;
+- an optional content-free locator digest only when the approved vault needs
+  one; the actual vault locator or bearer capability never enters this table;
 - `QUEUED`, `RUNNING`, `SUCCEEDED`, `FAILED` or `CANCELLED`;
 - attempt count and scheduling timestamps;
 - allowlisted failure code;
@@ -150,7 +155,7 @@ boundary by adding `cleaned_facts jsonb`.
 
 Activation is blocked until all of the following are frozen and tested:
 
-- the payload-vault backend and an opaque, non-URL handle contract;
+- the payload-vault backend and its private, non-URL locator contract;
 - encryption and key/version management;
 - who may decrypt and for which single job/attempt purpose;
 - maximum queued, running, terminal and error retention;
@@ -161,8 +166,10 @@ Activation is blocked until all of the following are frozen and tested:
 - prohibition of payload, tokens and decrypted facts in logs and diagnostics.
 
 Until this decision exists, a schema can describe metadata but no route or
-worker may enqueue a durable real-model job. The opaque handle itself must also
-remain private and must not act as a bearer token.
+worker may enqueue a durable real-model job. A job stores only the payload UUID
+and immutable policy bindings. The locator remains inside the vault boundary;
+neither a claim nor a client-facing response returns it or treats it as a
+bearer token.
 
 ## 5. Claim, lease and recovery semantics
 
@@ -193,8 +200,9 @@ and database transaction time. That short transaction must fresh-read the
 initiating `auth.users`/`auth.sessions` eligibility and the exact privacy proof,
 including owner, Note type, facts hash, schema, status, policy/revision and
 expiry. Only a successful transaction may record payload authorization on that
-exact attempt and release an opaque, attempt-bound payload handle to the
-worker. A failed session or privacy check atomically
+exact attempt and issue a short-lived, single-consumption grant identifier.
+The vault consumes that grant without exposing its internal locator to the
+worker API. A failed session or privacy check atomically
 closes the attempt and job with the corresponding allowlisted failure code,
 starts no provider work and makes the payload unavailable. A future database
 implementation may combine claim and payload authorization into one short
@@ -212,8 +220,9 @@ All job operations use one lock order to avoid deadlocks:
 2. active attempt row;
 3. initiating Auth session/user and privacy-proof rows;
 4. canonical document/revision rows;
-5. sync change and mutation receipt;
-6. terminal attempt and job update.
+5. sync change, mutation receipt and provider-evidence metadata;
+6. payload metadata and purge-outbox row;
+7. terminal attempt and job update.
 
 All time comparisons use the database transaction clock; RPC callers cannot
 supply or backdate an authoritative time. No transaction may remain open
@@ -235,7 +244,7 @@ session, proof or request binding fails closed.
 
 ## 7. Atomic success transaction
 
-The future success RPC must complete these eleven operations in one short
+The future success RPC must complete all of these operations in one short
 database transaction:
 
 1. assert the database capability is enabled, shadow-only and called through
@@ -254,14 +263,18 @@ database transaction:
 7. create the canonical `ai_documents` row with no prior placeholder document;
 8. create revision 1 with `base_revision_id=null`, the exact privacy proof and
    a server-owned mutation identifier;
-9. update the document's current revision, then create the sync change and
-   idempotent mutation receipt;
-10. bind the real document/revision/content hash to the attempt and job and mark
+9. update the document's current revision, then create the sync change and a
+   `CREATE_DOCUMENT` idempotent mutation receipt;
+10. persist the validated, content-free provider-evidence digest on the exact
+    attempt;
+11. logically revoke the payload metadata and enqueue its idempotent physical
+    purge without performing any external vault call in the transaction;
+12. bind the real document/revision/content hash to the attempt and job and mark
     both `SUCCEEDED`;
-11. return a metadata-only `SERVER_ACKNOWLEDGED` result after all durable rows
-    exist.
+13. return a metadata-only `SERVER_ACKNOWLEDGED` result only after every row
+    above exists in the same committed transaction.
 
-Any exception rolls back all eleven operations. Failure, cancellation, expired
+Any exception rolls back every operation above. Failure, cancellation, expired
 lease, revoked session, stale privacy proof, hash mismatch or invalid output
 must leave zero new canonical, revision, sync or receipt rows. The transaction
 does not create a checkpoint yet: the existing checkpoint job foreign key
@@ -276,14 +289,18 @@ lots.
 ## 8. ACL, RLS and RPC exposure
 
 Both private tables must enable **and force** RLS as defence in depth and define
-no client owner policy. `FORCE ROW LEVEL SECURITY` is required because ordinary
-RLS does not constrain the table owner used by reviewed definer functions.
-Schema and table privileges are revoked from `PUBLIC`, `anon`, `authenticated`
-and `service_role`; the API roles receive neither private schema usage nor
-direct table access.
+no client owner policy. `FORCE ROW LEVEL SECURITY` makes the table owner subject
+to policies, but it does not constrain a superuser or a role with
+`BYPASSRLS`. Therefore the schema/table owner is distinct from the reviewed
+definer executor, and the executor must be `NOLOGIN`, `NOSUPERUSER` and
+`NOBYPASSRLS`. Private policies name only that exact executor and permit only
+the operations required by the reviewed wrappers. Schema and table privileges
+are revoked from `PUBLIC`, `anon`, `authenticated` and `service_role`; API
+roles receive neither private schema usage nor direct table access.
 
 Every privileged function must be narrowly typed, owned by the reviewed
-migration role, declared `SECURITY DEFINER`, and use `SET search_path = ''`.
+non-login executor role, declared `SECURITY DEFINER`, and use
+`SET search_path = ''`.
 Public wrappers must repeat the expected role/feature/session checks even though
 ACL is the primary invocation boundary. Function creation is immediately
 followed by explicit revocation from all API roles to remove PostgreSQL's
@@ -319,11 +336,12 @@ Before any execute grant, route, worker or model integration, the exact source
 revision must clean-apply to a new disposable non-Production Preview and pass
 rollback-only assertions covering:
 
-- namespace absence preflight, expected owner, exact ACL/default ACL and exact
-  private object set;
+- namespace absence preflight, distinct expected schema/table owner and
+  executor roles, exact ACL/default ACL and exact private object set;
 - `relrowsecurity=true` and `relforcerowsecurity=true` on every private table,
-  zero schema/table privileges for all API roles, and only the reviewed definer
-  owner exercising the explicitly tested internal write path;
+  zero schema/table privileges for all API roles, executor
+  `rolcanlogin=false`, `rolsuper=false` and `rolbypassrls=false`, and only the
+  reviewed executor exercising the explicitly tested internal write path;
 - no raw facts, content, provider output, transcript, token, Authorization,
   URL, raw idempotency key or arbitrary error text column;
 - no unsafe public overload and no `PUBLIC`, anon, authenticated or
@@ -339,17 +357,20 @@ rollback-only assertions covering:
   monotonically increasing attempts;
 - wrong/stale lease token, heartbeat bounds, lease expiry and recovery;
 - session revocation or privacy-proof expiry between enqueue and claim cannot
-  release a payload handle, decrypt facts or start provider work;
+  issue or consume a payload-use grant, decrypt facts or start provider work;
 - cancellation and late provider-result rejection;
 - claim-response and success-response loss replay;
-- canonical document + revision 1 + sync change + receipt + terminal job
-  atomicity, including injected failure at every boundary;
+- canonical document + revision 1 + sync change + `CREATE_DOCUMENT` receipt +
+  provider-evidence digest + payload logical revocation + purge outbox +
+  terminal attempt/job atomicity, including injected failure at every
+  boundary;
 - zero canonical output after failure, cancellation, stale proof, revoked
   session or transaction rollback;
 - identical commit replay remains one document/revision, while changed output
   is rejected;
-- payload handle is private, content-free and purged according to the eventually
-  approved vault/retention contract;
+- payload locator remains vault-private; only an attempt-bound one-time grant
+  is consumed, and the payload is logically revoked and physically purged
+  according to the eventually approved vault/retention contract;
 - no Points RPC, ledger or wallet mutation.
 
 The same exact revision must then pass the existing canonical JSON vectors,
@@ -359,9 +380,16 @@ promotion evidence for this design.
 
 ## 11. Current evidence boundary
 
-This document was produced from a local read-only audit of the current source.
-No Supabase changelog or online documentation was fetched because this batch
-was explicitly offline. No migration was generated or applied, no SQL assertion
-was executed, no database or Preview was contacted, and no runtime capability
-was enabled. Supabase CLI availability and current external platform behaviour
-must be reverified before implementation.
+This handoff and its adjacent source-only adapter contract were produced from a
+local offline audit of the current source. No Supabase changelog or online
+documentation was fetched because this batch was explicitly offline. No
+migration was generated or applied, no SQL assertion was executed, no database
+or Preview was contacted, and no runtime capability was enabled. Supabase CLI
+availability and current external platform behaviour must be reverified before
+database implementation.
+
+The source-only registered-worker database adapter may validate a composite
+atomic acknowledgement, but that acknowledgement is not proof that a database
+transaction, RLS policy, executor-role topology, vault grant or purge outbox
+exists. Only the clean-apply and rollback assertions above can provide that
+evidence for the exact future migration revision.

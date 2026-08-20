@@ -99,6 +99,8 @@ export type CaresLinkV1RegisteredWorkerJob = Readonly<{
   providerPolicyDigest: string;
   payloadPolicyVersion: string;
   payloadPolicySnapshotHash: string;
+  /** Metadata-only digest of the privacy-reviewed, typed payload. */
+  cleanedFactsHash: string;
   status: "RUNNING";
 }>;
 
@@ -207,6 +209,7 @@ export type CaresLinkV1NoteGenerationRegisteredWorkerStore = Readonly<{
     claim: CaresLinkV1RegisteredWorkerClaim;
     registration: CaresLinkV1NoteGenerationWorkerRegistration;
     expectedContentHash: string | null;
+    expectedProviderEvidenceHash: string | null;
   }>): Promise<CaresLinkV1RegisteredWorkerPersistedOutcome>;
   /** Store owns time, recovery batch size, max attempts, delay and jitter. */
   recoverExpired(input: Readonly<{
@@ -227,6 +230,10 @@ export type CaresLinkV1NoteGenerationRegisteredWorkerPayloadPort = Readonly<{
     attemptId: string;
     leaseToken: string;
     registrationDigest: string;
+    noteType: CaresLinkV1NoteTypeCode;
+    contractVersion: typeof CARESLINK_V1_CONTRACT_VERSION;
+    schemaVersion: typeof CARESLINK_V1_NOTE_SCHEMA_VERSION;
+    cleanedFactsHash: string;
   }>): Promise<Readonly<{ grantId: string; expiresAt: string }>>;
   consumeAttemptGrant(input: Readonly<{
     jobId: string;
@@ -234,6 +241,10 @@ export type CaresLinkV1NoteGenerationRegisteredWorkerPayloadPort = Readonly<{
     attemptId: string;
     leaseToken: string;
     registrationDigest: string;
+    noteType: CaresLinkV1NoteTypeCode;
+    contractVersion: typeof CARESLINK_V1_CONTRACT_VERSION;
+    schemaVersion: typeof CARESLINK_V1_NOTE_SCHEMA_VERSION;
+    cleanedFactsHash: string;
     grantId: string;
   }>): Promise<unknown>;
 }>;
@@ -319,6 +330,7 @@ const CLAIM_JOB_KEYS = [
   "providerPolicyDigest",
   "payloadPolicyVersion",
   "payloadPolicySnapshotHash",
+  "cleanedFactsHash",
   "status",
 ] as const;
 const CLAIM_ATTEMPT_KEYS = [
@@ -457,6 +469,9 @@ export function createTestOnlyCaresLinkV1NoteGenerationRegisteredWorker(
     reason: CaresLinkV1RegisteredWorkerSettleReason,
     providerEvidence?: CaresLinkV1NoteProviderAttemptEvidence,
   ): Promise<CaresLinkV1RegisteredWorkerRunOutcome> {
+    const expectedProviderEvidenceHash = providerEvidence
+      ? sha256(stringifyCaresLinkV1CanonicalJson(providerEvidence))
+      : null;
     let settlement: CaresLinkV1RegisteredWorkerFailureSettlement;
     try {
       settlement = await store.settleFailure({
@@ -473,6 +488,7 @@ export function createTestOnlyCaresLinkV1NoteGenerationRegisteredWorker(
           claim,
           registration,
           expectedContentHash: null,
+          expectedProviderEvidenceHash,
         });
         validatePersistedOutcome(persisted);
       } catch {
@@ -596,6 +612,9 @@ export function createTestOnlyCaresLinkV1NoteGenerationRegisteredWorker(
           },
         );
         validatedProviderEvidence = evidence;
+        const expectedProviderEvidenceHash = sha256(
+          stringifyCaresLinkV1CanonicalJson(evidence),
+        );
         const observedFinishedAt = requireServerTime(
           clock.now(),
           "Provider observed finish time",
@@ -648,6 +667,7 @@ export function createTestOnlyCaresLinkV1NoteGenerationRegisteredWorker(
               claim,
               registration,
               expectedContentHash: canonical.contentHash,
+              expectedProviderEvidenceHash,
             });
             validatePersistedOutcome(persisted);
           } catch {
@@ -964,6 +984,10 @@ function validateClaim(
   );
   requireOpaque(claim.job.jobId, "Job ID");
   requireOpaque(claim.job.payloadId, "Payload ID");
+  const cleanedFactsHash = requireSha256(
+    claim.job.cleanedFactsHash,
+    "Cleaned facts hash",
+  );
   requireOpaque(claim.attempt.attemptId, "Attempt ID");
   requireOpaque(claim.leaseToken, "Lease token");
   if (
@@ -1016,6 +1040,7 @@ function validateClaim(
       providerPolicyDigest: claim.job.providerPolicyDigest,
       payloadPolicyVersion: claim.job.payloadPolicyVersion,
       payloadPolicySnapshotHash: claim.job.payloadPolicySnapshotHash,
+      cleanedFactsHash,
       status: "RUNNING" as const,
     }),
     attempt: Object.freeze({
@@ -1040,6 +1065,10 @@ function payloadInput(
     attemptId: claim.attempt.attemptId,
     leaseToken: claim.leaseToken,
     registrationDigest: registration.registrationDigest,
+    noteType: claim.job.noteType,
+    contractVersion: claim.job.contractVersion,
+    schemaVersion: claim.job.schemaVersion,
+    cleanedFactsHash: claim.job.cleanedFactsHash,
   });
 }
 
@@ -1406,10 +1435,12 @@ function requireSha256(value: unknown, label: string) {
 }
 
 function requireServerTime(value: unknown, label: string) {
+  const parsed = typeof value === "string" ? Date.parse(value) : Number.NaN;
   if (
     typeof value !== "string" ||
     !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value) ||
-    !Number.isFinite(Date.parse(value))
+    !Number.isFinite(parsed) ||
+    new Date(parsed).toISOString() !== value
   ) {
     throw invalid(`${label} is invalid`);
   }

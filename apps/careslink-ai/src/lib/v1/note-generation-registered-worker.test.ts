@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
 
 import { createValidCaresLinkV1CleanedFacts } from "./cleaned-facts-test-fixtures";
+import { stringifyCaresLinkV1CanonicalJson } from "./canonical-json";
 import type { CaresLinkV1NoteProviderCandidate } from "./note-generation-output";
 import {
   createCaresLinkV1NoteProviderAttemptEvidence,
@@ -207,6 +208,24 @@ describe("CaresLink V1 registered Note worker", () => {
         "fence",
         "commit",
       ]);
+      const expectedPayloadBinding = {
+        jobId: harness.claim.job.jobId,
+        payloadId: harness.claim.job.payloadId,
+        attemptId: harness.claim.attempt.attemptId,
+        leaseToken: harness.claim.leaseToken,
+        registrationDigest: harness.setup.registration.registrationDigest,
+        noteType,
+        contractVersion: CARESLINK_V1_CONTRACT_VERSION,
+        schemaVersion: CARESLINK_V1_NOTE_SCHEMA_VERSION,
+        cleanedFactsHash: harness.claim.job.cleanedFactsHash,
+      };
+      expect(harness.payload.authorizeAttempt).toHaveBeenCalledWith(
+        expectedPayloadBinding,
+      );
+      expect(harness.payload.consumeAttemptGrant).toHaveBeenCalledWith({
+        ...expectedPayloadBinding,
+        grantId: "grant-private-001",
+      });
       expect(harness.provider.generate).toHaveBeenCalledTimes(1);
       expect(harness.provider.generate).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -296,6 +315,19 @@ describe("CaresLink V1 registered Note worker", () => {
       expect(harness.store.settleFailure).toHaveBeenCalledTimes(1);
     },
   );
+
+  it("rejects a normalized-but-impossible calendar timestamp", async () => {
+    const harness = createHarness({
+      grantExpiresAt: "2026-02-30T00:01:00.000Z",
+    });
+
+    await expect(harness.worker.runNext()).resolves.toMatchObject({
+      status: "FAILED",
+      reason: "PROVIDER_OUTPUT_INVALID",
+    });
+    expect(harness.payload.consumeAttemptGrant).not.toHaveBeenCalled();
+    expect(harness.provider.generate).not.toHaveBeenCalled();
+  });
 
   it("aborts at the hard provider timeout and discards a late provider result", async () => {
     const generation = deferred<Awaited<ReturnType<CaresLinkV1NoteProviderPort["generate"]>>>();
@@ -659,6 +691,24 @@ describe("CaresLink V1 registered Note worker", () => {
     expect(harness.store.settleFailure).not.toHaveBeenCalled();
   });
 
+  it("does not repeat an uncertain commit when resolution remains RUNNING", async () => {
+    const harness = createHarness({
+      commitCanonicalSuccess: async () => {
+        throw new Error("commit response lost");
+      },
+      resolveAttemptOutcome: async () => ({ status: "RUNNING" }),
+    });
+
+    await expect(harness.worker.runNext()).resolves.toMatchObject({
+      status: "FAILED",
+      reason: "INTERNAL_FAILURE",
+    });
+    expect(harness.provider.generate).toHaveBeenCalledTimes(1);
+    expect(harness.store.commitCanonicalSuccess).toHaveBeenCalledTimes(1);
+    expect(harness.store.resolveAttemptOutcome).toHaveBeenCalledTimes(1);
+    expect(harness.store.settleFailure).toHaveBeenCalledTimes(1);
+  });
+
   it("keeps outcomes and logs free of payload, lease, provider ID and facts", async () => {
     const logSpies = [
       vi.spyOn(console, "log").mockImplementation(() => undefined),
@@ -742,6 +792,7 @@ function createHarness(options: HarnessOptions = {}) {
   );
   const events: string[] = [];
   const leaseToken = "lease-token-sensitive-001";
+  const cleanedFacts = createValidCaresLinkV1CleanedFacts(noteType);
   const claim: CaresLinkV1RegisteredWorkerClaim = {
     job: {
       jobId: `job-${noteType}-${sourceLocale}`,
@@ -757,6 +808,9 @@ function createHarness(options: HarnessOptions = {}) {
       providerPolicyDigest: policy.policyDigest,
       payloadPolicyVersion: PAYLOAD_POLICY.policyVersion,
       payloadPolicySnapshotHash: PAYLOAD_POLICY.policySnapshotHash,
+      cleanedFactsHash: sha256(
+        stringifyCaresLinkV1CanonicalJson(cleanedFacts),
+      ),
       status: "RUNNING",
     },
     attempt: {
@@ -837,7 +891,7 @@ function createHarness(options: HarnessOptions = {}) {
       if (options.consumeAttemptGrant) {
         return options.consumeAttemptGrant(input);
       }
-      return createValidCaresLinkV1CleanedFacts(noteType);
+      return structuredClone(cleanedFacts);
     }),
   } satisfies CaresLinkV1NoteGenerationRegisteredWorkerPayloadPort;
 
