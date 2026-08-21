@@ -500,7 +500,12 @@ export function createTestOnlyCaresLinkV1NoteGenerationRegisteredWorker(
         persisted.status === "CANCELLED"
       ) {
         try {
-          if (persisted.settlement.reason !== reason) {
+          if (
+            !settlementReasonsMatchForResponseLoss(
+              reason,
+              persisted.settlement.reason,
+            )
+          ) {
             throw invalid("Persisted settlement reason drifted");
           }
           return outcomeFromPersisted(
@@ -847,7 +852,7 @@ function validateRegistrationCore(
     }
     return Object.freeze({
       noteType: policy.noteType as CaresLinkV1NoteTypeCode,
-      policyVersion: requireIdentifier(
+      policyVersion: requireProviderPolicyIdentifier(
         policy.policyVersion,
         "Provider policy version",
       ),
@@ -1163,6 +1168,27 @@ function normalizeFailure(error: unknown): CaresLinkV1RegisteredWorkerSettleReas
   return "INTERNAL_FAILURE";
 }
 
+function settlementReasonsMatchForResponseLoss(
+  requested: CaresLinkV1RegisteredWorkerSettleReason,
+  persisted: CaresLinkV1RegisteredWorkerSettleReason,
+): boolean {
+  return (
+    requested === persisted ||
+    (isAuthorityDenialSettleReason(requested) &&
+      isAuthorityDenialSettleReason(persisted))
+  );
+}
+
+function isAuthorityDenialSettleReason(
+  reason: CaresLinkV1RegisteredWorkerSettleReason,
+): boolean {
+  return (
+    reason === "PAYLOAD_UNAVAILABLE" ||
+    reason === "SESSION_REVOKED" ||
+    reason === "PRIVACY_REVIEW_STALE"
+  );
+}
+
 function settleReasonForFinishReason(
   finishReason: CaresLinkV1NoteProviderAttemptEvidence["finishReason"],
 ): CaresLinkV1RegisteredWorkerSettleReason {
@@ -1408,6 +1434,16 @@ function requireIdentifier(value: unknown, label: string) {
   if (
     typeof value !== "string" ||
     !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(value)
+  ) {
+    throw invalid(`${label} is invalid`);
+  }
+  return value;
+}
+
+function requireProviderPolicyIdentifier(value: unknown, label: string) {
+  if (
+    typeof value !== "string" ||
+    !/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/.test(value)
   ) {
     throw invalid(`${label} is invalid`);
   }

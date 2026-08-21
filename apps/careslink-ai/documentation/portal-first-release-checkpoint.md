@@ -13,13 +13,18 @@ Current registered-worker adapter local batch base: `ec30b9342164d893f096cc0942b
 
 Current disposable database assertion gate HEAD: `7f214429d9cdb3a2a6f16fd6b91d0bd9e67a038f`
 
+Current worker RPC shadow migration source:
+`20260821071044_add_v1_note_generation_worker_rpc_shadow.sql`
+
 This checkpoint covers the AI Web Portal reality audit, release sequencing,
 local Referral foundation and source-only five-Note generation contracts. It
 does not modify the native App, Main Website, Native Auth/M0 implementation or
 served shared Product API routes. Those are prerequisites recorded in the
 existing versioned contract documentation. All new Referral and Note
 generation capabilities remain local, default-off, Production-unapplied and
-absent from retained Preview runtime. Four disposable Preview databases were
+absent from retained Preview runtime. The current source includes a private
+worker RPC migration, but it has not been applied to any database. Four
+disposable Preview databases were
 used only for the isolated migration/assertion gates recorded below and then
 deleted; no Preview application deployment or Production database was used as
 the SQL target.
@@ -43,7 +48,7 @@ availability.
 | Admin access requests/material usage | real/mixed | Yes | Manages AI access/metadata, not providers or referrals | Reuse its auth-first action pattern, not its business schema |
 | `/plan-and-usage` | legacy credits | Read-only | Runtime is still 3 legacy credits although the 300-Point/Pro product baseline is approved | Do not show both systems; implement and reconcile the approved wallet before cutover |
 | NDIS Case Note | real legacy server flow plus local shared-job evidence | Legacy generate/save only | Uses synchronous model and old credits; the new shared job is source-only and does not call it | Preserve legacy; keep the shared provider and canonical write default-off |
-| Other four Note types | catalog plus local shared-job/durable-contract evidence | No | Communication, Handover, Progress and Incident Factual share the dispatcher/output boundary and a default-off durable internal contract/memory fake, but have no database-backed repository, registered worker, served route, real provider or golden safety set | Implement the reviewed database/worker boundary, then validate each type without forking orchestration |
+| Other four Note types | catalog plus local shared-job/durable/RPC source evidence | No | Communication, Handover, Progress and Incident Factual share the dispatcher/output boundary, default-off durable contracts and the Production-unapplied private RPC source, but have no applied database repository, registered/deployed worker, served route, real provider or golden safety set | Prove the reviewed database/worker boundary on disposable Preview, then validate each type without forking orchestration |
 | `/ai-documents` | real legacy generated drafts | Delete only | Not canonical documents; store errors can appear as an empty list; no revision/export | Feature-gated canonical list only after current Preview evidence |
 | Shared `/v1` documents/sync | local durable adapter | Default-off | Exact current migrations are Production-unapplied and exist on no retained Preview; write grants withheld; no current base URL | M0 permits only me/list/pull after all identity/RLS gates pass |
 | Library/Guides/Updates | absent | No | No page, store, content version or API | After referral + Notes/documents/export |
@@ -640,8 +645,74 @@ deployment, capability/flag change or grant occurred. This closes only the
 schema/cross-domain assertion gate; it does not implement or enable an RPC,
 worker, model/STT call, Points settlement or user flow.
 
-There is still no payload metadata/grant, vault/KMS/retention decision, purge
-outbox, provider-evidence detail store, transaction-clock scheduler,
-claim/heartbeat/fence/commit/settle RPC, registered worker, model/STT call,
-Points call or runtime capability. Those remain separate activation gates, not
-hidden defaults in this schema.
+At that `r4` foundation checkpoint there was still no payload metadata/grant,
+purge outbox, provider-evidence detail store or worker RPC source. The next
+section records the later source addition; it does not retroactively turn the
+deleted-`r4` result into evidence for that revision. Vault/KMS/retention,
+registered worker, model/STT, Points and runtime capability remain separate
+activation gates, not hidden defaults.
+
+## 15. Durable Note worker RPC shadow source — 2026-08-21
+
+Supabase CLI generated
+`20260821071044_add_v1_note_generation_worker_rpc_shadow.sql`. It extends the
+same private generation schema with nine metadata tables for policy catalogs,
+registration bindings, payload/grant lifecycle, provider evidence and purge
+outbox, plus nine exact private RPC identities: claim, heartbeat, fence,
+success commit, failure settlement, attempt resolution, expired recovery,
+payload authorization and payload consumption. Communication, Handover,
+Progress, NDIS and Incident Factual all use this one versioned database
+contract; no type receives a separate scheduler or settlement path.
+
+The implementation is deliberately inert. It seeds no catalog, registration
+or payload, and the database settings capability remains hard-off. All twelve
+private tables use RLS plus FORCE RLS. The distinct executor is non-login,
+non-superuser and non-`BYPASSRLS`; its exact `SECURITY DEFINER` functions have
+empty `search_path` and only the minimum underlying object access. No API role
+or `service_role` receives RPC `EXECUTE`, so there is no Data API or deployed
+worker entrypoint.
+
+The source implements database-time leases/recovery, fresh Auth/session and
+privacy-proof checks, immutable worker/provider/payload bindings and composite
+validated success/failure/replay acknowledgements. Canonical success is designed
+as one transaction that binds revision 1, sync change, mutation receipt,
+provider evidence, terminal state, payload logical revoke and purge enqueue.
+The assertion locks exact top-level envelopes, allowlisted nested fields and
+persisted-row relationships, plus injected rollback failures. The TypeScript
+adapter is stricter about nested exact keys; matching database vectors remain
+an activation gate. The older foundation assertion is now additive-aware so it
+can retain its three-table invariants after the extension; the worker assertion
+owns the extension's exact tables, policies, functions and ACLs.
+
+Vault/KMS/retention is not decided. Normal payload consume therefore always
+settles `DENIED_SETTLED` / `PAYLOAD_UNAVAILABLE` and cannot return a
+`vaultGrant`, locator or facts. A direct `CONSUMED` metadata update appears only
+in the rollback-only SQL assertion as a `TEST_ONLY` bridge for canonical
+transaction atomicity. It is not a vault, payload-consume, purge or
+account-deletion E2E test.
+
+Local source evidence for this batch:
+
+| Command | Result |
+|---|---|
+| adjacent Note generation tests | 10 files / 348 tests passed |
+| `pnpm test` | 122 files / 1,331 tests passed; preserves 121 / 1,294 and the 90 / 653 historical baseline |
+| `pnpm exec tsc --noEmit --incremental false` | passed |
+| `pnpm lint` | passed |
+| `pnpm build` | passed; Next static generation 63/63 |
+
+This migration and both current assertions have not been applied or executed
+on a database, disposable Preview or Production. Activation requires the exact
+clean-apply/rollback gate on supported PostgreSQL 16/17 paths, exact roles,
+`FOR SHARE` authority locks, ACL/function configuration, `pg_temp` injected
+faults, owner A/B and true two-session/two-connection claim/revocation races,
+attempt-2-success historical replay and a full post-rollback zero matrix.
+Account-delete/purge cross-state recovery remains unproved. Before catalogs can
+be populated, governance must either make registration/catalog rows append-only
+for the lifetime of every referencing attempt or add and prove a reviewed
+`RESTRICT` attempt registration foreign key plus index. Before real provider
+work, provider `startedAt` must bind to a consumed grant with post-consume
+lease/heartbeat freshness; before trusting an executor caller, JSON numeric
+parsing needs sequential type/regex/safe-cast hardening. No route, model, STT,
+Points, deployment, Production change or user traffic is authorized by this
+checkpoint.

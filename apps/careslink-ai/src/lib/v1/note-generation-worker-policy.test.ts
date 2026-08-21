@@ -209,6 +209,22 @@ describe("CaresLink V1 Note generation worker policy", () => {
     );
   });
 
+  it("keeps attempt and recovery limits within the database catalog bound", () => {
+    for (const override of [
+      { maxAttempts: 1_000_001 },
+      { recoveryBatchLimit: 1_000_001 },
+    ]) {
+      expectContractCode(
+        () =>
+          parseCaresLinkV1NoteGenerationWorkerPolicy({
+            ...signedPolicy(),
+            ...override,
+          }),
+        "VALIDATION_ERROR",
+      );
+    }
+  });
+
   it("requires an explicit and exact jitter mode", () => {
     expect(() =>
       parseCaresLinkV1NoteGenerationWorkerPolicy(
@@ -231,6 +247,28 @@ describe("CaresLink V1 Note generation worker policy", () => {
         "VALIDATION_ERROR",
       );
     }
+  });
+
+  it("keeps every approved jittered retry delay within the safe-integer bound", () => {
+    expectContractCode(
+      () =>
+        parseCaresLinkV1NoteGenerationWorkerPolicy(
+          signedPolicy({
+            retryDelayMsAfterAttempt: [Number.MAX_SAFE_INTEGER, 2_000],
+            jitter: { mode: "APPROVED_BOUNDED", maxMs: 1 },
+          }),
+        ),
+      "VALIDATION_ERROR",
+    );
+
+    expect(() =>
+      parseCaresLinkV1NoteGenerationWorkerPolicy(
+        signedPolicy({
+          retryDelayMsAfterAttempt: [Number.MAX_SAFE_INTEGER - 1, 2_000],
+          jitter: { mode: "APPROVED_BOUNDED", maxMs: 1 },
+        }),
+      ),
+    ).not.toThrow();
   });
 
   it("stores drafts for review but never resolves them as runtime policy", () => {

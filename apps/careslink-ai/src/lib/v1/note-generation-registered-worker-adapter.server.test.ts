@@ -401,6 +401,138 @@ describe("CaresLink V1 registered worker composite adapter", () => {
     },
   );
 
+  it.each([
+    "SESSION_REVOKED",
+    "PRIVACY_REVIEW_STALE",
+    "PAYLOAD_UNAVAILABLE",
+  ] as const)(
+    "surfaces an atomically settled authorize denial for %s without vault access",
+    async (reason) => {
+      const harness = createHarness();
+      harness.respond.set(
+        CARESLINK_V1_REGISTERED_WORKER_ADAPTER_RPC_NAMES.authorizePayloadAttempt,
+        payloadDeniedAndSettled(harness.claim, reason),
+      );
+
+      await expect(
+        harness.adapter.payload.authorizeAttempt(harness.payloadInput()),
+      ).rejects.toMatchObject({
+        name: "CaresLinkV1RegisteredWorkerExecutionError",
+        reason,
+      });
+      expect(harness.vault.consumeOneTimeGrant).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([
+    "SESSION_REVOKED",
+    "PRIVACY_REVIEW_STALE",
+    "PAYLOAD_UNAVAILABLE",
+  ] as const)(
+    "surfaces an atomically settled consume denial for %s without vault access",
+    async (reason) => {
+      const harness = createHarness();
+      harness.respond.set(
+        CARESLINK_V1_REGISTERED_WORKER_ADAPTER_RPC_NAMES.consumePayloadGrant,
+        payloadDeniedAndSettled(harness.claim, reason),
+      );
+
+      await expect(
+        harness.adapter.payload.consumeAttemptGrant({
+          ...harness.payloadInput(),
+          grantId: IDS.grant,
+        }),
+      ).rejects.toMatchObject({
+        name: "CaresLinkV1RegisteredWorkerExecutionError",
+        reason,
+      });
+      expect(harness.vault.consumeOneTimeGrant).not.toHaveBeenCalled();
+    },
+  );
+
+  const deniedSettlementDrifts = [
+    ["status", (value: Record<string, unknown>) => {
+      value.status = "DENIED";
+    }],
+    ["transaction ID", (value: Record<string, unknown>) => {
+      value.transactionId = "not-a-uuid";
+    }],
+    ["transaction status", (value: Record<string, unknown>) => {
+      value.transactionStatus = "ROLLED_BACK";
+    }],
+    ["atomic declaration", (value: Record<string, unknown>) => {
+      value.atomic = false;
+    }],
+    ["commit time", (value: Record<string, unknown>) => {
+      value.committedAt = "not-a-server-time";
+    }],
+    ["registration digest", (value: Record<string, unknown>) => {
+      value.registrationDigest = sha256("other-registration");
+    }],
+    ["denial reason", (value: Record<string, unknown>) => {
+      value.reason = "CANCELLED";
+    }],
+    ["job reference", (value: Record<string, unknown>) => {
+      value.jobReferenceHash = sha256("other-job");
+    }],
+    ["attempt reference", (value: Record<string, unknown>) => {
+      value.attemptReferenceHash = sha256("other-attempt");
+    }],
+    ["payload reference", (value: Record<string, unknown>) => {
+      value.payloadReferenceHash = sha256("other-payload");
+    }],
+    ["job terminal status", (value: Record<string, unknown>) => {
+      value.jobStatus = "RUNNING";
+    }],
+    ["attempt terminal status", (value: Record<string, unknown>) => {
+      value.attemptStatus = "RUNNING";
+    }],
+    ["payload state", (value: Record<string, unknown>) => {
+      value.payloadState = "AVAILABLE";
+    }],
+    ["payload disposition", (value: Record<string, unknown>) => {
+      value.payloadDisposition = "RETAINED_FOR_RETRY";
+    }],
+    ["purge event hash", (value: Record<string, unknown>) => {
+      value.purgeEventReferenceHash = "not-a-sha256";
+    }],
+  ] as const;
+
+  it.each(["authorize", "consume"] as const)(
+    "rejects drifted atomically settled %s denials before vault access",
+    async (operation) => {
+      for (const [label, mutate] of deniedSettlementDrifts) {
+        const harness = createHarness();
+        const denial = payloadDeniedAndSettled(
+          harness.claim,
+          "SESSION_REVOKED",
+        ) as Record<string, unknown>;
+        mutate(denial);
+        harness.respond.set(
+          operation === "authorize"
+            ? CARESLINK_V1_REGISTERED_WORKER_ADAPTER_RPC_NAMES.authorizePayloadAttempt
+            : CARESLINK_V1_REGISTERED_WORKER_ADAPTER_RPC_NAMES.consumePayloadGrant,
+          denial,
+        );
+
+        const call =
+          operation === "authorize"
+            ? harness.adapter.payload.authorizeAttempt(harness.payloadInput())
+            : harness.adapter.payload.consumeAttemptGrant({
+                ...harness.payloadInput(),
+                grantId: IDS.grant,
+              });
+        await expect(call, label).rejects.toMatchObject({
+          reason: "INTERNAL_FAILURE",
+        });
+        expect(
+          harness.vault.consumeOneTimeGrant,
+          label,
+        ).not.toHaveBeenCalled();
+      }
+    },
+  );
+
   it("accepts a complete atomic success and returns metadata-only canonical refs", async () => {
     const harness = createHarness();
     const result = await harness.adapter.store.commitCanonicalSuccess({
@@ -419,6 +551,8 @@ describe("CaresLink V1 registered worker composite adapter", () => {
       baseRevisionId: null,
     });
     expect(result).not.toHaveProperty("canonicalContent");
+    expect(harness.atomicSuccess).not.toHaveProperty("canonicalContent");
+    expect(harness.atomicSuccess).not.toHaveProperty("providerEvidence");
     expect(harness.rpc).toHaveBeenCalledWith(
       CARESLINK_V1_REGISTERED_WORKER_ADAPTER_RPC_NAMES.commitCanonicalSuccess,
       expect.objectContaining({
@@ -432,8 +566,11 @@ describe("CaresLink V1 registered worker composite adapter", () => {
   });
 
   it.each([
-    ["missing canonicalContent", (value: Record<string, unknown>): void => {
-      delete value.canonicalContent;
+    ["legacy canonicalContent echo", (value: Record<string, unknown>): void => {
+      value.canonicalContent = { private: "must-not-echo" };
+    }],
+    ["legacy providerEvidence echo", (value: Record<string, unknown>): void => {
+      value.providerEvidence = { private: "must-not-echo" };
     }],
     ["extra top key", (value: Record<string, unknown>): void => {
       value.extra = true;
@@ -1114,7 +1251,6 @@ function atomicSuccessDto(
       revisionNumber: 1,
       baseRevisionId: null,
     },
-    canonicalContent: canonical.content,
     syncReceipt: {
       transactionId,
       status: "APPENDED",
@@ -1168,7 +1304,6 @@ function atomicSuccessDto(
       eventReferenceHash: sha256("purge-event-success"),
       enqueuedAt: COMMITTED_AT,
     },
-    providerEvidence: evidence,
   };
 }
 
@@ -1240,7 +1375,6 @@ function atomicSettlementDto(
           eventReferenceHash: sha256("purge-event-settlement"),
           enqueuedAt: COMMITTED_AT,
         },
-    providerEvidence: evidence,
   };
 }
 
@@ -1275,6 +1409,32 @@ function payloadGrant(claim: CaresLinkV1RegisteredWorkerClaim) {
     attemptReferenceHash: sha256(claim.attempt.attemptId),
     payloadReferenceHash: sha256(claim.job.payloadId),
     registrationDigest: claim.attempt.registrationDigest,
+  };
+}
+
+function payloadDeniedAndSettled(
+  claim: CaresLinkV1RegisteredWorkerClaim,
+  reason:
+    | "SESSION_REVOKED"
+    | "PRIVACY_REVIEW_STALE"
+    | "PAYLOAD_UNAVAILABLE",
+) {
+  return {
+    status: "DENIED_SETTLED",
+    transactionId: IDS.transaction,
+    transactionStatus: "COMMITTED",
+    atomic: true,
+    committedAt: COMMITTED_AT,
+    registrationDigest: claim.attempt.registrationDigest,
+    reason,
+    jobReferenceHash: sha256(claim.job.jobId),
+    attemptReferenceHash: sha256(claim.attempt.attemptId),
+    payloadReferenceHash: sha256(claim.job.payloadId),
+    jobStatus: "FAILED",
+    attemptStatus: "FAILED",
+    payloadState: "REVOKED",
+    payloadDisposition: "REVOKED_PURGE_ENQUEUED",
+    purgeEventReferenceHash: sha256(`purge-event-${reason}`),
   };
 }
 

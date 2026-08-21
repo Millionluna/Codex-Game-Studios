@@ -1,11 +1,12 @@
 # V1 Note generation durable design handoff
 
-> Status: source-only, default-off design plus a Production-unapplied
-> schema-only migration foundation whose exact schema/cross-domain assertion
-> gate passed only on deleted disposable `r4`. This document records the next
-> database and worker boundary; it does not claim that a durable repository,
-> worker, route, RPC, Preview capability, model call or Production capability
-> exists.
+> Status: source-only, default-off design plus two Production-unapplied
+> migrations. The schema-only foundation passed its exact schema/cross-domain
+> assertion gate only on deleted disposable `r4`; the later CLI-generated
+> worker RPC migration and its additive-aware assertions have not run against a
+> database. This document records an implemented private RPC source boundary,
+> not an applied repository, callable worker, route, Preview capability, model
+> call or Production capability.
 
 ## 1. Scope and non-goals
 
@@ -16,7 +17,8 @@ persist a usable canonical result.
 
 This handoff does not authorize or implement:
 
-- a database connection, migration apply or private worker RPC;
+- a database connection, migration apply, caller `EXECUTE` grant or reachable
+  private worker RPC;
 - a served route, worker deployment or feature activation;
 - raw cleaned-facts persistence;
 - a real model or STT call;
@@ -55,8 +57,8 @@ future retirement or reconciliation is a separately reviewed migration.
 
 ## 3. Private schema blueprint
 
-A future migration should create a separate private schema such as
-`careslink_v1_generation`. It must not add tables or types to
+The foundation migration creates the separate private schema
+`careslink_v1_generation`. It does not add tables or types to
 `careslink_v1_internal`: the existing Product API migrations and assertions
 lock that schema to an exact function-only object set.
 
@@ -68,7 +70,7 @@ may be an API role. The executor must be `NOLOGIN`, `NOSUPERUSER` and
 reviewed definer functions. The schema grants no `USAGE` or `CREATE` to
 `PUBLIC`, `anon`, `authenticated` or `service_role`.
 
-The first schema-only object set is deliberately smaller than the eventual
+The first schema-only object set was deliberately smaller than the eventual
 durable repository:
 
 1. two dedicated `NOLOGIN`, `NOSUPERUSER`, `NOBYPASSRLS` roles, one owner and
@@ -78,11 +80,13 @@ durable repository:
 4. a metadata-only `attempts` table;
 5. only their required constraints and indexes.
 
-It creates no function, view, trigger or RLS policy. The future payload
-metadata, one-time grants, provider-evidence detail, purge outbox and nine
-reviewed worker RPCs are a separate additive phase. They must exist before the
-atomic transaction in section 7 can be implemented; the current three-table
-foundation must never be described as that transaction.
+At its deleted-`r4` checkpoint it created no function, view, trigger or RLS
+policy. The subsequent source-only migration now adds payload metadata,
+one-time grants, provider-evidence detail, purge outbox, immutable policy and
+registration catalogs, executor policies and the nine reviewed worker RPC
+identities. The original three-table foundation and its historical evidence
+must still never be described as the atomic transaction in section 7; the
+additive revision has separate unexecuted assertions and Preview gates.
 
 No enum type is required; bounded text checks keep migration and rollback
 inspection explicit. Every foreign-key column used for lookup or cascade must
@@ -255,8 +259,9 @@ session, proof or request binding fails closed.
 
 ## 7. Atomic success transaction
 
-The future success RPC must complete all of these operations in one short
-database transaction:
+The source-only success RPC is written to complete all of these operations in
+one short database transaction; this remains an unexecuted contract until the
+exact migration passes the disposable-Preview gates in section 10:
 
 1. assert the database capability is enabled, shadow-only and called through
    the exact reviewed privileged boundary;
@@ -299,8 +304,11 @@ lots.
 
 ## 8. ACL, RLS and RPC exposure
 
-All three private tables enable **and force** RLS as defence in depth and define
-no policy in the schema-only phase. `FORCE ROW LEVEL SECURITY` makes the table owner subject
+The three foundation tables and all nine additive private metadata tables
+enable **and force** RLS as defence in depth. The foundation had no policy at
+its historical schema-only checkpoint; the additive migration now defines only
+the command-specific executor policies required by the private RPCs.
+`FORCE ROW LEVEL SECURITY` makes the table owner subject
 to policies, but it does not constrain a superuser or a role with
 `BYPASSRLS`. Therefore the schema/table owner is distinct from the reviewed
 definer executor, and the executor must be `NOLOGIN`, `NOSUPERUSER` and
@@ -329,15 +337,16 @@ default `PUBLIC` execute privilege.
 
 This source-only batch grants **no `EXECUTE`** to `service_role`, authenticated
 users or any other API role. A later activation migration may grant only the
-minimum public wrapper signatures after the exact migration and assertions pass
-on a disposable Preview. No private helper is directly callable by an API role.
+minimum exact worker signatures after the exact migration and assertions pass
+on a disposable Preview. The current RPCs and private helpers are not directly
+callable by an API role and are not in a Data API-exposed schema.
 
 The existing authenticated direct SELECT on historical
 `public.generation_jobs` must be revoked before any route could treat job status
 as live data. User-facing job reads must go through a fresh-session-validating,
 metadata-only adapter rather than direct PostgREST table access.
 
-## 9. Schema-only migration boundary
+## 9. Migration boundaries
 
 Supabase CLI 2.115.0 was used locally to generate the filename with:
 
@@ -350,18 +359,43 @@ The exact returned file is
 It remains additive, default-off, Production-unapplied and free of top-level
 transaction syntax because the migration runner owns the transaction.
 
-This first migration contains only the private metadata foundation described
+The first migration contains only the private metadata foundation described
 in section 3. It grants no schema/table/function privilege to the future
 executor, `PUBLIC`, `anon`, `authenticated` or `service_role`. It deliberately
 contains no lease duration, retry budget, provider/model selection, payload
-TTL, vault/KMS choice or purge SLA. A later migration must be generated by the
-same CLI workflow and separately reviewed before adding any function or grant.
+TTL, vault/KMS choice or purge SLA.
+
+The same CLI workflow subsequently generated
+`supabase/migrations/20260821071044_add_v1_note_generation_worker_rpc_shadow.sql`.
+That additive source extends jobs/attempts and creates nine private metadata
+tables: worker/provider/payload policy catalogs, worker registrations and
+five-Note provider bindings, payloads, one-time grants, provider evidence and
+the purge outbox. It creates the nine exact private claim, heartbeat, fence,
+success-commit, failure-settle, resolve, recover, payload-authorize and
+payload-consume identities. It seeds no catalog, registration or payload,
+leaves the settings capability hard-off and grants no caller `EXECUTE`.
+
+All RPCs are owned by the distinct executor, are `SECURITY DEFINER`, fix an
+empty `search_path` and use database time. Executor table rights and RLS
+policies are command-specific; API roles and `service_role` retain no private
+schema/table rights or function execution. This is a source boundary, not
+evidence that the migration, policies or transactions work on PostgreSQL.
+
+Because the vault backend, KMS, retention and purge operator remain undecided,
+normal payload consume can only settle `DENIED_SETTLED` /
+`PAYLOAD_UNAVAILABLE`. It returns no `vaultGrant`, locator, bearer token or raw
+facts. The SQL assertion's direct rollback-only `TEST_ONLY` transition of a
+grant to `CONSUMED` exists solely to exercise canonical transaction atomicity;
+it is not a vault/payload-consume E2E path.
 
 ## 10. Disposable Preview assertion gate
 
 Before any execute grant, route, worker or model integration, the exact source
 revision must clean-apply to a new disposable non-Production Preview. The
-schema-only foundation must first pass rollback-only assertions covering:
+foundation-only revision established the rollback-only checks below. The
+current additive-aware foundation assertion preserves that required subset
+when the worker extension is present, while the worker assertion owns the
+extension's exact objects and privileges:
 
 - `server_version_num >= 160000`; this migration intentionally uses the
   PostgreSQL 16+ role-membership option syntax and has no pre-16 compatibility
@@ -372,9 +406,12 @@ schema-only foundation must first pass rollback-only assertions covering:
 - `relrowsecurity=true` and `relforcerowsecurity=true` on every private table,
   zero schema/table privileges for all API roles and the future executor, and
   executor `rolcanlogin=false`, `rolsuper=false` and `rolbypassrls=false`;
-- exactly zero private or public wrapper functions, views, triggers and
-  policies, and no `PUBLIC`, anon, authenticated, `service_role` or executor
-  schema/table/function privilege;
+- for the historical foundation-only object set, exactly zero private or public
+  wrapper functions, views, triggers and policies and no executor object
+  privilege; for the additive revision, exact worker-owned policies/functions
+  and command-scoped executor rights are checked by its separate assertion;
+- no `PUBLIC`, anon, authenticated or `service_role` private schema/table/RPC
+  privilege in either revision;
 - exact metadata-only columns, state/hash/time constraints, composite owner
   foreign keys, one active-attempt index and deterministic claim-order index;
 - no raw facts, canonical content, provider output, transcript, token, URL,
@@ -383,11 +420,17 @@ schema-only foundation must first pass rollback-only assertions covering:
 - invalid hashes, states, terminal shapes, owner bindings, duplicate attempt
   ordinals and duplicate active attempts fail closed;
 
-The later RPC/payload migration must then extend those assertions to cover:
+The source-only RPC/payload assertion now extends those checks with the cases
+below, but has not been executed against a database. They remain required
+disposable-Preview evidence rather than established behavior:
 
 - no unsafe public overload and no unreviewed execute privilege;
 - every definer function has a fixed empty search path and allowlisted owner;
 - owner A/B isolation and metadata-only acknowledgements;
+- exact top-level acknowledgement keys plus allowlisted nested fields and
+  persisted relationships; before activation, add database vectors that reject
+  unknown or missing keys at every nested envelope level, matching the stricter
+  TypeScript adapter parser;
 - initiating-session UUID mismatch, missing/revoked/expired session, deleted or
   banned user, anonymous/unconfirmed/non-provider user;
 - wrong-owner, wrong-type, wrong-hash, wrong-schema, expired and revoked privacy
@@ -411,12 +454,19 @@ The later RPC/payload migration must then extend those assertions to cover:
 - payload locator remains vault-private; only an attempt-bound one-time grant
   is consumed, and the payload is logically revoked and physically purged
   according to the eventually approved vault/retention contract;
+- account deletion remains compatible with logical revoke and durable purge
+  outbox evidence without losing required audit/reconciliation bindings;
+- policy catalog and registration rows remain immutable while historical
+  attempts reference their digests, or attempts gain a reviewed registration
+  foreign key plus lookup index before catalog lifecycle operations exist;
 - no Points RPC, ledger or wallet mutation.
 
 The same exact revision must then pass the existing canonical JSON vectors,
 active-session tests, privacy tests, owner A/B RLS tests and revoked-session
-cleanup tests. Preview evidence for an earlier migration revision is not
-promotion evidence for this design.
+cleanup tests, including true two-session/two-connection claim races and
+concurrent session/privacy revocation locks on supported PostgreSQL 16/17
+paths. Preview evidence for an earlier migration revision is not promotion
+evidence for this design.
 
 ## 11. Current evidence boundary
 
@@ -507,3 +557,63 @@ atomic acknowledgement, but that acknowledgement is not proof that a database
 transaction, RLS policy, executor-role topology, vault grant or purge outbox
 exists. Only the clean-apply and rollback assertions above can provide that
 evidence for the exact future migration revision.
+
+## 12. Current worker RPC source handoff
+
+The paragraph above closes the historical deleted-`r4` foundation result. It
+does not describe the later worktree. The current worktree now contains the
+CLI-generated worker RPC migration described in section 9 and
+`supabase/assertions/v1_note_generation_worker_rpc_shadow_assertions.sql`.
+`supabase/assertions/v1_note_generation_durable_foundation_assertions.sql` is
+also additive-aware so it can retain the foundation subset after the worker
+extension is installed. Neither current assertion revision nor the worker RPC
+migration has been executed against a database.
+
+The worker assertion installs transaction-only `TEST_ONLY` policy,
+registration, Auth/privacy and job fixtures after proving the real migration's
+empty catalogs, hard-off setting and private ACL posture. Its source checks
+claim/lease/recovery, authority denial, retries, response-loss replay, canonical
+success/rollback and composite acknowledgement-to-row relationships. It
+temporarily marks a grant `CONSUMED` only to reach the canonical atomicity
+fixture; the real consume RPC remains permanently fail-closed as
+`DENIED_SETTLED` / `PAYLOAD_UNAVAILABLE` and exposes no vault capability.
+
+The local source gate passed:
+
+| Command | Result |
+|---|---|
+| adjacent Note generation tests | 10 files / 348 tests passed |
+| `pnpm test` | 122 files / 1,331 tests passed; preserves 121 / 1,294 and the 90 / 653 historical baseline |
+| `pnpm exec tsc --noEmit --incremental false` | passed |
+| `pnpm lint` | passed |
+| `pnpm build` | passed; Next static generation 63/63 |
+
+Independent final source/security review reported no P0/P1. Remaining P2
+activation governance is explicit, not a hidden default:
+
+- treat approved policy catalogs and registration bindings as append-only and
+  retain them while jobs/attempts reference their digests, or add a reviewed
+  `RESTRICT` attempt-registration foreign key plus index before deletion or
+  replacement is possible;
+- add database exact-key vectors for every nested acknowledgement envelope;
+  the SQL helpers currently lock top-level keys and validate allowlisted nested
+  fields/row relationships, while the TypeScript adapter parser is stricter;
+- prove old-attempt settle/resolve replay after attempt 2 has reached
+  `SUCCEEDED`, as well as after later retry/purge lifecycle advancement;
+- prove account-delete, logical revoke, purge-outbox retry and cross-state
+  recovery retain the required audit/reconciliation evidence;
+- before any real provider call, bind provider `startedAt` to a successfully
+  consumed grant and recheck post-consume lease/heartbeat freshness;
+- before any executor caller can be treated as untrusted, harden sequential
+  JSON numeric parsing with explicit type, regex and safe-cast gates rather
+  than relying on expression evaluation order.
+
+The activation run must clean-apply on supported PostgreSQL 16/17 paths, run
+both rollback assertions, inspect exact role membership/`FOR SHARE` authority
+locking/ACL and function configuration, exercise `pg_temp` injected-fault
+rollback plus true two-connection claim/revocation races, and finish with the
+full cross-domain zero-fixture/flags-off matrix. Only after those results and
+the vault/KMS/retention, worker credential, model/provider/STT and Points
+decisions are separately approved may a caller grant or runtime registry entry
+be considered. Nothing in this source handoff authorizes Preview retention,
+Production apply, route activation, model/STT traffic or Points settlement.

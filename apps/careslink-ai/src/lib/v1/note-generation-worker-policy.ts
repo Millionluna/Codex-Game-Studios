@@ -258,6 +258,11 @@ function normalizeDefinition(
     record.recoveryBatchLimit,
     "Recovery batch limit",
   );
+  if (maxAttempts > 1_000_000 || recoveryBatchLimit > 1_000_000) {
+    throw validationError(
+      "Attempt and recovery limits cannot exceed the catalog bound",
+    );
+  }
   const retryDelayMsAfterAttempt = requirePositiveIntegerArray(
     record.retryDelayMsAfterAttempt,
     "Retry delay",
@@ -289,6 +294,16 @@ function normalizeDefinition(
   if (retryDelayMsAfterAttempt.length !== maxAttempts - 1) {
     throw validationError(
       "Retry delay vector must contain one delay for every possible retry",
+    );
+  }
+  const maximumJitterMs = jitter.mode === "APPROVED_BOUNDED" ? jitter.maxMs : 0;
+  if (
+    retryDelayMsAfterAttempt.some(
+      (delayMs) => delayMs > Number.MAX_SAFE_INTEGER - maximumJitterMs,
+    )
+  ) {
+    throw validationError(
+      "Retry delay plus maximum jitter must remain a safe integer",
     );
   }
   if (maxAttempts === 1 && retryableOutcomes.length !== 0) {

@@ -114,6 +114,24 @@ describe("CaresLink V1 Note generation payload contract", () => {
     },
   );
 
+  it("keeps the registration-bound policy digest stable across absolute payload expiry", async () => {
+    const earlier = await createRepository().stageCanonicalFacts(
+      stageInput("progress", {
+        expiresAt: "2026-08-20T00:09:00.000Z",
+      }),
+    );
+    const later = await createRepository().stageCanonicalFacts(
+      stageInput("progress", {
+        expiresAt: PAYLOAD_EXPIRES_AT,
+      }),
+    );
+
+    expect(earlier.metadata.expiresAt).not.toBe(later.metadata.expiresAt);
+    expect(earlier.metadata.policySnapshotHash).toBe(
+      later.metadata.policySnapshotHash,
+    );
+  });
+
   it("recomputes the canonical facts hash and accepts expiry equal to proof expiry", async () => {
     const repository = createRepository();
     await expect(

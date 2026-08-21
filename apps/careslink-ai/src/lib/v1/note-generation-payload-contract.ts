@@ -105,7 +105,11 @@ export type CaresLinkV1NoteGenerationPayloadMetadata = Readonly<{
   policyVersion: string;
   encryptionProfileVersion: string;
   backupDispositionVersion: string;
-  /** Digest of the immutable policy identifiers and absolute expiry bounds. */
+  /**
+   * Digest of the immutable policy identifiers. Absolute payload/proof expiry
+   * remains separately persisted and request-fingerprint-bound so one approved
+   * worker registration can process multiple jobs without weakening expiry.
+   */
   policySnapshotHash: string;
   /** Digest only. The locator is private to the vault implementation. */
   payloadHandleHash: string;
@@ -881,8 +885,6 @@ function prepareStage(input: CaresLinkV1NoteGenerationPayloadStageInput) {
       policyVersion: input.policy.policyVersion,
       encryptionProfileVersion: input.policy.encryptionProfileVersion,
       backupDispositionVersion: input.policy.backupDispositionVersion,
-      expiresAt: input.expiresAt,
-      privacyProofExpiresAt: input.privacyProofExpiresAt,
     }),
   );
   return {

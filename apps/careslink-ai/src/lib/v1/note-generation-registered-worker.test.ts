@@ -122,6 +122,37 @@ describe("CaresLink V1 registered Note worker", () => {
     ).toEqual(setup.registration);
   });
 
+  it("round-trips provider policy versions that use the provider-safe slash", () => {
+    const setup = policySetup();
+    const providerPolicies = setup.providerPolicies.map((policy) =>
+      policy.noteType === "communication"
+        ? providerPolicy(
+            policy.noteType,
+            policy.timeoutMs,
+            "policy/communication/v1",
+          )
+        : policy,
+    );
+    const { registrationDigest, ...core } =
+      setup.registration;
+    const registration = createCaresLinkV1NoteGenerationWorkerRegistration({
+      ...core,
+      providerPolicies: providerPolicies.map((policy) => ({
+        noteType: policy.noteType,
+        policyVersion: policy.policyVersion,
+        policyDigest: policy.policyDigest,
+      })),
+    });
+
+    expect(registration.providerPolicies[0]?.policyVersion).toBe(
+      "policy/communication/v1",
+    );
+    expect(registration.registrationDigest).not.toBe(registrationDigest);
+    expect(
+      validateCaresLinkV1NoteGenerationWorkerRegistration(registration),
+    ).toEqual(registration);
+  });
+
   it("rejects registration shape, digest, identity, provider and payload-policy drift", () => {
     const setup = policySetup();
     expect(() =>
@@ -599,6 +630,107 @@ describe("CaresLink V1 registered Note worker", () => {
     },
   );
 
+  it.each([
+    {
+      phase: "authorize",
+      persistedReason: "SESSION_REVOKED",
+      expectedEvents: ["authorize"],
+    },
+    {
+      phase: "consume",
+      persistedReason: "PRIVACY_REVIEW_STALE",
+      expectedEvents: ["authorize", "consume"],
+    },
+  ] as const)(
+    "uses the persisted authority denial after $phase and settlement response loss",
+    async ({ phase, persistedReason, expectedEvents }) => {
+      const setup = policySetup();
+      const responseLoss = async () => {
+        throw new CaresLinkV1RegisteredWorkerExecutionError(
+          "PAYLOAD_UNAVAILABLE",
+        );
+      };
+      const payloadResponseLoss =
+        phase === "authorize"
+          ? { authorizeAttempt: responseLoss }
+          : { consumeAttemptGrant: responseLoss };
+      const harness = createHarness({
+        setup,
+        ...payloadResponseLoss,
+        settleFailure: async () => {
+          throw new Error("settle response lost");
+        },
+        resolveAttemptOutcome: async () => ({
+          status: "FAILED",
+          settlement: settlement(
+            persistedReason,
+            1,
+            setup.workerPolicy,
+            0,
+          ),
+        }),
+      });
+
+      await expect(harness.worker.runNext()).resolves.toMatchObject({
+        status: "FAILED",
+        reason: persistedReason,
+      });
+      expect(harness.events).toEqual(expectedEvents);
+      expect(harness.payload.authorizeAttempt).toHaveBeenCalledTimes(1);
+      expect(harness.payload.consumeAttemptGrant).toHaveBeenCalledTimes(
+        phase === "consume" ? 1 : 0,
+      );
+      expect(harness.store.settleFailure).toHaveBeenCalledWith(
+        expect.objectContaining({ reason: "PAYLOAD_UNAVAILABLE" }),
+      );
+      expect(harness.store.resolveAttemptOutcome).toHaveBeenCalledTimes(1);
+      expect(harness.provider.generate).not.toHaveBeenCalled();
+      expect(harness.store.commitCanonicalSuccess).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([
+    {
+      requestedReason: "PAYLOAD_UNAVAILABLE",
+      persistedReason: "PROVIDER_PERMANENT",
+    },
+    {
+      requestedReason: "PROVIDER_TRANSIENT",
+      persistedReason: "SESSION_REVOKED",
+    },
+  ] as const)(
+    "rejects response-loss reason drift from $requestedReason to $persistedReason",
+    async ({ requestedReason, persistedReason }) => {
+      const setup = policySetup();
+      const harness = createHarness({
+        setup,
+        authorizeAttempt: async () => {
+          throw new CaresLinkV1RegisteredWorkerExecutionError(
+            requestedReason,
+          );
+        },
+        settleFailure: async () => {
+          throw new Error("settle response lost");
+        },
+        resolveAttemptOutcome: async () => ({
+          status: "FAILED",
+          settlement: settlement(
+            persistedReason,
+            1,
+            setup.workerPolicy,
+            0,
+          ),
+        }),
+      });
+
+      await expect(harness.worker.runNext()).rejects.toThrowError();
+      expect(harness.store.settleFailure).toHaveBeenCalledTimes(1);
+      expect(harness.store.resolveAttemptOutcome).toHaveBeenCalledTimes(1);
+      expect(harness.provider.generate).not.toHaveBeenCalled();
+      expect(harness.store.commitCanonicalSuccess).not.toHaveBeenCalled();
+    },
+  );
+
   it("rejects malformed or unknown settlement enums", async () => {
     for (const malformed of [
       {
@@ -1012,6 +1144,7 @@ function workerPolicy(
 function providerPolicy(
   noteType: CaresLinkV1NoteTypeCode,
   timeoutMs: number,
+  policyVersion = `policy.${noteType}.v1`,
 ): CaresLinkV1NoteProviderPolicySnapshot {
   const core: CaresLinkV1NoteProviderPolicyCore = {
     noteType,
@@ -1023,7 +1156,7 @@ function providerPolicy(
     modelId: "model.test-only",
     modelRevision: "revision.test-only",
     modelRevisionAvailability: "EXACT",
-    policyVersion: `policy.${noteType}.v1`,
+    policyVersion,
     promptTemplateVersion: `prompt.${noteType}.v1`,
     goldenSetVersion: `golden.${noteType}.v1`,
     parserVersion: "parser.note-candidate.v1",

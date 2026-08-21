@@ -313,6 +313,75 @@ separately implement and prove those boundaries; this checkpoint does not
 prove `SKIP LOCKED`, live session/privacy route E2E or atomic canonical
 persistence through a callable RPC.
 
+### Durable Note worker RPC shadow source checkpoint — 2026-08-21
+
+The next local batch used the CLI-generated filename
+`supabase/migrations/20260821071044_add_v1_note_generation_worker_rpc_shadow.sql`.
+It adds nine private metadata tables—worker, provider and payload policy
+catalogs; worker registrations and their five-Note provider bindings; payloads;
+single-use payload grants; provider evidence; and the payload purge outbox—and
+extends jobs/attempts with the bindings required by the registered-worker
+adapter. It also defines the nine exact private claim, heartbeat, fence,
+success-commit, failure-settle, attempt-resolve, expired-recover,
+payload-authorize and payload-consume RPC identities.
+
+This is source-only and fail-closed. The migration seeds no policy catalog,
+worker registration or payload, and the existing settings row remains hard-off.
+All twelve private tables have RLS plus FORCE RLS. The new policies and object
+ACLs admit only the narrow operations needed by the distinct non-login,
+non-superuser, non-`BYPASSRLS` executor; all RPCs are executor-owned
+`SECURITY DEFINER` functions with exact signatures and `search_path=''`.
+`PUBLIC`, `anon`, `authenticated` and `service_role` have no `EXECUTE`, so the
+functions are neither a Data API surface nor a worker credential.
+
+The RPC source uses the database transaction clock and fresh Auth/session and
+privacy-proof reads, and its success envelope binds canonical document,
+revision 1, sync change, `CREATE_DOCUMENT` mutation receipt, provider evidence,
+terminal job/attempt, payload logical revocation and purge enqueue. The
+rollback-only worker assertion checks exact top-level envelopes, allowlisted
+nested fields and persisted metadata relationships, plus replay/conflict
+behavior, retries, recovery and rollback atomicity. The TypeScript adapter
+parser performs the stricter nested exact-key validation; matching database
+nested exact-key vectors remain an activation gate. The earlier
+durable-foundation assertion is
+now additive-aware: it retains the required three-table foundation checks when
+the separately reviewed worker extension is present, while the worker assertion
+owns the exact extension tables, policies, functions and executor ACL surface.
+Neither revised SQL assertion has been run against a database in this batch.
+
+Vault backend, KMS, retention and purge operations remain undecided. Therefore
+a valid normal consume can only atomically return `DENIED_SETTLED` with
+`PAYLOAD_UNAVAILABLE`; it never emits a `vaultGrant`, locator, token or raw
+facts. The worker assertion directly marks a grant `CONSUMED` only inside its
+rollback transaction to exercise canonical success/failure atomicity. That
+explicit `TEST_ONLY` bridge is not payload-consume, vault, encryption, purge or
+account-deletion E2E evidence.
+
+| Command | Result |
+|---|---|
+| adjacent Note generation tests | 10 files / 348 tests passed |
+| `pnpm test` | 122 files / 1,331 tests passed; preserves the 121 / 1,294 and 90 / 653 historical baselines |
+| `pnpm exec tsc --noEmit --incremental false` | passed |
+| `pnpm lint` | passed |
+| `pnpm build` | passed; Next static generation 63/63 |
+
+Activation evidence remains open. A disposable Preview must clean-apply the
+exact revision and execute both assertions, then prove owner A/B isolation,
+true two-session/two-connection `SKIP LOCKED` races, single active attempts,
+concurrent session/privacy `FOR SHARE` revocation locks, response-loss replay
+after attempt 2 has already succeeded, and `pg_temp` injected atomic failure on
+supported PostgreSQL 16/17 paths. The run must inspect exact roles, ACLs and
+function configuration and end with the full zero-fixture/flags-off matrix.
+Governance must freeze catalog/registration retention as append-only while
+attempts reference their digests, or add a reviewed `RESTRICT` attempt
+registration foreign key plus index; and it must prove purge/outbox cross-state
+recovery with account deletion. Before a real provider starts, `startedAt` must
+bind to a consumed grant and a fresh post-consume lease/heartbeat check. Before
+an executor caller is treated as untrusted, sequential JSON numeric parsing
+must use explicit type/regex/safe-cast gates.
+No route, worker, model, STT, Points, Preview, Production migration, deployment
+or user flow was enabled or exercised by this checkpoint.
+
 ### First durable-metadata disposable Preview attempt — 2026-08-21
 
 A fresh non-default Supabase branch reported `with_data=false`, PostgreSQL 17
@@ -679,7 +748,7 @@ The following suites are required before the corresponding V1 slice can be calle
 
 1. The native App exists in a separate repository and is outside this task; this AI repository does not execute or attest its iOS/Android, offline, purchase or store gates.
 2. The OpenAPI/TypeScript contract and default-off durable `/v1` route adapter now exist, but there is no Preview- or Production-served Product API, generated client package, schema registry or previous-version compatibility fixture.
-3. The current worktree passes 1,294 tests across 121 files (with 120 / 1,284, 119 / 1,236, 118 / 1,193, 115 / 1,089, 114 / 1,051, 112 / 983, 107 / 938, 104 / 894 and 103 / 831 retained as prior source-level batches and 90 / 653 as the historical baseline). All five Note types share a source-only generation/output/job foundation plus default-off durable, worker-policy, provider-evidence, payload-lifecycle, registered-worker and strict database/vault adapter contracts and a Production-unapplied schema-only metadata migration. Deleted PostgreSQL 17 disposable `r4` passed the exact 13-file clean-apply and all six durable/adjacent rollback suites, closing the schema/cross-domain assertion gate. The five types still lack an implemented database repository/RPC layer, deployed worker, real provider/STT integration and complete per-type input/output/privacy/semantic golden sets.
+3. The current worktree passes 1,331 tests across 122 files (with 121 / 1,294, 120 / 1,284, 119 / 1,236, 118 / 1,193, 115 / 1,089, 114 / 1,051, 112 / 983, 107 / 938, 104 / 894 and 103 / 831 retained as prior source-level batches and 90 / 653 as the historical baseline). All five Note types share a source-only generation/output/job foundation plus default-off durable, worker-policy, provider-evidence, payload-lifecycle, registered-worker and strict database/vault adapter contracts. They now also share a Production-unapplied private metadata/RPC source layer with nine exact RPC identities and no caller execute grant. Deleted PostgreSQL 17 disposable `r4` proved only the earlier 13-file schema foundation and six durable/adjacent rollback suites; the new migration and additive-aware assertions have not run on a database. The five types still lack an applied database repository, deployed worker, real provider/STT integration and complete per-type input/output/privacy/semantic golden sets.
 4. Canonical document/revision/checkpoint states exist as memory/domain contracts plus historical isolated schema/RPC evidence and a Production-unapplied mobile-sync migration draft that was clean-applied only on a deleted disposable branch; there is no retained schema activation, editor, renderer or cross-device recovery E2E.
 5. Points lots/rates/reservations passed isolated serial database tests but remain shadow-only. There is no runtime entitlement integration, welcome eligibility decision, concurrent reservation proof or legacy-credit conversion/reconciliation test.
 6. No payment provider sandbox, webhook replay, refund or reconciliation harness exists.

@@ -409,14 +409,13 @@ describe("V1 Note durable generation foundation migration contract", () => {
       "information_schema exposed generated NOT NULL constraint names",
     );
     expect(assertions).toContain(
-      "This pg_constraint-based revision passed as one rollback-only request on the",
+      "The prior exact-schema pg_constraint revision passed as one rollback-only",
     );
     expect(assertions).toContain("deleted PostgreSQL 17 r3 and r4 Previews");
     expect(assertions).toContain("Production was not a SQL target");
-    expect(assertions).not.toContain(
-      "This pg_constraint-based revision has not yet been rerun on a fresh Preview",
+    expect(assertions).toContain(
+      "This additive-aware revision has not yet been rerun on a disposable",
     );
-    expect(assertions).not.toContain("has not been run against a database");
     expect(assertions).not.toContain("information_schema.table_constraints");
     expect(
       assertions.match(/^  from pg_constraint as constraint_metadata$/gm),
@@ -440,6 +439,8 @@ describe("V1 Note durable generation foundation migration contract", () => {
       "durable generation sensitive column leaked",
       "durable generation constraint scope drifted",
       "durable generation index scope drifted",
+      "durable generation additive catalog fixture scope drifted",
+      "durable generation additive catalog FORCE cleanup failed",
       "invalid job state unexpectedly succeeded",
       "invalid job hash unexpectedly succeeded",
       "cross-owner privacy binding unexpectedly succeeded",
@@ -451,7 +452,70 @@ describe("V1 Note durable generation foundation migration contract", () => {
       expect(assertions).toContain(marker);
     }
     expect(assertions).toContain(
-      "does not prove SKIP LOCKED, worker RPCs or atomic canonical persistence",
+      "executor-ACL surface. It does not prove SKIP LOCKED,",
+    );
+    expect(assertions).toContain(
+      "worker RPCs or atomic canonical persistence.",
+    );
+    expect(assertions).toContain(
+      "with or without later separately\n-- reviewed additive worker migrations",
+    );
+    expect(assertions).toContain(
+      "the worker RPC assertion owns the exact extension table",
+    );
+    expect(assertions.match(/<@ coalesce\(v_actual, array\[\]::text\[\]\)/g)).toHaveLength(8);
+    expect(assertions).toContain(
+      "and table_name in ('jobs', 'attempts')",
+    );
+    expect(assertions).toContain(
+      "to_regclass('careslink_v1_generation.worker_policies')",
+    );
+    expect(assertions).toContain(
+      "minimum transaction-local TEST_ONLY",
+    );
+    expect(assertions).toContain("column_name = 'terminal_transaction_id'");
+    expect(assertions).toContain(
+      "terminal_transaction_id =\n              'a7000000-0000-4000-8000-000000000001'::uuid",
+    );
+    expect(assertions).toContain(
+      "v_worker_extension_present boolean :=\n    to_regclass('careslink_v1_generation.worker_policies') is not null",
+    );
+    expect(assertions).toContain("if v_worker_extension_present then");
+    expect(assertions).toContain(
+      "elsif v_actual is distinct from array['attempts', 'jobs', 'settings']::text[]",
+    );
+    expect(assertions).toContain(
+      "or exists (select 1 from pg_proc where pronamespace = v_schema)",
+    );
+    expect(assertions).toContain("if not v_worker_extension_present then");
+
+    const apiRoleLoopStart = assertions.indexOf(
+      "foreach v_role in array array[",
+    );
+    const apiRoleLoopEnd = assertions.indexOf(
+      "\n  end loop;",
+      apiRoleLoopStart,
+    );
+    expect(apiRoleLoopStart).toBeGreaterThanOrEqual(0);
+    expect(apiRoleLoopEnd).toBeGreaterThan(apiRoleLoopStart);
+    expect(
+      assertions.slice(apiRoleLoopStart, apiRoleLoopEnd),
+    ).not.toContain("careslink_v1_generation_executor");
+    const defaultAclStart = assertions.indexOf(
+      "foreach v_object_kind in array",
+      apiRoleLoopEnd,
+    );
+    const defaultAclEnd = assertions.indexOf(
+      "\n  end loop;",
+      defaultAclStart,
+    );
+    expect(defaultAclStart).toBeGreaterThan(apiRoleLoopEnd);
+    expect(defaultAclEnd).toBeGreaterThan(defaultAclStart);
+    expect(
+      assertions.slice(defaultAclStart, defaultAclEnd),
+    ).toContain("careslink_v1_generation_executor");
+    expect(assertions).toContain(
+      "where owner.rolname = 'careslink_v1_generation_owner'\n        and defaults.defaclnamespace <> 0",
     );
     expect(assertions).toContain(
       "transaction-local test scaffolding, not migration or runtime permissions",

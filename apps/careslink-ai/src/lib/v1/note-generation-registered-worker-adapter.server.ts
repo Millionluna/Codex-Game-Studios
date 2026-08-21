@@ -184,6 +184,11 @@ const SETTLE_REASONS = [
   "POLICY_MISMATCH",
   "INTERNAL_FAILURE",
 ] as const;
+const PAYLOAD_DENIAL_REASONS = [
+  "PAYLOAD_UNAVAILABLE",
+  "SESSION_REVOKED",
+  "PRIVACY_REVIEW_STALE",
+] as const;
 const EVIDENCE_KEYS = [
   "policyDigest",
   "providerId",
@@ -344,7 +349,6 @@ export function createTestOnlyCaresLinkV1RegisteredWorkerCompositeAdapter(
         data,
         claim,
         contentHash,
-        approved,
         sha256(stringifyCaresLinkV1CanonicalJson(evidence)),
       );
     },
@@ -461,6 +465,7 @@ export function createTestOnlyCaresLinkV1RegisteredWorkerCompositeAdapter(
           args,
           "PAYLOAD_UNAVAILABLE",
         );
+        throwIfPayloadDeniedAndSettled(data, input);
         return parsePayloadGrant(data, input);
       },
 
@@ -475,6 +480,7 @@ export function createTestOnlyCaresLinkV1RegisteredWorkerCompositeAdapter(
           args,
           "PAYLOAD_UNAVAILABLE",
         );
+        throwIfPayloadDeniedAndSettled(data, input);
         const authorization = parseVaultAuthorization(data, input);
         let facts: unknown;
         try {
@@ -957,22 +963,19 @@ function parseAtomicCommit(
   value: unknown,
   claim: CaresLinkV1RegisteredWorkerClaim,
   expectedContentHash: string,
-  approved: ApprovedPolicyBinding,
-  expectedProviderEvidenceHash?: string,
+  expectedProviderEvidenceHash: string,
 ): CaresLinkV1RegisteredWorkerSuccess {
   const record = exactObject(
     value,
     [
       "transaction",
       "canonical",
-      "canonicalContent",
       "syncReceipt",
       "mutationReceipt",
       "jobTerminal",
       "attemptTerminal",
       "payloadMetadata",
       "purgeOutboxAcknowledgment",
-      "providerEvidence",
     ],
     "atomic success",
   );
@@ -1003,35 +1006,6 @@ function parseAtomicCommit(
     throw unavailable("INTERNAL_FAILURE");
   }
   const canonical = parseSuccess(record.canonical, expectedContentHash);
-  // Server-private verification proof only. The adapter rebuilds it through the
-  // canonical output gate and never returns it in the owner-safe worker result.
-  const canonicalContent = rebuildCanonicalContent(
-    record.canonicalContent,
-    claim.job.noteType,
-  );
-  if (
-    sha256(stringifyCaresLinkV1CanonicalJson(canonicalContent)) !==
-    expectedContentHash
-  ) {
-    throw unavailable("INTERNAL_FAILURE");
-  }
-  const providerEvidence = parseContentFreeEvidence(
-    record.providerEvidence,
-    claim,
-    approvedPolicyForClaim(claim, approved),
-    approved.workerPolicy,
-    providerCandidateFromContent(canonicalContent),
-  );
-  const providerEvidenceHash = sha256(
-    stringifyCaresLinkV1CanonicalJson(providerEvidence),
-  );
-  if (
-    providerEvidence.finishReason !== "COMPLETED" ||
-    expectedProviderEvidenceHash !== undefined &&
-    providerEvidenceHash !== expectedProviderEvidenceHash
-  ) {
-    throw unavailable("INTERNAL_FAILURE");
-  }
   const sync = exactObject(
     record.syncReceipt,
     [
@@ -1146,7 +1120,7 @@ function parseAtomicCommit(
     attemptTerminal.attemptReferenceHash !==
       sha256(claim.attempt.attemptId) ||
     attemptTerminal.contentHash !== canonical.contentHash ||
-    attemptTerminal.providerEvidenceHash !== providerEvidenceHash ||
+    attemptTerminal.providerEvidenceHash !== expectedProviderEvidenceHash ||
     attemptTerminal.finishedAt !== committedAt ||
     payloadMetadata.transactionId !== transactionId ||
     payloadMetadata.state !== "REVOKED" ||
@@ -1269,7 +1243,6 @@ function parseAtomicSettlement(
       "attemptTerminal",
       "payloadMetadata",
       "purgeOutboxAcknowledgment",
-      "providerEvidence",
     ],
     "atomic failure settlement",
   );
@@ -1303,25 +1276,6 @@ function parseAtomicSettlement(
     approved.workerPolicy,
   );
   if (expectedReason !== undefined && settlement.reason !== expectedReason) {
-    throw unavailable("INTERNAL_FAILURE");
-  }
-  const providerEvidence =
-    record.providerEvidence === null
-      ? null
-      : parseContentFreeEvidence(
-          record.providerEvidence,
-          claim,
-          approvedPolicyForClaim(claim, approved),
-          approved.workerPolicy,
-        );
-  const providerEvidenceHash =
-    providerEvidence === null
-      ? null
-      : sha256(stringifyCaresLinkV1CanonicalJson(providerEvidence));
-  if (
-    expectedProviderEvidenceHash !== undefined &&
-    providerEvidenceHash !== expectedProviderEvidenceHash
-  ) {
     throw unavailable("INTERNAL_FAILURE");
   }
   const job = exactObject(
@@ -1372,7 +1326,7 @@ function parseAtomicSettlement(
     attempt.status !== expectedAttemptStatus ||
     attempt.attemptReferenceHash !== sha256(claim.attempt.attemptId) ||
     attempt.reason !== settlement.reason ||
-    attempt.providerEvidenceHash !== providerEvidenceHash ||
+    attempt.providerEvidenceHash !== expectedProviderEvidenceHash ||
     attempt.finishedAt !== committedAt ||
     payload.transactionId !== transactionId ||
     payload.payloadReferenceHash !== sha256(claim.job.payloadId)
@@ -1515,7 +1469,6 @@ function parsePersistedOutcome(
         record.atomicSuccess,
         claim,
         expectedContentHash,
-        approved,
         expectedProviderEvidenceHash,
       ),
     });
@@ -1556,6 +1509,68 @@ function parseRecovery(value: unknown): CaresLinkV1RegisteredWorkerRecoverySumma
     throw unavailable("INTERNAL_FAILURE");
   }
   return result;
+}
+
+/**
+ * Authority failures must be committed by the database before they surface as
+ * worker errors. Raising from inside the RPC would roll the terminal mutation
+ * back and could leave a RUNNING attempt after a worker crash.
+ */
+function throwIfPayloadDeniedAndSettled(
+  value: unknown,
+  input: Readonly<{
+    jobId: string;
+    payloadId: string;
+    attemptId: string;
+    registrationDigest: string;
+  }>,
+): void {
+  const valueWithStatus = recordWithStatus(value, "payload authorization");
+  if (valueWithStatus.status !== "DENIED_SETTLED") return;
+  const record = exactObject(
+    valueWithStatus,
+    [
+      "status",
+      "transactionId",
+      "transactionStatus",
+      "atomic",
+      "committedAt",
+      "registrationDigest",
+      "reason",
+      "jobReferenceHash",
+      "attemptReferenceHash",
+      "payloadReferenceHash",
+      "jobStatus",
+      "attemptStatus",
+      "payloadState",
+      "payloadDisposition",
+      "purgeEventReferenceHash",
+    ],
+    "settled payload denial",
+  );
+  expectUuid(record.transactionId, "transaction ID");
+  expectServerTime(record.committedAt, "transaction commit time");
+  const reason = expectEnum(
+    record.reason,
+    PAYLOAD_DENIAL_REASONS,
+    "payload denial reason",
+  );
+  if (
+    record.transactionStatus !== "COMMITTED" ||
+    record.atomic !== true ||
+    record.registrationDigest !== input.registrationDigest ||
+    record.jobReferenceHash !== sha256(input.jobId) ||
+    record.attemptReferenceHash !== sha256(input.attemptId) ||
+    record.payloadReferenceHash !== sha256(input.payloadId) ||
+    record.jobStatus !== "FAILED" ||
+    record.attemptStatus !== "FAILED" ||
+    record.payloadState !== "REVOKED" ||
+    record.payloadDisposition !== "REVOKED_PURGE_ENQUEUED" ||
+    !isSha256(record.purgeEventReferenceHash)
+  ) {
+    throw unavailable("INTERNAL_FAILURE");
+  }
+  throw unavailable(reason);
 }
 
 function parsePayloadGrant(

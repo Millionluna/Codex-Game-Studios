@@ -2,14 +2,19 @@
 -- This file is not executed by pnpm test. A 2026-08-21 PostgreSQL 17 r2 run
 -- reached the constraint-catalog check and rolled back after
 -- information_schema exposed generated NOT NULL constraint names.
--- This pg_constraint-based revision passed as one rollback-only request on the
--- deleted PostgreSQL 17 r3 and r4 Previews. The r4 gate also passed all five
--- adjacent assertion suites and post-rollback zero-fixture checks.
+-- The prior exact-schema pg_constraint revision passed as one rollback-only
+-- request on the deleted PostgreSQL 17 r3 and r4 Previews. The r4 gate also
+-- passed all five adjacent assertion suites and post-rollback zero-fixture
+-- checks. This additive-aware revision has not yet been rerun on a disposable
+-- Preview database.
 -- Production was not a SQL target.
 -- This remains metadata-schema evidence only; it does not prove or enable a
 -- live worker, payload vault or canonical persistence RPC.
--- Run it only after a clean apply of the exact migration revision. It verifies
--- the metadata schema foundation and does not prove SKIP LOCKED, worker RPCs or atomic canonical persistence.
+-- Run it after the foundation migration, with or without later separately
+-- reviewed additive worker migrations. It verifies the required three-table
+-- foundation subset; the worker RPC assertion owns the exact extension table,
+-- policy, function and executor-ACL surface. It does not prove SKIP LOCKED,
+-- worker RPCs or atomic canonical persistence.
 -- Invoke it explicitly with psql; it intentionally lives outside
 -- supabase/tests because it is not a pgTAP/supabase test db test file.
 
@@ -169,6 +174,85 @@ alter table careslink_v1_generation.settings no force row level security;
 alter table careslink_v1_generation.jobs no force row level security;
 alter table careslink_v1_generation.attempts no force row level security;
 
+-- Later worker migrations add immediate catalog FKs to jobs. When that
+-- additive layer is present, seed only the minimum transaction-local TEST_ONLY
+-- rows needed to keep exercising the original foundation constraints. Exact
+-- catalog shape, policy values and executor access remain owned by the worker
+-- RPC assertion.
+do $$
+declare
+  v_worker_catalog regclass :=
+    to_regclass('careslink_v1_generation.worker_policies');
+  v_provider_catalog regclass :=
+    to_regclass('careslink_v1_generation.provider_policies');
+  v_payload_catalog regclass :=
+    to_regclass('careslink_v1_generation.payload_policies');
+begin
+  if (v_worker_catalog is null) <> (v_provider_catalog is null)
+    or (v_worker_catalog is null) <> (v_payload_catalog is null)
+  then
+    raise exception 'durable generation additive catalog fixture scope drifted';
+  end if;
+
+  if v_worker_catalog is not null then
+    execute
+      'alter table careslink_v1_generation.worker_policies ' ||
+      'no force row level security';
+    execute
+      'alter table careslink_v1_generation.provider_policies ' ||
+      'no force row level security';
+    execute
+      'alter table careslink_v1_generation.payload_policies ' ||
+      'no force row level security';
+
+    execute $catalog$
+      insert into careslink_v1_generation.worker_policies (
+        version, status, max_queue_age_ms,
+        minimum_payload_remaining_at_claim_ms, lease_duration_ms,
+        heartbeat_interval_ms, heartbeat_safety_margin_ms,
+        attempt_deadline_ms, provider_deadline_ms, commit_safety_margin_ms,
+        max_attempts, retry_delay_ms_after_attempt, retryable_outcomes,
+        recovery_batch_limit, jitter_mode, jitter_max_ms, policy_digest,
+        shadow_only
+      ) values (
+        'worker.test.v1', 'APPROVED', 600000, 60000, 10000, 2000, 1000,
+        30000, 20000, 5000, 2, array[1000]::bigint[],
+        array[
+          'LEASE_EXPIRED', 'PROVIDER_TIMEOUT', 'PROVIDER_TRANSIENT'
+        ]::text[],
+        10, 'NONE', null, repeat('d', 64), true
+      )
+    $catalog$;
+
+    execute $catalog$
+      insert into careslink_v1_generation.provider_policies (
+        note_type, policy_version, status, service_code, contract_version,
+        schema_version, rate_catalog_version, provider_id, model_id,
+        model_revision, model_revision_availability, prompt_template_version,
+        golden_set_version, parser_version, timeout_ms, policy_digest,
+        shadow_only
+      ) values (
+        'communication', 'provider.test.v1', 'APPROVED',
+        'note.communication.generate', '1.0.0-shadow.1',
+        '2026-08-09.v1-shadow', '2026-08-09.v1-shadow', 'provider.test',
+        'model.test', null, 'PROVIDER_NOT_EXPOSED', 'prompt.test.v1',
+        'golden.test.v1', 'parser.test.v1', 20000, repeat('e', 64), true
+      )
+    $catalog$;
+
+    execute $catalog$
+      insert into careslink_v1_generation.payload_policies (
+        policy_version, status, encryption_profile_version,
+        backup_disposition_version, policy_digest, shadow_only
+      ) values (
+        'payload.test.v1', 'APPROVED', 'encryption.test.v1',
+        'backup.test.v1', repeat('f', 64), true
+      )
+    $catalog$;
+  end if;
+end
+$$;
+
 do $$
 declare
   v_schema oid;
@@ -178,6 +262,8 @@ declare
   v_object_kind text;
   v_owner oid := 'careslink_v1_generation_owner'::regrole;
   v_effective_acl aclitem[];
+  v_worker_extension_present boolean :=
+    to_regclass('careslink_v1_generation.worker_policies') is not null;
 begin
   select namespace.oid
   into v_schema
@@ -201,7 +287,14 @@ begin
   where relation.relnamespace = v_schema
     and relation.relkind in ('r', 'p', 'v', 'm', 'S', 'f');
 
-  if v_actual is distinct from array['attempts', 'jobs', 'settings']::text[]
+  if v_worker_extension_present then
+    if not (
+      array['attempts', 'jobs', 'settings']::text[]
+        <@ coalesce(v_actual, array[]::text[])
+    ) then
+      raise exception 'durable generation schema scope drifted';
+    end if;
+  elsif v_actual is distinct from array['attempts', 'jobs', 'settings']::text[]
     or exists (select 1 from pg_proc where pronamespace = v_schema)
     or exists (
       select 1
@@ -260,9 +353,11 @@ begin
   where table_schema = 'careslink_v1_generation'
     and table_name = 'settings';
 
-  if v_actual is distinct from array[
-    'capability', 'enabled', 'shadow_only', 'created_at', 'updated_at'
-  ]::text[] then
+  if not (
+    array[
+      'capability', 'enabled', 'shadow_only', 'created_at', 'updated_at'
+    ]::text[] <@ coalesce(v_actual, array[]::text[])
+  ) then
     raise exception 'durable generation settings are not hard-off and unconfigured';
   end if;
 
@@ -284,8 +379,7 @@ begin
   foreach v_role in array array[
     'anon',
     'authenticated',
-    'service_role',
-    'careslink_v1_generation_executor'
+    'service_role'
   ] loop
     if has_schema_privilege(v_role, 'careslink_v1_generation', 'USAGE')
       or has_schema_privilege(v_role, 'careslink_v1_generation', 'CREATE')
@@ -315,6 +409,53 @@ begin
         v_role;
     end if;
   end loop;
+
+  -- Before the additive worker layer exists, preserve the foundation's
+  -- original proof that the inert executor has no direct object capability.
+  -- Once present, its exact least-privilege ACL belongs to the worker assertion.
+  if not v_worker_extension_present then
+    if has_schema_privilege(
+      'careslink_v1_generation_executor',
+      'careslink_v1_generation',
+      'USAGE'
+    )
+      or has_schema_privilege(
+        'careslink_v1_generation_executor',
+        'careslink_v1_generation',
+        'CREATE'
+      )
+    then
+      raise exception
+        'durable generation API or executor privilege leaked: executor schema';
+    end if;
+
+    foreach v_table in array array['settings', 'jobs', 'attempts'] loop
+      if has_table_privilege(
+        'careslink_v1_generation_executor',
+        'careslink_v1_generation.' || v_table,
+        'SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER'
+      ) then
+        raise exception
+          'durable generation API or executor privilege leaked: executor %',
+          v_table;
+      end if;
+    end loop;
+
+    if exists (
+      select 1
+      from pg_type as object_type
+      where object_type.typnamespace = v_schema
+        and object_type.typname in ('settings', 'jobs', 'attempts')
+        and has_type_privilege(
+          'careslink_v1_generation_executor',
+          object_type.oid,
+          'USAGE'
+        )
+    ) then
+      raise exception
+        'durable generation API or executor type privilege leaked: executor';
+    end if;
+  end if;
 
   foreach v_object_kind in array array['r', 'S', 'f', 'T'] loop
     select defaults.defaclacl
@@ -399,19 +540,21 @@ begin
   where table_schema = 'careslink_v1_generation'
     and table_name = 'jobs';
 
-  if v_actual is distinct from array[
-    'id', 'owner_user_id', 'initiating_session_id', 'admission_transport',
-    'payload_id', 'note_type', 'source_locale', 'service_code',
-    'rate_catalog_version', 'contract_version', 'schema_version',
-    'privacy_review_id', 'privacy_scanner_policy_version',
-    'privacy_review_revision', 'cleaned_facts_hash', 'idempotency_hash',
-    'request_hash', 'worker_policy_version', 'worker_policy_digest',
-    'provider_policy_version', 'provider_policy_digest',
-    'payload_policy_version', 'payload_policy_snapshot_hash', 'status',
-    'attempt_count', 'next_eligible_at', 'failure_reason',
-    'result_document_id', 'result_revision_id', 'result_content_hash',
-    'created_at', 'updated_at', 'started_at', 'finished_at', 'shadow_only'
-  ]::text[] then
+  if not (
+    array[
+      'id', 'owner_user_id', 'initiating_session_id', 'admission_transport',
+      'payload_id', 'note_type', 'source_locale', 'service_code',
+      'rate_catalog_version', 'contract_version', 'schema_version',
+      'privacy_review_id', 'privacy_scanner_policy_version',
+      'privacy_review_revision', 'cleaned_facts_hash', 'idempotency_hash',
+      'request_hash', 'worker_policy_version', 'worker_policy_digest',
+      'provider_policy_version', 'provider_policy_digest',
+      'payload_policy_version', 'payload_policy_snapshot_hash', 'status',
+      'attempt_count', 'next_eligible_at', 'failure_reason',
+      'result_document_id', 'result_revision_id', 'result_content_hash',
+      'created_at', 'updated_at', 'started_at', 'finished_at', 'shadow_only'
+    ]::text[] <@ coalesce(v_actual, array[]::text[])
+  ) then
     raise exception 'durable generation job column scope drifted';
   end if;
 
@@ -421,14 +564,16 @@ begin
   where table_schema = 'careslink_v1_generation'
     and table_name = 'attempts';
 
-  if v_actual is distinct from array[
-    'id', 'job_id', 'owner_user_id', 'attempt_number', 'status',
-    'worker_identity_hash', 'registration_digest', 'lease_token_hash',
-    'acquired_at', 'last_heartbeat_at', 'lease_expires_at',
-    'payload_authorized_at', 'fence_id', 'fence_digest', 'fenced_at',
-    'fence_expires_at', 'provider_evidence_hash', 'canonical_content_hash',
-    'failure_reason', 'finished_at', 'created_at', 'shadow_only'
-  ]::text[] then
+  if not (
+    array[
+      'id', 'job_id', 'owner_user_id', 'attempt_number', 'status',
+      'worker_identity_hash', 'registration_digest', 'lease_token_hash',
+      'acquired_at', 'last_heartbeat_at', 'lease_expires_at',
+      'payload_authorized_at', 'fence_id', 'fence_digest', 'fenced_at',
+      'fence_expires_at', 'provider_evidence_hash', 'canonical_content_hash',
+      'failure_reason', 'finished_at', 'created_at', 'shadow_only'
+    ]::text[] <@ coalesce(v_actual, array[]::text[])
+  ) then
     raise exception 'durable generation attempt column scope drifted';
   end if;
 
@@ -436,6 +581,7 @@ begin
     select 1
     from information_schema.columns
     where table_schema = 'careslink_v1_generation'
+      and table_name in ('jobs', 'attempts')
       and (
         data_type in ('json', 'jsonb', 'bytea')
         or column_name in (
@@ -464,10 +610,12 @@ begin
     and relation.relkind = 'r'
     and relation.relname = 'settings';
 
-  if v_actual is distinct from array[
-    'settings_capability_check', 'settings_enabled_check', 'settings_pkey',
-    'settings_shadow_only_check', 'settings_time_check'
-  ]::text[] then
+  if not (
+    array[
+      'settings_capability_check', 'settings_enabled_check', 'settings_pkey',
+      'settings_shadow_only_check', 'settings_time_check'
+    ]::text[] <@ coalesce(v_actual, array[]::text[])
+  ) then
     raise exception 'durable generation constraint scope drifted: settings';
   end if;
 
@@ -485,20 +633,22 @@ begin
     and relation.relkind = 'r'
     and relation.relname = 'jobs';
 
-  if v_actual is distinct from array[
-    'jobs_admission_transport_check', 'jobs_attempt_count_check',
-    'jobs_contract_version_check', 'jobs_failure_reason_check',
-    'jobs_hashes_check', 'jobs_note_type_check',
-    'jobs_owner_idempotency_unique', 'jobs_owner_identity_unique',
-    'jobs_owner_user_id_fkey', 'jobs_payload_unique', 'jobs_pkey',
-    'jobs_privacy_owner_fk', 'jobs_privacy_policy_version_check',
-    'jobs_privacy_review_revision_check', 'jobs_rate_catalog_version_check',
-    'jobs_result_document_owner_fk', 'jobs_result_revision_owner_fk',
-    'jobs_schema_version_check', 'jobs_service_binding_check',
-    'jobs_shadow_only_check', 'jobs_source_locale_check', 'jobs_status_check',
-    'jobs_terminal_shape_check', 'jobs_time_check',
-    'jobs_version_identifiers_check'
-  ]::text[] then
+  if not (
+    array[
+      'jobs_admission_transport_check', 'jobs_attempt_count_check',
+      'jobs_contract_version_check', 'jobs_failure_reason_check',
+      'jobs_hashes_check', 'jobs_note_type_check',
+      'jobs_owner_idempotency_unique', 'jobs_owner_identity_unique',
+      'jobs_owner_user_id_fkey', 'jobs_payload_unique', 'jobs_pkey',
+      'jobs_privacy_owner_fk', 'jobs_privacy_policy_version_check',
+      'jobs_privacy_review_revision_check', 'jobs_rate_catalog_version_check',
+      'jobs_result_document_owner_fk', 'jobs_result_revision_owner_fk',
+      'jobs_schema_version_check', 'jobs_service_binding_check',
+      'jobs_shadow_only_check', 'jobs_source_locale_check', 'jobs_status_check',
+      'jobs_terminal_shape_check', 'jobs_time_check',
+      'jobs_version_identifiers_check'
+    ]::text[] <@ coalesce(v_actual, array[]::text[])
+  ) then
     raise exception 'durable generation constraint scope drifted: jobs';
   end if;
 
@@ -516,14 +666,16 @@ begin
     and relation.relkind = 'r'
     and relation.relname = 'attempts';
 
-  if v_actual is distinct from array[
-    'attempts_failure_reason_check', 'attempts_fence_shape_check',
-    'attempts_hashes_check', 'attempts_identity_binding_unique',
-    'attempts_job_number_unique', 'attempts_job_owner_fk',
-    'attempts_number_check', 'attempts_pkey', 'attempts_reason_status_check',
-    'attempts_shadow_only_check', 'attempts_status_check',
-    'attempts_terminal_shape_check', 'attempts_time_check'
-  ]::text[] then
+  if not (
+    array[
+      'attempts_failure_reason_check', 'attempts_fence_shape_check',
+      'attempts_hashes_check', 'attempts_identity_binding_unique',
+      'attempts_job_number_unique', 'attempts_job_owner_fk',
+      'attempts_number_check', 'attempts_pkey', 'attempts_reason_status_check',
+      'attempts_shadow_only_check', 'attempts_status_check',
+      'attempts_terminal_shape_check', 'attempts_time_check'
+    ]::text[] <@ coalesce(v_actual, array[]::text[])
+  ) then
     raise exception 'durable generation constraint scope drifted: attempts';
   end if;
 
@@ -533,17 +685,19 @@ begin
   join pg_class as index_relation on index_relation.oid = index_metadata.indexrelid
   where index_relation.relnamespace = v_schema;
 
-  if v_actual is distinct from array[
-    'attempts_identity_binding_unique', 'attempts_job_number_unique',
-    'attempts_job_owner_idx', 'attempts_one_running_per_job_idx',
-    'attempts_owner_created_idx', 'attempts_pkey',
-    'attempts_running_lease_expiry_idx', 'jobs_claim_order_idx',
-    'jobs_initiating_session_idx', 'jobs_owner_created_idx',
-    'jobs_owner_idempotency_unique', 'jobs_owner_identity_unique',
-    'jobs_payload_unique', 'jobs_pkey', 'jobs_privacy_owner_idx',
-    'jobs_result_document_owner_idx', 'jobs_result_revision_owner_idx',
-    'settings_pkey'
-  ]::text[] then
+  if not (
+    array[
+      'attempts_identity_binding_unique', 'attempts_job_number_unique',
+      'attempts_job_owner_idx', 'attempts_one_running_per_job_idx',
+      'attempts_owner_created_idx', 'attempts_pkey',
+      'attempts_running_lease_expiry_idx', 'jobs_claim_order_idx',
+      'jobs_initiating_session_idx', 'jobs_owner_created_idx',
+      'jobs_owner_idempotency_unique', 'jobs_owner_identity_unique',
+      'jobs_payload_unique', 'jobs_pkey', 'jobs_privacy_owner_idx',
+      'jobs_result_document_owner_idx', 'jobs_result_revision_owner_idx',
+      'settings_pkey'
+    ]::text[] <@ coalesce(v_actual, array[]::text[])
+  ) then
     raise exception 'durable generation index scope drifted';
   end if;
 
@@ -692,9 +846,25 @@ declare
   v_constraint text;
 begin
   begin
-    update careslink_v1_generation.attempts
-    set status = 'UNKNOWN'
-    where id = 'a6000000-0000-4000-8000-000000000001';
+    if exists (
+      select 1
+      from information_schema.columns
+      where table_schema = 'careslink_v1_generation'
+        and table_name = 'attempts'
+        and column_name = 'terminal_transaction_id'
+    ) then
+      execute $fixture$
+        update careslink_v1_generation.attempts
+        set status = 'UNKNOWN',
+            terminal_transaction_id =
+              'a7000000-0000-4000-8000-000000000001'::uuid
+        where id = 'a6000000-0000-4000-8000-000000000001'::uuid
+      $fixture$;
+    else
+      update careslink_v1_generation.attempts
+      set status = 'UNKNOWN'
+      where id = 'a6000000-0000-4000-8000-000000000001';
+    end if;
     raise exception 'invalid attempt state unexpectedly succeeded';
   exception when check_violation then
     get stacked diagnostics v_constraint = constraint_name;
@@ -764,6 +934,38 @@ begin
         v_constraint;
     end if;
   end;
+end
+$$;
+
+do $$
+begin
+  if to_regclass('careslink_v1_generation.worker_policies') is not null then
+    execute
+      'alter table careslink_v1_generation.worker_policies ' ||
+      'force row level security';
+    execute
+      'alter table careslink_v1_generation.provider_policies ' ||
+      'force row level security';
+    execute
+      'alter table careslink_v1_generation.payload_policies ' ||
+      'force row level security';
+
+    if (
+      select count(*)
+      from pg_class as relation
+      where relation.relnamespace =
+          'careslink_v1_generation'::regnamespace
+        and relation.relname in (
+          'worker_policies', 'provider_policies', 'payload_policies'
+        )
+        and relation.relkind = 'r'
+        and relation.relrowsecurity
+        and relation.relforcerowsecurity
+    ) <> 3 then
+      raise exception
+        'durable generation additive catalog FORCE cleanup failed';
+    end if;
+  end if;
 end
 $$;
 
