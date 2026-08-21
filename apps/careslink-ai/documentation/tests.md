@@ -1,6 +1,6 @@
 # CaresLink AI Test Evidence
 
-> Evidence date: 2026-08-14. This document separates **Existing**, **Proposed**, and **Gaps**. Passing current tests does not mean Product Baseline V1.0 is implemented.
+> Evidence date: 2026-08-21. This document separates **Existing**, **Proposed**, and **Gaps**. Passing current tests does not mean Product Baseline V1.0 is implemented.
 
 ## Existing
 
@@ -288,8 +288,9 @@ single-running-attempt failures. That temporary test access is restored before
 the final rollback and is not part of the migration. The former
 `information_schema` body ran on PostgreSQL 17 and rolled back at its constraint
 catalog check. The repaired `pg_constraint` revision subsequently passed as one
-rollback-only request on fresh `r3`; the TypeScript source test additionally
-locks exact index and foreign-key definitions.
+rollback-only request on fresh `r3` and again as part of the complete `r4`
+cross-domain gate; the TypeScript source test additionally locks exact index
+and foreign-key definitions.
 
 | Command | Result |
 |---|---|
@@ -302,15 +303,15 @@ locks exact index and foreign-key definitions.
 | focused ESLint and `git diff --check` | passed |
 
 This remains a schema-only foundation, not a durable database implementation.
-Its exact clean-apply plus dedicated rollback assertion passed on deleted `r3`,
-but the complete exact-revision cross-domain gate did not: the final Portal
-Referral rollback suite exposed an older revision fixture that no longer meets
-the current privacy-proof contract. There is no retained Preview, pgTAP run,
-function, RPC, payload metadata/grant, vault, purge outbox, worker registration,
-runtime flag, model call, Points call or Production migration apply. The next database
-phase must separately implement and prove those boundaries; this checkpoint
-does not prove `SKIP LOCKED`, live session/privacy checks or atomic canonical
-persistence.
+At exact HEAD `7f214429d9cdb3a2a6f16fd6b91d0bd9e67a038f`, deleted disposable `r4`
+passed the same 13-file clean-apply 13/13 plus the durable and all five adjacent
+rollback suites 6/6, including the repaired privacy-bound Portal Referral
+fixture. There is no retained Preview, pgTAP run, function, RPC, payload
+metadata/grant, vault, purge outbox, worker registration, runtime flag, model
+call, Points call or Production migration apply. The next database phase must
+separately implement and prove those boundaries; this checkpoint does not
+prove `SKIP LOCKED`, live session/privacy route E2E or atomic canonical
+persistence through a callable RPC.
 
 ### First durable-metadata disposable Preview attempt — 2026-08-21
 
@@ -393,19 +394,56 @@ the privacy proof/facts binding now required by the newer revision trigger; this
 is cross-migration fixture drift, not evidence that the durable assertion
 failed. No fixture or temporary privilege from that request persisted.
 
-The exact-revision cross-domain gate is therefore incomplete. The local Portal
-Referral repair now supplies a hash-bound confirmed proof and valid five-field
-Communication facts without weakening or bypassing the privacy trigger; its
-source contract passes, but this revision has not run against a database. The
-complete sequence must run again on a fresh disposable `r4`. The `r3` branch was
-deleted and its absence verified. Production was not used as the SQL target,
-and no deployment, runtime flag, capability or API/executor grant was added or
-enabled.
+At the end of the third attempt, the exact-revision cross-domain gate was
+therefore incomplete. The local Portal Referral repair then supplied a
+hash-bound confirmed proof and valid five-field Communication facts without
+weakening or bypassing the privacy trigger. The `r3` branch was deleted and its
+absence verified. Production was not used as the SQL target, and no deployment,
+runtime flag, capability or API/executor grant was added or enabled.
 
 Local validation of that repair passed the Portal migration contract (1 file /
 13 tests), the five adjacent migration-contract files (5 files / 64 tests), the
 full 121-file / 1,294-test suite, TypeScript, full lint and Next static
-generation 63/63. These are source gates, not a substitute for `r4`.
+generation 63/63. These source gates preceded the fourth attempt below.
+
+### Fourth durable-metadata disposable Preview attempt — 2026-08-21
+
+At exact HEAD `7f214429d9cdb3a2a6f16fd6b91d0bd9e67a038f`, a fresh PostgreSQL 17
+branch named `careslink-note-durable-preview-20260821-r4` was created as
+non-default, `persistent=false` and `with_data=false` from parent default
+`adocsnwnslxhxcjgbyee`. Its branch id was
+`ecb8213c-f7fc-4dbd-96a9-db5cfb01d28b` and its project ref was
+`czqdjqdjghmmzukstprt`. The same reviewed 13-file source manifest applied in
+order 13/13.
+
+The durable rollback assertion and all five adjacent rollback suites then
+passed 6/6: V1 shadow, NDIS integration, mobile sync, privacy review and the
+now privacy-bound Portal Referral fixture. The Portal suite passed the current
+privacy trigger; it was not bypassed or weakened.
+
+Post-rollback inspection passed the recorded zero-row matrix across
+Auth/session, legacy, canonical, sync/NDIS, Points/migration, Portal, generation
+and assertion fixtures while retaining only the expected forced-off
+seed/catalog rows. Both generation roles remained non-login and non-privileged
+with only the expected PostgreSQL 16+ admin-only creator edges. All three
+generation tables remained RLS-enabled and RLS-forced. The private generation
+schema had zero policies, functions, views, non-internal triggers and
+API/executor privilege leaks. The generation, Portal and mobile-sync capability
+rows remained disabled and shadow-only; no runtime flag was enabled.
+
+Generation-scope security and performance advisors reported exactly three
+informational `rls_enabled_no_policy` findings and seven informational unused-
+index findings, with zero warning/error. These are expected for the deliberate
+fail-closed, zero-row schema and are not runtime-usage evidence.
+
+The exact `r4` branch was deleted after verification. A subsequent branch list
+contained neither id `ecb8213c-f7fc-4dbd-96a9-db5cfb01d28b` nor ref
+`czqdjqdjghmmzukstprt`; parent default `adocsnwnslxhxcjgbyee` still existed.
+Production was never the SQL target, and there was no Production action,
+migration, deployment, capability/flag change or grant. This fourth attempt
+closes only the exact schema/cross-domain assertion gate. It does not make any
+RPC, worker, provider/model/STT integration, Points settlement or user flow
+available.
 
 ### Mobile V1 protected Product API Preview E2E — 2026-08-14
 
@@ -570,7 +608,7 @@ This does not prove a live, data-bearing cross-migration upgrade. The `202608100
 | Canonical document shadow | `src/lib/v1/canonical-document-shadow.test.ts` | owner deny, immutable revision sequence, stale base, full-request idempotency, checkpoint, self-review invalidation and tombstone/purge domain rules |
 | Points shadow | `src/lib/v1/points-shadow.test.ts` | lot ordering/expiry, quote boundaries, reserve/commit/release, replay, insufficient balance and cross-owner deny in memory |
 | Legacy NDIS projection | `src/lib/v1/legacy-ndis-adapter.test.ts` | deterministic read-only projection, no approval upgrade, no invented facts and metadata-only migration candidate |
-| Production-unapplied SQL boundary | `src/lib/v1/v1-shadow-migration-contract.test.ts`, `mobile-sync-migration-contract.test.ts`, isolated historical guarded-live evidence | additive/no legacy DML, owner isolation and explicit grants are source-checked; the exact mobile-sync assertion passed on deleted `r3`, while the complete current cross-domain gate remains open because the later Portal Referral assertion fixture rolled back |
+| Production-unapplied SQL boundary | `src/lib/v1/v1-shadow-migration-contract.test.ts`, `mobile-sync-migration-contract.test.ts`, isolated historical guarded-live evidence | additive/no legacy DML, owner isolation and explicit grants are source-checked; at HEAD `7f214429d9cdb3a2a6f16fd6b91d0bd9e67a038f`, deleted disposable `r4` passed the same 13-file manifest 13/13 and all six rollback suites, including mobile sync and the repaired privacy-bound Portal Referral fixture. This is schema/assertion evidence only; writes remain withheld |
 | Runtime isolation | `src/lib/v1/runtime-boundary.test.ts` | audited NDIS routes and the new `/v1` adapter are the only allowed server boundaries; `/v1` remains disabled without explicit adapters |
 
 ### Current live/read-only evidence
@@ -641,7 +679,7 @@ The following suites are required before the corresponding V1 slice can be calle
 
 1. The native App exists in a separate repository and is outside this task; this AI repository does not execute or attest its iOS/Android, offline, purchase or store gates.
 2. The OpenAPI/TypeScript contract and default-off durable `/v1` route adapter now exist, but there is no Preview- or Production-served Product API, generated client package, schema registry or previous-version compatibility fixture.
-3. The current worktree passes 1,294 tests across 121 files (with 120 / 1,284, 119 / 1,236, 118 / 1,193, 115 / 1,089, 114 / 1,051, 112 / 983, 107 / 938, 104 / 894 and 103 / 831 retained as prior source-level batches and 90 / 653 as the historical baseline). All five Note types share a source-only generation/output/job foundation plus default-off durable, worker-policy, provider-evidence, payload-lifecycle, registered-worker and strict database/vault adapter contracts and a Production-unapplied schema-only metadata migration. The PG17-safe durable assertion passed on deleted `r3`; the local Portal Referral fixture repair passes its source contract, but the complete database gate still needs fresh `r4`. The five types still lack an implemented database repository/RPC layer, deployed worker, real provider/STT integration and complete per-type input/output/privacy/semantic golden sets.
+3. The current worktree passes 1,294 tests across 121 files (with 120 / 1,284, 119 / 1,236, 118 / 1,193, 115 / 1,089, 114 / 1,051, 112 / 983, 107 / 938, 104 / 894 and 103 / 831 retained as prior source-level batches and 90 / 653 as the historical baseline). All five Note types share a source-only generation/output/job foundation plus default-off durable, worker-policy, provider-evidence, payload-lifecycle, registered-worker and strict database/vault adapter contracts and a Production-unapplied schema-only metadata migration. Deleted PostgreSQL 17 disposable `r4` passed the exact 13-file clean-apply and all six durable/adjacent rollback suites, closing the schema/cross-domain assertion gate. The five types still lack an implemented database repository/RPC layer, deployed worker, real provider/STT integration and complete per-type input/output/privacy/semantic golden sets.
 4. Canonical document/revision/checkpoint states exist as memory/domain contracts plus historical isolated schema/RPC evidence and a Production-unapplied mobile-sync migration draft that was clean-applied only on a deleted disposable branch; there is no retained schema activation, editor, renderer or cross-device recovery E2E.
 5. Points lots/rates/reservations passed isolated serial database tests but remain shadow-only. There is no runtime entitlement integration, welcome eligibility decision, concurrent reservation proof or legacy-credit conversion/reconciliation test.
 6. No payment provider sandbox, webhook replay, refund or reconciliation harness exists.

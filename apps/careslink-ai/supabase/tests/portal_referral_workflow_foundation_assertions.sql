@@ -1,7 +1,9 @@
 -- Manual rollback-only assertions for a fresh disposable Preview database.
 -- The prior fixture revision ran on the deleted r3 Preview and rolled back when
 -- the current privacy trigger rejected its pre-privacy empty revision fixture.
--- This privacy-bound revision has not yet been rerun on a fresh Preview.
+-- This privacy-bound revision passed on the deleted r4 Preview and reached the
+-- final ROLLBACK without disabling or bypassing the privacy trigger. Production
+-- was not a SQL target.
 -- It must be run only after a clean apply of the exact migration revision.
 
 begin;

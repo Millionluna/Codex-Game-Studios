@@ -400,6 +400,11 @@ describe("Portal referral workflow migration contract", () => {
       "prior fixture revision ran on the deleted r3 Preview",
     );
     expect(assertions).toContain(
+      "privacy-bound revision passed on the deleted r4 Preview",
+    );
+    expect(assertions).toContain("Production");
+    expect(assertions).toContain("was not a SQL target");
+    expect(assertions).not.toContain(
       "privacy-bound revision has not yet been rerun on a fresh Preview",
     );
     expect(assertions).toContain("begin;");

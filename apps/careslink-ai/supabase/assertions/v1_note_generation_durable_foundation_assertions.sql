@@ -2,7 +2,12 @@
 -- This file is not executed by pnpm test. A 2026-08-21 PostgreSQL 17 r2 run
 -- reached the constraint-catalog check and rolled back after
 -- information_schema exposed generated NOT NULL constraint names.
--- This pg_constraint-based revision has not yet been rerun on a fresh Preview.
+-- This pg_constraint-based revision passed as one rollback-only request on the
+-- deleted PostgreSQL 17 r3 and r4 Previews. The r4 gate also passed all five
+-- adjacent assertion suites and post-rollback zero-fixture checks.
+-- Production was not a SQL target.
+-- This remains metadata-schema evidence only; it does not prove or enable a
+-- live worker, payload vault or canonical persistence RPC.
 -- Run it only after a clean apply of the exact migration revision. It verifies
 -- the metadata schema foundation and does not prove SKIP LOCKED, worker RPCs or atomic canonical persistence.
 -- Invoke it explicitly with psql; it intentionally lives outside

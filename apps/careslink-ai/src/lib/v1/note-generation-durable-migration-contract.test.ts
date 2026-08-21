@@ -409,6 +409,11 @@ describe("V1 Note durable generation foundation migration contract", () => {
       "information_schema exposed generated NOT NULL constraint names",
     );
     expect(assertions).toContain(
+      "This pg_constraint-based revision passed as one rollback-only request on the",
+    );
+    expect(assertions).toContain("deleted PostgreSQL 17 r3 and r4 Previews");
+    expect(assertions).toContain("Production was not a SQL target");
+    expect(assertions).not.toContain(
       "This pg_constraint-based revision has not yet been rerun on a fresh Preview",
     );
     expect(assertions).not.toContain("has not been run against a database");

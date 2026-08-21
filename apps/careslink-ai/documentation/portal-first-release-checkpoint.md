@@ -1,6 +1,6 @@
 # Portal-first release checkpoint
 
-Date: 2026-08-20
+Date: 2026-08-21
 
 Branch: `codex/careslink-ai-mobile-sync-v1`
 Base HEAD inspected: `fe5b708c488853418bfec3822369429e8fe9ff8f`
@@ -11,13 +11,15 @@ Current durable generation local batch base: `4bf34ee0955a958c64e6865faa8bde2f2d
 
 Current registered-worker adapter local batch base: `ec30b9342164d893f096cc0942b09d64fd457a73`
 
+Current disposable database assertion gate HEAD: `7f214429d9cdb3a2a6f16fd6b91d0bd9e67a038f`
+
 This checkpoint covers the AI Web Portal reality audit, release sequencing,
 local Referral foundation and source-only five-Note generation contracts. It
 does not modify the native App, Main Website, Native Auth/M0 implementation or
 served shared Product API routes. Those are prerequisites recorded in the
 existing versioned contract documentation. All new Referral and Note
 generation capabilities remain local, default-off, Production-unapplied and
-absent from retained Preview runtime. Three disposable Preview databases were
+absent from retained Preview runtime. Four disposable Preview databases were
 used only for the isolated migration/assertion gates recorded below and then
 deleted; no Preview application deployment or Production database was used as
 the SQL target.
@@ -252,8 +254,9 @@ Referral foundation included in this batch:
   access removal, multi-follow-up, role/provider eligibility, contact-summary
   rejection, frozen Preview catalog codes, sequential competing-decision
   rejection and failure rollback tests;
-- Production-unapplied Portal referral foundation migration, clean-applied only
-  on a deleted disposable Preview, with RLS and all writes withheld;
+- Production-unapplied Portal referral foundation migration, clean-applied and
+  assertion-tested only on deleted disposable Previews, with RLS and all writes
+  withheld;
 - rollback-only SQL assertions for A/B, contact visibility, revoked session and
   direct-write denial.
 
@@ -269,8 +272,11 @@ Formal local gates passed:
 
 The original Portal assertion revision ran on deleted disposable `r3` and
 rolled back when its pre-privacy canonical revision fixture hit the current
-privacy trigger. The privacy-bound local repair below has not yet run; a fresh
-disposable `r4` remains required before this SQL gate can pass.
+privacy trigger. At exact HEAD `7f214429d9cdb3a2a6f16fd6b91d0bd9e67a038f`,
+the privacy-bound repair passed that trigger on fresh deleted disposable `r4`
+as part of the complete six-suite cross-domain assertion gate. This closes the
+Portal schema/assertion gate only; it does not provide callable state-changing
+RPCs or enable the Portal workflow.
 
 ## 7. Disposable Preview entry criteria
 
@@ -317,11 +323,12 @@ pre-database slice:
   database-identity boundary.
 
 Local evidence at this checkpoint is 7 focused files / 73 tests, full 112 files
-/ 983 tests, TypeScript, ESLint and Next static generation 63/63. The migration
-and transactional SQL assertions remain unexecuted. The memory arbitration test
-does not prove Postgres row-lock behavior. No Preview URL can be handed to the
-App or Main Website until the entry criteria above pass on one exact disposable
-Preview revision.
+/ 983 tests, TypeScript, ESLint and Next static generation 63/63. The exact
+Portal migration and privacy-bound transactional assertion later passed on
+deleted disposable `r4`, but the route/page slice still has no database adapter
+or callable mutation RPC. The memory arbitration test does not prove Postgres
+row-lock behavior. No Preview URL can be handed to the App or Main Website until
+the remaining entry criteria above pass for a served exact revision.
 
 ## 9. Five-Note source/offline generation foundation — 2026-08-20
 
@@ -525,10 +532,11 @@ races, canonical atomicity and purge behavior.
 The official Supabase CLI workflow was reverified and CLI 2.115.0 generated
 `20260820135834_add_v1_note_generation_durable_shadow.sql`; no timestamp was
 invented. This is the first database-shaped layer for the five shared Note
-types, but it remains inert and Production-unapplied. A second disposable
-Preview clean-applied the complete 13-file source manifest, while the
-rollback-only assertion exposed a PostgreSQL 17 catalog-compatibility bug and
-rolled back. The complete Preview gate has not passed.
+types, but it remains inert and Production-unapplied. The first three disposable
+attempts exposed and safely isolated one hosted-role issue, one PostgreSQL 17
+catalog-assertion issue and one stale Portal privacy fixture. The fourth
+disposable attempt passed the exact schema/cross-domain assertion gate. The
+broader served Preview and activation gates have not passed.
 
 The migration creates dedicated owner/executor roles with `NOLOGIN`,
 `NOSUPERUSER` and `NOBYPASSRLS`, the private
@@ -595,16 +603,42 @@ generation-schema warning/error: only the expected informational RLS-with-no-
 policy and zero-row unused-index findings remained.
 
 The first four adjacent rollback suites—V1 shadow, NDIS integration, mobile
-sync and privacy review—also passed. The fifth, Portal Referral, failed with
-`VALIDATION_ERROR` because its older canonical-revision fixture lacks the
-current privacy proof/facts binding; its transaction rolled back. Therefore the
-durable metadata foundation's isolated `r3` gate passed, but the complete exact-
-revision cross-domain gate did not. The privacy-bound fixture repair now exists
-locally and passes its source contract without weakening the trigger, but has
-not run against a database. A
-fresh disposable `r4` must run the complete sequence. The `r3` branch was
-deleted and its absence verified. Production was not used as the SQL target,
-and no deployment, runtime flag or API/executor grant was added or enabled.
+sync and privacy review—also passed on `r3`. The fifth, Portal Referral, failed
+with `VALIDATION_ERROR` because its older canonical-revision fixture lacked the
+current privacy proof/facts binding; its transaction rolled back. Thus the
+complete cross-domain gate was still open at the end of the third attempt. The
+`r3` branch was deleted and its absence verified. Production was not used as
+the SQL target, and no deployment, runtime flag or API/executor grant was added
+or enabled.
+
+### Fourth disposable Preview attempt (`r4`)
+
+At exact HEAD `7f214429d9cdb3a2a6f16fd6b91d0bd9e67a038f`, fresh branch
+`careslink-note-durable-preview-20260821-r4` was non-default,
+`persistent=false`, `with_data=false` and PostgreSQL 17, with parent default
+`adocsnwnslxhxcjgbyee`. Its id was
+`ecb8213c-f7fc-4dbd-96a9-db5cfb01d28b` and its project ref was
+`czqdjqdjghmmzukstprt`. The same 13-file manifest clean-applied 13/13. The
+durable assertion and all five adjacent suites then passed 6/6, including the
+privacy-bound Portal Referral fixture against the current trigger.
+
+Post-rollback checks passed the recorded zero-row matrix across Auth/session,
+legacy, canonical, sync/NDIS, Points/migration, Portal, generation and assertion
+fixtures while retaining only expected forced-off seed/catalog rows. Both
+generation roles retained the reviewed non-login, non-privileged topology; all
+three generation tables retained RLS plus FORCE RLS; the private schema had zero
+policies, functions, views, non-internal triggers and API/executor privilege
+leaks. Generation, Portal and mobile-sync flags remained disabled and
+shadow-only. Generation-scope advisors reported exactly three informational
+no-policy and seven informational unused-index findings, with zero
+warning/error.
+
+The exact `r4` branch was deleted. Subsequent branch listing contained neither
+its id nor ref, while parent default `adocsnwnslxhxcjgbyee` still existed.
+Production was not the SQL target, and no Production action, migration,
+deployment, capability/flag change or grant occurred. This closes only the
+schema/cross-domain assertion gate; it does not implement or enable an RPC,
+worker, model/STT call, Points settlement or user flow.
 
 There is still no payload metadata/grant, vault/KMS/retention decision, purge
 outbox, provider-evidence detail store, transaction-clock scheduler,

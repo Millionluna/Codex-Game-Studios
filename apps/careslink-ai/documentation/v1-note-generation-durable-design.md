@@ -1,10 +1,11 @@
 # V1 Note generation durable design handoff
 
 > Status: source-only, default-off design plus a Production-unapplied
-> schema-only migration foundation that clean-applied only on a deleted
-> disposable Preview. This document records the next database and worker
-> boundary; it does not claim that a durable repository, worker, route, RPC,
-> Preview capability, model call or Production capability exists.
+> schema-only migration foundation whose exact schema/cross-domain assertion
+> gate passed only on deleted disposable `r4`. This document records the next
+> database and worker boundary; it does not claim that a durable repository,
+> worker, route, RPC, Preview capability, model call or Production capability
+> exists.
 
 ## 1. Scope and non-goals
 
@@ -462,17 +463,44 @@ triggers and API/executor privilege leaks. The security and performance advisor
 review had no generation warning/error; only the expected informational
 RLS-with-no-policy and zero-row unused-index findings remained.
 
-Four adjacent rollback suites then passed: V1 shadow, NDIS integration, mobile
-sync and privacy review. The Portal Referral rollback suite failed with
-`VALIDATION_ERROR` because its older canonical-revision fixture lacks the
+Four adjacent rollback suites then passed on `r3`: V1 shadow, NDIS integration,
+mobile sync and privacy review. The Portal Referral rollback suite failed with
+`VALIDATION_ERROR` because its older canonical-revision fixture lacked the
 privacy proof/facts binding required by the newer trigger; its transaction
-rolled back. The isolated durable-metadata gate therefore passed, but the
-complete exact-revision cross-domain gate remains incomplete. The local
-privacy-bound fixture repair now passes its source contract without weakening
-that trigger, but has not run against a database; the sequence must be repeated
-on a fresh disposable `r4`. The `r3` branch was deleted and its absence was
-verified. Production was not used as the SQL target, and no deployment, runtime
-flag, capability or API/executor grant was added or enabled.
+rolled back. The complete exact-revision cross-domain gate was therefore still
+incomplete at the end of the third attempt. The `r3` branch was deleted and its
+absence was verified. Production was not used as the SQL target, and no
+deployment, runtime flag, capability or API/executor grant was added or enabled.
+
+### Fourth disposable Preview result
+
+At exact HEAD `7f214429d9cdb3a2a6f16fd6b91d0bd9e67a038f`, fresh PostgreSQL 17
+branch `careslink-note-durable-preview-20260821-r4` was non-default,
+`persistent=false` and `with_data=false`, with parent default
+`adocsnwnslxhxcjgbyee`. Its id was
+`ecb8213c-f7fc-4dbd-96a9-db5cfb01d28b` and project ref was
+`czqdjqdjghmmzukstprt`. The same reviewed 13-file source manifest applied 13/13.
+The durable assertion and all five adjacent suites passed 6/6, including the
+repaired privacy-bound Portal Referral fixture against the current trigger.
+
+Post-rollback checks passed the recorded zero-row matrix across Auth/session,
+legacy, canonical, sync/NDIS, Points/migration, Portal, generation and assertion
+fixtures; only the expected forced-off seed/catalog rows remained. Both
+generation roles retained the reviewed non-login, non-privileged topology, all
+three tables retained RLS plus FORCE RLS, and the private schema retained zero
+policies, functions, views, non-internal triggers and API/executor privilege
+leaks. Generation, Portal and mobile-sync flags remained disabled and
+shadow-only. Generation-scope advisors returned exactly three informational
+no-policy and seven informational unused-index findings, with zero
+warning/error.
+
+The exact `r4` branch was deleted; subsequent branch listing contained neither
+its id nor ref, while parent default `adocsnwnslxhxcjgbyee` still existed.
+Production was not the SQL target, and no Production action, migration,
+deployment, flag/capability change or grant occurred. This result proves only
+the exact schema/cross-domain assertion gate. It does not implement or enable a
+callable RPC, durable worker, model/STT integration, Points settlement or user
+flow.
 
 The source-only registered-worker database adapter may validate a composite
 atomic acknowledgement, but that acknowledgement is not proof that a database
