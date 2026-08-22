@@ -927,6 +927,17 @@ describe("V1 Note registered-worker RPC shadow migration contract", () => {
     expect(assertions).toContain("transaction-only TEST_ONLY fixtures");
     expect(assertions).toContain("pg_get_function_identity_arguments");
     expect(assertions).toContain("aclexplode(");
+    expect(
+      assertions.match(
+        /case\s+when acl\.grantee = 0 then 'PUBLIC'::text\s+else grantee\.rolname::text\s+end/g,
+      ),
+    ).toHaveLength(2);
+    expect(assertions).toContain(
+      "is distinct from array['careslink_v1_generation_executor']::text[]",
+    );
+    expect(assertions).not.toMatch(
+      /case\s+when acl\.grantee = 0 then 'PUBLIC'\s+else grantee\.rolname\s+end/,
+    );
     expect(assertions).toContain("procedure.proconfig is null");
     expect(assertions).toContain("procedure.proconfig[1] is null");
     expect(assertions).not.toMatch(

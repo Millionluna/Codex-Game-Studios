@@ -221,9 +221,15 @@ begin
       and procedure.proname = any(v_rpc_names)
       and (
         select array_agg(
-          case when acl.grantee = 0 then 'PUBLIC' else grantee.rolname end
+          case
+            when acl.grantee = 0 then 'PUBLIC'::text
+            else grantee.rolname::text
+          end
           order by
-            case when acl.grantee = 0 then 'PUBLIC' else grantee.rolname end
+            case
+              when acl.grantee = 0 then 'PUBLIC'::text
+              else grantee.rolname::text
+            end
         )
         from aclexplode(
           coalesce(procedure.proacl, acldefault('f', procedure.proowner))
