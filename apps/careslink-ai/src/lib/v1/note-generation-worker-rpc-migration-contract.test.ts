@@ -833,6 +833,52 @@ describe("V1 Note registered-worker RPC shadow migration contract", () => {
     );
   });
 
+  it("precomputes the owner fixture lease digest before entering the restricted owner role", () => {
+    const bootstrapReset = assertions.indexOf("reset role;");
+    const digestSetting = assertions.indexOf(
+      "'careslink.assert.expired_lease_hash'",
+      bootstrapReset,
+    );
+    const fixtureOwnerSet = assertions.indexOf(
+      `set local role ${ownerRole};`,
+      bootstrapReset,
+    );
+    const fixtureOwnerReset = assertions.indexOf(
+      "reset role;",
+      fixtureOwnerSet,
+    );
+
+    expect(bootstrapReset).toBeGreaterThanOrEqual(0);
+    expect(digestSetting).toBeGreaterThan(bootstrapReset);
+    expect(fixtureOwnerSet).toBeGreaterThan(digestSetting);
+    expect(fixtureOwnerReset).toBeGreaterThan(fixtureOwnerSet);
+
+    const bootstrapDigest = assertions.slice(bootstrapReset, fixtureOwnerSet);
+    expect(bootstrapDigest).toContain(
+      "extensions.digest(convert_to('test-only-expired-lease', 'UTF8'), 'sha256')",
+    );
+    expect(bootstrapDigest).toContain(
+      "select set_config(\n  'careslink.assert.expired_lease_hash'",
+    );
+
+    const ownerFixtures = assertions.slice(fixtureOwnerSet, fixtureOwnerReset);
+    expect(ownerFixtures).toContain(
+      "current_setting('careslink.assert.expired_lease_hash')",
+    );
+    expect(ownerFixtures).not.toContain("extensions.");
+    expect(ownerFixtures).not.toContain("public.v1_shadow_content_sha256");
+
+    expect(normalizeSql(migration)).toContain(
+      `grant usage on schema public, extensions to ${executorRole};`,
+    );
+    expect(normalizeSql(migration)).toContain(
+      `grant execute on function extensions.digest(bytea, text) to ${executorRole};`,
+    );
+    expect(normalizeSql(migration)).toContain(
+      `grant execute on function public.v1_shadow_content_sha256(jsonb) to ${executorRole};`,
+    );
+  });
+
   it("validates the deferred job-payload cycle before restoring FORCE RLS", () => {
     const jobsInsert = assertions.indexOf(
       `insert into ${schemaName}.jobs (`,

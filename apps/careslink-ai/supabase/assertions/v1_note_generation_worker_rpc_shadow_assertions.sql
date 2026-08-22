@@ -389,6 +389,19 @@ select set_config(
   true
 );
 
+-- Precompute the fixed assertion-only lease digest while still running as the
+-- bootstrap actor. The restricted owner intentionally has no extensions
+-- schema privilege and receives only this irreversible, transaction-local
+-- fixture value.
+select set_config(
+  'careslink.assert.expired_lease_hash',
+  encode(
+    extensions.digest(convert_to('test-only-expired-lease', 'UTF8'), 'sha256'),
+    'hex'
+  ),
+  true
+);
+
 select set_config(
   'careslink.assert.worker_policy_digest',
   public.v1_shadow_content_sha256(
@@ -1242,10 +1255,7 @@ insert into careslink_v1_generation.attempts (
   'RUNNING',
   current_setting('careslink.assert.worker_identity_hash'),
   current_setting('careslink.assert.registration_digest'),
-  encode(
-    extensions.digest(convert_to('test-only-expired-lease', 'UTF8'), 'sha256'),
-    'hex'
-  ),
+  current_setting('careslink.assert.expired_lease_hash'),
   date_trunc('milliseconds', transaction_timestamp()) - interval '15 seconds',
   date_trunc('milliseconds', transaction_timestamp()) - interval '15 seconds',
   date_trunc('milliseconds', transaction_timestamp()) - interval '5 seconds',
