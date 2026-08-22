@@ -8,7 +8,21 @@ begin;
 do $$
 declare
   v_count integer;
+  v_worker_policy_table_present boolean :=
+    to_regclass('careslink_v1_generation.worker_policies') is not null;
+  v_worker_claim_rpc_present boolean :=
+    to_regprocedure(
+      'careslink_v1_generation.claim_v1_shadow_note_generation_job(text,text,text,text,text,text)'
+    ) is not null;
+  v_worker_extension_present boolean;
 begin
+  if v_worker_policy_table_present is distinct from
+    v_worker_claim_rpc_present
+  then
+    raise exception 'Partial worker extension detected';
+  end if;
+  v_worker_extension_present := v_worker_policy_table_present;
+
   select count(*) into v_count
   from pg_class
   where relnamespace = 'public'::regnamespace
@@ -90,7 +104,137 @@ begin
       'ndis_shadow_document_links', 'ndis_shadow_write_outbox',
       'ndis_shadow_read_comparisons'
     );
-  if v_count <> 14 then
+
+  if exists (
+    with expected_owner_policies(policyname, tablename, roles) as (
+      values
+        (
+          'ai_documents_owner_select'::name,
+          'ai_documents'::name,
+          array['authenticated']::name[]
+        ),
+        (
+          'privacy_reviews_owner_select'::name,
+          'privacy_reviews'::name,
+          array['authenticated']::name[]
+        ),
+        (
+          'ai_document_revisions_owner_select'::name,
+          'ai_document_revisions'::name,
+          array['authenticated']::name[]
+        ),
+        (
+          'document_checkpoints_owner_select'::name,
+          'document_checkpoints'::name,
+          array['authenticated']::name[]
+        ),
+        (
+          'self_review_events_owner_select'::name,
+          'self_review_events'::name,
+          array['authenticated']::name[]
+        ),
+        (
+          'generation_jobs_owner_select'::name,
+          'generation_jobs'::name,
+          array['authenticated']::name[]
+        ),
+        (
+          'export_jobs_owner_select'::name,
+          'export_jobs'::name,
+          array['authenticated']::name[]
+        ),
+        (
+          'export_events_owner_select'::name,
+          'export_events'::name,
+          array['authenticated']::name[]
+        ),
+        (
+          'point_wallets_owner_select'::name,
+          'point_wallets'::name,
+          array['authenticated']::name[]
+        ),
+        (
+          'point_lots_owner_select'::name,
+          'point_lots'::name,
+          array['authenticated']::name[]
+        ),
+        (
+          'point_quotes_owner_select'::name,
+          'point_quotes'::name,
+          array['authenticated']::name[]
+        ),
+        (
+          'point_reservations_owner_select'::name,
+          'point_reservations'::name,
+          array['authenticated']::name[]
+        ),
+        (
+          'point_reservation_allocations_owner_select'::name,
+          'point_reservation_allocations'::name,
+          array['authenticated']::name[]
+        ),
+        (
+          'point_ledger_entries_owner_select'::name,
+          'point_ledger_entries'::name,
+          array['authenticated']::name[]
+        )
+    ),
+    actual_owner_policies as (
+      select policyname, tablename, roles
+      from pg_policies
+      where schemaname = 'public'
+        and cmd = 'SELECT'
+        and roles = array['authenticated']::name[]
+        and tablename in (
+          'ai_documents', 'privacy_reviews', 'ai_document_revisions',
+          'document_checkpoints', 'self_review_events', 'generation_jobs',
+          'export_jobs', 'export_events', 'point_wallets', 'point_lots',
+          'point_quotes', 'point_reservations',
+          'point_reservation_allocations', 'point_ledger_entries',
+          'ndis_shadow_document_links', 'ndis_shadow_write_outbox',
+          'ndis_shadow_read_comparisons'
+        )
+    ),
+    missing_owner_policies as (
+      select * from expected_owner_policies
+      except
+      select * from actual_owner_policies
+    ),
+    unexpected_owner_policies as (
+      select * from actual_owner_policies
+      except
+      select * from expected_owner_policies
+    )
+    select 1 from missing_owner_policies
+    union all
+    select 1 from unexpected_owner_policies
+  ) then
+    raise exception 'Owner SELECT policy identity/table/role set is invalid';
+  end if;
+
+  if v_worker_extension_present then
+    if v_count <> 16 then
+      raise exception 'Expected 14 owner and 2 worker SELECT policies, found %',
+        v_count;
+    end if;
+
+    select count(*) into v_count
+    from pg_policies
+    where schemaname = 'public'
+      and cmd = 'SELECT'
+      and roles = array['careslink_v1_generation_executor']::name[]
+      and (policyname, tablename) in (
+        values
+          ('ai_documents_generation_executor_select', 'ai_documents'),
+          (
+            'ai_document_revisions_generation_executor_select',
+            'ai_document_revisions'
+          )
+      );
+    if v_count <> 2 then
+      raise exception 'Worker canonical SELECT policy identities are invalid';
+    end if;
+  elsif v_count <> 14 then
     raise exception 'Expected 14 owner SELECT policies, found %', v_count;
   end if;
 
