@@ -720,6 +720,12 @@ begin
 end
 $$;
 
+-- The additive worker layer introduces a deferred jobs/payload cycle. Keep the
+-- foundation-only job/attempt fixtures below inside a savepoint, then remove
+-- their pending constraint-trigger events before restoring FORCE RLS. The
+-- worker RPC assertion owns the complete job/payload transaction proof.
+savepoint durable_generation_job_attempt_fixtures;
+
 insert into careslink_v1_generation.jobs (
   id, owner_user_id, initiating_session_id, admission_transport, payload_id,
   note_type, source_locale, service_code, rate_catalog_version,
@@ -936,6 +942,9 @@ begin
   end;
 end
 $$;
+
+rollback to savepoint durable_generation_job_attempt_fixtures;
+release savepoint durable_generation_job_attempt_fixtures;
 
 do $$
 begin

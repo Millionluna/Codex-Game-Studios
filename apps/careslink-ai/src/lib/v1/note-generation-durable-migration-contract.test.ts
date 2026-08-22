@@ -536,6 +536,52 @@ describe("V1 Note durable generation foundation migration contract", () => {
         /^alter table careslink_v1_generation\.(?:settings|jobs|attempts) force row level security;$/gm,
       ),
     ).toHaveLength(3);
+
+    const fixtureSavepoint = assertions.indexOf(
+      "savepoint durable_generation_job_attempt_fixtures;",
+    );
+    const jobFixture = assertions.indexOf(
+      "insert into careslink_v1_generation.jobs (",
+      fixtureSavepoint,
+    );
+    const attemptFixture = assertions.indexOf(
+      "insert into careslink_v1_generation.attempts (",
+      jobFixture,
+    );
+    const fixtureProofEnd = assertions.indexOf(
+      "multiple RUNNING attempts unexpectedly succeeded",
+      attemptFixture,
+    );
+    const fixtureRollback = assertions.indexOf(
+      "rollback to savepoint durable_generation_job_attempt_fixtures;",
+      fixtureProofEnd,
+    );
+    const fixtureRelease = assertions.indexOf(
+      "release savepoint durable_generation_job_attempt_fixtures;",
+      fixtureRollback,
+    );
+    const firstForceRestore = assertions.indexOf(
+      "'alter table careslink_v1_generation.worker_policies ' ||\n      'force row level security'",
+      fixtureRelease,
+    );
+    const jobsForceRestore = assertions.indexOf(
+      "alter table careslink_v1_generation.jobs force row level security;",
+      fixtureRelease,
+    );
+    expect(fixtureSavepoint).toBeGreaterThanOrEqual(0);
+    expect(jobFixture).toBeGreaterThan(fixtureSavepoint);
+    expect(attemptFixture).toBeGreaterThan(jobFixture);
+    expect(fixtureProofEnd).toBeGreaterThan(attemptFixture);
+    expect(fixtureRollback).toBeGreaterThan(fixtureProofEnd);
+    expect(fixtureRelease).toBeGreaterThan(fixtureRollback);
+    expect(firstForceRestore).toBeGreaterThan(fixtureRelease);
+    expect(jobsForceRestore).toBeGreaterThan(firstForceRestore);
+    expect(assertions.slice(jobFixture, fixtureRollback)).not.toMatch(
+      /\balter\s+table\b/i,
+    );
+    expect(assertions).toContain(
+      "remove\n-- their pending constraint-trigger events before restoring FORCE RLS",
+    );
     expect(assertions).toContain("reset role;");
     expect(normalizeSql(assertions)).toContain(
       "revoke careslink_v1_generation_owner from current_user granted by current_user;",

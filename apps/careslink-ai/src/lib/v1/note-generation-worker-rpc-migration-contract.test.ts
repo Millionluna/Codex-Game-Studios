@@ -833,6 +833,47 @@ describe("V1 Note registered-worker RPC shadow migration contract", () => {
     );
   });
 
+  it("validates the deferred job-payload cycle before restoring FORCE RLS", () => {
+    const jobsInsert = assertions.indexOf(
+      `insert into ${schemaName}.jobs (`,
+    );
+    const payloadsInsert = assertions.indexOf(
+      `insert into ${schemaName}.payloads (`,
+      jobsInsert,
+    );
+    const attemptsInsert = assertions.indexOf(
+      `insert into ${schemaName}.attempts (`,
+      payloadsInsert,
+    );
+    const constraintValidation = assertions.indexOf(
+      "set constraints all immediate;",
+      payloadsInsert,
+    );
+    const firstForceRestore = assertions.indexOf(
+      `alter table ${schemaName}.settings force row level security;`,
+      constraintValidation,
+    );
+
+    expect(jobsInsert).toBeGreaterThanOrEqual(0);
+    expect(payloadsInsert).toBeGreaterThan(jobsInsert);
+    expect(attemptsInsert).toBeGreaterThan(payloadsInsert);
+    expect(constraintValidation).toBeGreaterThan(attemptsInsert);
+    expect(firstForceRestore).toBeGreaterThan(constraintValidation);
+    expect(
+      assertions.match(/^set constraints all immediate;$/gim),
+    ).toHaveLength(1);
+    expect(
+      assertions.slice(constraintValidation, firstForceRestore),
+    ).not.toMatch(
+      /insert\s+into\s+careslink_v1_generation\.(?:jobs|payloads)\b/i,
+    );
+    expect(assertions).not.toMatch(/^set constraints .+ deferred;$/gim);
+    expect(assertions).not.toMatch(/\bdisable\s+trigger\b/i);
+    expect(assertions).toContain(
+      "Validate\n-- the real foreign keys and drain their pending trigger events",
+    );
+  });
+
   it("re-enters only the executor for final hosted hard-off verification", () => {
     const settingsForce = assertions.lastIndexOf(
       `alter table ${schemaName}.settings force row level security;`,

@@ -1247,6 +1247,11 @@ insert into careslink_v1_generation.attempts (
   true
 );
 
+-- Both sides of the deferred jobs/payloads identity cycle now exist. Validate
+-- the real foreign keys and drain their pending trigger events before any
+-- assertion-only FORCE RLS restoration performs ALTER TABLE.
+set constraints all immediate;
+
 alter table careslink_v1_generation.settings force row level security;
 alter table careslink_v1_generation.jobs force row level security;
 alter table careslink_v1_generation.attempts force row level security;
