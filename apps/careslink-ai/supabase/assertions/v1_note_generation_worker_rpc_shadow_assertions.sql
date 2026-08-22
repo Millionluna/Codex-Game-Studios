@@ -1929,7 +1929,8 @@ begin
       'REVOKED_PURGE_ENQUEUED'
     or v_success #>> '{purgeOutboxAcknowledgment,status}' is distinct from
       'ENQUEUED'
-    or v_success::text ~* 'canonicalContent|providerEvidence|englishDraft|providerId|vault|locator'
+    or v_success::text ~*
+      '"(canonicalContent|providerEvidence|englishDraft|providerId)"[[:space:]]*:|vault|locator'
   then
     raise exception 'atomic success envelope drifted or leaked content';
   end if;
@@ -2157,7 +2158,8 @@ begin
     or v_failure #>> '{payloadMetadata,state}' is distinct from 'REVOKED'
     or v_failure #>> '{purgeOutboxAcknowledgment,status}' is distinct from
       'ENQUEUED'
-    or v_failure::text ~* 'canonicalContent|providerEvidence|englishDraft|vault|locator'
+    or v_failure::text ~*
+      '"(canonicalContent|providerEvidence|englishDraft)"[[:space:]]*:|vault|locator'
   then
     raise exception 'atomic failure envelope drifted or leaked content';
   end if;

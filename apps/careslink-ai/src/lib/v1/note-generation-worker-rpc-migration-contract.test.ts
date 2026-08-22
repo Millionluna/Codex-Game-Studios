@@ -664,6 +664,33 @@ describe("V1 Note registered-worker RPC shadow migration contract", () => {
     }
   });
 
+  it("distinguishes metadata-only provider evidence hashes from raw provider evidence", () => {
+    expect(assertions).toContain(
+      "v_success #>> '{attemptTerminal,providerEvidenceHash}' is distinct from",
+    );
+    expect(assertions).toContain(
+      "v_failure #> '{attemptTerminal,providerEvidenceHash}' is distinct from",
+    );
+    expect(assertions).toContain(
+      `'"(canonicalContent|providerEvidence|englishDraft|providerId)"[[:space:]]*:|vault|locator'`,
+    );
+    expect(assertions).toContain(
+      `'"(canonicalContent|providerEvidence|englishDraft)"[[:space:]]*:|vault|locator'`,
+    );
+    expect(assertions).not.toContain(
+      "v_success::text ~* 'canonicalContent|providerEvidence",
+    );
+    expect(assertions).not.toContain(
+      "v_failure::text ~* 'canonicalContent|providerEvidence",
+    );
+    expect(assertions).toContain(
+      "v_resolved->'atomicSuccess' is distinct from v_success",
+    );
+    expect(assertions).toContain(
+      "v_resolved->'atomicSettlement' is distinct from v_failure",
+    );
+  });
+
   it("binds success to one consumed grant and keeps payload consumption fail-closed", () => {
     const commit = functionBlock("commit_v1_shadow_note_generation_success");
     expect(commit).toContain("grant_record.status = 'CONSUMED'");
