@@ -691,6 +691,75 @@ describe("V1 Note registered-worker RPC shadow migration contract", () => {
     );
   });
 
+  it("refreshes the terminal attempt before binding success time and advancing payload state", () => {
+    const successStart = assertions.indexOf(
+      "-- Canonical success is one atomic transaction:",
+    );
+    const preCommitRefresh = assertions.indexOf(
+      "select attempt.* into v_attempt",
+      successStart,
+    );
+    const commit = assertions.indexOf(
+      `${schemaName}.commit_v1_shadow_note_generation_success(`,
+      preCommitRefresh,
+    );
+    const terminalRefresh = assertions.indexOf(
+      "select attempt.* into v_attempt",
+      commit,
+    );
+    const binding = assertions.indexOf("if v_attempt.id is null", terminalRefresh);
+    const purge = assertions.indexOf(
+      `update ${schemaName}.payloads as payload`,
+      binding,
+    );
+
+    expect(successStart).toBeGreaterThanOrEqual(0);
+    expect(preCommitRefresh).toBeGreaterThan(successStart);
+    expect(commit).toBeGreaterThan(preCommitRefresh);
+    expect(terminalRefresh).toBeGreaterThan(commit);
+    expect(binding).toBeGreaterThan(terminalRefresh);
+    expect(purge).toBeGreaterThan(binding);
+
+    const preCommitWindow = assertions.slice(preCommitRefresh, commit);
+    expect(preCommitWindow).toContain("v_attempt.acquired_at");
+
+    const terminalRefreshWindow = assertions.slice(terminalRefresh, binding);
+    expect(terminalRefreshWindow).toContain(
+      "where attempt.id = v_state.attempt_id",
+    );
+    expect(terminalRefreshWindow).toContain(
+      "and attempt.job_id = v_state.job_id",
+    );
+    expect(terminalRefreshWindow).toContain(
+      "and attempt.status = 'SUCCEEDED'",
+    );
+
+    const bindingWindow = assertions.slice(binding, purge);
+    expect(bindingWindow).toContain("v_attempt.finished_at is null");
+    expect(bindingWindow).toContain(
+      "v_job.finished_at is distinct from v_attempt.finished_at",
+    );
+    expect(bindingWindow).toContain(
+      "v_success #>> '{transaction,committedAt}' is distinct from",
+    );
+    expect(bindingWindow).toContain(
+      `${schemaName}._server_time(v_attempt.finished_at)`,
+    );
+
+    const purgeEnd = assertions.indexOf(
+      "success payload purge fixture was not applied",
+      purge,
+    );
+    const purgeWindow = assertions.slice(purge, purgeEnd);
+    expect(purgeWindow).toContain("purged_at = v_attempt.finished_at");
+    expect(purgeWindow).toContain(
+      "payload.revoked_at = v_attempt.finished_at",
+    );
+    expect(purgeWindow).toContain(
+      "payload.purge_requested_at = v_attempt.finished_at",
+    );
+  });
+
   it("binds success to one consumed grant and keeps payload consumption fail-closed", () => {
     const commit = functionBlock("commit_v1_shadow_note_generation_success");
     expect(commit).toContain("grant_record.status = 'CONSUMED'");

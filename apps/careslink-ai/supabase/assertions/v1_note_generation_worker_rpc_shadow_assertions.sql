@@ -1906,6 +1906,15 @@ begin
       v_evidence
     );
 
+  -- The earlier attempt record supplied the provider timing fixture while the
+  -- attempt was RUNNING. Refresh the persisted terminal row before binding
+  -- its database-owned finished_at to the ACK and later purge simulation.
+  select attempt.* into v_attempt
+  from careslink_v1_generation.attempts as attempt
+  where attempt.id = v_state.attempt_id
+    and attempt.job_id = v_state.job_id
+    and attempt.status = 'SUCCEEDED';
+
   if not (v_success ?& array[
       'transaction', 'canonical', 'syncReceipt', 'mutationReceipt',
       'jobTerminal', 'attemptTerminal', 'payloadMetadata',
@@ -1943,7 +1952,12 @@ begin
       v_state.job_id::text
     );
 
-  if v_job.status is distinct from 'SUCCEEDED'
+  if v_attempt.id is null
+    or v_attempt.finished_at is null
+    or v_job.status is distinct from 'SUCCEEDED'
+    or v_job.finished_at is distinct from v_attempt.finished_at
+    or v_success #>> '{transaction,committedAt}' is distinct from
+      careslink_v1_generation._server_time(v_attempt.finished_at)
     or v_job.result_content_hash is distinct from v_content_hash
     or v_job.result_revision_id::text is distinct from
       v_success #>> '{canonical,revisionId}'
