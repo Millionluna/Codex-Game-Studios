@@ -734,6 +734,98 @@ describe("V1 Note registered-worker RPC shadow migration contract", () => {
     expect(rpcProgram).not.toContain("vault_grant_hash");
   });
 
+  it("proves raw canonical content outside the restricted executor role", () => {
+    const normalizedMigration = normalizeSql(migration);
+    const revisionSelectStart = normalizedMigration.indexOf(
+      "grant select (id, document_id, owner_user_id, revision_number,",
+    );
+    const revisionSelectEnd = normalizedMigration.indexOf(
+      `) on public.ai_document_revisions to ${executorRole};`,
+      revisionSelectStart,
+    );
+    const revisionInsertStart = normalizedMigration.indexOf(
+      "grant insert (id, document_id, owner_user_id, revision_number,",
+      revisionSelectEnd,
+    );
+    const revisionInsertEnd = normalizedMigration.indexOf(
+      `) on public.ai_document_revisions to ${executorRole};`,
+      revisionInsertStart,
+    );
+
+    expect(revisionSelectStart).toBeGreaterThanOrEqual(0);
+    expect(revisionSelectEnd).toBeGreaterThan(revisionSelectStart);
+    expect(revisionInsertStart).toBeGreaterThan(revisionSelectEnd);
+    expect(revisionInsertEnd).toBeGreaterThan(revisionInsertStart);
+    expect(
+      normalizedMigration.slice(revisionSelectStart, revisionSelectEnd),
+    ).not.toMatch(/(?:^|, )content(?:,|$)/);
+    expect(
+      normalizedMigration.slice(revisionInsertStart, revisionInsertEnd),
+    ).toMatch(/(?:^|, )content(?:,|$)/);
+
+    const proofStart = assertions.indexOf(
+      "-- The executor deliberately has no SELECT privilege on raw revision content.",
+    );
+    const actorReset = assertions.lastIndexOf("reset role;", proofStart);
+    const proofFailure = assertions.indexOf(
+      "canonical success raw revision binding drifted",
+      proofStart,
+    );
+    const proofEndStart = assertions.indexOf("\nend\n$$;", proofFailure);
+    const proofEnd = proofEndStart + "\nend\n$$;".length;
+    const faultComment = assertions.indexOf(
+      "-- The trigger is assertion-only fault injection.",
+      proofEnd,
+    );
+    const faultFunction = assertions.indexOf(
+      "create function pg_temp.fail_v1_worker_rpc_late()",
+      faultComment,
+    );
+    const nextExecutor = assertions.indexOf(
+      `set local role ${executorRole};`,
+      faultFunction,
+    );
+
+    const initialExecutor = assertions.indexOf(
+      `set local role ${executorRole};`,
+    );
+    expect(actorReset).toBeGreaterThan(initialExecutor);
+    expect(proofStart).toBeGreaterThan(actorReset);
+    expect(proofFailure).toBeGreaterThan(proofStart);
+    expect(proofEndStart).toBeGreaterThan(proofFailure);
+    expect(faultComment).toBeGreaterThan(proofEnd);
+    expect(faultFunction).toBeGreaterThan(faultComment);
+    expect(nextExecutor).toBeGreaterThan(faultFunction);
+
+    const rawProof = assertions.slice(proofStart, proofEnd);
+    expect(rawProof).toContain("from rpc_assertion_state as state");
+    expect(rawProof).toContain("from rpc_assertion_artifacts as artifact");
+    expect(rawProof).toContain(
+      "from public.ai_document_revisions as revision",
+    );
+    expect(rawProof).toContain("revision.mutation_id = v_mutation_id");
+    expect(rawProof).toContain(
+      "revision.content is not distinct from v_artifact.canonical_content",
+    );
+    expect(rawProof).toContain(
+      "revision.content_hash is not distinct from\n          v_artifact.canonical_content_hash",
+    );
+    expect(rawProof).toContain(
+      "public.v1_shadow_content_sha256(revision.content)\n          is not distinct from revision.content_hash",
+    );
+    expect(rawProof).not.toContain(`set local role ${executorRole}`);
+
+    const executorBeforeActor = assertions.slice(initialExecutor, actorReset);
+    expect(executorBeforeActor).not.toContain("and content = v_content");
+    expect(executorBeforeActor).toContain("and content_hash = v_content_hash");
+    expect(executorBeforeActor).toContain(
+      "v_job.result_revision_id::text is distinct from",
+    );
+    expect(executorBeforeActor).toContain(
+      "v_job.result_document_id::text is distinct from",
+    );
+  });
+
   it("does not mutate Points, legacy credits or entitlement state", () => {
     const financialTables =
       "account_entitlements|credit_ledger|point_wallets|point_lots|point_quotes|point_reservations|point_reservation_allocations|point_ledger_entries";

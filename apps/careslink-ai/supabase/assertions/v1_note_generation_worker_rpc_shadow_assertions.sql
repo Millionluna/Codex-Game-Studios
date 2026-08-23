@@ -1963,7 +1963,6 @@ begin
       where id = v_job.result_revision_id
         and document_id = v_job.result_document_id
         and owner_user_id = v_job.owner_user_id
-        and content = v_content
         and content_hash = v_content_hash
         and mutation_id = v_mutation_id
     ) <> 1
@@ -2708,10 +2707,52 @@ begin
 end
 $$;
 
+reset role;
+
+-- The executor deliberately has no SELECT privilege on raw revision content.
+-- After leaving that role, the migration actor proves the one successful raw
+-- revision against the transaction-local artifact and the immutable
+-- job-derived mutation identifier without widening the runtime ACL.
+do $$
+declare
+  v_state rpc_assertion_state%rowtype;
+  v_artifact rpc_assertion_artifacts%rowtype;
+  v_mutation_id text;
+begin
+  select state.* into v_state
+  from rpc_assertion_state as state
+  where state.scenario = 'success';
+  select artifact.* into v_artifact
+  from rpc_assertion_artifacts as artifact
+  where artifact.scenario = 'success';
+
+  v_mutation_id :=
+    'note-generation:' || encode(
+      extensions.digest(convert_to(v_state.job_id::text, 'UTF8'), 'sha256'),
+      'hex'
+    );
+
+  if v_state.job_id is null
+    or v_artifact.scenario is null
+    or (
+      select count(*)
+      from public.ai_document_revisions as revision
+      where revision.mutation_id = v_mutation_id
+        and revision.content is not distinct from v_artifact.canonical_content
+        and revision.content_hash is not distinct from
+          v_artifact.canonical_content_hash
+        and public.v1_shadow_content_sha256(revision.content)
+          is not distinct from revision.content_hash
+    ) <> 1
+  then
+    raise exception 'canonical success raw revision binding drifted';
+  end if;
+end
+$$;
+
 -- The trigger is assertion-only fault injection. It fires after document,
 -- revision and sync inserts but before the terminal metadata transaction can
 -- complete, proving PostgreSQL rolls the entire commit statement back.
-reset role;
 create function pg_temp.fail_v1_worker_rpc_late()
 returns trigger
 language plpgsql
