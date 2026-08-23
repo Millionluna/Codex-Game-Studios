@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -8,6 +9,13 @@ const assertionsPath =
   "supabase/assertions/v1_note_generation_durable_foundation_assertions.sql";
 const migration = readFileSync(join(process.cwd(), migrationPath), "utf8");
 const assertions = readFileSync(join(process.cwd(), assertionsPath), "utf8");
+const assertionHeader = assertions
+  .slice(0, assertions.indexOf("\\set ON_ERROR_STOP on"))
+  .replace(/^-- ?/gm, "")
+  .replace(/\s+/g, " ")
+  .trim();
+const assertionBodyStart = assertions.indexOf("begin;\n");
+const assertionBody = assertions.slice(assertionBodyStart);
 
 const schemaName = "careslink_v1_generation";
 const tableNames = ["settings", "jobs", "attempts"] as const;
@@ -412,9 +420,36 @@ describe("V1 Note durable generation foundation migration contract", () => {
       "The prior exact-schema pg_constraint revision passed as one rollback-only",
     );
     expect(assertions).toContain("deleted PostgreSQL 17 r3 and r4 Previews");
-    expect(assertions).toContain("Production was not a SQL target");
-    expect(assertions).toContain(
-      "This additive-aware revision has not yet been rerun on a disposable",
+    expect(assertionHeader).toContain(
+      "PostgreSQL 17.6 r9 disposable Preview",
+    );
+    expect(assertionHeader).toContain(
+      "14/14 migrations, 7/7 assertions and the independent postcheck all passed",
+    );
+    for (const marker of [
+      "c7b70e9f84b9b804779039711b85cc7eda55bd57",
+      "a1571c30-a322-4cea-b332-b189804df195",
+      "hyczevivoakmflswmwlb",
+      "v1-note-worker-rpc-r9",
+      "both branch ID and ref absent",
+      "Production adocsnwnslxhxcjgbyee was never a SQL target",
+      "ae07158b899243cec9dc591b9d7c3f3beb6b85cdc213f9b732d6ed159932cfb8",
+      "3bd571e8447cbedd838251339e273877a25decaa582a538f0d7049319504bab0",
+      "36467 bytes",
+    ]) {
+      expect(assertionHeader).toContain(marker);
+    }
+    expect(assertionBodyStart).toBeGreaterThanOrEqual(0);
+    expect(Buffer.byteLength(assertionBody, "utf8")).toBe(36_467);
+    expect(
+      createHash("sha256").update(assertionBody, "utf8").digest("hex"),
+    ).toBe("3bd571e8447cbedd838251339e273877a25decaa582a538f0d7049319504bab0");
+    expect(assertionHeader).toContain(
+      "serial rollback proof does not prove true two-connection SKIP LOCKED",
+    );
+    expect(assertionHeader).toContain("session/privacy-revocation races");
+    expect(assertionHeader).toContain(
+      "remain a hard blocker before any caller grant or activation",
     );
     expect(assertions).not.toContain("information_schema.table_constraints");
     expect(

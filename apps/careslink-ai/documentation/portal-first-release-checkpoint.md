@@ -1,6 +1,6 @@
 # Portal-first release checkpoint
 
-Date: 2026-08-21
+Date: 2026-08-23
 
 Branch: `codex/careslink-ai-mobile-sync-v1`
 Base HEAD inspected: `fe5b708c488853418bfec3822369429e8fe9ff8f`
@@ -11,7 +11,7 @@ Current durable generation local batch base: `4bf34ee0955a958c64e6865faa8bde2f2d
 
 Current registered-worker adapter local batch base: `ec30b9342164d893f096cc0942b09d64fd457a73`
 
-Current disposable database assertion gate HEAD: `7f214429d9cdb3a2a6f16fd6b91d0bd9e67a038f`
+Current disposable database assertion gate HEAD: `c7b70e9f84b9b804779039711b85cc7eda55bd57`
 
 Current worker RPC shadow migration source:
 `20260821071044_add_v1_note_generation_worker_rpc_shadow.sql`
@@ -22,12 +22,11 @@ does not modify the native App, Main Website, Native Auth/M0 implementation or
 served shared Product API routes. Those are prerequisites recorded in the
 existing versioned contract documentation. All new Referral and Note
 generation capabilities remain local, default-off, Production-unapplied and
-absent from retained Preview runtime. The current source includes a private
-worker RPC migration, but it has not been applied to any database. Four
-disposable Preview databases were
-used only for the isolated migration/assertion gates recorded below and then
-deleted; no Preview application deployment or Production database was used as
-the SQL target.
+absent from retained Preview runtime. The private worker RPC migration passed
+the isolated PostgreSQL 17.6 migration/assertion gate on deleted disposable
+`r9`; this is not a runtime apply. Disposable Preview databases were used only
+for the isolated gates recorded below and then deleted; no Preview application
+deployment or Production database was used as the SQL target.
 
 ## 1. Portal reality matrix
 
@@ -48,7 +47,7 @@ availability.
 | Admin access requests/material usage | real/mixed | Yes | Manages AI access/metadata, not providers or referrals | Reuse its auth-first action pattern, not its business schema |
 | `/plan-and-usage` | legacy credits | Read-only | Runtime is still 3 legacy credits although the 300-Point/Pro product baseline is approved | Do not show both systems; implement and reconcile the approved wallet before cutover |
 | NDIS Case Note | real legacy server flow plus local shared-job evidence | Legacy generate/save only | Uses synchronous model and old credits; the new shared job is source-only and does not call it | Preserve legacy; keep the shared provider and canonical write default-off |
-| Other four Note types | catalog plus local shared-job/durable/RPC source evidence | No | Communication, Handover, Progress and Incident Factual share the dispatcher/output boundary, default-off durable contracts and the Production-unapplied private RPC source, but have no applied database repository, registered/deployed worker, served route, real provider or golden safety set | Prove the reviewed database/worker boundary on disposable Preview, then validate each type without forking orchestration |
+| Other four Note types | catalog plus local shared-job/durable/RPC source evidence | No | Communication, Handover, Progress and Incident Factual share the dispatcher/output boundary, default-off durable contracts and the Production-unapplied private RPC source, but have no retained/applied runtime repository, registered/deployed worker, served route, real provider or golden safety set | Extend the isolated database evidence with true two-connection races and a reviewed runtime boundary, then validate each type without forking orchestration |
 | `/ai-documents` | real legacy generated drafts | Delete only | Not canonical documents; store errors can appear as an empty list; no revision/export | Feature-gated canonical list only after current Preview evidence |
 | Shared `/v1` documents/sync | local durable adapter | Default-off | Exact current migrations are Production-unapplied and exist on no retained Preview; write grants withheld; no current base URL | M0 permits only me/list/pull after all identity/RLS gates pass |
 | Library/Guides/Updates | absent | No | No page, store, content version or API | After referral + Notes/documents/export |
@@ -691,7 +690,8 @@ in the rollback-only SQL assertion as a `TEST_ONLY` bridge for canonical
 transaction atomicity. It is not a vault, payload-consume, purge or
 account-deletion E2E test.
 
-Local source evidence for this batch:
+Pre-r9 local source evidence at exact commit
+`5692ddc0427cba10f5311071fdea6c886ef13d2d`:
 
 | Command | Result |
 |---|---|
@@ -701,12 +701,11 @@ Local source evidence for this batch:
 | `pnpm lint` | passed |
 | `pnpm build` | passed; Next static generation 63/63 |
 
-This migration and both current assertions have not been applied or executed
-on a database, disposable Preview or Production. Activation requires the exact
-clean-apply/rollback gate on supported PostgreSQL 16/17 paths, exact roles,
-`FOR SHARE` authority locks, ACL/function configuration, `pg_temp` injected
-faults, owner A/B and true two-session/two-connection claim/revocation races,
-attempt-2-success historical replay and a full post-rollback zero matrix.
+The later `r9` result below closes the exact PostgreSQL 17.6 clean-apply,
+rollback-assertion, role/ACL/function and post-rollback zero-matrix gate; it is
+not Production or runtime evidence. Activation still requires the PostgreSQL 16
+path, owner A/B runtime integration and true two-session/two-connection
+`SKIP LOCKED` claim plus session/privacy-revocation races.
 Account-delete/purge cross-state recovery remains unproved. Before catalogs can
 be populated, governance must either make registration/catalog rows append-only
 for the lifetime of every referencing attempt or add and prove a reviewed
@@ -716,3 +715,43 @@ lease/heartbeat freshness; before trusting an executor caller, JSON numeric
 parsing needs sequential type/regex/safe-cast hardening. No route, model, STT,
 Points, deployment, Production change or user traffic is authorized by this
 checkpoint.
+
+## 16. Durable Note worker RPC isolated PostgreSQL gate — 2026-08-23
+
+At source HEAD `c7b70e9f84b9b804779039711b85cc7eda55bd57`, disposable
+`r9` (`v1-note-worker-rpc-r9`; id
+`a1571c30-a322-4cea-b332-b189804df195`; ref
+`hyczevivoakmflswmwlb`) was non-default, `persistent=false`,
+`with_data=false` and PostgreSQL 17.6 under parent default Production project
+`adocsnwnslxhxcjgbyee`. The exact 14 migrations applied 14/14; the five
+adjacent, durable and worker rollback suites passed 7/7.
+
+The independent postcheck passed all 12 generation-table owner/RLS/FORCE-RLS
+checks, hard-off flags, exact non-login/non-superuser/non-`BYPASSRLS`/
+non-inheriting roles, denied API table/RPC ACLs and nine executor-only
+`SECURITY DEFINER` RPCs with `search_path=''`. Auth, canonical, generation,
+catalog/registration, payload/grant/evidence/outbox, Points and Portal fixture
+rows were zero. Security advisors returned 26 global findings (23 INFO + 3 WARN
+for pre-existing public `get`/`list`/`pull` functions; [remediation](https://supabase.com/docs/guides/database/database-linter?lint=0029_authenticated_security_definer_function_executable))
+and zero generation findings. Performance advisors returned 155 global findings
+(144 INFO + 11 WARN); generation scope was 20 INFO—14 [unindexed composite
+foreign keys](https://supabase.com/docs/guides/database/database-linter?lint=0001_unindexed_foreign_keys)
+and 6 [unused fresh indexes](https://supabase.com/docs/guides/database/database-linter?lint=0005_unused_index)—with
+zero WARN/ERROR. Independent review reported P0/P1/P2(delete) = 0.
+
+Earlier worker attempts did not become evidence: `r6` stopped on MCP
+approval/transport infrastructure at migration 6; `r7` reached 14/14 plus six
+suites before a restricted-executor raw-content assertion failed with `42501`
+and was repaired assertion-only at `78f1dd3`; `r8` reached the same point before
+a stale pre-commit attempt fixture exposed `finished_at=NULL` and was repaired
+assertion-only at `c7b70e9`. Each branch was deleted rather than repaired in
+place. After the successful gate, `r9` was exactly deleted and its ID/ref were
+absent; the Production parent remained the default branch and healthy, and was
+never the SQL target.
+
+Local gates at that HEAD passed 122 files / 1,337 tests, TypeScript, full lint
+and Next static generation 63/63. There is no retained Preview, caller grant,
+runtime repository/worker, model/STT, vault/KMS/retention implementation,
+Points settlement or user-flow evidence. Normal consume remains
+`DENIED_SETTLED` / `PAYLOAD_UNAVAILABLE`; true two-connection claim and
+session/privacy-revocation races remain a hard activation blocker.

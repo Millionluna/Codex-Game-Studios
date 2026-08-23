@@ -5,9 +5,20 @@
 -- The prior exact-schema pg_constraint revision passed as one rollback-only
 -- request on the deleted PostgreSQL 17 r3 and r4 Previews. The r4 gate also
 -- passed all five adjacent assertion suites and post-rollback zero-fixture
--- checks. This additive-aware revision has not yet been rerun on a disposable
--- Preview database.
--- Production was not a SQL target.
+-- checks. This additive-aware revision later passed on the deleted PostgreSQL
+-- 17.6 r9 disposable Preview: 14/14 migrations, 7/7 assertions and the
+-- independent postcheck all passed from exact execution source HEAD
+-- c7b70e9f84b9b804779039711b85cc7eda55bd57.
+-- The deleted r9 branch identity was
+-- id a1571c30-a322-4cea-b332-b189804df195,
+-- ref hyczevivoakmflswmwlb and name v1-note-worker-rpc-r9. Deletion was
+-- confirmed with both branch ID and ref absent.
+-- Production adocsnwnslxhxcjgbyee was never a SQL target.
+-- Pre-header-edit full-file SHA-256:
+-- ae07158b899243cec9dc591b9d7c3f3beb6b85cdc213f9b732d6ed159932cfb8.
+-- Exact BEGIN-through-ROLLBACK body SHA-256:
+-- 3bd571e8447cbedd838251339e273877a25decaa582a538f0d7049319504bab0;
+-- 36467 bytes.
 -- This remains metadata-schema evidence only; it does not prove or enable a
 -- live worker, payload vault or canonical persistence RPC.
 -- Run it after the foundation migration, with or without later separately
@@ -15,6 +26,9 @@
 -- foundation subset; the worker RPC assertion owns the exact extension table,
 -- policy, function and executor-ACL surface. It does not prove SKIP LOCKED,
 -- worker RPCs or atomic canonical persistence.
+-- This serial rollback proof does not prove true two-connection SKIP LOCKED or
+-- session/privacy-revocation races. Those remain a hard blocker before any
+-- caller grant or activation.
 -- Invoke it explicitly with psql; it intentionally lives outside
 -- supabase/tests because it is not a pgTAP/supabase test db test file.
 

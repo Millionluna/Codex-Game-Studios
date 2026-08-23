@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -9,6 +10,13 @@ const assertionsPath =
   "supabase/assertions/v1_note_generation_worker_rpc_shadow_assertions.sql";
 const migration = readFileSync(join(process.cwd(), migrationPath), "utf8");
 const assertions = readFileSync(join(process.cwd(), assertionsPath), "utf8");
+const assertionHeader = assertions
+  .slice(0, assertions.indexOf("\\set ON_ERROR_STOP on"))
+  .replace(/^-- ?/gm, "")
+  .replace(/\s+/g, " ")
+  .trim();
+const assertionBodyStart = assertions.indexOf("begin;\n");
+const assertionBody = assertions.slice(assertionBodyStart);
 
 const schemaName = "careslink_v1_generation";
 const ownerRole = "careslink_v1_generation_owner";
@@ -1158,6 +1166,37 @@ describe("V1 Note registered-worker RPC shadow migration contract", () => {
     expect(assertions).toContain(
       "does not prove two independent database\n-- sessions race safely",
     );
+    expect(assertionHeader).toContain(
+      "serial rollback proof does not prove true two-connection SKIP LOCKED",
+    );
+    expect(assertionHeader).toContain("session/privacy-revocation races");
+    expect(assertionHeader).toContain(
+      "remain a hard blocker before any caller grant or activation",
+    );
+    expect(assertionHeader).toContain(
+      "PostgreSQL 17.6 r9 disposable Preview",
+    );
+    expect(assertionHeader).toContain(
+      "14/14 migrations, 7/7 assertions and the independent postcheck all passed",
+    );
+    for (const marker of [
+      "c7b70e9f84b9b804779039711b85cc7eda55bd57",
+      "a1571c30-a322-4cea-b332-b189804df195",
+      "hyczevivoakmflswmwlb",
+      "v1-note-worker-rpc-r9",
+      "both branch ID and ref absent",
+      "Production adocsnwnslxhxcjgbyee was never a SQL target",
+      "7ac37a3698e60636725195eae9eb07992a300c0219ab47f83c56128e5d8e9c3d",
+      "2be48250f3ad6d5cf5a1dc4a31f114a0ecdcab83699ba42a7d4575d6c06c1daf",
+      "111481 bytes",
+    ]) {
+      expect(assertionHeader).toContain(marker);
+    }
+    expect(assertionBodyStart).toBeGreaterThanOrEqual(0);
+    expect(Buffer.byteLength(assertionBody, "utf8")).toBe(111_481);
+    expect(
+      createHash("sha256").update(assertionBody, "utf8").digest("hex"),
+    ).toBe("2be48250f3ad6d5cf5a1dc4a31f114a0ecdcab83699ba42a7d4575d6c06c1daf");
     expect(assertions).toContain("transaction-only TEST_ONLY fixtures");
     expect(assertions).toContain("pg_get_function_identity_arguments");
     expect(assertions).toContain("aclexplode(");

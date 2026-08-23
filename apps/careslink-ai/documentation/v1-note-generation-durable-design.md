@@ -1,12 +1,11 @@
 # V1 Note generation durable design handoff
 
-> Status: source-only, default-off design plus two Production-unapplied
-> migrations. The schema-only foundation passed its exact schema/cross-domain
-> assertion gate only on deleted disposable `r4`; the later CLI-generated
-> worker RPC migration and its additive-aware assertions have not run against a
-> database. This document records an implemented private RPC source boundary,
-> not an applied repository, callable worker, route, Preview capability, model
-> call or Production capability.
+> Status: default-off design plus two Production-unapplied migrations. The
+> schema-only foundation passed its historical deleted-`r4` gate; at source HEAD
+> `c7b70e9f84b9b804779039711b85cc7eda55bd57`, the exact worker RPC bundle passed
+> isolated PostgreSQL 17.6 migration/assertion evidence on deleted disposable
+> `r9`. This is not a retained/applied runtime repository, callable worker,
+> route, Preview capability, model call or Production capability.
 
 ## 1. Scope and non-goals
 
@@ -17,7 +16,7 @@ persist a usable canonical result.
 
 This handoff does not authorize or implement:
 
-- a database connection, migration apply, caller `EXECUTE` grant or reachable
+- a retained or Production migration apply, caller `EXECUTE` grant or reachable
   private worker RPC;
 - a served route, worker deployment or feature activation;
 - raw cleaned-facts persistence;
@@ -81,12 +80,12 @@ durable repository:
 5. only their required constraints and indexes.
 
 At its deleted-`r4` checkpoint it created no function, view, trigger or RLS
-policy. The subsequent source-only migration now adds payload metadata,
+policy. The subsequent migration adds payload metadata,
 one-time grants, provider-evidence detail, purge outbox, immutable policy and
 registration catalogs, executor policies and the nine reviewed worker RPC
 identities. The original three-table foundation and its historical evidence
 must still never be described as the atomic transaction in section 7; the
-additive revision has separate unexecuted assertions and Preview gates.
+additive revision has separate deleted-`r9` assertion evidence and runtime gates.
 
 No enum type is required; bounded text checks keep migration and rollback
 inspection explicit. Every foreign-key column used for lookup or cascade must
@@ -259,9 +258,9 @@ session, proof or request binding fails closed.
 
 ## 7. Atomic success transaction
 
-The source-only success RPC is written to complete all of these operations in
-one short database transaction; this remains an unexecuted contract until the
-exact migration passes the disposable-Preview gates in section 10:
+The success RPC is written to complete all of these operations in one short
+database transaction. Its scripted transaction/rollback contract passed on
+deleted disposable `r9`; it remains unreachable and unproved as a runtime path:
 
 1. assert the database capability is enabled, shadow-only and called through
    the exact reviewed privileged boundary;
@@ -378,8 +377,9 @@ leaves the settings capability hard-off and grants no caller `EXECUTE`.
 All RPCs are owned by the distinct executor, are `SECURITY DEFINER`, fix an
 empty `search_path` and use database time. Executor table rights and RLS
 policies are command-specific; API roles and `service_role` retain no private
-schema/table rights or function execution. This is a source boundary, not
-evidence that the migration, policies or transactions work on PostgreSQL.
+schema/table rights or function execution. Deleted disposable `r9` supplied
+isolated PostgreSQL 17.6 schema, ACL and scripted transaction evidence for this
+boundary; it is not a retained database or runtime execution path.
 
 Because the vault backend, KMS, retention and purge operator remain undecided,
 normal payload consume can only settle `DENIED_SETTLED` /
@@ -391,11 +391,11 @@ it is not a vault/payload-consume E2E path.
 ## 10. Disposable Preview assertion gate
 
 Before any execute grant, route, worker or model integration, the exact source
-revision must clean-apply to a new disposable non-Production Preview. The
-foundation-only revision established the rollback-only checks below. The
-current additive-aware foundation assertion preserves that required subset
-when the worker extension is present, while the worker assertion owns the
-extension's exact objects and privileges:
+revision had to clean-apply to a disposable non-Production Preview. Deleted
+`r9` closed that gate for PostgreSQL 17.6. The foundation-only revision
+established the rollback checks below; the additive-aware foundation assertion
+preserved that subset while the worker assertion owned the extension's exact
+objects and privileges:
 
 - `server_version_num >= 160000`; this migration intentionally uses the
   PostgreSQL 16+ role-membership option syntax and has no pre-16 compatibility
@@ -420,9 +420,10 @@ extension's exact objects and privileges:
 - invalid hashes, states, terminal shapes, owner bindings, duplicate attempt
   ordinals and duplicate active attempts fail closed;
 
-The source-only RPC/payload assertion now extends those checks with the cases
-below, but has not been executed against a database. They remain required
-disposable-Preview evidence rather than established behavior:
+The RPC/payload assertion extended those checks and ran as one rollback-only
+request on deleted `r9`. The cases below are established only as serial,
+fixture-backed PostgreSQL 17.6 evidence, not runtime or independent-session
+behavior:
 
 - no unsafe public overload and no unreviewed execute privilege;
 - every definer function has a fixed empty search path and allowlisted owner;
@@ -436,11 +437,13 @@ disposable-Preview evidence rather than established behavior:
 - wrong-owner, wrong-type, wrong-hash, wrong-schema, expired and revoked privacy
   proofs;
 - same-request replay and changed-request idempotency conflict;
-- two-worker concurrent claim, `SKIP LOCKED`, single active attempt and
-  monotonically increasing attempts;
+- deterministic `SKIP LOCKED` claim structure, a single-active-attempt
+  invariant and monotonically increasing attempts; a true two-worker claim
+  race remains unproved;
 - wrong/stale lease token, heartbeat bounds, lease expiry and recovery;
-- session revocation or privacy-proof expiry between enqueue and claim cannot
-  issue or consume a payload-use grant, decrypt facts or start provider work;
+- scripted session revocation or privacy-proof expiry between enqueue and
+  claim cannot issue or consume a payload-use grant, decrypt facts or start
+  provider work; the corresponding two-connection lock races remain unproved;
 - cancellation and late provider-result rejection;
 - claim-response and success-response loss replay;
 - canonical document + revision 1 + sync change + `CREATE_DOCUMENT` receipt +
@@ -553,21 +556,25 @@ callable RPC, durable worker, model/STT integration, Points settlement or user
 flow.
 
 The source-only registered-worker database adapter may validate a composite
-atomic acknowledgement, but that acknowledgement is not proof that a database
-transaction, RLS policy, executor-role topology, vault grant or purge outbox
-exists. Only the clean-apply and rollback assertions above can provide that
-evidence for the exact future migration revision.
+atomic acknowledgement. Deleted `r9` proved the scripted database row and
+rollback relationships for the exact current migration, but it did not prove a
+retained runtime transaction, caller credential, vault grant or real purge
+operation.
 
 ## 12. Current worker RPC source handoff
 
-The paragraph above closes the historical deleted-`r4` foundation result. It
-does not describe the later worktree. The current worktree now contains the
-CLI-generated worker RPC migration described in section 9 and
+The paragraph above closes the historical deleted-`r4` foundation result. The
+current worktree contains the CLI-generated worker RPC migration described in
+section 9 and
 `supabase/assertions/v1_note_generation_worker_rpc_shadow_assertions.sql`.
 `supabase/assertions/v1_note_generation_durable_foundation_assertions.sql` is
 also additive-aware so it can retain the foundation subset after the worker
-extension is installed. Neither current assertion revision nor the worker RPC
-migration has been executed against a database.
+extension is installed. At source HEAD
+`c7b70e9f84b9b804779039711b85cc7eda55bd57`, disposable PostgreSQL 17.6 `r9`
+(`v1-note-worker-rpc-r9`; id
+`a1571c30-a322-4cea-b332-b189804df195`; ref
+`hyczevivoakmflswmwlb`) clean-applied 14/14 migrations and passed the five
+adjacent, durable and worker rollback suites 7/7.
 
 The worker assertion installs transaction-only `TEST_ONLY` policy,
 registration, Auth/privacy and job fixtures after proving the real migration's
@@ -578,17 +585,35 @@ temporarily marks a grant `CONSUMED` only to reach the canonical atomicity
 fixture; the real consume RPC remains permanently fail-closed as
 `DENIED_SETTLED` / `PAYLOAD_UNAVAILABLE` and exposes no vault capability.
 
+The independent postcheck retained 12-table owner/RLS/FORCE-RLS posture,
+hard-off flags, empty Auth/canonical/generation/catalog/registration/payload/
+grant/evidence/outbox/Points/Portal fixtures, exact non-login/non-superuser/
+non-`BYPASSRLS`/non-inheriting roles, denied API ACLs and nine executor-only
+`SECURITY DEFINER` RPCs with `search_path=''`. Generation-scope advisors had
+zero security findings and zero performance WARN/ERROR. Its 20 performance
+INFO findings were 14 [unindexed composite foreign keys](https://supabase.com/docs/guides/database/database-linter?lint=0001_unindexed_foreign_keys)
+and 6 [unused fresh indexes](https://supabase.com/docs/guides/database/database-linter?lint=0005_unused_index),
+which require load-time review rather than mechanical indexing. Global advisor
+results were not all green: security was 23 INFO + 3 pre-existing public
+security-definer WARN ([remediation](https://supabase.com/docs/guides/database/database-linter?lint=0029_authenticated_security_definer_function_executable));
+performance was 144 INFO + 11 WARN.
+
+Independent review reported P0/P1/P2(delete) = 0. The exact `r9` branch was
+deleted and both its ID and ref were absent afterward; Production
+`adocsnwnslxhxcjgbyee` remained the default branch and healthy, and was never a
+SQL target. This is disposable schema/transaction/assertion evidence only.
+
 The local source gate passed:
 
 | Command | Result |
 |---|---|
 | adjacent Note generation tests | 10 files / 348 tests passed |
-| `pnpm test` | 122 files / 1,331 tests passed; preserves 121 / 1,294 and the 90 / 653 historical baseline |
+| `pnpm test` | 122 files / 1,337 tests passed; preserves 121 / 1,294 and the 90 / 653 historical baseline |
 | `pnpm exec tsc --noEmit --incremental false` | passed |
 | `pnpm lint` | passed |
 | `pnpm build` | passed; Next static generation 63/63 |
 
-Independent final source/security review reported no P0/P1. Remaining P2
+Independent final source/security review reported no P0/P1. Remaining
 activation governance is explicit, not a hidden default:
 
 - treat approved policy catalogs and registration bindings as append-only and
@@ -608,12 +633,11 @@ activation governance is explicit, not a hidden default:
   JSON numeric parsing with explicit type, regex and safe-cast gates rather
   than relying on expression evaluation order.
 
-The activation run must clean-apply on supported PostgreSQL 16/17 paths, run
-both rollback assertions, inspect exact role membership/`FOR SHARE` authority
-locking/ACL and function configuration, exercise `pg_temp` injected-fault
-rollback plus true two-connection claim/revocation races, and finish with the
-full cross-domain zero-fixture/flags-off matrix. Only after those results and
-the vault/KMS/retention, worker credential, model/provider/STT and Points
-decisions are separately approved may a caller grant or runtime registry entry
-be considered. Nothing in this source handoff authorizes Preview retention,
+Deleted `r9` closed the PostgreSQL 17.6 serial assertion, role/ACL/function,
+scripted-fault and zero-fixture gates. Activation still requires the PostgreSQL
+16 path and true two-connection `SKIP LOCKED` claim plus session/privacy-
+revocation races. Those are hard blockers before any caller grant or registry
+entry. Only after those results and the vault/KMS/retention, worker credential,
+model/provider/STT and Points decisions are separately approved may runtime
+activation be considered. Nothing in this handoff authorizes Preview retention,
 Production apply, route activation, model/STT traffic or Points settlement.

@@ -5,7 +5,23 @@
 -- sessions race safely. It locks the SKIP LOCKED structure and single-active-
 -- attempt invariant; a separately authorized disposable Preview must run the
 -- real two-connection concurrency gate before any execute grant or activation.
--- Production must never be the SQL target for this assertion.
+-- This serial rollback proof does not prove true two-connection SKIP LOCKED or
+-- session/privacy-revocation races. Those remain a hard blocker before any
+-- caller grant or activation.
+-- Exact execution source HEAD c7b70e9f84b9b804779039711b85cc7eda55bd57
+-- passed on the deleted PostgreSQL 17.6 r9 disposable Preview: 14/14
+-- migrations, 7/7 assertions and the independent postcheck all passed.
+-- The deleted r9 branch identity was
+-- id a1571c30-a322-4cea-b332-b189804df195,
+-- ref hyczevivoakmflswmwlb and name v1-note-worker-rpc-r9. Deletion was
+-- confirmed with both branch ID and ref absent.
+-- Production must never be the SQL target for this assertion; Production
+-- adocsnwnslxhxcjgbyee was never a SQL target.
+-- Pre-header-edit full-file SHA-256:
+-- 7ac37a3698e60636725195eae9eb07992a300c0219ab47f83c56128e5d8e9c3d.
+-- Exact BEGIN-through-ROLLBACK body SHA-256:
+-- 2be48250f3ad6d5cf5a1dc4a31f114a0ecdcab83699ba42a7d4575d6c06c1daf;
+-- 111481 bytes.
 
 \set ON_ERROR_STOP on
 
