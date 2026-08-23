@@ -662,7 +662,7 @@ matched deleted `r9`. The branch was deleted; Production remained healthy and
 was never the SQL target. This closes Attempt-2 historical replay only and
 creates no retained Preview or runtime/Production capability.
 
-### Attempt-registration historical retention source hardening — 2026-08-24
+### Attempt-registration historical retention gate — 2026-08-24
 
 Supabase CLI 2.115.0 generated the additive fifteenth migration
 `20260823213144_harden_v1_note_generation_registration_retention.sql`. The
@@ -692,12 +692,34 @@ This is retention enforcement only: the migration adds no catalog lifecycle
 RPC, seed, caller grant, registry/runtime entrypoint or capability flag, and it
 does not apply or authorize a Production change.
 
-This source batch has no hosted execution evidence yet. Promotion evidence for
-the current revision requires a fresh no-data hosted gate that clean-applies all
-15 migrations 15/15, passes the seven rollback suites and repeats the independent
-hard-off/zero-row/RLS/ACL/RPC postcheck before the disposable branch is deleted.
-The deleted `r9`, `r20` and `r21` results above remain evidence only for their
-recorded revisions and are not rewritten as evidence for this migration.
+At exact source HEAD `4cae6f1a08ce2bcc7e43456c275cf5e743f13fdf`,
+disposable PostgreSQL 17.6 branch `r22` (`v1-note-worker-rpc-r22`; id
+`0bc8db56-0e4a-42ec-9595-1f32a3d74a6b`; ref
+`wuzcjcfrkctelcnbbgtg`) was non-default, `persistent=false` and
+`with_data=false`. Its confirmed Preview creation rate was US$0.01344/hour.
+The exact current durable-foundation assertion body was 37547 bytes with
+SHA-256 `2a2af2e8c7c745b769a731a4892b27f65fcf311321e813c3cc190e54167772a6`;
+the exact current worker-RPC assertion body was 153956 bytes with SHA-256
+`1c9f65bdc7f1de86e1c7398399ecf029207ba1b2bdf9fa3634dadb482424fdbb`.
+All 15 migrations applied 15/15 and all seven rollback suites passed 7/7.
+
+The independent postcheck proved the exact validated `RESTRICT` foreign key and
+valid/ready non-unique registration-digest index, all 12 private generation
+tables, all nine private RPC identities, hard-off settings, zero checked data
+and fixture rows, denied API table/RPC access and only the two expected
+admin-only creator edges. Security advisors reported 26 global findings (23
+INFO + 3 pre-existing WARN) with zero generation findings. Performance
+advisors reported 155 global findings (144 INFO + 11 WARN); generation scope
+contained 20 INFO (14 unindexed foreign keys + 6 unused indexes) and zero
+WARN/ERROR. The exact `r22`
+branch was deleted, so no ongoing charge or accrued total is inferred.
+Production remained the healthy default parent, was never the SQL target and
+was otherwise untouched.
+
+This closes the PostgreSQL 17.6 hosted registration-retention gate for the
+current revision. The deleted `r9`, `r20` and `r21` results above remain evidence
+only for their recorded revisions and are not rewritten as evidence for this
+migration.
 
 The current local source gate passed the three focused migration contracts
 (39/39), the full 125-file / 1,381-test suite, lint, TypeScript, the 63/63-page
@@ -725,11 +747,12 @@ PostgreSQL 17.6 true two-session `SKIP LOCKED` claim and session/privacy-
 revocation race gate. Activation still requires the PostgreSQL 16 path and
 owner A/B runtime integration. Deleted `r21` closed the Attempt-2 historical
 replay gate. The current source batch chooses and implements the registration
-retention FK/index design, but its exact 15-migration hosted gate remains open.
-Nested exact-key vectors, account-delete/purge recovery, provider-start binding,
-numeric parsing and the runtime/vault governance items above also remain open
-before any caller grant or registry entry. Only after those results and the
-vault/KMS/retention, worker credential, model/provider/STT and Points decisions
-are separately approved may runtime activation be considered. Nothing in this
-handoff authorizes Preview retention, Production apply, route activation,
-model/STT traffic or Points settlement.
+retention FK/index design, and deleted `r22` closes its exact PostgreSQL 17.6
+hosted gate. PostgreSQL 16, owner A/B runtime integration, nested exact-key
+vectors, account-delete/purge recovery, provider-start binding, numeric parsing
+and the runtime/vault governance items above remain open before any caller grant
+or registry entry. Only after those results and the vault/KMS/retention, worker
+credential, model/provider/STT and Points decisions are separately approved
+may runtime activation be considered. Nothing in this handoff authorizes
+Preview retention, Production apply, route activation, model/STT traffic or
+Points settlement.

@@ -26,9 +26,20 @@
 -- bdcd479473ed1c6ae0782127eb1d8e5765e3de2ede829aadeb3eb35c2eeadaac;
 -- 146488 bytes.
 -- The current source body adds the separately CLI-generated
--- registration-retention migration catalog and enforcement proof. It has no
--- hosted Preview execution evidence yet. Current BEGIN-through-ROLLBACK source
--- SHA-256:
+-- registration-retention migration catalog and enforcement proof. From exact
+-- execution source HEAD 4cae6f1a08ce2bcc7e43456c275cf5e743f13fdf it
+-- passed on deleted PostgreSQL 17.6 r22: 15/15 migrations, 7/7 rollback suites
+-- and the independent 12-table/9-RPC/hard-off/zero-fixture/API-denial,
+-- two-admin-only-edge and validated retention-FK/index postcheck all passed.
+-- The confirmed branch rate was US$0.01344/hour. The non-default,
+-- persistent=false, with_data=false branch was v1-note-worker-rpc-r22, id
+-- 0bc8db56-0e4a-42ec-9595-1f32a3d74a6b and ref wuzcjcfrkctelcnbbgtg.
+-- Security advisors were 23 INFO + 3 pre-existing WARN globally and zero in
+-- generation scope. Performance advisors were 144 INFO + 11 WARN globally;
+-- generation scope had 20 INFO (14 unindexed FKs + 6 unused indexes) and zero
+-- WARN/ERROR. Deletion was confirmed with r22 id and ref absent; Production
+-- remained the sole healthy default and was never a SQL target. Current
+-- BEGIN-through-ROLLBACK source SHA-256:
 -- 1c9f65bdc7f1de86e1c7398399ecf029207ba1b2bdf9fa3634dadb482424fdbb;
 -- 153956 bytes.
 

@@ -11,9 +11,10 @@ Current durable generation local batch base: `4bf34ee0955a958c64e6865faa8bde2f2d
 
 Current registered-worker adapter local batch base: `ec30b9342164d893f096cc0942b09d64fd457a73`
 
-Current disposable database assertion gate HEAD: `c7b70e9f84b9b804779039711b85cc7eda55bd57`
+Historical r9 disposable database assertion gate HEAD:
+`c7b70e9f84b9b804779039711b85cc7eda55bd57`
 
-Current Attempt-2 historical-replay gate base HEAD:
+Historical r21 Attempt-2 historical-replay gate base HEAD:
 `000f17af88eff9266a92e484ba2080335d20fd2d`
 
 Current worker RPC shadow migration source:
@@ -21,6 +22,9 @@ Current worker RPC shadow migration source:
 
 Current registration-retention hardening source:
 `20260823213144_harden_v1_note_generation_registration_retention.sql`
+
+Current registration-retention hosted gate HEAD:
+`4cae6f1a08ce2bcc7e43456c275cf5e743f13fdf`
 
 This checkpoint covers the AI Web Portal reality audit, release sequencing,
 local Referral foundation and source-only five-Note generation contracts. It
@@ -32,8 +36,9 @@ absent from retained Preview runtime. The private worker RPC migration passed
 the isolated PostgreSQL 17.6 migration/assertion gate on deleted disposable
 `r9`; deleted no-data `r20` subsequently passed its PostgreSQL 17.6 true
 two-session claim/session/privacy race gate, and deleted no-data `r21` passed
-the Attempt-2 historical-replay gate on PostgreSQL 17.6. None is a runtime
-apply.
+the Attempt-2 historical-replay gate on PostgreSQL 17.6. Deleted no-data `r22`
+then passed the exact 15-migration registration-retention gate. None is a
+runtime apply.
 Disposable Preview databases were used only for the isolated gates recorded
 below and then deleted; no Preview application deployment or Production
 database was used as the SQL target.
@@ -826,14 +831,15 @@ zero generation security findings and zero generation performance WARN/ERROR.
 The exact `r21` branch was deleted; Production remained the default healthy
 parent and was never the SQL target.
 
-This closes the Attempt-2 historical-replay gate only. PostgreSQL 16, owner A/B
-runtime integration, catalog retention, nested exact-key database vectors,
-account-delete/purge recovery, provider-start binding, sequential numeric
-parsing hardening and the real runtime/vault boundaries remain activation
-blockers. No caller grant, retained Preview, runtime worker, route, model/STT,
-Points or Production capability was created or authorized.
+This closes the Attempt-2 historical-replay gate only. At this `r21`
+checkpoint, PostgreSQL 16, owner A/B runtime integration, catalog retention,
+nested exact-key database vectors, account-delete/purge recovery,
+provider-start binding, sequential numeric parsing hardening and the real
+runtime/vault boundaries remained activation blockers. No caller grant,
+retained Preview, runtime worker, route, model/STT, Points or Production
+capability was created or authorized.
 
-## 19. Durable Note registration historical-retention source — 2026-08-24
+## 19. Durable Note registration historical-retention source and r22 gate — 2026-08-24
 
 Supabase CLI 2.115.0 generated the fifteenth migration in the reviewed local
 worker manifest,
@@ -860,12 +866,12 @@ new foreign key.
 
 The local gate passed all three focused migration contracts (39/39), the full
 125-file / 1,381-test suite, lint, TypeScript, the 63/63-page Next production
-build, the 73-file Codex-adapter sync check and `git diff --check`. This is
-local source evidence, not a database apply.
+build, the 73-file Codex-adapter sync check and `git diff --check`. That local
+result alone was source evidence; the separate hosted apply follows below.
 
-These are current source digests, not hosted execution evidence. Deleted `r21`
-still proves only its historical 14/14 manifest and 7/7 rollback suites with
-the earlier 146488-byte worker body, SHA-256
+These current bodies subsequently received the hosted `r22` evidence below.
+For historical separation, deleted `r21` still proves only its earlier 14/14
+manifest and 7/7 rollback suites with the 146488-byte worker body, SHA-256
 `bdcd479473ed1c6ae0782127eb1d8e5765e3de2ede829aadeb3eb35c2eeadaac`.
 Deleted `r9` still proves only its historical 14/14 manifest and 7/7 rollback
 suites with the earlier 36467-byte durable-foundation body, SHA-256
@@ -873,12 +879,33 @@ suites with the earlier 36467-byte durable-foundation body, SHA-256
 Neither historical gate included the fifteenth migration or the current
 assertion bodies.
 
-No hosted Preview branch was created for this source batch, so there is no new
-branch id/ref, cost confirmation, 15/15 apply, rollback-suite, postcheck or
-advisor result. Production was not a SQL target and no deployment, grant,
-catalog row, runtime flag or capability was added. The exact `RESTRICT` design
-is now represented in local source, but its hosted migration/assertion gate
-remains open. PostgreSQL 16, owner A/B runtime integration, nested exact-key
-database vectors, account-delete/purge recovery, provider-start binding,
-sequential numeric parsing and all real vault/runtime/activation gates also
-remain open.
+At source HEAD `4cae6f1a08ce2bcc7e43456c275cf5e743f13fdf`, disposable
+PostgreSQL 17.6 (`server_version_num=170006`) branch `r22`
+(`v1-note-worker-rpc-r22`; id
+`0bc8db56-0e4a-42ec-9595-1f32a3d74a6b`; ref
+`wuzcjcfrkctelcnbbgtg`) was non-default, `persistent=false` and
+`with_data=false`. Its confirmed Preview rate was US$0.01344/hour. The exact
+15-file manifest applied 15/15, and the five adjacent, durable-foundation and
+worker rollback suites passed 7/7 using the exact 153956-byte worker and
+37547-byte durable bodies recorded above.
+
+The independent postcheck retained exactly 12 private generation tables, nine
+private worker RPC identities, the hard-off setting, zero checked business,
+catalog, registration, grant, evidence, outbox and fixture rows, denied API
+table/RPC access and only the two expected admin-only creator membership edges.
+It also confirmed the validated `attempts_registration_catalog_fk` with exact
+`ON UPDATE RESTRICT` / `ON DELETE RESTRICT` actions and the exact
+`attempts_registration_digest_idx`. Security advisors returned 26 global
+findings (23 INFO + 3 pre-existing WARN) and zero generation findings.
+Performance advisors returned 155 global findings (144 INFO + 11 WARN), with
+20 generation INFO—14 unindexed composite-foreign-key findings plus six unused
+fresh-index findings—and zero generation WARN/ERROR.
+
+The exact `r22` branch was deleted, and its ID and ref were absent afterward;
+Production remained the healthy default and was never the SQL target. The
+confirmed hourly rate is creation evidence only, and no accrued total is
+inferred. This closes only the hosted registration historical-retention gate.
+PostgreSQL 16, owner A/B runtime integration, nested exact-key database vectors,
+account-delete/purge recovery, provider-start binding, sequential numeric
+parsing and all real vault/runtime/activation gates remain open. No retained
+Preview, deployment, caller grant, runtime flag or capability was created.

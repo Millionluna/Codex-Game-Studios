@@ -378,14 +378,15 @@ and `r21` gates recorded below close the PostgreSQL 17.6 two-session race and
 attempt-2 historical-replay subsets respectively.
 That checkpoint still required catalog/registration rows to remain append-only
 or gain a reviewed `RESTRICT` attempt-registration foreign key plus index. The
-current source checkpoint below selects the FK/index option, while its hosted
-gate remains pending. Governance must still prove purge/outbox cross-state
-recovery with account deletion. Before a real provider starts, `startedAt` must
-bind to a consumed grant and a fresh post-consume lease/heartbeat check. Before
-an executor caller is treated as untrusted, sequential JSON numeric parsing
-must use explicit type/regex/safe-cast gates.
-No route, worker, model, STT, Points, Preview, Production migration, deployment
-or user flow was enabled or exercised by this checkpoint.
+current source checkpoint below selects the FK/index option, and deleted `r22`
+subsequently closes its PostgreSQL 17.6 hosted migration/assertion gate.
+Governance must still prove purge/outbox cross-state recovery with account
+deletion. Before a real provider starts, `startedAt` must bind to a consumed
+grant and a fresh post-consume lease/heartbeat check. Before an executor caller
+is treated as untrusted, sequential JSON numeric parsing must use explicit
+type/regex/safe-cast gates.
+No route, worker, model, STT, Points, Preview application/runtime, Production
+migration, deployment or user flow was enabled or exercised by this checkpoint.
 
 ### First durable-metadata disposable Preview attempt — 2026-08-21
 
@@ -640,11 +641,12 @@ was never the SQL target.
 The focused worker-RPC migration contract passed 25/25; the full local gate
 passed 124 files / 1,377 tests, TypeScript, full lint and Next static generation
 63/63. This closes only the PostgreSQL 17.6 attempt-2 historical replay gate.
-PostgreSQL 16, owner A/B runtime integration and the already listed
-catalog/envelope/purge/provider/vault governance remain open. No caller grant,
-retained Preview, runtime worker or Production capability was created.
+At that `r21` checkpoint, PostgreSQL 16, owner A/B runtime integration and the
+already listed catalog/envelope/purge/provider/vault governance remained open.
+No caller grant, retained Preview, runtime worker or Production capability was
+created.
 
-### Durable Note registration historical-retention source checkpoint — 2026-08-24
+### Durable Note registration historical-retention source and r22 gate — 2026-08-24
 
 Supabase CLI 2.115.0 generated
 `20260823213144_harden_v1_note_generation_registration_retention.sql` as the
@@ -669,24 +671,44 @@ Local verification passed all three focused migration contracts (39/39), the
 full 125-file / 1,381-test suite, lint, TypeScript, the 63/63-page Next
 production build, the 73-file Codex-adapter sync check and `git diff --check`.
 
-The deleted Preview evidence remains historical and unchanged. `r21` passed
-the exact earlier 14/14 manifest and 7/7 suites with the 146488-byte worker body
-at SHA-256
+The earlier deleted Preview evidence remains historical and unchanged. `r21`
+passed the exact earlier 14/14 manifest and 7/7 suites with the 146488-byte
+worker body at SHA-256
 `bdcd479473ed1c6ae0782127eb1d8e5765e3de2ede829aadeb3eb35c2eeadaac`.
 `r9` passed the exact earlier 14/14 manifest and 7/7 suites with the 36467-byte
 durable-foundation body at SHA-256
 `3bd571e8447cbedd838251339e273877a25decaa582a538f0d7049319504bab0`.
 Neither run included the fifteenth migration or either current assertion body.
 
-This batch has local source/contract evidence only. No hosted Preview branch was
-created, so there is no new branch id/ref, cost confirmation, 15/15 apply,
-rollback-suite, postcheck or advisor result. Production was not the SQL target,
-and no deployment, grant, catalog row, runtime flag or capability changed. The
-source now selects the exact historical-retention strategy, but its hosted
-migration/assertion gate remains open. PostgreSQL 16, owner A/B runtime
-integration, nested exact-key envelopes, account-delete/purge recovery,
-provider-start binding, sequential numeric parsing and all vault/runtime gates
-remain open.
+At source HEAD `4cae6f1a08ce2bcc7e43456c275cf5e743f13fdf`, disposable
+`r22` (`v1-note-worker-rpc-r22`; id
+`0bc8db56-0e4a-42ec-9595-1f32a3d74a6b`; ref
+`wuzcjcfrkctelcnbbgtg`) was non-default, `persistent=false`,
+`with_data=false` and PostgreSQL 17.6 (`server_version_num=170006`) at the
+confirmed US$0.01344/hour Preview rate. The exact 15-file manifest applied
+15/15. The five adjacent suites plus the durable-foundation and worker bodies
+identified above passed 7/7.
+
+The independent postcheck confirmed exactly 12 private generation tables, nine
+private worker RPC identities, hard-off settings, zero checked business,
+catalog, registration, grant, evidence, outbox and fixture rows, denied API
+table/RPC access and only the two expected admin-only creator role edges. The
+new `attempts_registration_catalog_fk` was validated with exact `RESTRICT`
+update/delete actions, and `attempts_registration_digest_idx` had the exact
+single indexed key. Security advisors returned 26 global findings (23 INFO + 3
+pre-existing WARN) and zero generation findings. Performance advisors returned
+155 global findings (144 INFO + 11 WARN), with 20 generation INFO—14 unindexed
+composite-foreign-key findings and six unused fresh-index findings—and zero
+generation WARN/ERROR.
+
+The exact `r22` branch was deleted and its ID/ref were absent afterward.
+Production remained healthy and default and was never the SQL target. The
+hourly rate records only the confirmed creation price; no accrued total is
+inferred. This closes only the hosted registration historical-retention gate.
+PostgreSQL 16, owner A/B runtime integration, nested exact-key envelopes,
+account-delete/purge recovery, provider-start binding, sequential numeric
+parsing and all vault/runtime gates remain open. No retained Preview,
+deployment, caller grant, runtime flag or capability was created.
 
 ### Mobile V1 protected Product API Preview E2E — 2026-08-14
 
@@ -851,7 +873,7 @@ This does not prove a live, data-bearing cross-migration upgrade. The `202608100
 | Canonical document shadow | `src/lib/v1/canonical-document-shadow.test.ts` | owner deny, immutable revision sequence, stale base, full-request idempotency, checkpoint, self-review invalidation and tombstone/purge domain rules |
 | Points shadow | `src/lib/v1/points-shadow.test.ts` | lot ordering/expiry, quote boundaries, reserve/commit/release, replay, insufficient balance and cross-owner deny in memory |
 | Legacy NDIS projection | `src/lib/v1/legacy-ndis-adapter.test.ts` | deterministic read-only projection, no approval upgrade, no invented facts and metadata-only migration candidate |
-| Production-unapplied SQL boundary | `src/lib/v1/v1-shadow-migration-contract.test.ts`, `mobile-sync-migration-contract.test.ts`, isolated historical guarded-live evidence | additive/no legacy DML, owner isolation and explicit grants are source-checked; historical deleted `r4` passed the 13-file foundation manifest 13/13 and six rollback suites. At HEAD `c7b70e9f84b9b804779039711b85cc7eda55bd57`, deleted `r9` passed the exact 14-file worker manifest 14/14, seven rollback suites and independent hard-off/zero-row/role/RLS/ACL/9-RPC postchecks. Deleted `r20` additionally passed the PostgreSQL 17.6 true two-session claim/session/privacy race gate; deleted `r21` passed the Attempt 1/Attempt 2 historical-replay and post-purge matrix. Both were fully removed. The fifteenth registration-retention migration and both current assertion bodies remain local source only and are not covered by either 14/14 result. This is isolated schema/transaction evidence only; runtime writes remain withheld |
+| Production-unapplied SQL boundary | `src/lib/v1/v1-shadow-migration-contract.test.ts`, `mobile-sync-migration-contract.test.ts`, isolated historical guarded-live evidence | additive/no legacy DML, owner isolation and explicit grants are source-checked; historical deleted `r4` passed the 13-file foundation manifest 13/13 and six rollback suites. At HEAD `c7b70e9f84b9b804779039711b85cc7eda55bd57`, deleted `r9` passed the exact 14-file worker manifest 14/14, seven rollback suites and independent hard-off/zero-row/role/RLS/ACL/9-RPC postchecks. Deleted `r20` additionally passed the PostgreSQL 17.6 true two-session claim/session/privacy race gate; deleted `r21` passed the Attempt 1/Attempt 2 historical-replay and post-purge matrix. Deleted `r22` then passed the exact 15-file registration-retention manifest 15/15, the seven rollback suites and the independent retention/posture postcheck with both current assertion bodies. All worker Preview branches were removed. This is isolated schema/transaction evidence only; runtime writes remain withheld |
 | Runtime isolation | `src/lib/v1/runtime-boundary.test.ts` | audited NDIS routes and the new `/v1` adapter are the only allowed server boundaries; `/v1` remains disabled without explicit adapters |
 
 ### Current live/read-only evidence
@@ -922,7 +944,7 @@ The following suites are required before the corresponding V1 slice can be calle
 
 1. The native App exists in a separate repository and is outside this task; this AI repository does not execute or attest its iOS/Android, offline, purchase or store gates.
 2. The OpenAPI/TypeScript contract and default-off durable `/v1` route adapter now exist, but there is no Preview- or Production-served Product API, generated client package, schema registry or previous-version compatibility fixture.
-3. The current worktree used for the `r21` gate passed 1,377 tests across 124 files and the focused worker-RPC migration contract 25/25, with the `r9` 1,337-test / 122-file source result and earlier baselines retained. All five Note types share a Production-unapplied private metadata/RPC layer with nine exact RPC identities and no caller execute grant. Deleted PostgreSQL 17.6 disposable `r9` proved the exact 14-migration, seven-suite and independent postcheck gate; deleted `r20` closed the true two-session claim/session/privacy race gate; deleted `r21` closed Attempt 1 historical replay across Attempt 2 success and post-purge state. The fifteenth registration-retention migration and its updated assertion bodies are local-only and have no hosted apply/postcheck evidence. No worker-RPC Preview was retained. The five types still lack a runtime database repository, deployed worker, real provider/STT integration and complete per-type golden sets; PostgreSQL 16 and runtime/activation gates remain open.
+3. The registration-retention source worktree passed 1,381 tests across 125 files and all three focused migration contracts 39/39, with the `r21` 1,377-test / 124-file result, the `r9` 1,337-test / 122-file result and earlier baselines retained. All five Note types share a Production-unapplied private metadata/RPC layer with nine exact RPC identities and no caller execute grant. Deleted PostgreSQL 17.6 disposable `r9` proved the exact 14-migration, seven-suite and independent postcheck gate; deleted `r20` closed the true two-session claim/session/privacy race gate; deleted `r21` closed Attempt 1 historical replay across Attempt 2 success and post-purge state; deleted `r22` closed the hosted registration historical-retention gate with the exact 15/15 manifest, 7/7 suites and independent postcheck. No worker-RPC Preview was retained. The five types still lack a runtime database repository, deployed worker, real provider/STT integration and complete per-type golden sets; PostgreSQL 16 and runtime/activation gates remain open.
 4. Canonical document/revision/checkpoint states exist as memory/domain contracts plus historical isolated schema/RPC evidence and a Production-unapplied mobile-sync migration draft that was clean-applied only on a deleted disposable branch; there is no retained schema activation, editor, renderer or cross-device recovery E2E.
 5. Points lots/rates/reservations passed isolated serial database tests but remain shadow-only. There is no runtime entitlement integration, welcome eligibility decision, concurrent reservation proof or legacy-credit conversion/reconciliation test.
 6. No payment provider sandbox, webhook replay, refund or reconciliation harness exists.

@@ -21,8 +21,15 @@
 -- 36467 bytes.
 -- The current source body adds the minimum transaction-only registration row
 -- required by the separately CLI-generated attempt-registration retention
--- migration. It has no hosted Preview execution evidence yet. Current
--- BEGIN-through-ROLLBACK source SHA-256:
+-- migration. From exact execution source HEAD
+-- 4cae6f1a08ce2bcc7e43456c275cf5e743f13fdf it passed on deleted PostgreSQL
+-- 17.6 r22 as part of the 15/15 migration and 7/7 rollback-suite gate. The
+-- independent postcheck proved the validated retention FK/index, hard-off,
+-- zero-fixture, 12-table/9-RPC and denied-API posture. r22 was
+-- v1-note-worker-rpc-r22, id 0bc8db56-0e4a-42ec-9595-1f32a3d74a6b and ref
+-- wuzcjcfrkctelcnbbgtg; deletion was confirmed with id/ref absent and
+-- Production remained the sole healthy default and was never a SQL target.
+-- Current BEGIN-through-ROLLBACK source SHA-256:
 -- 2a2af2e8c7c745b769a731a4892b27f65fcf311321e813c3cc190e54167772a6;
 -- 37547 bytes.
 -- This remains metadata-schema evidence only; it does not prove or enable a
