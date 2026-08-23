@@ -1,6 +1,6 @@
 # Portal-first release checkpoint
 
-Date: 2026-08-23
+Date: 2026-08-24
 
 Branch: `codex/careslink-ai-mobile-sync-v1`
 Base HEAD inspected: `fe5b708c488853418bfec3822369429e8fe9ff8f`
@@ -24,9 +24,11 @@ existing versioned contract documentation. All new Referral and Note
 generation capabilities remain local, default-off, Production-unapplied and
 absent from retained Preview runtime. The private worker RPC migration passed
 the isolated PostgreSQL 17.6 migration/assertion gate on deleted disposable
-`r9`; this is not a runtime apply. Disposable Preview databases were used only
-for the isolated gates recorded below and then deleted; no Preview application
-deployment or Production database was used as the SQL target.
+`r9`; deleted no-data `r20` subsequently passed its PostgreSQL 17.6 true
+two-session claim/session/privacy race gate. Neither is a runtime apply.
+Disposable Preview databases were used only for the isolated gates recorded
+below and then deleted; no Preview application deployment or Production
+database was used as the SQL target.
 
 ## 1. Portal reality matrix
 
@@ -47,7 +49,7 @@ availability.
 | Admin access requests/material usage | real/mixed | Yes | Manages AI access/metadata, not providers or referrals | Reuse its auth-first action pattern, not its business schema |
 | `/plan-and-usage` | legacy credits | Read-only | Runtime is still 3 legacy credits although the 300-Point/Pro product baseline is approved | Do not show both systems; implement and reconcile the approved wallet before cutover |
 | NDIS Case Note | real legacy server flow plus local shared-job evidence | Legacy generate/save only | Uses synchronous model and old credits; the new shared job is source-only and does not call it | Preserve legacy; keep the shared provider and canonical write default-off |
-| Other four Note types | catalog plus local shared-job/durable/RPC source evidence | No | Communication, Handover, Progress and Incident Factual share the dispatcher/output boundary, default-off durable contracts and the Production-unapplied private RPC source, but have no retained/applied runtime repository, registered/deployed worker, served route, real provider or golden safety set | Extend the isolated database evidence with true two-connection races and a reviewed runtime boundary, then validate each type without forking orchestration |
+| Other four Note types | catalog plus local shared-job/durable/RPC source evidence | No | Communication, Handover, Progress and Incident Factual share the dispatcher/output boundary, default-off durable contracts and the Production-unapplied private RPC source, but have no retained/applied runtime repository, registered/deployed worker, served route, real provider or golden safety set | Complete the PostgreSQL 16 and reviewed runtime boundaries, then validate each type without forking orchestration |
 | `/ai-documents` | real legacy generated drafts | Delete only | Not canonical documents; store errors can appear as an empty list; no revision/export | Feature-gated canonical list only after current Preview evidence |
 | Shared `/v1` documents/sync | local durable adapter | Default-off | Exact current migrations are Production-unapplied and exist on no retained Preview; write grants withheld; no current base URL | M0 permits only me/list/pull after all identity/RLS gates pass |
 | Library/Guides/Updates | absent | No | No page, store, content version or API | After referral + Notes/documents/export |
@@ -703,9 +705,11 @@ Pre-r9 local source evidence at exact commit
 
 The later `r9` result below closes the exact PostgreSQL 17.6 clean-apply,
 rollback-assertion, role/ACL/function and post-rollback zero-matrix gate; it is
-not Production or runtime evidence. Activation still requires the PostgreSQL 16
-path, owner A/B runtime integration and true two-session/two-connection
-`SKIP LOCKED` claim plus session/privacy-revocation races.
+not Production or runtime evidence. At that checkpoint, activation still
+required the PostgreSQL 16 path, owner A/B runtime integration and true
+two-session/two-connection `SKIP LOCKED` claim plus session/privacy-revocation
+races. The later `r20` result below closes only that PostgreSQL 17.6 race
+subset.
 Account-delete/purge cross-state recovery remains unproved. Before catalogs can
 be populated, governance must either make registration/catalog rows append-only
 for the lifetime of every referencing attempt or add and prove a reviewed
@@ -753,5 +757,30 @@ Local gates at that HEAD passed 122 files / 1,337 tests, TypeScript, full lint
 and Next static generation 63/63. There is no retained Preview, caller grant,
 runtime repository/worker, model/STT, vault/KMS/retention implementation,
 Points settlement or user-flow evidence. Normal consume remains
-`DENIED_SETTLED` / `PAYLOAD_UNAVAILABLE`; true two-connection claim and
-session/privacy-revocation races remain a hard activation blocker.
+`DENIED_SETTLED` / `PAYLOAD_UNAVAILABLE`; at the `r9` checkpoint, true
+two-connection claim and session/privacy-revocation races remained a hard
+activation blocker.
+
+## 17. Durable Note worker RPC true two-session PostgreSQL 17 gate — 2026-08-24
+
+Disposable no-data `r20` used the Supabase Session Pooler with strict verified
+client TLS to hold two persistent PostgreSQL 17.6 sessions with distinct
+backend PIDs. A temporary least-privilege runner then passed all three live
+races: one `CLAIMED` plus one prompt `IDLE` result under `SKIP LOCKED`, session
+revocation winning before authorization, and privacy authorization locking
+before revocation so the later consume failed closed. The denial paths created
+no canonical rows.
+
+Management-plane cleanup committed runner `NOLOGIN`, drained only the exact
+idle pooler backends, removed the fixed fixtures/support schema/runner and
+passed an independent zero/posture postcheck. Security advisors were 26 global
+findings with zero in generation scope. Performance advisors were 133 global
+findings and 18 generation INFO with zero generation WARN/ERROR and zero
+concurrency-specific findings. The branch was deleted; Production was never
+the SQL target and remained `ACTIVE_HEALTHY`.
+
+This closes only the PostgreSQL 17.6 true two-session claim/session/privacy race
+gate. PostgreSQL 16, owner A/B runtime integration, attempt-2 historical replay
+and the existing catalog/envelope/purge/provider/vault governance remain open.
+No caller grant, retained Preview, runtime worker or Production capability was
+created.

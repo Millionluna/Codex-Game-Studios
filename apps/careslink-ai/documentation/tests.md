@@ -370,10 +370,11 @@ Pre-r9 local source evidence at exact commit
 
 Deleted disposable `r9` later closed the exact PostgreSQL 17.6 clean-apply,
 seven-suite rollback, role/ACL/function and zero-fixture/flags-off gates.
-Activation evidence remains open for the PostgreSQL 16 path, owner A/B runtime
-integration, true two-session/two-connection `SKIP LOCKED` claims and concurrent
-session/privacy-revocation locks, plus response-loss replay after attempt 2 has
-already succeeded.
+At that `r9` checkpoint, activation evidence was still open for the PostgreSQL
+16 path, owner A/B runtime integration, true two-session/two-connection
+`SKIP LOCKED` claims and concurrent session/privacy-revocation locks, plus
+response-loss replay after attempt 2 had already succeeded. The later `r20`
+gate recorded below closes only the PostgreSQL 17.6 two-session race subset.
 Governance must freeze catalog/registration retention as append-only while
 attempts reference their digests, or add a reviewed `RESTRICT` attempt
 registration foreign key plus index; and it must prove purge/outbox cross-state
@@ -551,9 +552,55 @@ The local gate passed 122 files / 1,337 tests, TypeScript, full lint and Next
 static generation 63/63. This is isolated schema/transaction/assertion evidence,
 not a retained Preview, Production apply, runtime worker/caller, live
 Auth/privacy route, model/STT, vault/KMS/retention, Points or user-flow result.
-Normal consume remains `DENIED_SETTLED` / `PAYLOAD_UNAVAILABLE`; PostgreSQL 16
-and true two-connection claim/session/privacy-revocation races remain hard
-activation blockers.
+Normal consume remains `DENIED_SETTLED` / `PAYLOAD_UNAVAILABLE`; at the `r9`
+checkpoint, PostgreSQL 16 and true two-connection
+claim/session/privacy-revocation races remained hard activation blockers.
+
+### Durable Note worker-RPC true two-session PostgreSQL 17 gate — 2026-08-24
+
+Disposable no-data `r20` exercised the current worker-RPC revision through the
+Supabase Session Pooler on port 5432 with `sslmode=verify-full`, the Supabase
+Root 2021 CA and an authorized client TLS socket. The harness established two
+persistent PostgreSQL 17.6 sessions with distinct backend PIDs as the temporary
+least-privilege concurrency runner. Within the test surface its only explicit
+grants were eight fixed zero-argument `TEST_ONLY` helpers and the three real
+claim, authorize and consume RPCs; it had no owner/executor membership or
+sensitive table/column DML privilege.
+
+All three live scenarios passed. `SKIP LOCKED` produced one `CLAIMED` and one
+prompt `IDLE` result while the first transaction remained open. A session
+deletion was observed blocking authorization and then settled
+`SESSION_REVOKED`. Authorization was observed blocking privacy revocation,
+after which consume settled `PRIVACY_REVIEW_STALE`. Both denial paths left zero
+canonical rows and fail-closed payload/purge state.
+
+Management-plane cleanup then committed runner `NOLOGIN`, drained only the
+exact idle Supavisor backends, removed the fixed fixtures, helper schema and
+runner, and passed an independent zero-row and posture postcheck. Security
+advisors were 26 global findings (23 INFO + 3 pre-existing WARN) and zero
+generation findings. Performance advisors were 133 global findings (122 INFO +
+11 WARN); generation scope was 18 INFO—14 [unindexed composite foreign keys](https://supabase.com/docs/guides/database/database-linter?lint=0001_unindexed_foreign_keys)
+plus 4 [unused indexes](https://supabase.com/docs/guides/database/database-linter?lint=0005_unused_index)—with
+zero WARN/ERROR and zero concurrency-specific findings. The disposable branch
+was deleted; Production was never the SQL target and remained `ACTIVE_HEALTHY`.
+
+This closes the true two-session claim/session/privacy race gate for PostgreSQL
+17.6 only. PostgreSQL 16, owner A/B runtime integration, attempt-2 historical
+replay and the already listed catalog/envelope/purge/provider/vault governance
+remain open. No caller grant, retained Preview, runtime worker or Production
+capability was created.
+
+Final source handoff gates passed:
+
+| Command | Result |
+|---|---|
+| `pnpm test:preview:e2e:policy` | 3 files / 53 tests passed |
+| `pnpm test` | 124 files / 1,377 tests passed |
+| `pnpm exec tsc --noEmit --incremental false` | passed |
+| `pnpm lint` | passed |
+| `pnpm build` | passed; Next static generation 63/63 |
+| `python3 tools/sync_codex_adapters.py --check` | passed; 73 adapter files in sync |
+| `git diff --check` | passed |
 
 ### Mobile V1 protected Product API Preview E2E — 2026-08-14
 
@@ -718,7 +765,7 @@ This does not prove a live, data-bearing cross-migration upgrade. The `202608100
 | Canonical document shadow | `src/lib/v1/canonical-document-shadow.test.ts` | owner deny, immutable revision sequence, stale base, full-request idempotency, checkpoint, self-review invalidation and tombstone/purge domain rules |
 | Points shadow | `src/lib/v1/points-shadow.test.ts` | lot ordering/expiry, quote boundaries, reserve/commit/release, replay, insufficient balance and cross-owner deny in memory |
 | Legacy NDIS projection | `src/lib/v1/legacy-ndis-adapter.test.ts` | deterministic read-only projection, no approval upgrade, no invented facts and metadata-only migration candidate |
-| Production-unapplied SQL boundary | `src/lib/v1/v1-shadow-migration-contract.test.ts`, `mobile-sync-migration-contract.test.ts`, isolated historical guarded-live evidence | additive/no legacy DML, owner isolation and explicit grants are source-checked; historical deleted `r4` passed the 13-file foundation manifest 13/13 and six rollback suites. At HEAD `c7b70e9f84b9b804779039711b85cc7eda55bd57`, deleted `r9` passed the exact 14-file worker manifest 14/14, seven rollback suites and independent hard-off/zero-row/role/RLS/ACL/9-RPC postchecks. This is isolated schema/transaction evidence only; runtime writes remain withheld |
+| Production-unapplied SQL boundary | `src/lib/v1/v1-shadow-migration-contract.test.ts`, `mobile-sync-migration-contract.test.ts`, isolated historical guarded-live evidence | additive/no legacy DML, owner isolation and explicit grants are source-checked; historical deleted `r4` passed the 13-file foundation manifest 13/13 and six rollback suites. At HEAD `c7b70e9f84b9b804779039711b85cc7eda55bd57`, deleted `r9` passed the exact 14-file worker manifest 14/14, seven rollback suites and independent hard-off/zero-row/role/RLS/ACL/9-RPC postchecks. Deleted `r20` additionally passed the PostgreSQL 17.6 true two-session claim/session/privacy race gate and was fully removed. This is isolated schema/transaction evidence only; runtime writes remain withheld |
 | Runtime isolation | `src/lib/v1/runtime-boundary.test.ts` | audited NDIS routes and the new `/v1` adapter are the only allowed server boundaries; `/v1` remains disabled without explicit adapters |
 
 ### Current live/read-only evidence
@@ -789,7 +836,7 @@ The following suites are required before the corresponding V1 slice can be calle
 
 1. The native App exists in a separate repository and is outside this task; this AI repository does not execute or attest its iOS/Android, offline, purchase or store gates.
 2. The OpenAPI/TypeScript contract and default-off durable `/v1` route adapter now exist, but there is no Preview- or Production-served Product API, generated client package, schema registry or previous-version compatibility fixture.
-3. The r9 execution source at HEAD `c7b70e9f84b9b804779039711b85cc7eda55bd57` passed 1,337 tests across 122 files (with 121 / 1,294, 120 / 1,284, 119 / 1,236, 118 / 1,193, 115 / 1,089, 114 / 1,051, 112 / 983, 107 / 938, 104 / 894 and 103 / 831 retained as prior source-level batches and 90 / 653 as the historical baseline). All five Note types share a Production-unapplied private metadata/RPC layer with nine exact RPC identities and no caller execute grant. Deleted PostgreSQL 17.6 disposable `r9` proved the exact 14-migration, seven-suite and independent postcheck gate, but no Preview was retained. The five types still lack a runtime database repository, deployed worker, real provider/STT integration and complete per-type golden sets; PostgreSQL 16 and true two-connection race gates remain open.
+3. The r9 execution source at HEAD `c7b70e9f84b9b804779039711b85cc7eda55bd57` passed 1,337 tests across 122 files (with 121 / 1,294, 120 / 1,284, 119 / 1,236, 118 / 1,193, 115 / 1,089, 114 / 1,051, 112 / 983, 107 / 938, 104 / 894 and 103 / 831 retained as prior source-level batches and 90 / 653 as the historical baseline). All five Note types share a Production-unapplied private metadata/RPC layer with nine exact RPC identities and no caller execute grant. Deleted PostgreSQL 17.6 disposable `r9` proved the exact 14-migration, seven-suite and independent postcheck gate; deleted `r20` additionally closed the PostgreSQL 17.6 true two-session claim/session/privacy race gate. No Preview was retained. The five types still lack a runtime database repository, deployed worker, real provider/STT integration and complete per-type golden sets; PostgreSQL 16 and runtime/activation gates remain open.
 4. Canonical document/revision/checkpoint states exist as memory/domain contracts plus historical isolated schema/RPC evidence and a Production-unapplied mobile-sync migration draft that was clean-applied only on a deleted disposable branch; there is no retained schema activation, editor, renderer or cross-device recovery E2E.
 5. Points lots/rates/reservations passed isolated serial database tests but remain shadow-only. There is no runtime entitlement integration, welcome eligibility decision, concurrent reservation proof or legacy-credit conversion/reconciliation test.
 6. No payment provider sandbox, webhook replay, refund or reconciliation harness exists.

@@ -4,8 +4,10 @@
 > schema-only foundation passed its historical deleted-`r4` gate; at source HEAD
 > `c7b70e9f84b9b804779039711b85cc7eda55bd57`, the exact worker RPC bundle passed
 > isolated PostgreSQL 17.6 migration/assertion evidence on deleted disposable
-> `r9`. This is not a retained/applied runtime repository, callable worker,
-> route, Preview capability, model call or Production capability.
+> `r9`. A subsequent fixed harness on deleted no-data `r20` proved the three
+> true two-session claim/session/privacy races on PostgreSQL 17.6. This is not a
+> retained/applied runtime repository, callable worker, route, Preview
+> capability, model call or Production capability.
 
 ## 1. Scope and non-goals
 
@@ -421,9 +423,10 @@ objects and privileges:
   ordinals and duplicate active attempts fail closed;
 
 The RPC/payload assertion extended those checks and ran as one rollback-only
-request on deleted `r9`. The cases below are established only as serial,
-fixture-backed PostgreSQL 17.6 evidence, not runtime or independent-session
-behavior:
+request on deleted `r9`. The cases below were initially established as serial,
+fixture-backed PostgreSQL 17.6 evidence. Deleted `r20` later added
+independent-session evidence only for the three races called out below; neither
+gate is runtime behavior:
 
 - no unsafe public overload and no unreviewed execute privilege;
 - every definer function has a fixed empty search path and allowlisted owner;
@@ -438,12 +441,13 @@ behavior:
   proofs;
 - same-request replay and changed-request idempotency conflict;
 - deterministic `SKIP LOCKED` claim structure, a single-active-attempt
-  invariant and monotonically increasing attempts; a true two-worker claim
-  race remains unproved;
+  invariant and monotonically increasing attempts; `r9` did not prove a true
+  two-worker claim race, while `r20` later proved it on PostgreSQL 17.6;
 - wrong/stale lease token, heartbeat bounds, lease expiry and recovery;
 - scripted session revocation or privacy-proof expiry between enqueue and
   claim cannot issue or consume a payload-use grant, decrypt facts or start
-  provider work; the corresponding two-connection lock races remain unproved;
+  provider work; `r9` did not prove the corresponding two-connection lock
+  races, while `r20` later proved them on PostgreSQL 17.6;
 - cancellation and late provider-result rejection;
 - claim-response and success-response loss replay;
 - canonical document + revision 1 + sync change + `CREATE_DOCUMENT` receipt +
@@ -466,10 +470,11 @@ behavior:
 
 The same exact revision must then pass the existing canonical JSON vectors,
 active-session tests, privacy tests, owner A/B RLS tests and revoked-session
-cleanup tests, including true two-session/two-connection claim races and
-concurrent session/privacy revocation locks on supported PostgreSQL 16/17
-paths. Preview evidence for an earlier migration revision is not promotion
-evidence for this design.
+cleanup tests. Deleted `r20` closed the true two-session/two-connection claim
+and concurrent session/privacy-revocation race subset on PostgreSQL 17.6; the
+PostgreSQL 16 path and owner A/B runtime integration remain open. Preview
+evidence for an earlier migration revision is not promotion evidence for this
+design.
 
 ## 11. Current evidence boundary
 
@@ -613,6 +618,19 @@ The local source gate passed:
 | `pnpm lint` | passed |
 | `pnpm build` | passed; Next static generation 63/63 |
 
+Deleted no-data `r20` subsequently exercised the same worker-RPC revision with
+two persistent PostgreSQL 17.6 sessions and distinct backend PIDs through the
+Supabase Session Pooler. Client TLS used `sslmode=verify-full` and the Supabase
+Root 2021 CA. Its temporary least-privilege runner could execute only eight
+fixed zero-argument `TEST_ONLY` helpers and the three real claim, authorize and
+consume RPCs; it had no sensitive table DML or owner/executor membership.
+`SKIP LOCKED`, session-revocation-first and privacy-authorization-first races
+all passed. Cleanup committed `NOLOGIN`, drained only the exact idle pooler
+backends, removed the fixed fixtures/support schema/runner, passed an
+independent zero/posture postcheck and deleted the Preview. Production was
+never the SQL target. The detailed evidence and advisor counts are recorded in
+`documentation/tests.md`.
+
 Independent final source/security review reported no P0/P1. Remaining
 activation governance is explicit, not a hidden default:
 
@@ -634,10 +652,12 @@ activation governance is explicit, not a hidden default:
   than relying on expression evaluation order.
 
 Deleted `r9` closed the PostgreSQL 17.6 serial assertion, role/ACL/function,
-scripted-fault and zero-fixture gates. Activation still requires the PostgreSQL
-16 path and true two-connection `SKIP LOCKED` claim plus session/privacy-
-revocation races. Those are hard blockers before any caller grant or registry
-entry. Only after those results and the vault/KMS/retention, worker credential,
-model/provider/STT and Points decisions are separately approved may runtime
-activation be considered. Nothing in this handoff authorizes Preview retention,
-Production apply, route activation, model/STT traffic or Points settlement.
+scripted-fault and zero-fixture gates. Deleted `r20` subsequently closed the
+PostgreSQL 17.6 true two-session `SKIP LOCKED` claim and session/privacy-
+revocation race gate. Activation still requires the PostgreSQL 16 path and
+owner A/B runtime integration; the governance items above remain open before
+any caller grant or registry entry. Only after those results and the
+vault/KMS/retention, worker credential, model/provider/STT and Points decisions
+are separately approved may runtime activation be considered. Nothing in this
+handoff authorizes Preview retention, Production apply, route activation,
+model/STT traffic or Points settlement.
