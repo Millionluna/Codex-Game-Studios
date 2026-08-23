@@ -1226,6 +1226,7 @@ describe("V1 Note registered-worker RPC shadow migration contract", () => {
     expect(assertionHeader).toContain(
       "this file remains serial evidence and PostgreSQL 16 remains unproved",
     );
+    expect(assertionHeader).toContain("historical pre-retention body");
     expect(assertionHeader).toContain("PostgreSQL 17.6 r21");
     expect(assertionHeader).toContain(
       "14/14 migrations, 7/7 rollback suites and the independent hard-off/zero-row/role/RLS/ACL postcheck all passed",
@@ -1245,14 +1246,18 @@ describe("V1 Note registered-worker RPC shadow migration contract", () => {
       "7ac37a3698e60636725195eae9eb07992a300c0219ab47f83c56128e5d8e9c3d",
       "bdcd479473ed1c6ae0782127eb1d8e5765e3de2ede829aadeb3eb35c2eeadaac",
       "146488 bytes",
+      "registration-retention migration catalog and enforcement proof",
+      "no hosted Preview execution evidence yet",
+      "1c9f65bdc7f1de86e1c7398399ecf029207ba1b2bdf9fa3634dadb482424fdbb",
+      "153956 bytes",
     ]) {
       expect(assertionHeader).toContain(marker);
     }
     expect(assertionBodyStart).toBeGreaterThanOrEqual(0);
-    expect(Buffer.byteLength(assertionBody, "utf8")).toBe(146_488);
+    expect(Buffer.byteLength(assertionBody, "utf8")).toBe(153_956);
     expect(
       createHash("sha256").update(assertionBody, "utf8").digest("hex"),
-    ).toBe("bdcd479473ed1c6ae0782127eb1d8e5765e3de2ede829aadeb3eb35c2eeadaac");
+    ).toBe("1c9f65bdc7f1de86e1c7398399ecf029207ba1b2bdf9fa3634dadb482424fdbb");
     expect(assertions).toContain("transaction-only TEST_ONLY fixtures");
     expect(assertions).toContain("pg_get_function_identity_arguments");
     expect(assertions).toContain("aclexplode(");

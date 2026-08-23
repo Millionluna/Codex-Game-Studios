@@ -1,6 +1,6 @@
 # V1 Note generation durable design handoff
 
-> Status: default-off design plus two Production-unapplied migrations. The
+> Status: default-off design plus three Production-unapplied migrations. The
 > schema-only foundation passed its historical deleted-`r4` gate; at source HEAD
 > `c7b70e9f84b9b804779039711b85cc7eda55bd57`, the exact worker RPC bundle passed
 > isolated PostgreSQL 17.6 migration/assertion evidence on deleted disposable
@@ -662,13 +662,52 @@ matched deleted `r9`. The branch was deleted; Production remained healthy and
 was never the SQL target. This closes Attempt-2 historical replay only and
 creates no retained Preview or runtime/Production capability.
 
-Independent final source/security review reported no P0/P1. Remaining
+### Attempt-registration historical retention source hardening — 2026-08-24
+
+Supabase CLI 2.115.0 generated the additive fifteenth migration
+`20260823213144_harden_v1_note_generation_registration_retention.sql`. The
+design chooses the reviewed database-enforced retention option: every
+historical `attempts.registration_digest` now references the exact immutable
+`worker_registrations.registration_digest` through the named
+`attempts_registration_catalog_fk`. The constraint uses explicit `ON UPDATE
+RESTRICT` and `ON DELETE RESTRICT`. It is added `NOT VALID`, so new orphaned
+history is rejected without an eager initial table scan, and is then explicitly
+validated so any pre-existing missing registration fails the migration closed.
+The non-unique B-tree `attempts_registration_digest_idx` supplies the required
+referencing-side lookup path.
+
+`NOT VALID` is a fail-closed validation shape, not an online low-lock promotion
+claim. The ordinary index build and same-transaction validation can block
+writers. The current capability is hard-off with no runtime writer; any future
+data-bearing promotion needs its own maintenance, zero-row or separately
+reviewed online-DDL plan.
+
+The static migration contract locks the exact constraint, validation and index
+shape. The rollback assertion inspects the live catalog metadata, then proves
+that changing a historical attempt to a missing registration digest and deleting
+an in-use worker registration are both rejected by the exact named foreign key.
+It verifies that the failed subtransactions leave the registration, all five
+provider-policy bindings, attempts and payload grants at their original counts.
+This is retention enforcement only: the migration adds no catalog lifecycle
+RPC, seed, caller grant, registry/runtime entrypoint or capability flag, and it
+does not apply or authorize a Production change.
+
+This source batch has no hosted execution evidence yet. Promotion evidence for
+the current revision requires a fresh no-data hosted gate that clean-applies all
+15 migrations 15/15, passes the seven rollback suites and repeats the independent
+hard-off/zero-row/RLS/ACL/RPC postcheck before the disposable branch is deleted.
+The deleted `r9`, `r20` and `r21` results above remain evidence only for their
+recorded revisions and are not rewritten as evidence for this migration.
+
+The current local source gate passed the three focused migration contracts
+(39/39), the full 125-file / 1,381-test suite, lint, TypeScript, the 63/63-page
+Next production build, the 73-file Codex-adapter sync check and
+`git diff --check`. These results are static/local evidence only.
+
+Independent review of this current source batch found no P0/P1/P2; the prior
+`r21` final source/security review also reported no P0/P1. Remaining
 activation governance is explicit, not a hidden default:
 
-- treat approved policy catalogs and registration bindings as append-only and
-  retain them while jobs/attempts reference their digests, or add a reviewed
-  `RESTRICT` attempt-registration foreign key plus index before deletion or
-  replacement is possible;
 - add database exact-key vectors for every nested acknowledgement envelope;
   the SQL helpers currently lock top-level keys and validate allowlisted nested
   fields/row relationships, while the TypeScript adapter parser is stricter;
@@ -685,11 +724,12 @@ scripted-fault and zero-fixture gates. Deleted `r20` subsequently closed the
 PostgreSQL 17.6 true two-session `SKIP LOCKED` claim and session/privacy-
 revocation race gate. Activation still requires the PostgreSQL 16 path and
 owner A/B runtime integration. Deleted `r21` closed the Attempt-2 historical
-replay gate; catalog retention, nested exact-key vectors,
-account-delete/purge recovery, provider-start binding, numeric parsing and the
-runtime/vault governance items above remain open before any caller grant or
-registry entry. Only after those results and the vault/KMS/retention, worker
-credential, model/provider/STT and Points decisions are separately approved
-may runtime activation be considered. Nothing in this handoff authorizes
-Preview retention, Production apply, route activation, model/STT traffic or
-Points settlement.
+replay gate. The current source batch chooses and implements the registration
+retention FK/index design, but its exact 15-migration hosted gate remains open.
+Nested exact-key vectors, account-delete/purge recovery, provider-start binding,
+numeric parsing and the runtime/vault governance items above also remain open
+before any caller grant or registry entry. Only after those results and the
+vault/KMS/retention, worker credential, model/provider/STT and Points decisions
+are separately approved may runtime activation be considered. Nothing in this
+handoff authorizes Preview retention, Production apply, route activation,
+model/STT traffic or Points settlement.

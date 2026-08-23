@@ -5,8 +5,8 @@
 -- The prior exact-schema pg_constraint revision passed as one rollback-only
 -- request on the deleted PostgreSQL 17 r3 and r4 Previews. The r4 gate also
 -- passed all five adjacent assertion suites and post-rollback zero-fixture
--- checks. This additive-aware revision later passed on the deleted PostgreSQL
--- 17.6 r9 disposable Preview: 14/14 migrations, 7/7 assertions and the
+-- checks. The historical additive-aware revision later passed on the deleted
+-- PostgreSQL 17.6 r9 disposable Preview: 14/14 migrations, 7/7 assertions and the
 -- independent postcheck all passed from exact execution source HEAD
 -- c7b70e9f84b9b804779039711b85cc7eda55bd57.
 -- The deleted r9 branch identity was
@@ -16,9 +16,15 @@
 -- Production adocsnwnslxhxcjgbyee was never a SQL target.
 -- Pre-header-edit full-file SHA-256:
 -- ae07158b899243cec9dc591b9d7c3f3beb6b85cdc213f9b732d6ed159932cfb8.
--- Exact BEGIN-through-ROLLBACK body SHA-256:
+-- Historical r9 BEGIN-through-ROLLBACK body SHA-256:
 -- 3bd571e8447cbedd838251339e273877a25decaa582a538f0d7049319504bab0;
 -- 36467 bytes.
+-- The current source body adds the minimum transaction-only registration row
+-- required by the separately CLI-generated attempt-registration retention
+-- migration. It has no hosted Preview execution evidence yet. Current
+-- BEGIN-through-ROLLBACK source SHA-256:
+-- 2a2af2e8c7c745b769a731a4892b27f65fcf311321e813c3cc190e54167772a6;
+-- 37547 bytes.
 -- This remains metadata-schema evidence only; it does not prove or enable a
 -- live worker, payload vault or canonical persistence RPC.
 -- Run it after the foundation migration, with or without later separately
@@ -26,9 +32,9 @@
 -- foundation subset; the worker RPC assertion owns the exact extension table,
 -- policy, function and executor-ACL surface. It does not prove SKIP LOCKED,
 -- worker RPCs or atomic canonical persistence.
--- This serial rollback proof does not prove true two-connection SKIP LOCKED or
--- session/privacy-revocation races. Those remain a hard blocker before any
--- caller grant or activation.
+-- This serial rollback proof does not itself prove true two-connection SKIP
+-- LOCKED or session/privacy-revocation races. Deleted r20 separately closed
+-- that PostgreSQL 17.6 subset; PostgreSQL 16 remains unproved.
 -- Invoke it explicitly with psql; it intentionally lives outside
 -- supabase/tests because it is not a pgTAP/supabase test db test file.
 
@@ -201,9 +207,12 @@ declare
     to_regclass('careslink_v1_generation.provider_policies');
   v_payload_catalog regclass :=
     to_regclass('careslink_v1_generation.payload_policies');
+  v_registration_catalog regclass :=
+    to_regclass('careslink_v1_generation.worker_registrations');
 begin
   if (v_worker_catalog is null) <> (v_provider_catalog is null)
     or (v_worker_catalog is null) <> (v_payload_catalog is null)
+    or (v_worker_catalog is null) <> (v_registration_catalog is null)
   then
     raise exception 'durable generation additive catalog fixture scope drifted';
   end if;
@@ -217,6 +226,9 @@ begin
       'no force row level security';
     execute
       'alter table careslink_v1_generation.payload_policies ' ||
+      'no force row level security';
+    execute
+      'alter table careslink_v1_generation.worker_registrations ' ||
       'no force row level security';
 
     execute $catalog$
@@ -261,6 +273,20 @@ begin
       ) values (
         'payload.test.v1', 'APPROVED', 'encryption.test.v1',
         'backup.test.v1', repeat('f', 64), true
+      )
+    $catalog$;
+
+    execute $catalog$
+      insert into careslink_v1_generation.worker_registrations (
+        registration_digest, registration_version, status,
+        contract_version, schema_version, worker_identity_version,
+        worker_identity_hash, worker_policy_version, worker_policy_digest,
+        payload_policy_version, payload_policy_snapshot_hash, shadow_only
+      ) values (
+        repeat('2', 64), 'registration.test.v1', 'APPROVED',
+        '1.0.0-shadow.1', '2026-08-09.v1-shadow', 'worker.test.v1',
+        repeat('1', 64), 'worker.test.v1', repeat('d', 64),
+        'payload.test.v1', repeat('f', 64), true
       )
     $catalog$;
   end if;
@@ -972,6 +998,9 @@ begin
     execute
       'alter table careslink_v1_generation.payload_policies ' ||
       'force row level security';
+    execute
+      'alter table careslink_v1_generation.worker_registrations ' ||
+      'force row level security';
 
     if (
       select count(*)
@@ -979,12 +1008,13 @@ begin
       where relation.relnamespace =
           'careslink_v1_generation'::regnamespace
         and relation.relname in (
-          'worker_policies', 'provider_policies', 'payload_policies'
+          'worker_policies', 'provider_policies', 'payload_policies',
+          'worker_registrations'
         )
         and relation.relkind = 'r'
         and relation.relrowsecurity
         and relation.relforcerowsecurity
-    ) <> 3 then
+    ) <> 4 then
       raise exception
         'durable generation additive catalog FORCE cleanup failed';
     end if;

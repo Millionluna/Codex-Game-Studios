@@ -426,6 +426,7 @@ describe("V1 Note durable generation foundation migration contract", () => {
     expect(assertionHeader).toContain(
       "14/14 migrations, 7/7 assertions and the independent postcheck all passed",
     );
+    expect(assertionHeader).toContain("historical additive-aware revision");
     for (const marker of [
       "c7b70e9f84b9b804779039711b85cc7eda55bd57",
       "a1571c30-a322-4cea-b332-b189804df195",
@@ -436,21 +437,27 @@ describe("V1 Note durable generation foundation migration contract", () => {
       "ae07158b899243cec9dc591b9d7c3f3beb6b85cdc213f9b732d6ed159932cfb8",
       "3bd571e8447cbedd838251339e273877a25decaa582a538f0d7049319504bab0",
       "36467 bytes",
+      "minimum transaction-only registration row",
+      "attempt-registration retention migration",
+      "no hosted Preview execution evidence yet",
+      "2a2af2e8c7c745b769a731a4892b27f65fcf311321e813c3cc190e54167772a6",
+      "37547 bytes",
     ]) {
       expect(assertionHeader).toContain(marker);
     }
     expect(assertionBodyStart).toBeGreaterThanOrEqual(0);
-    expect(Buffer.byteLength(assertionBody, "utf8")).toBe(36_467);
+    expect(Buffer.byteLength(assertionBody, "utf8")).toBe(37_547);
     expect(
       createHash("sha256").update(assertionBody, "utf8").digest("hex"),
-    ).toBe("3bd571e8447cbedd838251339e273877a25decaa582a538f0d7049319504bab0");
+    ).toBe("2a2af2e8c7c745b769a731a4892b27f65fcf311321e813c3cc190e54167772a6");
     expect(assertionHeader).toContain(
-      "serial rollback proof does not prove true two-connection SKIP LOCKED",
+      "serial rollback proof does not itself prove true two-connection SKIP LOCKED",
     );
     expect(assertionHeader).toContain("session/privacy-revocation races");
     expect(assertionHeader).toContain(
-      "remain a hard blocker before any caller grant or activation",
+      "Deleted r20 separately closed that PostgreSQL 17.6 subset",
     );
+    expect(assertionHeader).toContain("PostgreSQL 16 remains unproved");
     expect(assertions).not.toContain("information_schema.table_constraints");
     expect(
       assertions.match(/^  from pg_constraint as constraint_metadata$/gm),
@@ -486,6 +493,11 @@ describe("V1 Note durable generation foundation migration contract", () => {
     ]) {
       expect(assertions).toContain(marker);
     }
+    expect(assertions).toContain("v_registration_catalog");
+    expect(assertions).toContain(
+      "insert into careslink_v1_generation.worker_registrations",
+    );
+    expect(assertions).toContain("registration.test.v1");
     expect(assertions).toContain(
       "executor-ACL surface. It does not prove SKIP LOCKED,",
     );

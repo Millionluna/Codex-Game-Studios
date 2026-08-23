@@ -19,6 +19,9 @@ Current Attempt-2 historical-replay gate base HEAD:
 Current worker RPC shadow migration source:
 `20260821071044_add_v1_note_generation_worker_rpc_shadow.sql`
 
+Current registration-retention hardening source:
+`20260823213144_harden_v1_note_generation_registration_retention.sql`
+
 This checkpoint covers the AI Web Portal reality audit, release sequencing,
 local Referral foundation and source-only five-Note generation contracts. It
 does not modify the native App, Main Website, Native Auth/M0 implementation or
@@ -829,3 +832,53 @@ account-delete/purge recovery, provider-start binding, sequential numeric
 parsing hardening and the real runtime/vault boundaries remain activation
 blockers. No caller grant, retained Preview, runtime worker, route, model/STT,
 Points or Production capability was created or authorized.
+
+## 19. Durable Note registration historical-retention source — 2026-08-24
+
+Supabase CLI 2.115.0 generated the fifteenth migration in the reviewed local
+worker manifest,
+`20260823213144_harden_v1_note_generation_registration_retention.sql`. It adds
+the exact child index `attempts_registration_digest_idx` on
+`careslink_v1_generation.attempts(registration_digest)` and the exact validated
+foreign key `attempts_registration_catalog_fk` from that column to
+`careslink_v1_generation.worker_registrations(registration_digest)`, with both
+`ON UPDATE RESTRICT` and `ON DELETE RESTRICT`. The migration creates the
+referencing index first, adds the constraint `NOT VALID` so new orphans fail
+closed immediately, and then validates all existing attempt history.
+
+The current BEGIN-through-ROLLBACK worker assertion body is 153956 bytes with
+SHA-256
+`1c9f65bdc7f1de86e1c7398399ecf029207ba1b2bdf9fa3634dadb482424fdbb`.
+It now locks the exact constraint/index catalog posture and proves that both a
+registration-digest rewrite and deletion of a registration referenced by a
+historical terminal attempt fail on `attempts_registration_catalog_fk` without
+changing the retained rows. The current durable-foundation assertion body is
+37547 bytes with SHA-256
+`2a2af2e8c7c745b769a731a4892b27f65fcf311321e813c3cc190e54167772a6`;
+it adds only the minimum transaction-local registration fixture required by the
+new foreign key.
+
+The local gate passed all three focused migration contracts (39/39), the full
+125-file / 1,381-test suite, lint, TypeScript, the 63/63-page Next production
+build, the 73-file Codex-adapter sync check and `git diff --check`. This is
+local source evidence, not a database apply.
+
+These are current source digests, not hosted execution evidence. Deleted `r21`
+still proves only its historical 14/14 manifest and 7/7 rollback suites with
+the earlier 146488-byte worker body, SHA-256
+`bdcd479473ed1c6ae0782127eb1d8e5765e3de2ede829aadeb3eb35c2eeadaac`.
+Deleted `r9` still proves only its historical 14/14 manifest and 7/7 rollback
+suites with the earlier 36467-byte durable-foundation body, SHA-256
+`3bd571e8447cbedd838251339e273877a25decaa582a538f0d7049319504bab0`.
+Neither historical gate included the fifteenth migration or the current
+assertion bodies.
+
+No hosted Preview branch was created for this source batch, so there is no new
+branch id/ref, cost confirmation, 15/15 apply, rollback-suite, postcheck or
+advisor result. Production was not a SQL target and no deployment, grant,
+catalog row, runtime flag or capability was added. The exact `RESTRICT` design
+is now represented in local source, but its hosted migration/assertion gate
+remains open. PostgreSQL 16, owner A/B runtime integration, nested exact-key
+database vectors, account-delete/purge recovery, provider-start binding,
+sequential numeric parsing and all real vault/runtime/activation gates also
+remain open.

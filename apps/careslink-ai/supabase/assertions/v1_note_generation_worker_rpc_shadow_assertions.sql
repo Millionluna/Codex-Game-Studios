@@ -7,7 +7,7 @@
 -- real two-connection concurrency gate before any execute grant or activation.
 -- Deleted r20 separately closed that PostgreSQL 17.6 race subset; this file
 -- remains serial evidence and PostgreSQL 16 remains unproved.
--- This exact body, from the worktree based on HEAD
+-- The historical pre-retention body, from the worktree based on HEAD
 -- 000f17af88eff9266a92e484ba2080335d20fd2d, passed on deleted PostgreSQL
 -- 17.6 r21: 14/14 migrations, 7/7 rollback suites and the independent
 -- hard-off/zero-row/role/RLS/ACL postcheck all passed.
@@ -22,9 +22,15 @@
 -- v1-note-worker-rpc-r9.
 -- Historical pre-header-edit full-file SHA-256:
 -- 7ac37a3698e60636725195eae9eb07992a300c0219ab47f83c56128e5d8e9c3d.
--- Exact executed BEGIN-through-ROLLBACK body SHA-256:
+-- Historical r21 executed BEGIN-through-ROLLBACK body SHA-256:
 -- bdcd479473ed1c6ae0782127eb1d8e5765e3de2ede829aadeb3eb35c2eeadaac;
 -- 146488 bytes.
+-- The current source body adds the separately CLI-generated
+-- registration-retention migration catalog and enforcement proof. It has no
+-- hosted Preview execution evidence yet. Current BEGIN-through-ROLLBACK source
+-- SHA-256:
+-- 1c9f65bdc7f1de86e1c7398399ecf029207ba1b2bdf9fa3634dadb482424fdbb;
+-- 153956 bytes.
 
 \set ON_ERROR_STOP on
 
@@ -4217,6 +4223,207 @@ begin
 end
 $$;
 
+reset role;
+
+-- A terminal attempt must keep its immutable worker-registration row for
+-- historical resolve/settle/success replay. Prove both the exact catalog
+-- posture and live enforcement inside rollback-only owner subtransactions.
+set local role careslink_v1_generation_owner;
+alter table careslink_v1_generation.attempts no force row level security;
+alter table careslink_v1_generation.payload_grants
+  no force row level security;
+alter table careslink_v1_generation.worker_registrations
+  no force row level security;
+alter table careslink_v1_generation.worker_registration_provider_policies
+  no force row level security;
+
+do $$
+declare
+  v_registration_digest text :=
+    current_setting('careslink.assert.registration_digest');
+  v_attempt_id uuid;
+  v_attempt_count bigint;
+  v_grant_count bigint;
+  v_binding_count bigint;
+  v_constraint_name text;
+  v_orphan_rejected boolean := false;
+  v_delete_restricted boolean := false;
+begin
+  if (
+    select count(*)
+    from pg_constraint as constraint_metadata
+    where constraint_metadata.conname =
+        'attempts_registration_catalog_fk'
+      and constraint_metadata.contype = 'f'
+      and constraint_metadata.conrelid =
+        'careslink_v1_generation.attempts'::regclass
+      and constraint_metadata.confrelid =
+        'careslink_v1_generation.worker_registrations'::regclass
+      and constraint_metadata.convalidated is true
+      and constraint_metadata.condeferrable is false
+      and constraint_metadata.condeferred is false
+      and constraint_metadata.confupdtype = 'r'
+      and constraint_metadata.confdeltype = 'r'
+      and constraint_metadata.conkey = array[
+        (
+          select attribute.attnum
+          from pg_attribute as attribute
+          where attribute.attrelid =
+              'careslink_v1_generation.attempts'::regclass
+            and attribute.attname = 'registration_digest'
+            and not attribute.attisdropped
+        )
+      ]::smallint[]
+      and constraint_metadata.confkey = array[
+        (
+          select attribute.attnum
+          from pg_attribute as attribute
+          where attribute.attrelid =
+              'careslink_v1_generation.worker_registrations'::regclass
+            and attribute.attname = 'registration_digest'
+            and not attribute.attisdropped
+        )
+      ]::smallint[]
+  ) <> 1
+    or (
+      select count(*)
+      from pg_index as index_metadata
+      join pg_class as index_relation
+        on index_relation.oid = index_metadata.indexrelid
+      join pg_am as access_method
+        on access_method.oid = index_relation.relam
+      where index_metadata.indrelid =
+          'careslink_v1_generation.attempts'::regclass
+        and index_relation.relname = 'attempts_registration_digest_idx'
+        and index_relation.relnamespace =
+          'careslink_v1_generation'::regnamespace
+        and index_relation.relowner =
+          'careslink_v1_generation_owner'::regrole
+        and access_method.amname = 'btree'
+        and index_metadata.indisvalid is true
+        and index_metadata.indisready is true
+        and index_metadata.indisunique is false
+        and index_metadata.indisprimary is false
+        and index_metadata.indnkeyatts = 1
+        and index_metadata.indnatts = 1
+        and index_metadata.indkey[0] = (
+          select attribute.attnum
+          from pg_attribute as attribute
+          where attribute.attrelid =
+              'careslink_v1_generation.attempts'::regclass
+            and attribute.attname = 'registration_digest'
+            and not attribute.attisdropped
+        )
+        and index_metadata.indexprs is null
+        and index_metadata.indpred is null
+    ) <> 1
+  then
+    raise exception 'registration retention catalog posture drifted';
+  end if;
+
+  select attempt.id
+  into v_attempt_id
+  from careslink_v1_generation.attempts as attempt
+  where attempt.registration_digest = v_registration_digest
+  order by attempt.created_at, attempt.id
+  limit 1;
+  select count(*) into v_attempt_count
+  from careslink_v1_generation.attempts as attempt
+  where attempt.registration_digest = v_registration_digest;
+  select count(*) into v_grant_count
+  from careslink_v1_generation.payload_grants as grant_record
+  where grant_record.registration_digest = v_registration_digest;
+  select count(*) into v_binding_count
+  from careslink_v1_generation.worker_registration_provider_policies
+    as binding
+  where binding.registration_digest = v_registration_digest;
+
+  if v_attempt_id is null
+    or v_attempt_count < 1
+    or v_binding_count <> 5
+    or (
+      select count(*)
+      from careslink_v1_generation.worker_registrations as registration
+      where registration.registration_digest = v_registration_digest
+    ) <> 1
+  then
+    raise exception 'registration retention proof fixture drifted';
+  end if;
+
+  begin
+    update careslink_v1_generation.attempts as attempt
+    set registration_digest = repeat('f', 64)
+    where attempt.id = v_attempt_id
+      and attempt.registration_digest = v_registration_digest
+      and not exists (
+        select 1
+        from careslink_v1_generation.worker_registrations as registration
+        where registration.registration_digest = repeat('f', 64)
+      );
+  exception when foreign_key_violation then
+    get stacked diagnostics v_constraint_name = constraint_name;
+    if v_constraint_name = 'attempts_registration_catalog_fk' then
+      v_orphan_rejected := true;
+    else
+      raise;
+    end if;
+  end;
+  if not v_orphan_rejected then
+    raise exception 'unregistered historical attempt digest was accepted';
+  end if;
+
+  begin
+    delete from careslink_v1_generation.payload_grants as grant_record
+    where grant_record.registration_digest = v_registration_digest;
+
+    delete from careslink_v1_generation.worker_registrations as registration
+    where registration.registration_digest = v_registration_digest;
+  exception when foreign_key_violation then
+    get stacked diagnostics v_constraint_name = constraint_name;
+    if v_constraint_name = 'attempts_registration_catalog_fk' then
+      v_delete_restricted := true;
+    else
+      raise;
+    end if;
+  end;
+  if not v_delete_restricted then
+    raise exception
+      'referenced worker registration delete was not restricted by attempt history';
+  end if;
+
+  if (
+      select count(*)
+      from careslink_v1_generation.worker_registrations as registration
+      where registration.registration_digest = v_registration_digest
+    ) <> 1
+    or (
+      select count(*)
+      from careslink_v1_generation.worker_registration_provider_policies
+        as binding
+      where binding.registration_digest = v_registration_digest
+    ) <> v_binding_count
+    or (
+      select count(*)
+      from careslink_v1_generation.attempts as attempt
+      where attempt.registration_digest = v_registration_digest
+    ) <> v_attempt_count
+    or (
+      select count(*)
+      from careslink_v1_generation.payload_grants as grant_record
+      where grant_record.registration_digest = v_registration_digest
+    ) <> v_grant_count
+  then
+    raise exception 'registration retention rollback changed historical rows';
+  end if;
+end
+$$;
+
+alter table careslink_v1_generation.worker_registration_provider_policies
+  force row level security;
+alter table careslink_v1_generation.worker_registrations
+  force row level security;
+alter table careslink_v1_generation.payload_grants force row level security;
+alter table careslink_v1_generation.attempts force row level security;
 reset role;
 
 -- Revoke the shared TEST_ONLY proof only after every fresh-authority scenario
