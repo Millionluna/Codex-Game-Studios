@@ -5,9 +5,10 @@
 > `c7b70e9f84b9b804779039711b85cc7eda55bd57`, the exact worker RPC bundle passed
 > isolated PostgreSQL 17.6 migration/assertion evidence on deleted disposable
 > `r9`. A subsequent fixed harness on deleted no-data `r20` proved the three
-> true two-session claim/session/privacy races on PostgreSQL 17.6. This is not a
-> retained/applied runtime repository, callable worker, route, Preview
-> capability, model call or Production capability.
+> true two-session claim/session/privacy races on PostgreSQL 17.6; deleted
+> no-data `r21` then proved Attempt-2 historical replay through success and
+> purge. This is not a retained/applied runtime repository, callable worker,
+> route, Preview capability, model call or Production capability.
 
 ## 1. Scope and non-goals
 
@@ -450,6 +451,9 @@ gate is runtime behavior:
   races, while `r20` later proved them on PostgreSQL 17.6;
 - cancellation and late provider-result rejection;
 - claim-response and success-response loss replay;
+- Attempt 1 settle/resolve replay while Attempt 2 is running, after Attempt 2
+  succeeds and after payload plus purge-outbox advancement to `PURGED`, with
+  exact Attempt 2 commit/resolve replay and stale Attempt 1 commit fencing;
 - canonical document + revision 1 + sync change + `CREATE_DOCUMENT` receipt +
   provider-evidence digest + payload logical revocation + purge outbox +
   terminal attempt/job atomicity, including injected failure at every
@@ -472,7 +476,8 @@ The same exact revision must then pass the existing canonical JSON vectors,
 active-session tests, privacy tests, owner A/B RLS tests and revoked-session
 cleanup tests. Deleted `r20` closed the true two-session/two-connection claim
 and concurrent session/privacy-revocation race subset on PostgreSQL 17.6; the
-PostgreSQL 16 path and owner A/B runtime integration remain open. Preview
+deleted `r21` gate subsequently closed the Attempt-2 historical-replay subset.
+The PostgreSQL 16 path and owner A/B runtime integration remain open. Preview
 evidence for an earlier migration revision is not promotion evidence for this
 design.
 
@@ -631,6 +636,32 @@ independent zero/posture postcheck and deleted the Preview. Production was
 never the SQL target. The detailed evidence and advisor counts are recorded in
 `documentation/tests.md`.
 
+At base HEAD `000f17af88eff9266a92e484ba2080335d20fd2d`, deleted
+no-data PostgreSQL 17.6 `r21` (`v1-note-worker-rpc-r21`; id
+`688da83b-78e8-45fa-8646-b015822d59b0`; ref
+`kfgjxlilotpaxnozomqq`) was non-default, `persistent=false` and
+`with_data=false`. Its confirmed Preview creation rate was US$0.01344/hour;
+because the branch was deleted, no ongoing charge or accrued total is inferred.
+The exact 146488-byte rollback assertion body had SHA-256
+`bdcd479473ed1c6ae0782127eb1d8e5765e3de2ede829aadeb3eb35c2eeadaac`;
+14 migrations applied 14/14 and the adjacent, durable and worker rollback
+suites passed 7/7.
+
+The fixed scenario reproduced the exact Attempt 1 settle/resolve
+acknowledgements while Attempt 2 was `RUNNING`, after Attempt 2 reached
+`SUCCEEDED`, and after the payload plus purge outbox reached `PURGED`. Attempt
+2 commit and resolve replayed exactly, a fully valid stale Attempt 1 commit was
+rejected with `LEASE_EXPIRED` and expired recovery returned zero. Before
+Attempt 2 succeeded the directed side effects were absent; after success, every
+subsequent replay and purge stage retained one canonical document, revision,
+sync change, mutation receipt, provider-evidence row and purge-outbox row. The
+independent postcheck
+retained hard-off, zero fixtures, 12 private tables, nine private RPCs, denied
+API table/RPC access and two admin-only role-creator edges. Advisor results
+matched deleted `r9`. The branch was deleted; Production remained healthy and
+was never the SQL target. This closes Attempt-2 historical replay only and
+creates no retained Preview or runtime/Production capability.
+
 Independent final source/security review reported no P0/P1. Remaining
 activation governance is explicit, not a hidden default:
 
@@ -641,8 +672,6 @@ activation governance is explicit, not a hidden default:
 - add database exact-key vectors for every nested acknowledgement envelope;
   the SQL helpers currently lock top-level keys and validate allowlisted nested
   fields/row relationships, while the TypeScript adapter parser is stricter;
-- prove old-attempt settle/resolve replay after attempt 2 has reached
-  `SUCCEEDED`, as well as after later retry/purge lifecycle advancement;
 - prove account-delete, logical revoke, purge-outbox retry and cross-state
   recovery retain the required audit/reconciliation evidence;
 - before any real provider call, bind provider `startedAt` to a successfully
@@ -655,9 +684,12 @@ Deleted `r9` closed the PostgreSQL 17.6 serial assertion, role/ACL/function,
 scripted-fault and zero-fixture gates. Deleted `r20` subsequently closed the
 PostgreSQL 17.6 true two-session `SKIP LOCKED` claim and session/privacy-
 revocation race gate. Activation still requires the PostgreSQL 16 path and
-owner A/B runtime integration; the governance items above remain open before
-any caller grant or registry entry. Only after those results and the
-vault/KMS/retention, worker credential, model/provider/STT and Points decisions
-are separately approved may runtime activation be considered. Nothing in this
-handoff authorizes Preview retention, Production apply, route activation,
-model/STT traffic or Points settlement.
+owner A/B runtime integration. Deleted `r21` closed the Attempt-2 historical
+replay gate; catalog retention, nested exact-key vectors,
+account-delete/purge recovery, provider-start binding, numeric parsing and the
+runtime/vault governance items above remain open before any caller grant or
+registry entry. Only after those results and the vault/KMS/retention, worker
+credential, model/provider/STT and Points decisions are separately approved
+may runtime activation be considered. Nothing in this handoff authorizes
+Preview retention, Production apply, route activation, model/STT traffic or
+Points settlement.

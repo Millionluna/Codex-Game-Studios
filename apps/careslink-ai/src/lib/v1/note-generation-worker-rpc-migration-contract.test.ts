@@ -661,12 +661,66 @@ describe("V1 Note registered-worker RPC shadow migration contract", () => {
     expect(deniedReplay).not.toContain("v_outbox.status");
     expect(deniedReplay).toContain("'payloadState', 'REVOKED'");
 
+    const historicalStart = assertions.indexOf(
+      "-- A retry acknowledgement belongs to the terminal attempt",
+    );
+    const historicalEnd = assertions.indexOf(
+      "-- Cross-job credentials cannot resolve another attempt",
+      historicalStart,
+    );
+    expect(historicalStart).toBeGreaterThanOrEqual(0);
+    expect(historicalEnd).toBeGreaterThan(historicalStart);
+    const historicalProof = assertions.slice(historicalStart, historicalEnd);
+    for (const exactReplay of [
+      "v_resolved->'atomicSettlement' is distinct from v_first_ack",
+      "v_replay is distinct from v_first_ack",
+      "v_success_replay is distinct from v_success_ack",
+      "'atomicSuccess', v_success_ack",
+    ]) {
+      expect(historicalProof).toContain(exactReplay);
+    }
+    expect(historicalProof).toContain("if sqlerrm = 'LEASE_EXPIRED' then");
+    expect(historicalProof).toContain("'recovered', 0");
+    expect(historicalProof).toContain("'requeued', 0");
+    expect(historicalProof).toContain("'failed', 0");
+    expect(historicalProof).toContain("set state = 'PURGE_PENDING'");
+    expect(historicalProof).toContain("set status = 'PROCESSING'");
+    expect(historicalProof).toContain("set state = 'PURGED'");
+    expect(historicalProof).toContain("set status = 'PURGED'");
+    expect(historicalProof).not.toContain(
+      "grant update on careslink_v1_generation.payload_purge_outbox",
+    );
+
     for (const marker of [
       "success payload purge fixture was not applied",
+      "historical retry fixture claim drifted",
       "historical retry first acknowledgement drifted",
+      "historical retry eligibility fixture drifted",
       "historical retry next-attempt transition drifted",
-      "historical retry resolution drifted after current state advanced",
-      "historical retry settlement replay drifted after current state advanced",
+      "historical retry replay drifted while attempt 2 was running",
+      "historical retry attempt-2 authorization drifted",
+      "historical retry attempt-2 consumed fixture drifted",
+      "historical retry attempt-2 fence drifted",
+      "historical retry attempt-2 success drifted",
+      "historical retry resolution drifted after attempt 2 succeeded",
+      "historical retry settlement replay drifted after attempt 2 succeeded",
+      "historical retry attempt-2 replay or resolution drifted before purge",
+      "historical retry changed failure reason was accepted",
+      "historical retry stale attempt-1 commit was not rejected",
+      "historical retry recovery was not empty after attempt-2 success",
+      "historical retry pre-purge side-effect row set drifted",
+      "historical retry purge source fixture drifted",
+      "historical retry purge-pending fixture drifted",
+      "historical retry processing fixture drifted",
+      "historical retry payload purge fixture drifted",
+      "historical retry purge lifecycle fixture drifted",
+      "historical retry resolution drifted after purge",
+      "historical retry settlement replay drifted after purge",
+      "historical retry attempt-2 replay or resolution drifted after purge",
+      "historical retry changed failure reason was accepted after purge",
+      "historical retry stale attempt-1 commit was not rejected after purge",
+      "historical retry recovery was not empty after purge",
+      "historical retry post-purge side-effect row set drifted",
     ]) {
       expect(assertions).toContain(marker);
     }
@@ -1167,36 +1221,38 @@ describe("V1 Note registered-worker RPC shadow migration contract", () => {
       "does not prove two independent database\n-- sessions race safely",
     );
     expect(assertionHeader).toContain(
-      "serial rollback proof does not prove true two-connection SKIP LOCKED",
-    );
-    expect(assertionHeader).toContain("session/privacy-revocation races");
-    expect(assertionHeader).toContain(
-      "remain a hard blocker before any caller grant or activation",
+      "Deleted r20 separately closed that PostgreSQL 17.6 race subset",
     );
     expect(assertionHeader).toContain(
-      "PostgreSQL 17.6 r9 disposable Preview",
+      "this file remains serial evidence and PostgreSQL 16 remains unproved",
     );
+    expect(assertionHeader).toContain("PostgreSQL 17.6 r21");
     expect(assertionHeader).toContain(
-      "14/14 migrations, 7/7 assertions and the independent postcheck all passed",
+      "14/14 migrations, 7/7 rollback suites and the independent hard-off/zero-row/role/RLS/ACL postcheck all passed",
     );
     for (const marker of [
+      "000f17af88eff9266a92e484ba2080335d20fd2d",
+      "688da83b-78e8-45fa-8646-b015822d59b0",
+      "kfgjxlilotpaxnozomqq",
+      "v1-note-worker-rpc-r21",
       "c7b70e9f84b9b804779039711b85cc7eda55bd57",
       "a1571c30-a322-4cea-b332-b189804df195",
       "hyczevivoakmflswmwlb",
       "v1-note-worker-rpc-r9",
-      "both branch ID and ref absent",
-      "Production adocsnwnslxhxcjgbyee was never a SQL target",
+      "deletion was confirmed with its id, ref and name absent",
+      "adocsnwnslxhxcjgbyee remained the sole healthy default branch",
+      "was never a SQL target",
       "7ac37a3698e60636725195eae9eb07992a300c0219ab47f83c56128e5d8e9c3d",
-      "2be48250f3ad6d5cf5a1dc4a31f114a0ecdcab83699ba42a7d4575d6c06c1daf",
-      "111481 bytes",
+      "bdcd479473ed1c6ae0782127eb1d8e5765e3de2ede829aadeb3eb35c2eeadaac",
+      "146488 bytes",
     ]) {
       expect(assertionHeader).toContain(marker);
     }
     expect(assertionBodyStart).toBeGreaterThanOrEqual(0);
-    expect(Buffer.byteLength(assertionBody, "utf8")).toBe(111_481);
+    expect(Buffer.byteLength(assertionBody, "utf8")).toBe(146_488);
     expect(
       createHash("sha256").update(assertionBody, "utf8").digest("hex"),
-    ).toBe("2be48250f3ad6d5cf5a1dc4a31f114a0ecdcab83699ba42a7d4575d6c06c1daf");
+    ).toBe("bdcd479473ed1c6ae0782127eb1d8e5765e3de2ede829aadeb3eb35c2eeadaac");
     expect(assertions).toContain("transaction-only TEST_ONLY fixtures");
     expect(assertions).toContain("pg_get_function_identity_arguments");
     expect(assertions).toContain("aclexplode(");
@@ -1273,10 +1329,32 @@ describe("V1 Note registered-worker RPC shadow migration contract", () => {
       "NULL settlement_retry_delay_ms was accepted",
       "partial-NULL settlement delay checks mutated state",
       "success payload purge fixture was not applied",
+      "historical retry fixture claim drifted",
       "historical retry first acknowledgement drifted",
+      "historical retry eligibility fixture drifted",
       "historical retry next-attempt transition drifted",
-      "historical retry resolution drifted after current state advanced",
-      "historical retry settlement replay drifted after current state advanced",
+      "historical retry replay drifted while attempt 2 was running",
+      "historical retry attempt-2 authorization drifted",
+      "historical retry attempt-2 consumed fixture drifted",
+      "historical retry attempt-2 fence drifted",
+      "historical retry attempt-2 success drifted",
+      "historical retry resolution drifted after attempt 2 succeeded",
+      "historical retry settlement replay drifted after attempt 2 succeeded",
+      "historical retry attempt-2 replay or resolution drifted before purge",
+      "historical retry stale attempt-1 commit was not rejected",
+      "historical retry recovery was not empty after attempt-2 success",
+      "historical retry pre-purge side-effect row set drifted",
+      "historical retry purge source fixture drifted",
+      "historical retry purge-pending fixture drifted",
+      "historical retry processing fixture drifted",
+      "historical retry payload purge fixture drifted",
+      "historical retry purge lifecycle fixture drifted",
+      "historical retry resolution drifted after purge",
+      "historical retry settlement replay drifted after purge",
+      "historical retry attempt-2 replay or resolution drifted after purge",
+      "historical retry stale attempt-1 commit was not rejected after purge",
+      "historical retry recovery was not empty after purge",
+      "historical retry post-purge side-effect row set drifted",
     ]) {
       expect(assertions).toContain(marker);
     }

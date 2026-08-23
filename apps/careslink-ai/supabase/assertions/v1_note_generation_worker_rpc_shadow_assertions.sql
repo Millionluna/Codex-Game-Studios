@@ -5,23 +5,26 @@
 -- sessions race safely. It locks the SKIP LOCKED structure and single-active-
 -- attempt invariant; a separately authorized disposable Preview must run the
 -- real two-connection concurrency gate before any execute grant or activation.
--- This serial rollback proof does not prove true two-connection SKIP LOCKED or
--- session/privacy-revocation races. Those remain a hard blocker before any
--- caller grant or activation.
--- Exact execution source HEAD c7b70e9f84b9b804779039711b85cc7eda55bd57
--- passed on the deleted PostgreSQL 17.6 r9 disposable Preview: 14/14
--- migrations, 7/7 assertions and the independent postcheck all passed.
--- The deleted r9 branch identity was
--- id a1571c30-a322-4cea-b332-b189804df195,
--- ref hyczevivoakmflswmwlb and name v1-note-worker-rpc-r9. Deletion was
--- confirmed with both branch ID and ref absent.
+-- Deleted r20 separately closed that PostgreSQL 17.6 race subset; this file
+-- remains serial evidence and PostgreSQL 16 remains unproved.
+-- This exact body, from the worktree based on HEAD
+-- 000f17af88eff9266a92e484ba2080335d20fd2d, passed on deleted PostgreSQL
+-- 17.6 r21: 14/14 migrations, 7/7 rollback suites and the independent
+-- hard-off/zero-row/role/RLS/ACL postcheck all passed.
+-- The deleted r21 branch was v1-note-worker-rpc-r21, id
+-- 688da83b-78e8-45fa-8646-b015822d59b0 and ref kfgjxlilotpaxnozomqq;
+-- deletion was confirmed with its id, ref and name absent.
 -- Production must never be the SQL target for this assertion; Production
--- adocsnwnslxhxcjgbyee was never a SQL target.
--- Pre-header-edit full-file SHA-256:
+-- adocsnwnslxhxcjgbyee remained the sole healthy default branch and was never
+-- a SQL target. Historical deleted-r9 evidence remains identified by source
+-- HEAD c7b70e9f84b9b804779039711b85cc7eda55bd57, branch id
+-- a1571c30-a322-4cea-b332-b189804df195, ref hyczevivoakmflswmwlb and name
+-- v1-note-worker-rpc-r9.
+-- Historical pre-header-edit full-file SHA-256:
 -- 7ac37a3698e60636725195eae9eb07992a300c0219ab47f83c56128e5d8e9c3d.
--- Exact BEGIN-through-ROLLBACK body SHA-256:
--- 2be48250f3ad6d5cf5a1dc4a31f114a0ecdcab83699ba42a7d4575d6c06c1daf;
--- 111481 bytes.
+-- Exact executed BEGIN-through-ROLLBACK body SHA-256:
+-- bdcd479473ed1c6ae0782127eb1d8e5765e3de2ede829aadeb3eb35c2eeadaac;
+-- 146488 bytes.
 
 \set ON_ERROR_STOP on
 
@@ -366,11 +369,18 @@ create temporary table rpc_assertion_artifacts (
   provider_evidence_hash text not null
 ) on commit drop;
 
+create temporary table rpc_assertion_acknowledgements (
+  scenario text primary key,
+  acknowledgement jsonb not null
+) on commit drop;
+
 grant select on rpc_assertion_policy_values
   to careslink_v1_generation_owner, careslink_v1_generation_executor;
 grant select, insert, update on rpc_assertion_state
   to careslink_v1_generation_executor;
 grant select, insert, update on rpc_assertion_artifacts
+  to careslink_v1_generation_executor;
+grant select, insert on rpc_assertion_acknowledgements
   to careslink_v1_generation_executor;
 
 create temporary table rpc_assertion_point_snapshot (
@@ -1301,7 +1311,6 @@ alter table careslink_v1_generation.payload_purge_outbox
   force row level security;
 
 reset role;
-
 set local role careslink_v1_generation_executor;
 
 -- Serial arbitration proves that repeated claims in one transaction select
@@ -2915,88 +2924,7 @@ drop trigger test_only_fail_v1_worker_rpc_late
   on public.ai_document_mutation_receipts;
 drop function pg_temp.fail_v1_worker_rpc_late();
 
--- Revoke the shared TEST_ONLY proof only after every other fresh-authority
--- scenario has completed. Authorize must re-read it and atomically settle the
--- still-running late-failure attempt as PRIVACY_REVIEW_STALE.
-update public.privacy_reviews
-set status = 'REVOKED'
-where id = 'b2000000-0000-4000-8000-000000000001'::uuid
-  and owner_user_id = 'b0000000-0000-4000-8000-000000000001'::uuid
-  and status = 'CONFIRMED';
-
 set local role careslink_v1_generation_executor;
-
-do $$
-declare
-  v_state rpc_assertion_state%rowtype;
-  v_denied jsonb;
-  v_replay jsonb;
-  v_resolved jsonb;
-begin
-  select state.* into v_state
-  from rpc_assertion_state as state
-  where state.scenario = 'atomic-rollback';
-
-  v_denied :=
-    careslink_v1_generation.authorize_v1_shadow_note_generation_payload_attempt(
-      v_state.job_id,
-      v_state.payload_id,
-      v_state.attempt_id,
-      v_state.lease_token,
-      current_setting('careslink.assert.registration_digest')
-    );
-  v_replay :=
-    careslink_v1_generation.authorize_v1_shadow_note_generation_payload_attempt(
-      v_state.job_id,
-      v_state.payload_id,
-      v_state.attempt_id,
-      v_state.lease_token,
-      current_setting('careslink.assert.registration_digest')
-    );
-
-  if v_denied->>'status' is distinct from 'DENIED_SETTLED'
-    or v_denied->>'reason' is distinct from 'PRIVACY_REVIEW_STALE'
-    or v_denied->>'transactionStatus' is distinct from 'COMMITTED'
-    or (v_denied->>'atomic')::boolean is not true
-    or v_denied->>'jobStatus' is distinct from 'FAILED'
-    or v_denied->>'attemptStatus' is distinct from 'FAILED'
-    or v_denied->>'payloadState' is distinct from 'REVOKED'
-    or v_denied->>'payloadDisposition' is distinct from
-      'REVOKED_PURGE_ENQUEUED'
-    or v_denied::text ~* 'vaultGrant|vault|locator|rawFacts|canonicalContent|providerEvidence'
-    or v_replay is distinct from v_denied
-    or (
-      select count(*)
-      from careslink_v1_generation.provider_evidence
-      where attempt_id = v_state.attempt_id
-    ) <> 0
-    or (
-      select count(*)
-      from careslink_v1_generation.payload_purge_outbox
-      where payload_id = v_state.payload_id
-        and reason = 'FAILED'
-    ) <> 1
-  then
-    raise exception 'fresh-privacy denial was not atomic and replayable';
-  end if;
-
-  v_resolved :=
-    careslink_v1_generation.resolve_v1_shadow_note_generation_attempt(
-      v_state.job_id,
-      v_state.attempt_id,
-      v_state.lease_token,
-      current_setting('careslink.assert.registration_digest'),
-      null,
-      null
-    );
-  if v_resolved->>'status' is distinct from 'FAILED'
-    or v_resolved #>> '{atomicSettlement,settlement,reason}' is distinct from
-      'PRIVACY_REVIEW_STALE'
-  then
-    raise exception 'fresh-privacy denial resolution drifted';
-  end if;
-end
-$$;
 
 -- Recovery serially arbitrates an expired lease, persists the exact retry
 -- choice once, and makes the prior attempt resolvable after response loss.
@@ -3103,9 +3031,10 @@ end
 $$;
 
 -- A retry acknowledgement belongs to the terminal attempt, not to the job's
--- later mutable state. Settle attempt 1, claim attempt 2, advance the payload
--- to PURGED, then prove both resolve and repeated settle reproduce every field
--- of the original acknowledgement (including transaction IDs and hashes).
+-- later mutable state. Settle attempt 1, complete attempt 2 canonically, advance
+-- the payload to PURGED, then prove old-attempt resolve/settle and current-
+-- attempt success replay reproduce the original acknowledgements without any
+-- duplicate canonical, evidence or purge-outbox side effect.
 do $$
 declare
   v_job_id constant uuid :=
@@ -3120,6 +3049,26 @@ declare
   v_first_attempt_id uuid;
   v_next_attempt_id uuid;
   v_first_lease_token text;
+  v_next_lease_token text;
+  v_grant_id uuid;
+  v_authorized jsonb;
+  v_fence jsonb;
+  v_first_attempt record;
+  v_next_attempt record;
+  v_content jsonb;
+  v_candidate jsonb;
+  v_evidence jsonb;
+  v_stale_evidence jsonb;
+  v_content_hash text;
+  v_candidate_hash text;
+  v_evidence_hash text;
+  v_success_ack jsonb;
+  v_success_resolved jsonb;
+  v_success_replay jsonb;
+  v_recovery jsonb;
+  v_stale_worker_rejected boolean := false;
+  v_wrong_reason_rejected boolean := false;
+  v_mutation_id text;
 begin
   v_claim :=
     careslink_v1_generation.claim_v1_shadow_note_generation_job(
@@ -3201,10 +3150,12 @@ begin
     );
   v_next_attempt_id :=
     (v_next_claim #>> '{claim,attempt,attemptId}')::uuid;
+  v_next_lease_token := v_next_claim #>> '{claim,leaseToken}';
   if v_next_claim->>'status' is distinct from 'CLAIMED'
     or (v_next_claim #>> '{claim,job,jobId}')::uuid is distinct from v_job_id
     or v_next_claim #>> '{claim,attempt,ordinal}' is distinct from '2'
     or v_next_attempt_id is not distinct from v_first_attempt_id
+    or coalesce(v_next_lease_token, '') = ''
     or (
       select count(*)
       from careslink_v1_generation.jobs as job
@@ -3224,19 +3175,190 @@ begin
     raise exception 'historical retry next-attempt transition drifted';
   end if;
 
-  update careslink_v1_generation.payloads as payload
-  set state = 'PURGED',
-      revoked_at = date_trunc('milliseconds', transaction_timestamp()),
-      revoke_reason = 'ORPHAN',
-      purge_requested_at =
-        date_trunc('milliseconds', transaction_timestamp()),
-      purged_at = date_trunc('milliseconds', transaction_timestamp()),
-      updated_at = date_trunc('milliseconds', transaction_timestamp())
-  where payload.id = v_payload_id
-    and payload.job_id = v_job_id
-    and payload.state = 'AVAILABLE';
+  v_resolved :=
+    careslink_v1_generation.resolve_v1_shadow_note_generation_attempt(
+      v_job_id,
+      v_first_attempt_id,
+      v_first_lease_token,
+      current_setting('careslink.assert.registration_digest'),
+      null,
+      null
+    );
+  v_replay :=
+    careslink_v1_generation.settle_v1_shadow_note_generation_failure(
+      v_job_id,
+      v_first_attempt_id,
+      v_first_lease_token,
+      current_setting('careslink.assert.registration_digest'),
+      'worker.test.v1',
+      current_setting('careslink.assert.worker_policy_digest'),
+      'PROVIDER_TRANSIENT',
+      null
+    );
+  if v_resolved is distinct from jsonb_build_object(
+      'status', 'RETRY_SCHEDULED',
+      'atomicSettlement', v_first_ack
+    )
+    or v_replay is distinct from v_first_ack
+  then
+    raise exception
+      'historical retry replay drifted while attempt 2 was running';
+  end if;
+
+  -- Attempt 2 completes canonically before the old response-loss replay.
+  v_authorized :=
+    careslink_v1_generation.authorize_v1_shadow_note_generation_payload_attempt(
+      v_job_id,
+      v_payload_id,
+      v_next_attempt_id,
+      v_next_lease_token,
+      current_setting('careslink.assert.registration_digest')
+    );
+  v_grant_id := (v_authorized->>'grantId')::uuid;
+  if v_authorized->>'status' is distinct from 'AUTHORIZED'
+    or v_grant_id is null
+    or v_authorized::text ~* 'vault|locator|rawFacts|cleanedFacts'
+  then
+    raise exception 'historical retry attempt-2 authorization drifted';
+  end if;
+
+  -- TEST_ONLY fixture bridge: normal consume remains deliberately unavailable
+  -- until the vault/KMS/retention contract is approved.
+  update careslink_v1_generation.payload_grants as grant_record
+  set status = 'CONSUMED',
+      consumed_at = date_trunc('milliseconds', transaction_timestamp()),
+      vault_grant_hash = repeat('6', 64)
+  where grant_record.id = v_grant_id
+    and grant_record.payload_id = v_payload_id
+    and grant_record.job_id = v_job_id
+    and grant_record.attempt_id = v_next_attempt_id
+    and grant_record.registration_digest =
+      current_setting('careslink.assert.registration_digest')
+    and grant_record.lease_token_hash =
+      encode(
+        extensions.digest(
+          convert_to(v_next_lease_token, 'UTF8'),
+          'sha256'
+        ),
+        'hex'
+      )
+    and grant_record.request_hash = repeat('7', 64)
+    and grant_record.status = 'ISSUED';
   if not found then
-    raise exception 'historical retry payload purge fixture drifted';
+    raise exception 'historical retry attempt-2 consumed fixture drifted';
+  end if;
+
+  v_fence :=
+    careslink_v1_generation.fence_v1_shadow_note_generation_attempt(
+      v_job_id,
+      v_next_attempt_id,
+      v_next_lease_token,
+      current_setting('careslink.assert.registration_digest'),
+      'worker.test.v1',
+      current_setting('careslink.assert.worker_policy_digest')
+    );
+  if v_fence->>'status' is distinct from 'FENCED'
+    or coalesce(v_fence->>'fenceId', '') = ''
+    or coalesce(v_fence->>'fenceDigest', '') !~ '^[a-f0-9]{64}$'
+  then
+    raise exception 'historical retry attempt-2 fence drifted';
+  end if;
+
+  select attempt.* into v_next_attempt
+  from careslink_v1_generation.attempts as attempt
+  where attempt.id = v_next_attempt_id
+    and attempt.job_id = v_job_id
+    and attempt.status = 'RUNNING';
+  select
+    artifact.canonical_content,
+    artifact.canonical_content_hash
+  into v_content, v_content_hash
+  from rpc_assertion_artifacts as artifact
+  where artifact.scenario = 'success';
+  v_candidate := jsonb_build_object(
+    'englishDraft', v_content->'englishDraft',
+    'reviewVersions', v_content->'reviewVersions',
+    'missingFacts', v_content->'missingFacts',
+    'neutralWordingChecks', v_content->'neutralWordingChecks',
+    'followUpPrompts', v_content->'followUpPrompts'
+  );
+  v_candidate_hash := public.v1_shadow_content_sha256(v_candidate);
+  v_evidence := jsonb_build_object(
+    'policyDigest', (
+      select provider_digest
+      from rpc_assertion_policy_values
+      where note_type = 'communication'
+    ),
+    'providerId', 'provider.test',
+    'modelId', 'model.test',
+    'modelRevision', null,
+    'modelRevisionAvailability', 'PROVIDER_NOT_EXPOSED',
+    'policyVersion', 'provider.test.v1',
+    'promptTemplateVersion', 'prompt.test.v1',
+    'goldenSetVersion', 'golden.test.v1',
+    'parserVersion', 'parser.test.v1',
+    'serviceCode', 'note.communication.generate',
+    'rateCatalogVersion', '2026-08-09.v1-shadow',
+    'timeoutMs', 20000,
+    'workerPolicyDigest',
+      current_setting('careslink.assert.worker_policy_digest'),
+    'deadlineAt', careslink_v1_generation._server_time(
+      v_next_attempt.acquired_at + interval '20 seconds'
+    ),
+    'startedAt',
+      careslink_v1_generation._server_time(v_next_attempt.acquired_at),
+    'finishedAt',
+      careslink_v1_generation._server_time(v_next_attempt.acquired_at),
+    'durationMs', 0,
+    'finishReason', 'COMPLETED',
+    'providerRequestIdHash', null,
+    'usage', jsonb_build_object(
+      'status', 'UNAVAILABLE', 'source', 'UNAVAILABLE'
+    ),
+    'cost', jsonb_build_object(
+      'status', 'UNAVAILABLE', 'source', 'UNAVAILABLE'
+    ),
+    'candidateDigest', v_candidate_hash
+  );
+  v_evidence_hash := public.v1_shadow_content_sha256(v_evidence);
+
+  v_success_ack :=
+    careslink_v1_generation.commit_v1_shadow_note_generation_success(
+      v_job_id,
+      v_next_attempt_id,
+      v_next_lease_token,
+      current_setting('careslink.assert.registration_digest'),
+      'worker.test.v1',
+      current_setting('careslink.assert.worker_policy_digest'),
+      (v_fence->>'fenceId')::uuid,
+      v_fence->>'fenceDigest',
+      v_content,
+      v_content_hash,
+      v_evidence
+    );
+  v_mutation_id :=
+    'note-generation:' || careslink_v1_generation._sha256_text(v_job_id::text);
+  select attempt.* into v_next_attempt
+  from careslink_v1_generation.attempts as attempt
+  where attempt.id = v_next_attempt_id
+    and attempt.job_id = v_job_id
+    and attempt.status = 'SUCCEEDED';
+  if v_success_ack #>> '{transaction,status}' is distinct from 'COMMITTED'
+    or v_success_ack #>> '{jobTerminal,status}' is distinct from 'SUCCEEDED'
+    or v_success_ack #>> '{attemptTerminal,status}' is distinct from
+      'SUCCEEDED'
+    or v_success_ack #>> '{attemptTerminal,contentHash}' is distinct from
+      v_content_hash
+    or v_success_ack #>> '{attemptTerminal,providerEvidenceHash}'
+      is distinct from v_evidence_hash
+    or v_success_ack #>> '{payloadMetadata,state}' is distinct from 'REVOKED'
+    or v_success_ack #>> '{purgeOutboxAcknowledgment,status}' is distinct from
+      'ENQUEUED'
+    or v_success_ack::text ~*
+      '"(canonicalContent|providerEvidence|englishDraft|providerId)"[[:space:]]*:|vault|locator'
+    or v_next_attempt.id is null
+  then
+    raise exception 'historical retry attempt-2 success drifted';
   end if;
 
   v_resolved :=
@@ -3253,7 +3375,7 @@ begin
     or v_resolved - array['status', 'atomicSettlement'] <> '{}'::jsonb
   then
     raise exception
-      'historical retry resolution drifted after current state advanced';
+      'historical retry resolution drifted after attempt 2 succeeded';
   end if;
 
   v_replay :=
@@ -3282,18 +3404,908 @@ begin
       select count(*)
       from careslink_v1_generation.payloads as payload
       where payload.id = v_payload_id
-        and payload.state = 'PURGED'
+        and payload.state = 'REVOKED'
+        and payload.revoke_reason = 'SUCCEEDED'
     ) <> 1
   then
     raise exception
-      'historical retry settlement replay drifted after current state advanced';
+      'historical retry settlement replay drifted after attempt 2 succeeded';
+  end if;
+
+  v_success_replay :=
+    careslink_v1_generation.commit_v1_shadow_note_generation_success(
+      v_job_id,
+      v_next_attempt_id,
+      v_next_lease_token,
+      current_setting('careslink.assert.registration_digest'),
+      'worker.test.v1',
+      current_setting('careslink.assert.worker_policy_digest'),
+      (v_fence->>'fenceId')::uuid,
+      v_fence->>'fenceDigest',
+      v_content,
+      v_content_hash,
+      v_evidence
+    );
+  v_success_resolved :=
+    careslink_v1_generation.resolve_v1_shadow_note_generation_attempt(
+      v_job_id,
+      v_next_attempt_id,
+      v_next_lease_token,
+      current_setting('careslink.assert.registration_digest'),
+      v_content_hash,
+      v_evidence_hash
+    );
+  if v_success_replay is distinct from v_success_ack
+    or v_success_resolved is distinct from jsonb_build_object(
+      'status', 'SUCCEEDED',
+      'atomicSuccess', v_success_ack
+    )
+  then
+    raise exception
+      'historical retry attempt-2 replay or resolution drifted before purge';
+  end if;
+
+  begin
+    perform careslink_v1_generation.settle_v1_shadow_note_generation_failure(
+      v_job_id,
+      v_first_attempt_id,
+      v_first_lease_token,
+      current_setting('careslink.assert.registration_digest'),
+      'worker.test.v1',
+      current_setting('careslink.assert.worker_policy_digest'),
+      'PROVIDER_PERMANENT',
+      null
+    );
+  exception when sqlstate 'P0001' then
+    if sqlerrm = 'INTERNAL_FAILURE' then
+      v_wrong_reason_rejected := true;
+    else
+      raise;
+    end if;
+  end;
+  if not v_wrong_reason_rejected then
+    raise exception 'historical retry changed failure reason was accepted';
+  end if;
+
+  select attempt.* into v_first_attempt
+  from careslink_v1_generation.attempts as attempt
+  where attempt.id = v_first_attempt_id
+    and attempt.job_id = v_job_id;
+  v_stale_evidence := v_evidence || jsonb_build_object(
+    'deadlineAt', careslink_v1_generation._server_time(
+      v_first_attempt.acquired_at + interval '20 seconds'
+    ),
+    'startedAt',
+      careslink_v1_generation._server_time(v_first_attempt.acquired_at),
+    'finishedAt',
+      careslink_v1_generation._server_time(v_first_attempt.acquired_at),
+    'durationMs', 0
+  );
+  begin
+    perform careslink_v1_generation.commit_v1_shadow_note_generation_success(
+      v_job_id,
+      v_first_attempt_id,
+      v_first_lease_token,
+      current_setting('careslink.assert.registration_digest'),
+      'worker.test.v1',
+      current_setting('careslink.assert.worker_policy_digest'),
+      v_first_attempt.fence_id,
+      v_first_attempt.fence_digest,
+      v_content,
+      v_content_hash,
+      v_stale_evidence
+    );
+  exception when sqlstate 'P0001' then
+    if sqlerrm = 'LEASE_EXPIRED' then
+      v_stale_worker_rejected := true;
+    else
+      raise;
+    end if;
+  end;
+  if not v_stale_worker_rejected then
+    raise exception 'historical retry stale attempt-1 commit was not rejected';
+  end if;
+
+  v_recovery :=
+    careslink_v1_generation.recover_v1_shadow_note_generation_expired(
+      current_setting('careslink.assert.registration_digest'),
+      'worker.test.v1',
+      current_setting('careslink.assert.worker_policy_digest'),
+      current_setting('careslink.assert.worker_identity_hash'),
+      '1.0.0-shadow.1',
+      '2026-08-09.v1-shadow'
+    );
+  if v_recovery is distinct from jsonb_build_object(
+    'recovered', 0,
+    'requeued', 0,
+    'failed', 0
+  ) then
+    raise exception
+      'historical retry recovery was not empty after attempt-2 success';
+  end if;
+
+  insert into rpc_assertion_state (
+    scenario,
+    job_id,
+    payload_id,
+    attempt_id,
+    lease_token,
+    grant_id,
+    fence_id,
+    fence_digest
+  ) values
+    (
+      'historical-retry-attempt-1',
+      v_job_id,
+      v_payload_id,
+      v_first_attempt_id,
+      v_first_lease_token,
+      null,
+      null,
+      null
+    ),
+    (
+      'historical-retry-attempt-2',
+      v_job_id,
+      v_payload_id,
+      v_next_attempt_id,
+      v_next_lease_token,
+      v_grant_id,
+      (v_fence->>'fenceId')::uuid,
+      v_fence->>'fenceDigest'
+    );
+  insert into rpc_assertion_artifacts (
+    scenario,
+    canonical_content,
+    canonical_content_hash,
+    provider_evidence,
+    provider_evidence_hash
+  ) values (
+    'historical-retry-attempt-2',
+    v_content,
+    v_content_hash,
+    v_evidence,
+    v_evidence_hash
+  );
+  insert into rpc_assertion_acknowledgements (
+    scenario,
+    acknowledgement
+  ) values
+    ('historical-retry-attempt-1', v_first_ack),
+    ('historical-retry-attempt-2', v_success_ack);
+
+  perform careslink_v1_generation._set_owner(
+    'b0000000-0000-4000-8000-000000000001'::uuid
+  );
+  if (
+      select count(*)
+      from careslink_v1_generation.jobs as job
+      where job.id = v_job_id
+        and job.status = 'SUCCEEDED'
+        and job.attempt_count = 2
+        and job.result_document_id::text =
+          v_success_ack #>> '{canonical,canonicalId}'
+        and job.result_revision_id::text =
+          v_success_ack #>> '{canonical,revisionId}'
+        and job.result_content_hash = v_content_hash
+    ) <> 1
+    or (
+      select count(*)
+      from careslink_v1_generation.attempts as attempt
+      where attempt.job_id = v_job_id
+    ) <> 2
+    or (
+      select count(*)
+      from careslink_v1_generation.attempts as attempt
+      where attempt.id = v_first_attempt_id
+        and attempt.status = 'FAILED'
+        and attempt.failure_reason = 'PROVIDER_TRANSIENT'
+        and attempt.terminal_transaction_id::text =
+          v_first_ack #>> '{transaction,transactionId}'
+        and attempt.settlement_base_delay_ms = 1000
+        and attempt.settlement_jitter_ms = 0
+        and attempt.settlement_retry_delay_ms = 1000
+        and attempt.canonical_content_hash is null
+        and attempt.provider_evidence_hash is null
+    ) <> 1
+    or (
+      select count(*)
+      from careslink_v1_generation.attempts as attempt
+      where attempt.id = v_next_attempt_id
+        and attempt.status = 'SUCCEEDED'
+        and attempt.terminal_transaction_id::text =
+          v_success_ack #>> '{transaction,transactionId}'
+        and attempt.canonical_content_hash = v_content_hash
+        and attempt.provider_evidence_hash = v_evidence_hash
+    ) <> 1
+    or (
+      select count(*)
+      from careslink_v1_generation.payloads as payload
+      where payload.id = v_payload_id
+        and payload.job_id = v_job_id
+        and payload.state = 'REVOKED'
+        and payload.revoke_reason = 'SUCCEEDED'
+        and payload.revoked_at = v_next_attempt.finished_at
+        and payload.purge_requested_at = v_next_attempt.finished_at
+        and payload.purged_at is null
+        and payload.purge_attempt_count = 0
+    ) <> 1
+    or (
+      select count(*)
+      from careslink_v1_generation.payload_grants as grant_record
+      where grant_record.job_id = v_job_id
+        and grant_record.attempt_id = v_next_attempt_id
+        and grant_record.id = v_grant_id
+        and grant_record.status = 'CONSUMED'
+    ) <> 1
+    or (
+      select count(*)
+      from careslink_v1_generation.provider_evidence as evidence
+      where evidence.job_id = v_job_id
+        and evidence.attempt_id = v_next_attempt_id
+        and evidence.evidence_hash = v_evidence_hash
+        and evidence.evidence = v_evidence
+    ) <> 1
+    or (
+      select count(*)
+      from careslink_v1_generation.provider_evidence as evidence
+      where evidence.attempt_id = v_first_attempt_id
+    ) <> 0
+    or (
+      select count(*)
+      from careslink_v1_generation.payload_purge_outbox as outbox
+      where outbox.payload_id = v_payload_id
+        and outbox.job_id = v_job_id
+        and outbox.transaction_id::text =
+          v_success_ack #>> '{transaction,transactionId}'
+        and outbox.event_reference_hash =
+          v_success_ack #>> '{purgeOutboxAcknowledgment,eventReferenceHash}'
+        and outbox.reason = 'SUCCEEDED'
+        and outbox.status = 'PENDING'
+        and outbox.attempt_count = 0
+        and outbox.last_attempt_at is null
+        and outbox.completed_at is null
+    ) <> 1
+    or (
+      select count(*)
+      from public.ai_documents as document
+      where document.id =
+        (v_success_ack #>> '{canonical,canonicalId}')::uuid
+    ) <> 1
+    or (
+      select count(*)
+      from public.ai_document_revisions as revision
+      where revision.id =
+          (v_success_ack #>> '{canonical,revisionId}')::uuid
+        and revision.document_id =
+          (v_success_ack #>> '{canonical,canonicalId}')::uuid
+        and revision.content_hash = v_content_hash
+        and revision.mutation_id = v_mutation_id
+    ) <> 1
+    or (
+      select count(*)
+      from public.ai_document_sync_changes as change
+      where change.document_id =
+          (v_success_ack #>> '{canonical,canonicalId}')::uuid
+        and change.revision_id =
+          (v_success_ack #>> '{canonical,revisionId}')::uuid
+        and change.last_mutation_id = v_mutation_id
+    ) <> 1
+    or (
+      select count(*)
+      from public.ai_document_mutation_receipts as receipt
+      where receipt.document_id =
+          (v_success_ack #>> '{canonical,canonicalId}')::uuid
+        and receipt.revision_id =
+          (v_success_ack #>> '{canonical,revisionId}')::uuid
+        and receipt.mutation_id = v_mutation_id
+    ) <> 1
+  then
+    raise exception 'historical retry pre-purge side-effect row set drifted';
+  end if;
+end
+$$;
+
+-- Advance the successful payload and its outbox through the rollback-only
+-- purge-worker lifecycle without widening the executor's production ACL.
+reset role;
+set local role careslink_v1_generation_owner;
+alter table careslink_v1_generation.payloads no force row level security;
+alter table careslink_v1_generation.payload_purge_outbox
+  no force row level security;
+
+do $$
+declare
+  v_job_id constant uuid :=
+    'b3000000-0000-4000-8000-000000000007'::uuid;
+  v_payload_id constant uuid :=
+    'b5000000-0000-4000-8000-000000000007'::uuid;
+  v_completed_at timestamptz;
+begin
+  select greatest(
+    outbox.requested_at,
+    date_trunc('milliseconds', statement_timestamp())
+  )
+  into v_completed_at
+  from careslink_v1_generation.payloads as payload
+  join careslink_v1_generation.payload_purge_outbox as outbox
+    on outbox.payload_id = payload.id
+   and outbox.job_id = payload.job_id
+   and outbox.owner_user_id = payload.owner_user_id
+  where payload.id = v_payload_id
+    and payload.job_id = v_job_id
+    and payload.owner_user_id =
+      'b0000000-0000-4000-8000-000000000001'::uuid
+    and payload.state = 'REVOKED'
+    and payload.revoke_reason = 'SUCCEEDED'
+    and payload.revoked_at is not null
+    and payload.purge_requested_at = payload.revoked_at
+    and payload.purged_at is null
+    and payload.purge_attempt_count = 0
+    and outbox.reason = 'SUCCEEDED'
+    and outbox.status = 'PENDING'
+    and outbox.requested_at = payload.purge_requested_at
+    and outbox.attempt_count = 0
+    and outbox.last_attempt_at is null
+    and outbox.completed_at is null
+  for update of payload, outbox;
+  if v_completed_at is null then
+    raise exception 'historical retry purge source fixture drifted';
+  end if;
+
+  update careslink_v1_generation.payloads as payload
+  set state = 'PURGE_PENDING',
+      purge_attempt_count = 1,
+      updated_at = v_completed_at
+  where payload.id = v_payload_id
+    and payload.job_id = v_job_id
+    and payload.state = 'REVOKED'
+    and payload.revoke_reason = 'SUCCEEDED'
+    and payload.purged_at is null
+    and payload.purge_attempt_count = 0;
+  if not found then
+    raise exception 'historical retry purge-pending fixture drifted';
+  end if;
+
+  update careslink_v1_generation.payload_purge_outbox as outbox
+  set status = 'PROCESSING',
+      attempt_count = 1,
+      last_attempt_at = v_completed_at
+  where outbox.payload_id = v_payload_id
+    and outbox.job_id = v_job_id
+    and outbox.reason = 'SUCCEEDED'
+    and outbox.status = 'PENDING'
+    and outbox.attempt_count = 0
+    and outbox.last_attempt_at is null
+    and outbox.completed_at is null;
+  if not found
+    or (
+      select count(*)
+      from careslink_v1_generation.payloads as payload
+      join careslink_v1_generation.payload_purge_outbox as outbox
+        on outbox.payload_id = payload.id
+       and outbox.job_id = payload.job_id
+       and outbox.owner_user_id = payload.owner_user_id
+      where payload.id = v_payload_id
+        and payload.job_id = v_job_id
+        and payload.state = 'PURGE_PENDING'
+        and payload.purge_attempt_count = 1
+        and payload.purged_at is null
+        and outbox.status = 'PROCESSING'
+        and outbox.attempt_count = 1
+        and outbox.last_attempt_at = v_completed_at
+        and outbox.completed_at is null
+    ) <> 1
+  then
+    raise exception 'historical retry processing fixture drifted';
+  end if;
+
+  update careslink_v1_generation.payloads as payload
+  set state = 'PURGED',
+      purged_at = v_completed_at,
+      updated_at = v_completed_at
+  where payload.id = v_payload_id
+    and payload.job_id = v_job_id
+    and payload.state = 'PURGE_PENDING'
+    and payload.purge_attempt_count = 1
+    and payload.purged_at is null;
+  if not found then
+    raise exception 'historical retry payload purge fixture drifted';
+  end if;
+
+  update careslink_v1_generation.payload_purge_outbox as outbox
+  set status = 'PURGED',
+      completed_at = v_completed_at
+  where outbox.payload_id = v_payload_id
+    and outbox.job_id = v_job_id
+    and outbox.reason = 'SUCCEEDED'
+    and outbox.status = 'PROCESSING'
+    and outbox.attempt_count = 1
+    and outbox.last_attempt_at = v_completed_at
+    and outbox.completed_at is null;
+  if not found
+    or (
+      select count(*)
+      from careslink_v1_generation.payloads as payload
+      join careslink_v1_generation.payload_purge_outbox as outbox
+        on outbox.payload_id = payload.id
+       and outbox.job_id = payload.job_id
+       and outbox.owner_user_id = payload.owner_user_id
+      where payload.id = v_payload_id
+        and payload.job_id = v_job_id
+        and payload.state = 'PURGED'
+        and payload.revoke_reason = 'SUCCEEDED'
+        and payload.purge_attempt_count = 1
+        and payload.purged_at = v_completed_at
+        and payload.updated_at = v_completed_at
+        and outbox.status = 'PURGED'
+        and outbox.reason = 'SUCCEEDED'
+        and outbox.attempt_count = 1
+        and outbox.last_attempt_at = v_completed_at
+        and outbox.completed_at = v_completed_at
+        and outbox.requested_at = payload.purge_requested_at
+    ) <> 1
+  then
+    raise exception 'historical retry purge lifecycle fixture drifted';
+  end if;
+end
+$$;
+
+alter table careslink_v1_generation.payload_purge_outbox
+  force row level security;
+alter table careslink_v1_generation.payloads force row level security;
+reset role;
+set local role careslink_v1_generation_executor;
+
+-- Both attempts now replay across a later live purge state. The old worker
+-- cannot overwrite Attempt 2's success, and no terminal call duplicates any
+-- canonical, evidence, grant or outbox side effect.
+do $$
+declare
+  v_first_state rpc_assertion_state%rowtype;
+  v_success_state rpc_assertion_state%rowtype;
+  v_artifact rpc_assertion_artifacts%rowtype;
+  v_first_ack jsonb;
+  v_success_ack jsonb;
+  v_resolved jsonb;
+  v_replay jsonb;
+  v_success_resolved jsonb;
+  v_success_replay jsonb;
+  v_first_attempt record;
+  v_success_attempt record;
+  v_stale_evidence jsonb;
+  v_recovery jsonb;
+  v_stale_worker_rejected boolean := false;
+  v_wrong_reason_rejected boolean := false;
+  v_mutation_id text;
+begin
+  select state.* into v_first_state
+  from rpc_assertion_state as state
+  where state.scenario = 'historical-retry-attempt-1';
+  select state.* into v_success_state
+  from rpc_assertion_state as state
+  where state.scenario = 'historical-retry-attempt-2';
+  select artifact.* into v_artifact
+  from rpc_assertion_artifacts as artifact
+  where artifact.scenario = 'historical-retry-attempt-2';
+  select outcome.acknowledgement into v_first_ack
+  from rpc_assertion_acknowledgements as outcome
+  where outcome.scenario = 'historical-retry-attempt-1';
+  select outcome.acknowledgement into v_success_ack
+  from rpc_assertion_acknowledgements as outcome
+  where outcome.scenario = 'historical-retry-attempt-2';
+  if v_first_state.scenario is null
+    or v_success_state.scenario is null
+    or v_artifact.scenario is null
+    or v_first_ack is null
+    or v_success_ack is null
+  then
+    raise exception 'historical retry persisted proof state drifted';
+  end if;
+
+  v_resolved :=
+    careslink_v1_generation.resolve_v1_shadow_note_generation_attempt(
+      v_first_state.job_id,
+      v_first_state.attempt_id,
+      v_first_state.lease_token,
+      current_setting('careslink.assert.registration_digest'),
+      null,
+      null
+    );
+  if v_resolved is distinct from jsonb_build_object(
+    'status', 'RETRY_SCHEDULED',
+    'atomicSettlement', v_first_ack
+  ) then
+    raise exception 'historical retry resolution drifted after purge';
+  end if;
+
+  v_replay :=
+    careslink_v1_generation.settle_v1_shadow_note_generation_failure(
+      v_first_state.job_id,
+      v_first_state.attempt_id,
+      v_first_state.lease_token,
+      current_setting('careslink.assert.registration_digest'),
+      'worker.test.v1',
+      current_setting('careslink.assert.worker_policy_digest'),
+      'PROVIDER_TRANSIENT',
+      null
+    );
+  if v_replay is distinct from v_first_ack then
+    raise exception
+      'historical retry settlement replay drifted after purge';
+  end if;
+
+  v_success_replay :=
+    careslink_v1_generation.commit_v1_shadow_note_generation_success(
+      v_success_state.job_id,
+      v_success_state.attempt_id,
+      v_success_state.lease_token,
+      current_setting('careslink.assert.registration_digest'),
+      'worker.test.v1',
+      current_setting('careslink.assert.worker_policy_digest'),
+      v_success_state.fence_id,
+      v_success_state.fence_digest,
+      v_artifact.canonical_content,
+      v_artifact.canonical_content_hash,
+      v_artifact.provider_evidence
+    );
+  v_success_resolved :=
+    careslink_v1_generation.resolve_v1_shadow_note_generation_attempt(
+      v_success_state.job_id,
+      v_success_state.attempt_id,
+      v_success_state.lease_token,
+      current_setting('careslink.assert.registration_digest'),
+      v_artifact.canonical_content_hash,
+      v_artifact.provider_evidence_hash
+    );
+  if v_success_replay is distinct from v_success_ack
+    or v_success_resolved is distinct from jsonb_build_object(
+      'status', 'SUCCEEDED',
+      'atomicSuccess', v_success_ack
+    )
+  then
+    raise exception
+      'historical retry attempt-2 replay or resolution drifted after purge';
+  end if;
+
+  begin
+    perform careslink_v1_generation.settle_v1_shadow_note_generation_failure(
+      v_first_state.job_id,
+      v_first_state.attempt_id,
+      v_first_state.lease_token,
+      current_setting('careslink.assert.registration_digest'),
+      'worker.test.v1',
+      current_setting('careslink.assert.worker_policy_digest'),
+      'PROVIDER_PERMANENT',
+      null
+    );
+  exception when sqlstate 'P0001' then
+    if sqlerrm = 'INTERNAL_FAILURE' then
+      v_wrong_reason_rejected := true;
+    else
+      raise;
+    end if;
+  end;
+  if not v_wrong_reason_rejected then
+    raise exception
+      'historical retry changed failure reason was accepted after purge';
+  end if;
+
+  select attempt.* into v_first_attempt
+  from careslink_v1_generation.attempts as attempt
+  where attempt.id = v_first_state.attempt_id
+    and attempt.job_id = v_first_state.job_id;
+  select attempt.* into v_success_attempt
+  from careslink_v1_generation.attempts as attempt
+  where attempt.id = v_success_state.attempt_id
+    and attempt.job_id = v_success_state.job_id;
+  v_stale_evidence := v_artifact.provider_evidence || jsonb_build_object(
+    'deadlineAt', careslink_v1_generation._server_time(
+      v_first_attempt.acquired_at + interval '20 seconds'
+    ),
+    'startedAt',
+      careslink_v1_generation._server_time(v_first_attempt.acquired_at),
+    'finishedAt',
+      careslink_v1_generation._server_time(v_first_attempt.acquired_at),
+    'durationMs', 0
+  );
+  begin
+    perform careslink_v1_generation.commit_v1_shadow_note_generation_success(
+      v_first_state.job_id,
+      v_first_state.attempt_id,
+      v_first_state.lease_token,
+      current_setting('careslink.assert.registration_digest'),
+      'worker.test.v1',
+      current_setting('careslink.assert.worker_policy_digest'),
+      v_first_attempt.fence_id,
+      v_first_attempt.fence_digest,
+      v_artifact.canonical_content,
+      v_artifact.canonical_content_hash,
+      v_stale_evidence
+    );
+  exception when sqlstate 'P0001' then
+    if sqlerrm = 'LEASE_EXPIRED' then
+      v_stale_worker_rejected := true;
+    else
+      raise;
+    end if;
+  end;
+  if not v_stale_worker_rejected then
+    raise exception
+      'historical retry stale attempt-1 commit was not rejected after purge';
+  end if;
+
+  v_recovery :=
+    careslink_v1_generation.recover_v1_shadow_note_generation_expired(
+      current_setting('careslink.assert.registration_digest'),
+      'worker.test.v1',
+      current_setting('careslink.assert.worker_policy_digest'),
+      current_setting('careslink.assert.worker_identity_hash'),
+      '1.0.0-shadow.1',
+      '2026-08-09.v1-shadow'
+    );
+  if v_recovery is distinct from jsonb_build_object(
+    'recovered', 0,
+    'requeued', 0,
+    'failed', 0
+  ) then
+    raise exception 'historical retry recovery was not empty after purge';
+  end if;
+
+  perform careslink_v1_generation._set_owner(
+    'b0000000-0000-4000-8000-000000000001'::uuid
+  );
+  v_mutation_id :=
+    'note-generation:' || careslink_v1_generation._sha256_text(
+      v_success_state.job_id::text
+    );
+  if (
+      select count(*)
+      from careslink_v1_generation.jobs as job
+      where job.id = v_success_state.job_id
+        and job.status = 'SUCCEEDED'
+        and job.attempt_count = 2
+        and job.result_document_id::text =
+          v_success_ack #>> '{canonical,canonicalId}'
+        and job.result_revision_id::text =
+          v_success_ack #>> '{canonical,revisionId}'
+        and job.result_content_hash = v_artifact.canonical_content_hash
+    ) <> 1
+    or (
+      select count(*)
+      from careslink_v1_generation.attempts as attempt
+      where attempt.job_id = v_success_state.job_id
+    ) <> 2
+    or (
+      select count(*)
+      from careslink_v1_generation.attempts as attempt
+      where attempt.job_id = v_success_state.job_id
+        and attempt.status = 'RUNNING'
+    ) <> 0
+    or (
+      select count(*)
+      from careslink_v1_generation.attempts as attempt
+      where attempt.id = v_first_state.attempt_id
+        and attempt.status = 'FAILED'
+        and attempt.failure_reason = 'PROVIDER_TRANSIENT'
+        and attempt.terminal_transaction_id::text =
+          v_first_ack #>> '{transaction,transactionId}'
+        and attempt.settlement_base_delay_ms = 1000
+        and attempt.settlement_jitter_ms = 0
+        and attempt.settlement_retry_delay_ms = 1000
+        and attempt.canonical_content_hash is null
+        and attempt.provider_evidence_hash is null
+    ) <> 1
+    or (
+      select count(*)
+      from careslink_v1_generation.attempts as attempt
+      where attempt.id = v_success_state.attempt_id
+        and attempt.status = 'SUCCEEDED'
+        and attempt.terminal_transaction_id::text =
+          v_success_ack #>> '{transaction,transactionId}'
+        and attempt.canonical_content_hash =
+          v_artifact.canonical_content_hash
+        and attempt.provider_evidence_hash =
+          v_artifact.provider_evidence_hash
+    ) <> 1
+    or (
+      select count(*)
+      from careslink_v1_generation.payloads as payload
+      where payload.id = v_success_state.payload_id
+        and payload.job_id = v_success_state.job_id
+        and payload.state = 'PURGED'
+        and payload.revoke_reason = 'SUCCEEDED'
+        and payload.revoked_at = v_success_attempt.finished_at
+        and payload.purge_requested_at = v_success_attempt.finished_at
+        and payload.purged_at is not null
+        and payload.purge_attempt_count = 1
+    ) <> 1
+    or (
+      select count(*)
+      from careslink_v1_generation.payload_grants as grant_record
+      where grant_record.job_id = v_success_state.job_id
+    ) <> 1
+    or (
+      select count(*)
+      from careslink_v1_generation.payload_grants as grant_record
+      where grant_record.id = v_success_state.grant_id
+        and grant_record.attempt_id = v_success_state.attempt_id
+        and grant_record.status = 'CONSUMED'
+    ) <> 1
+    or (
+      select count(*)
+      from careslink_v1_generation.provider_evidence as evidence
+      where evidence.job_id = v_success_state.job_id
+    ) <> 1
+    or (
+      select count(*)
+      from careslink_v1_generation.provider_evidence as evidence
+      where evidence.job_id = v_success_state.job_id
+        and evidence.attempt_id = v_success_state.attempt_id
+        and evidence.evidence_hash = v_artifact.provider_evidence_hash
+        and evidence.evidence = v_artifact.provider_evidence
+    ) <> 1
+    or (
+      select count(*)
+      from careslink_v1_generation.provider_evidence as evidence
+      where evidence.attempt_id = v_first_state.attempt_id
+    ) <> 0
+    or (
+      select count(*)
+      from careslink_v1_generation.payload_purge_outbox as outbox
+      where outbox.payload_id = v_success_state.payload_id
+        and outbox.job_id = v_success_state.job_id
+    ) <> 1
+    or (
+      select count(*)
+      from careslink_v1_generation.payload_purge_outbox as outbox
+      where outbox.payload_id = v_success_state.payload_id
+        and outbox.job_id = v_success_state.job_id
+        and outbox.transaction_id::text =
+          v_success_ack #>> '{transaction,transactionId}'
+        and outbox.event_reference_hash =
+          v_success_ack #>> '{purgeOutboxAcknowledgment,eventReferenceHash}'
+        and outbox.reason = 'SUCCEEDED'
+        and outbox.status = 'PURGED'
+        and outbox.attempt_count = 1
+        and outbox.last_attempt_at is not null
+        and outbox.completed_at = outbox.last_attempt_at
+        and outbox.requested_at = v_success_attempt.finished_at
+    ) <> 1
+    or (
+      select count(*)
+      from public.ai_documents as document
+      where document.id =
+        (v_success_ack #>> '{canonical,canonicalId}')::uuid
+    ) <> 1
+    or (
+      select count(*)
+      from public.ai_document_revisions as revision
+      where revision.id =
+          (v_success_ack #>> '{canonical,revisionId}')::uuid
+        and revision.document_id =
+          (v_success_ack #>> '{canonical,canonicalId}')::uuid
+        and revision.content_hash = v_artifact.canonical_content_hash
+        and revision.mutation_id = v_mutation_id
+    ) <> 1
+    or (
+      select count(*)
+      from public.ai_document_sync_changes as change
+      where change.document_id =
+          (v_success_ack #>> '{canonical,canonicalId}')::uuid
+        and change.revision_id =
+          (v_success_ack #>> '{canonical,revisionId}')::uuid
+        and change.last_mutation_id = v_mutation_id
+    ) <> 1
+    or (
+      select count(*)
+      from public.ai_document_mutation_receipts as receipt
+      where receipt.document_id =
+          (v_success_ack #>> '{canonical,canonicalId}')::uuid
+        and receipt.revision_id =
+          (v_success_ack #>> '{canonical,revisionId}')::uuid
+        and receipt.mutation_id = v_mutation_id
+    ) <> 1
+    or v_first_ack #>> '{payloadMetadata,state}' is distinct from 'AVAILABLE'
+    or v_first_ack->'purgeOutboxAcknowledgment' is distinct from 'null'::jsonb
+    or v_success_ack #>> '{payloadMetadata,state}' is distinct from 'REVOKED'
+    or v_success_ack #>> '{purgeOutboxAcknowledgment,status}' is distinct from
+      'ENQUEUED'
+  then
+    raise exception 'historical retry post-purge side-effect row set drifted';
+  end if;
+end
+$$;
+
+reset role;
+
+-- Revoke the shared TEST_ONLY proof only after every fresh-authority scenario
+-- has completed. Authorize must re-read it and atomically settle the still-
+-- running late-failure attempt as PRIVACY_REVIEW_STALE.
+update public.privacy_reviews
+set status = 'REVOKED'
+where id = 'b2000000-0000-4000-8000-000000000001'::uuid
+  and owner_user_id = 'b0000000-0000-4000-8000-000000000001'::uuid
+  and status = 'CONFIRMED';
+
+set local role careslink_v1_generation_executor;
+
+do $$
+declare
+  v_state rpc_assertion_state%rowtype;
+  v_denied jsonb;
+  v_replay jsonb;
+  v_resolved jsonb;
+begin
+  select state.* into v_state
+  from rpc_assertion_state as state
+  where state.scenario = 'atomic-rollback';
+
+  v_denied :=
+    careslink_v1_generation.authorize_v1_shadow_note_generation_payload_attempt(
+      v_state.job_id,
+      v_state.payload_id,
+      v_state.attempt_id,
+      v_state.lease_token,
+      current_setting('careslink.assert.registration_digest')
+    );
+  v_replay :=
+    careslink_v1_generation.authorize_v1_shadow_note_generation_payload_attempt(
+      v_state.job_id,
+      v_state.payload_id,
+      v_state.attempt_id,
+      v_state.lease_token,
+      current_setting('careslink.assert.registration_digest')
+    );
+
+  if v_denied->>'status' is distinct from 'DENIED_SETTLED'
+    or v_denied->>'reason' is distinct from 'PRIVACY_REVIEW_STALE'
+    or v_denied->>'transactionStatus' is distinct from 'COMMITTED'
+    or (v_denied->>'atomic')::boolean is not true
+    or v_denied->>'jobStatus' is distinct from 'FAILED'
+    or v_denied->>'attemptStatus' is distinct from 'FAILED'
+    or v_denied->>'payloadState' is distinct from 'REVOKED'
+    or v_denied->>'payloadDisposition' is distinct from
+      'REVOKED_PURGE_ENQUEUED'
+    or v_denied::text ~*
+      'vaultGrant|vault|locator|rawFacts|canonicalContent|providerEvidence'
+    or v_replay is distinct from v_denied
+    or (
+      select count(*)
+      from careslink_v1_generation.provider_evidence
+      where attempt_id = v_state.attempt_id
+    ) <> 0
+    or (
+      select count(*)
+      from careslink_v1_generation.payload_purge_outbox
+      where payload_id = v_state.payload_id
+        and reason = 'FAILED'
+    ) <> 1
+  then
+    raise exception 'fresh-privacy denial was not atomic and replayable';
+  end if;
+
+  v_resolved :=
+    careslink_v1_generation.resolve_v1_shadow_note_generation_attempt(
+      v_state.job_id,
+      v_state.attempt_id,
+      v_state.lease_token,
+      current_setting('careslink.assert.registration_digest'),
+      null,
+      null
+    );
+  if v_resolved->>'status' is distinct from 'FAILED'
+    or v_resolved #>> '{atomicSettlement,settlement,reason}' is distinct from
+      'PRIVACY_REVIEW_STALE'
+  then
+    raise exception 'fresh-privacy denial resolution drifted';
   end if;
 end
 $$;
 
 -- Cross-job credentials cannot resolve another attempt. Canonical RLS is
 -- scoped by the database-owned owner GUC: owner B cannot observe owner A's
--- one successful document, while switching back restores exactly that row.
+-- two successful documents, while switching back restores exactly those rows.
 do $$
 declare
   v_success rpc_assertion_state%rowtype;
@@ -3341,10 +4353,10 @@ begin
   perform careslink_v1_generation._set_owner(
     'b0000000-0000-4000-8000-000000000001'::uuid
   );
-  if (select count(*) from public.ai_documents) <> 1
-    or (select count(*) from public.ai_document_revisions) <> 1
-    or (select count(*) from public.ai_document_sync_changes) <> 1
-    or (select count(*) from public.ai_document_mutation_receipts) <> 1
+  if (select count(*) from public.ai_documents) <> 2
+    or (select count(*) from public.ai_document_revisions) <> 2
+    or (select count(*) from public.ai_document_sync_changes) <> 2
+    or (select count(*) from public.ai_document_mutation_receipts) <> 2
   then
     raise exception 'owner A canonical success row set drifted';
   end if;

@@ -13,6 +13,9 @@ Current registered-worker adapter local batch base: `ec30b9342164d893f096cc0942b
 
 Current disposable database assertion gate HEAD: `c7b70e9f84b9b804779039711b85cc7eda55bd57`
 
+Current Attempt-2 historical-replay gate base HEAD:
+`000f17af88eff9266a92e484ba2080335d20fd2d`
+
 Current worker RPC shadow migration source:
 `20260821071044_add_v1_note_generation_worker_rpc_shadow.sql`
 
@@ -25,7 +28,9 @@ generation capabilities remain local, default-off, Production-unapplied and
 absent from retained Preview runtime. The private worker RPC migration passed
 the isolated PostgreSQL 17.6 migration/assertion gate on deleted disposable
 `r9`; deleted no-data `r20` subsequently passed its PostgreSQL 17.6 true
-two-session claim/session/privacy race gate. Neither is a runtime apply.
+two-session claim/session/privacy race gate, and deleted no-data `r21` passed
+the Attempt-2 historical-replay gate on PostgreSQL 17.6. None is a runtime
+apply.
 Disposable Preview databases were used only for the isolated gates recorded
 below and then deleted; no Preview application deployment or Production
 database was used as the SQL target.
@@ -709,6 +714,7 @@ not Production or runtime evidence. At that checkpoint, activation still
 required the PostgreSQL 16 path, owner A/B runtime integration and true
 two-session/two-connection `SKIP LOCKED` claim plus session/privacy-revocation
 races. The later `r20` result below closes only that PostgreSQL 17.6 race
+subset, and the later `r21` result closes the Attempt-2 historical-replay
 subset.
 Account-delete/purge cross-state recovery remains unproved. Before catalogs can
 be populated, governance must either make registration/catalog rows append-only
@@ -780,7 +786,46 @@ concurrency-specific findings. The branch was deleted; Production was never
 the SQL target and remained `ACTIVE_HEALTHY`.
 
 This closes only the PostgreSQL 17.6 true two-session claim/session/privacy race
-gate. PostgreSQL 16, owner A/B runtime integration, attempt-2 historical replay
-and the existing catalog/envelope/purge/provider/vault governance remain open.
-No caller grant, retained Preview, runtime worker or Production capability was
-created.
+gate. Deleted `r21` below subsequently closes Attempt-2 historical replay;
+PostgreSQL 16, owner A/B runtime integration and the existing
+catalog/envelope/purge/provider/vault governance remain open. No caller grant,
+retained Preview, runtime worker or Production capability was created.
+
+## 18. Durable Note worker RPC Attempt-2 historical replay gate — 2026-08-24
+
+At base HEAD `000f17af88eff9266a92e484ba2080335d20fd2d`, the exact
+rollback assertion body had SHA-256
+`bdcd479473ed1c6ae0782127eb1d8e5765e3de2ede829aadeb3eb35c2eeadaac`
+and was 146488 bytes. Disposable PostgreSQL 17.6 branch `r21`
+(`v1-note-worker-rpc-r21`; id
+`688da83b-78e8-45fa-8646-b015822d59b0`; ref
+`kfgjxlilotpaxnozomqq`) was non-default, `persistent=false` and
+`with_data=false`. Its confirmed Preview creation rate was US$0.01344/hour;
+because the branch was deleted, no ongoing charge or accrued total is inferred.
+All 14 migrations applied 14/14 and the adjacent, durable and worker rollback
+suites passed 7/7.
+
+The fixed two-attempt scenario proved exact Attempt 1 settle/resolve replay
+while Attempt 2 was `RUNNING`, again after Attempt 2 reached `SUCCEEDED`, and
+again after both payload and purge outbox reached `PURGED`. Attempt 2 success
+commit and resolve replayed their exact acknowledgements; a fully valid stale
+Attempt 1 commit failed with `LEASE_EXPIRED`; expired recovery returned zero.
+Before Attempt 2 succeeded those directed side effects were absent. After
+success, every subsequent replay and purge stage retained exactly one canonical
+document, revision, sync change, mutation receipt, provider-evidence row and
+purge-outbox row.
+
+The independent postcheck retained the hard-off setting, zero fixtures, all 12
+private generation tables, all nine private worker RPC identities, denied API
+table/RPC access and the two admin-only role-creator membership edges. Security
+and performance advisor results were unchanged from deleted `r9`, including
+zero generation security findings and zero generation performance WARN/ERROR.
+The exact `r21` branch was deleted; Production remained the default healthy
+parent and was never the SQL target.
+
+This closes the Attempt-2 historical-replay gate only. PostgreSQL 16, owner A/B
+runtime integration, catalog retention, nested exact-key database vectors,
+account-delete/purge recovery, provider-start binding, sequential numeric
+parsing hardening and the real runtime/vault boundaries remain activation
+blockers. No caller grant, retained Preview, runtime worker, route, model/STT,
+Points or Production capability was created or authorized.
