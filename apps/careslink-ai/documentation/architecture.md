@@ -86,7 +86,7 @@ The first implementation-readiness batch is present in source but is deliberatel
 | Durable Note generation internal contract | `src/lib/v1/note-generation-durable.ts`, `note-generation-durable.test.ts` and `documentation/v1-note-generation-durable-design.md` define a server-internal metadata-only repository and memory fake for enqueue replay, attempt claim, lease renewal, fresh-authority-bound payload authorization, bounded recovery, stale-worker fencing, response-loss replay and atomic canonical revision-1 success | both durable readiness and payload-retention readiness are fixed `false`; source-only and default-off. A private RPC migration now exists in source, but no route, applied database repository, registered/deployed worker, payload vault, live Auth/privacy transaction, model/STT, Points or deployment exists |
 | Note worker/provider/payload policy contracts | `note-generation-worker-policy.ts`, `note-generation-provider-policy.ts` and `note-generation-payload-contract.ts` define digest-bound immutable worker timing/retry policy, exact provider/model/prompt/golden/parser evidence, server-owned deadline binding, explicit unavailable usage/cost, and a single-consumption privacy/session-bound payload lifecycle with logical revoke and content-free purge receipts | all runtime catalogs are empty or undefined and readiness remains `false`; only explicit `TEST_ONLY` catalogs/memory storage exist. No duration, retention TTL, provider/model, encryption/KMS, backup, purge SLA or live session/privacy transaction is configured |
 | Registered Note worker v2 source contract | `note-generation-registered-worker.ts` and its test bind worker identity, contract/schema, all five provider policies and payload policy into one registration digest; enforce authorize/consume, deadline, heartbeat, finish-reason, evidence, retry, fencing and response-loss order; and require one atomic canonical revision-1, sync-receipt and payload-revoke store boundary | readiness is fixed `false`, the runtime registry is empty and the only factory is `TEST_ONLY`; there is no applied database store, scheduler, deployed worker, live Auth/privacy integration, real provider/model, Points call, route or deployment |
-| Registered-worker database/vault adapter contract | `note-generation-registered-worker-adapter.server.ts` and its test define nine exact privileged RPC calls plus a one-time vault-consume port; reject caller-supplied owner/session/time/retry/facts/locator fields; strictly rebuild canonical NoteContent and provider evidence; and accept success or failure replay only through composite transaction acknowledgements that bind revision 1, sync, mutation kind, attempt/job state, payload revocation and purge enqueue | adapter readiness is fixed `false` and construction is `TEST_ONLY` with injected clients and approved policies. The exact SQL identities and RLS/ACL posture passed isolated PostgreSQL 17 hosted evidence on deleted disposable `r9` and the current PostgreSQL 16.15 local compatibility gate described below; there is still no Supabase runtime client, environment lookup, route, runtime registry entry, vault backend or caller execute grant. A returned composite acknowledgement remains source-contract evidence, not proof of a retained or runtime database effect |
+| Registered-worker database/vault adapter contract | `note-generation-registered-worker-adapter.server.ts` and its test define nine exact privileged RPC calls plus a one-time vault-consume port; reject caller-supplied owner/session/time/retry/facts/locator fields; strictly rebuild canonical NoteContent and provider evidence; and accept success or failure replay only through composite transaction acknowledgements that bind revision 1, sync, mutation kind, attempt/job state, payload revocation and purge enqueue. `note-generation-registered-worker-postgres.server.ts` maps an explicitly injected query capability to those nine exact schema-qualified SQL calls | adapter and Postgres-client readiness remain fixed `false`, and both construction paths remain `TEST_ONLY` with injected ports and approved policies. The exact SQL identities and RLS/ACL posture passed isolated PostgreSQL 17 hosted evidence on deleted disposable `r9` and the current PostgreSQL 16.15 local compatibility gate described below. The current batch closes only the worker-half owner A/B adapter-to-database boundary; it does not create a connection, pool, environment lookup, database role or grant, and does not add owner admission/enqueue/status/cancel, a route, runtime registry entry or vault backend. A returned composite acknowledgement remains isolated integration evidence, not proof of a retained or served runtime database effect |
 | Durable Note metadata schema foundation | `supabase/migrations/20260820135834_add_v1_note_generation_durable_shadow.sql` creates dedicated non-login owner/executor roles, one private schema, a forced-off settings row, metadata-only jobs/attempts and supporting indexes; all three tables enable and force RLS, define no policy and expose no API/executor privilege | generated by Supabase CLI 2.115.0 and Production-unapplied. At exact HEAD `7f214429d9cdb3a2a6f16fd6b91d0bd9e67a038f`, a fourth fresh non-default, `persistent=false`, `with_data=false` PostgreSQL 17 disposable branch (`careslink-note-durable-preview-20260821-r4`; id `ecb8213c-f7fc-4dbd-96a9-db5cfb01d28b`; ref `czqdjqdjghmmzukstprt`; parent default `adocsnwnslxhxcjgbyee`) clean-applied the same 13-file manifest 13/13. The durable assertion and all five adjacent suites, including the repaired privacy-bound Portal Referral fixture, passed 6/6. Post-rollback zero-row, role, forced-RLS, zero-policy/function/view/non-internal-trigger and zero API/executor privilege-leak checks passed; runtime flags remained off. Generation-scope advisors reported only three informational no-policy findings and seven informational unused-index findings, with zero warning/error. The exact `r4` branch was deleted, both its ID and project ref were absent afterward, and the parent default branch still existed. This proves only the schema and cross-domain assertion gate: no RPC, worker, model/STT, Points or runtime capability exists. Production was not the SQL target, and no Production action, deployment, runtime flag or grant was added or enabled |
 | Durable Note worker RPC shadow | CLI-generated `supabase/migrations/20260821071044_add_v1_note_generation_worker_rpc_shadow.sql` adds nine private metadata tables and the nine exact claim, heartbeat, fence, success, failure, resolve, recover, payload-authorize and payload-consume RPC identities. It binds fresh Auth/privacy reads, database time, worker/provider/payload registration digests, retry/recovery, canonical revision-1 persistence, provider evidence, payload logical revoke and purge-outbox acknowledgements | default-off and Production-unapplied. At source HEAD `c7b70e9f84b9b804779039711b85cc7eda55bd57`, deleted disposable PostgreSQL 17.6 branch `r9` clean-applied the exact 14 migrations 14/14 and passed the five adjacent, durable and worker rollback suites 7/7. Catalogs/registrations and all fixture domains remained empty, flags remained hard-off, all 12 private tables retained RLS plus FORCE RLS, and the nine executor-owned `SECURITY DEFINER` RPCs retained `search_path=''` with API/service-role execute denied. Deleted disposable `r20` later proved the three true two-session claim/session/privacy races on PostgreSQL 17.6 through verified Session Pooler TLS, then removed the runner, `TEST_ONLY` support and branch. Deleted disposable `r21` subsequently proved exact Attempt-1 historical replay while Attempt 2 was `RUNNING`, after its terminal success and after payload/outbox purge, with a stale valid Attempt-1 commit rejected as `LEASE_EXPIRED`, zero recovery work and no duplicate canonical/evidence/outbox side effect. The later local PostgreSQL 16.15 gate independently closed the current engine/serial/true-two-session version path. Runtime activation remains unproved. With vault/KMS/retention undecided, normal consume still settles only `DENIED_SETTLED` / `PAYLOAD_UNAVAILABLE`; the test-only consumed fixture is not vault E2E. This is isolated schema/transaction/assertion evidence, not a retained Preview, caller grant, runtime worker or Production capability |
 | Historical worker-registration retention hardening | Supabase CLI 2.115.0 generated `supabase/migrations/20260823213144_harden_v1_note_generation_registration_retention.sql`. It adds the single-column `attempts_registration_digest_idx` and the named `attempts_registration_catalog_fk` from `attempts.registration_digest` to `worker_registrations.registration_digest`, with `ON UPDATE RESTRICT`, `ON DELETE RESTRICT`, initial `NOT VALID` enforcement and an explicit `VALIDATE CONSTRAINT` pass | source-only, additive, default-off and Production-unapplied. It creates no seed/catalog row, caller grant, runtime entrypoint or capability. Deleted disposable PostgreSQL 17.6 `r22` subsequently clean-applied the current 15-migration manifest 15/15, passed all seven rollback suites and independently verified the exact validated FK/index posture. Historical deleted `r9`/`r20`/`r21` remain the prior 14-migration evidence; the current hosted registration-retention gate and separate local PostgreSQL 16.15 compatibility gate are closed |
@@ -144,7 +144,9 @@ clean-apply, rollback-assertion, role/ACL/function and cross-domain zero-fixture
 gate. Deleted `r20` additionally closed the PostgreSQL 17.6 true two-session
 `SKIP LOCKED` and session/privacy-revocation race gate. The local PostgreSQL
 16.15 run subsequently closed the current engine/serial/true-two-session version
-gate. Owner A/B runtime integration remains a hard activation blocker. Deleted
+gate. The current batch closes only the worker-half owner A/B database
+integration boundary; the full owner admission/enqueue/status/cancel runtime
+repository remains a hard activation blocker. Deleted
 `r21` closed the fixed Attempt-2-success historical replay gate across the later `RUNNING`,
 `SUCCEEDED` and payload/outbox `PURGED` states. Source migration
 `20260823213144` now codifies historical registration retention with the named
@@ -155,6 +157,60 @@ to a consumed grant with fresh lease/heartbeat, and safe sequential JSON
 numeric parsing remain unproved pre-activation governance. Payload
 vault/KMS/retention, worker credentials, model/STT, Points, caller/runtime
 wiring, grants and activation also remain hard-off runtime blocks.
+
+### Worker-half owner A/B database integration boundary — 2026-08-24
+
+This boundary joins the existing registered-worker adapter to the current nine
+private worker RPC identities without widening the architecture. Synthetic
+owner A and owner B bindings remain database-owned, cross-owner identifiers and
+worker capabilities fail closed, and the adapter continues to expose only
+metadata acknowledgements. The integration port is explicit and server-private;
+it is not an environment-selected Production repository.
+
+The closure is deliberately narrower than the durable repository contract.
+There is still no database-backed owner enqueue/admission path, owner-safe job
+read/status adapter, cancellation path, caller grant, runtime worker registry,
+scheduler, route, payload vault, provider/model/STT call or Points settlement.
+All application readiness latches, the Production/default database state and
+the final local state remain off. The disposable TEST_ONLY setup temporarily
+enabled the private database setting only for the live transaction window; the
+separate quiesce and fixed cleanup restored its hard-off constraint. The three
+generation migrations remain Production-unapplied.
+
+On a worktree based on `ec29430dec7a79c611a552a52e36277e3512166e`, a
+fresh vanilla PostgreSQL 16.15 cluster on passwordless loopback
+`127.0.0.1:55432` applied the current repository migrations 27/27 and reached
+the expected 12-table, nine-RPC, hard-off, zero-generation-row baseline. The
+fixed TEST_ONLY setup, quiesce and cleanup bodies had SHA-256
+`a2b4ddd54acbbc621aa886b70b1c80dfac56de4b722154f4e9820f16b2aeea7b`,
+`e6ea88f8a280626c0059ee3a7e9d131382520630f2a7733d3983e5161f2a4ef0`
+and `e490809e3c39cb17d8d407399200743378df2b29d84bbd9da35da0cec18ff203`.
+The temporary runner was non-superuser, `NOINHERIT`, `NOBYPASSRLS`, connection
+limit 1, had no effective application-table or `TEMPORARY` privilege and no
+owner/executor membership. Exact ACL allowlists admitted only each function
+owner plus the runner for the nine RPCs and eight fixed zero-argument helpers.
+The management SQL also required the exact loopback address/port, temporary
+data-directory pattern, cluster name, bootstrap marker and application name.
+
+The explicit live Vitest passed 2/2. Owners A and B each committed one
+canonical document/revision/sync/receipt set; unqualified FORCE-RLS projections
+were A=1, B=1 and privacy-denied C=0. Cross-job, attempt, payload, issued-grant
+and lease composition failed closed. The cross-grant terminal side effect was
+contained by an explicit rollback-only transaction. Owner B recovered an intentionally lost commit
+response through resolve without a second commit, while C's revoked privacy
+proof produced replay-safe `DENIED_SETTLED / PRIVACY_REVIEW_STALE` before vault
+access; the vault port was called zero times. The A/B `CONSUMED` transition was
+performed only by fixed TEST_ONLY metadata helpers and is not vault E2E.
+
+The independent quiesce first committed `NOLOGIN`, rejected a new runner
+connection and found no runner session. Cleanup then committed, and an
+independent postcheck found zero Auth
+users/sessions, privacy reviews, canonical rows and generation/catalog rows;
+the runner and helper schema were absent, the settings constraint was restored
+hard-off, PUBLIC `TEMPORARY` was restored, all nine RPCs retained owner-only
+ACLs and still denied `anon`, `authenticated` and `service_role`. The server stopped, its exact temporary cluster directory was
+deleted and port 55432 no longer listened. No hosted target, Preview retention,
+Production apply, deployment, paid resource or runtime activation was used.
 
 The foundation migration creates only new shadow resources. The integration migration adds one composite uniqueness constraint to `generated_material_drafts(id, user_id)` so the source-owner foreign key is enforceable; it performs no legacy DML, backfill, entitlement change or content rewrite. Neither migration reads or changes `account_entitlements` or `credit_ledger`, issues a welcome grant, or changes production entitlement behavior. Every shadow business row is database-constrained to `shadow_only=true`. Authenticated grants are owner-only `SELECT` on the canonical owner resources; integration link/outbox/comparison tables expose no authenticated table grant. Shadow RPC execution is reserved to `service_role`. Cross-resource foreign keys bind owner and document identities to prevent same-ID/cross-owner composition errors.
 

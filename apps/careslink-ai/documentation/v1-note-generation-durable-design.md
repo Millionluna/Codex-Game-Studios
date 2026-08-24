@@ -482,8 +482,9 @@ cleanup tests. Deleted `r20` closed the true two-session/two-connection claim
 and concurrent session/privacy-revocation race subset on PostgreSQL 17.6; the
 deleted `r21` gate subsequently closed the Attempt-2 historical-replay subset.
 The later local PostgreSQL 16.15 gate closed the current database-engine,
-serial and true-two-session version path. Owner A/B runtime integration remains
-open. Preview evidence for an earlier migration revision is not promotion
+serial and true-two-session version path. The worker-half owner A/B database
+boundary is now closed; the full admission/enqueue/status/cancel runtime
+repository remains open. Preview evidence for an earlier migration revision is not promotion
 evidence for this design.
 
 ## 11. Current evidence boundary
@@ -792,10 +793,11 @@ scripted-fault and zero-fixture gates. Deleted `r20` subsequently closed the
 PostgreSQL 17.6 true two-session `SKIP LOCKED` claim and session/privacy-
 revocation race gate. The local PostgreSQL 16.15 run subsequently closed the
 current engine/serial/true-two-session version path. Activation still requires
-owner A/B runtime integration. Deleted `r21` closed the Attempt-2 historical
+the full owner admission/enqueue/status/cancel runtime repository; the worker-half
+adapter-to-database boundary is closed below. Deleted `r21` closed the Attempt-2 historical
 replay gate. The current source batch chooses and implements the registration
 retention FK/index design, and deleted `r22` closes its exact PostgreSQL 17.6
-hosted gate. Owner A/B runtime integration, nested exact-key vectors,
+hosted gate. The remaining full owner runtime repository, nested exact-key vectors,
 account-delete/purge recovery, provider-start binding, numeric parsing and the
 runtime/vault governance items above remain open before any caller grant or
 registry entry. Only after those results and the vault/KMS/retention, worker
@@ -803,3 +805,71 @@ credential, model/provider/STT and Points decisions are separately approved
 may runtime activation be considered. Nothing in this handoff authorizes
 Preview retention, Production apply, route activation, model/STT traffic or
 Points settlement.
+
+## 13. Worker-half owner A/B database integration boundary — 2026-08-24
+
+The current batch closes the narrowly defined worker-half owner A/B runtime
+integration boundary. The existing default-off registered-worker composite
+adapter is joined through `note-generation-registered-worker-postgres.server.ts`
+to the exact nine private database RPC identities using an explicitly injected,
+server-private query port. That source-only port creates no connection, pool,
+environment lookup, role or grant. Claim and authority calls supply no owner,
+initiating session, authoritative time, duration, retry budget, raw payload or
+locator. Lease-bound calls intentionally carry an opaque lease token, and the
+success commit intentionally carries canonical NoteContent. Owner A and owner B remain bound by database-owned
+job, attempt, payload, grant and privacy relationships, and cross-owner
+composition must fail closed without exposing private row content.
+
+This boundary is not the complete implementation of
+`CaresLinkV1NoteGenerationDurableRepository`. In particular, it does not add
+owner admission or enqueue, private idempotency lookup, owner-safe status/read,
+attempt listing or cancellation. It also adds no caller credential or execute
+grant, runtime registry entry, scheduler, route, payload vault, real provider,
+model/STT call, Points settlement or activation flag. Every application
+readiness latch and the Production/default database state remain off. Fixed
+TEST_ONLY setup temporarily enabled the disposable local private setting only
+for the live window; cleanup restored its hard-off constraint. The migrations
+remain Production-unapplied.
+
+Normal payload consumption remains fail-closed until the vault/KMS/retention
+contract exists. The disposable, cleanup-bounded `TEST_ONLY` consumed-grant bridge used to
+exercise a composite success acknowledgement remains scripted integration
+evidence only and must not be described as payload-vault, purge or provider E2E.
+
+The isolated execution used source base
+`ec29430dec7a79c611a552a52e36277e3512166e` and a fresh vanilla PostgreSQL
+16.15 cluster on passwordless loopback `127.0.0.1:55432`. All 27 current
+repository migrations applied and the expected 12 private tables, nine RPCs,
+hard-off setting and zero generation rows were present before setup. The
+temporary worker role was non-superuser, `NOINHERIT`, `NOBYPASSRLS`, connection
+limit 1, with no effective application-table or `TEMPORARY` privilege or
+owner/executor membership. Exact ACL allowlists admitted only each function
+owner plus the runner for nine RPCs and eight fixed helpers. Management SQL was
+bound to the exact local data-directory pattern, cluster name, bootstrap marker
+and application name. This management/bootstrap run does not
+replace the earlier non-superuser 27/27 and seven-suite PG16 migration proof.
+
+Setup, quiesce and cleanup SHA-256 values were
+`a2b4ddd54acbbc621aa886b70b1c80dfac56de4b722154f4e9820f16b2aeea7b`,
+`e6ea88f8a280626c0059ee3a7e9d131382520630f2a7733d3983e5161f2a4ef0`
+and `e490809e3c39cb17d8d407399200743378df2b29d84bbd9da35da0cec18ff203`.
+The explicit live test passed 2/2. A and B each completed a canonical revision-1
+transaction. Cross-job, attempt, payload, issued-grant and lease substitutions failed; B's
+committed result was recovered after simulated response loss without commit
+retry. C's post-authorization privacy revoke made authorize and consume return
+replay-safe `DENIED_SETTLED`; a later settle call replayed the same terminal
+`FAILED / PRIVACY_REVIEW_STALE` outcome before vault access. All nine RPCs were observed,
+vault calls remained zero, and unqualified owner projections were A=1, B=1 and
+C=0. The A/B grant bridge only marked two fixed metadata rows `CONSUMED`; it
+released no payload capability and is not provider, purge or vault E2E.
+
+The final source gate passed four focused files / 80 tests, the Preview E2E
+policy suite 4 files / 75 tests, and the full suite 128 files / 1,425 tests,
+plus TypeScript, full lint, 63/63-page build, 73-file adapter sync and diff
+checks. Independent quiesce committed `NOLOGIN`, rejected a new runner
+connection and found no runner session. Fixed cleanup then committed and independent postcheck found zero Auth,
+privacy, canonical and generation/catalog fixtures, no runner or helper schema,
+hard-off settings, restored PUBLIC `TEMPORARY`, zero unexpected RPC ACLs and 9/9
+API/service-role RPC denials. The server stopped and
+the exact temporary cluster directory was deleted. No hosted database,
+Production apply, deployment, paid resource or activation was involved.

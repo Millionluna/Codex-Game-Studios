@@ -93,10 +93,70 @@ repository migrations. It closes the PostgreSQL 16 database-engine, serial and
 true-two-session gates; it is not GoTrue, PostgREST, `supautils`, Advisors or
 hosted Supabase parity evidence.
 
+### Registered-worker owner A/B database integration boundary — 2026-08-24
+
+The current batch closes only the **worker half** of owner A/B runtime database
+integration. The existing default-off registered-worker adapter is bound to the
+exact nine private worker RPC identities through an explicitly injected,
+server-private database port implemented by
+`note-generation-registered-worker-postgres.server.ts`. It creates no
+connection, pool, environment lookup, role or grant. Separate synthetic owner A
+and owner B database bindings remain database-derived. Claim/authority calls
+accept no caller-supplied owner, session, clock, retry policy, raw payload or
+locator. Lease-bound calls intentionally carry an opaque lease token, and the
+success commit intentionally carries canonical NoteContent; returned
+acknowledgements and retained gate evidence remain content-free.
+
+This closure does not create the full durable runtime repository. Owner
+admission and enqueue, owner-safe job status/read, cancellation, a caller
+credential or grant, runtime registry, scheduler, route and deployment remain
+absent. Every application readiness latch and the Production/default database
+state remain off. Fixed TEST_ONLY setup temporarily enabled the private setting
+inside the disposable local execution window only; cleanup restored its hard-off
+constraint. Normal payload consumption remains fail-closed without an approved
+vault, and neither Preview retention nor any Production action is authorized.
+
+The isolated execution used a worktree based on
+`ec29430dec7a79c611a552a52e36277e3512166e` and a disposable vanilla
+PostgreSQL 16.15 cluster. The cluster listened only on passwordless loopback
+`127.0.0.1:55432`; management SQL additionally required the exact temporary
+data-directory pattern, cluster name, bootstrap marker and application name. A
+local superuser was used only for bootstrap, migration and fixture lifecycle,
+while the tested worker connection used the fixed
+`careslink_v1_generation_owner_ab_runner` role with
+`NOSUPERUSER / NOINHERIT / NOBYPASSRLS`, connection limit 1, no effective
+application-table or `TEMPORARY` privilege or owner/executor membership, and
+exact ACLs for only the nine reviewed RPCs plus eight fixed TEST_ONLY helpers.
+The current migration sequence applied 27/27 and the
+pre-setup baseline was 12 private tables, nine RPCs, hard-off and zero
+generation rows. This run did not repeat or replace the earlier seven-suite
+non-superuser PG16 migration proof.
+
+The setup/quiesce/cleanup hashes were
+`a2b4ddd54acbbc621aa886b70b1c80dfac56de4b722154f4e9820f16b2aeea7b`,
+`e6ea88f8a280626c0059ee3a7e9d131382520630f2a7733d3983e5161f2a4ef0`
+and `e490809e3c39cb17d8d407399200743378df2b29d84bbd9da35da0cec18ff203`.
+The explicit live test passed 2/2: A/B success, A/B unqualified RLS projection
+1/1, C projection 0, five cross-owner capability denials, response-loss resolve
+without commit retry, replay-safe privacy denial and zero vault calls. The
+fixed A/B consumed-grant helpers updated metadata only and released no payload
+or capability.
+
+An independent quiesce committed `NOLOGIN`, rejected a new runner connection
+and found no active runner session before cleanup. Cleanup removed the exact
+fixtures, grants, helpers, schema and runner and restored the membership and
+PUBLIC `TEMPORARY` baselines. Independent postcheck counts were zero for
+Auth users/sessions, privacy, canonical and generation/catalog data; capability
+was hard-off, unexpected RPC ACLs were zero and all nine RPCs still denied every
+API/service role. The local
+server and exact temporary directory were then deleted. No scheduler, retained
+worker, hosted Preview, Production action, deployment or paid resource was
+created.
+
 ## Inactive shadow automation contracts
 
-- The contract and migrations define generation/export job states. Source-only memory contracts model leases, recovery, retry policy, provider evidence and single-use payload grants, and the registered-worker v2 facade composes those boundaries without a payload locator. All three generation migrations remain Production-unapplied; deleted `r9` supplied isolated PostgreSQL 17.6 execution evidence for database-clock claim/heartbeat/fence/commit/settle/resolve/recover/authorize/consume logic and payload/grant/evidence/purge-outbox metadata, deleted `r20` supplied the three true two-session race results, and deleted `r21` supplied exact historical transient-retry/success replay through payload/outbox purge. There is still no caller grant. Normal consume deliberately settles `DENIED_SETTLED` / `PAYLOAD_UNAVAILABLE` and returns no vault grant, locator or facts; the rollback-only `TEST_ONLY` `CONSUMED` fixture proves only scripted canonical transaction atomicity. There is still no payload vault, queue service, deployed worker, live retry loop or cancellation endpoint.
-- No worker automation may be scheduled yet. Deleted `r20` closed the PostgreSQL 17.6 true two-session claim/session/privacy race gate, deleted `r21` closed the fixed Attempt-2 historical replay gate, deleted `r22` closed the current hosted registration-retention gate, and the isolated local PostgreSQL 16.15 run closed the current engine/serial/true-two-session version gate. Owner A/B runtime integration, nested database exact-key envelopes, account-delete/purge recovery, provider-start binding to a consumed grant plus fresh lease/heartbeat, sequential JSON numeric parsing hardening, and the payload-vault/KMS/retention, caller, model/STT, Points and runtime-activation blocks remain unproved explicit governance.
+- The contract and migrations define generation/export job states. Source-only memory contracts model leases, recovery, retry policy, provider evidence and single-use payload grants, and the registered-worker v2 facade composes those boundaries without a payload locator. All three generation migrations remain Production-unapplied; deleted `r9` supplied isolated PostgreSQL 17.6 execution evidence for database-clock claim/heartbeat/fence/commit/settle/resolve/recover/authorize/consume logic and payload/grant/evidence/purge-outbox metadata, deleted `r20` supplied the three true two-session race results, and deleted `r21` supplied exact historical transient-retry/success replay through payload/outbox purge. There is still no caller grant. Normal consume deliberately settles `DENIED_SETTLED` / `PAYLOAD_UNAVAILABLE` and returns no vault grant, locator or facts; the historical rollback-only `TEST_ONLY` `CONSUMED` fixture proves only scripted canonical transaction atomicity. There is still no payload vault, queue service, deployed worker, live retry loop or cancellation endpoint.
+- No worker automation may be scheduled yet. Deleted `r20` closed the PostgreSQL 17.6 true two-session claim/session/privacy race gate, deleted `r21` closed the fixed Attempt-2 historical replay gate, deleted `r22` closed the current hosted registration-retention gate, and the isolated local PostgreSQL 16.15 run closed the current engine/serial/true-two-session version gate. The current batch closes only the worker-half owner A/B adapter-to-database boundary. The full owner admission/enqueue/status/cancel repository, nested database exact-key envelopes, account-delete/purge recovery, provider-start binding to a consumed grant plus fresh lease/heartbeat, sequential JSON numeric parsing hardening, and the payload-vault/KMS/retention, caller, model/STT, Points and runtime-activation blocks remain unproved explicit governance.
 - The memory Points reference store proves quote/reserve/commit/release semantics. The SQL draft exposes five `security definer` shadow RPCs only to `service_role`; those RPCs passed isolated branch tests for settlement, replay/conflict, source-lot release, expiry, insufficient balance and cross-owner denial. The migration remains unapplied to Production and no server route calls it.
 - The legacy NDIS adapter remains pure. The server-only NDIS integration invokes it only after a successful legacy Save on an explicitly verified Preview. The RPC creates an owner-bound shadow revision and metadata-only outbox; optional read comparison records `MATCH/MISMATCH/MISSING/ERROR`. No call invokes OpenAI or settles Points.
 - There is no automatic retry worker. `audit_ndis_shadow_reconciliation` is a service-role-only, read-only operator surface that reports IDs/status/timestamps/hashes. Live legacy rows remain the projection retry source; a legacy-schema canonical document whose source has disappeared while the lifecycle is still non-terminal is reported as `SOURCE_DELETE_CLEANUP_PENDING` for operator cleanup.

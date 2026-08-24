@@ -762,10 +762,81 @@ repository migrations. This closes the current PostgreSQL 16 database-engine,
 serial and true-two-session compatibility gate; it is not GoTrue, PostgREST,
 `supautils`, Advisors or hosted Supabase parity evidence.
 
-Owner A/B runtime integration, nested database exact-key envelopes,
+The worker-half owner A/B adapter-to-database boundary is closed below. The full
+owner admission/enqueue/status/cancel runtime repository, nested database exact-key envelopes,
 account-delete/purge recovery, provider-start binding to a consumed grant plus
 fresh lease/heartbeat, sequential numeric parsing, vault/KMS/retention, worker
 credentials, model/STT, Points and runtime activation remain open.
+
+### Registered-worker owner A/B database integration boundary — 2026-08-24
+
+The current batch closes only the worker-half adapter-to-database boundary. The
+existing `TEST_ONLY`, default-off registered-worker adapter is joined to
+`note-generation-registered-worker-postgres.server.ts`, which maps an explicitly
+injected query port to the exact nine private RPC identities without creating a
+connection, environment lookup, role or grant. Its owner A and owner B cases
+require database-derived owner/session/privacy/job bindings, symmetric positive
+paths, cross-owner job/attempt/payload/grant/lease denial, metadata-only
+acknowledgements and no raw payload or locator in claim/authority arguments.
+Lease-bound calls intentionally carry an opaque lease token, and success commit
+intentionally carries canonical NoteContent. Transient lease/grant capabilities
+are not logged or retained; terminal acknowledgements, logs and retained gate
+evidence contain no private content.
+
+The observed gate ran on a worktree based on
+`ec29430dec7a79c611a552a52e36277e3512166e` against a fresh vanilla
+PostgreSQL 16.15 cluster listening only on passwordless loopback
+`127.0.0.1:55432`. Management SQL also required the fixed temporary-directory
+pattern, cluster name, bootstrap marker and management application name. The
+repository migration sequence applied 27/27 and the
+pre-setup baseline reported 12 private generation tables, nine RPCs, hard-off
+settings and zero generation rows. Management bootstrap was local-only; the
+tested runner was non-superuser, `NOINHERIT`, `NOBYPASSRLS`, connection limit 1,
+had no effective application-table or `TEMPORARY` privilege or owner/executor
+membership, and exact ACLs admitted only each function owner plus the runner for
+the nine RPCs and eight fixed helpers.
+
+The fixed setup/quiesce/cleanup SHA-256 values were
+`a2b4ddd54acbbc621aa886b70b1c80dfac56de4b722154f4e9820f16b2aeea7b`,
+`e6ea88f8a280626c0059ee3a7e9d131382520630f2a7733d3983e5161f2a4ef0`
+and `e490809e3c39cb17d8d407399200743378df2b29d84bbd9da35da0cec18ff203`.
+The explicit live file passed 2/2 and proved:
+
+- owner A heartbeat, authorize, TEST_ONLY consumed metadata, fence, commit and
+  exact successful resolve;
+- owner B cross-job, cross-attempt, cross-payload and owner-A-lease denial, plus
+  rejection of C's still-`ISSUED` grant inside an explicit rollback-only
+  transaction, followed by a successful commit whose deliberately lost response
+  resolved without commit retry;
+- owner C authorization followed by privacy revoke; authorize and consume both
+  returned replay-safe `DENIED_SETTLED / PRIVACY_REVIEW_STALE`, and the later
+  `settleFailure` call replayed the same terminal `FAILED` reason, with zero vault
+  calls;
+- all nine RPC identities called through the real query adapter, final A/B/C
+  unqualified FORCE-RLS canonical projections 1/1/0, two evidence rows and no
+  duplicate canonical, evidence or outbox effect.
+
+The four focused Postgres/adapter/policy files passed 80/80, the Preview E2E
+policy suite passed 4 files / 75 tests, and the full source suite passed 128
+files / 1,425 tests. TypeScript, full ESLint, the 63/63-page production build,
+the 73-file Codex-adapter sync check and `git diff --check` passed. A separate
+quiesce first committed `NOLOGIN`, rejected a new runner connection and found no
+runner session. Cleanup then committed and an independent postcheck found zero Auth users/sessions, privacy
+reviews, canonical rows and generation/catalog rows; runner and helper schema
+were absent, settings were hard-off with the constraint restored, PUBLIC
+`TEMPORARY` was restored, unexpected RPC ACLs were zero, and 9/9 RPCs still
+denied `anon`, `authenticated` and `service_role`. The server stopped,
+the exact temporary cluster directory was permanently deleted and the port was
+closed.
+
+The fixed A/B consumed metadata helper is not a payload vault or real consume
+implementation. This gate does not close the full runtime database repository. Owner admission
+and enqueue, private idempotency lookup, owner-safe job status/read, attempt
+listing, cancellation, caller credentials/grants, runtime registry, scheduler,
+route, vault/KMS/retention, provider/model/STT and Points remain absent. All
+application readiness values remain `false`; only the disposable TEST_ONLY
+window temporarily enabled the private setting, and cleanup restored it
+hard-off. No Production or retained Preview capability is created.
 
 ### Mobile V1 protected Product API Preview E2E — 2026-08-14
 
@@ -1001,7 +1072,7 @@ The following suites are required before the corresponding V1 slice can be calle
 
 1. The native App exists in a separate repository and is outside this task; this AI repository does not execute or attest its iOS/Android, offline, purchase or store gates.
 2. The OpenAPI/TypeScript contract and default-off durable `/v1` route adapter now exist, but there is no Preview- or Production-served Product API, generated client package, schema registry or previous-version compatibility fixture.
-3. The registration-retention source worktree passed its historical 1,381 tests across 125 files and all three focused migration contracts 39/39, with the `r21` 1,377-test / 124-file result, the `r9` 1,337-test / 122-file result and earlier baselines retained. The strict-local harness batch subsequently passed 1,400 tests across the same 125 files. All five Note types share a Production-unapplied private metadata/RPC layer with nine exact RPC identities and no caller execute grant. Deleted PostgreSQL 17.6 disposable `r9` proved the exact 14-migration, seven-suite and independent postcheck gate; deleted `r20` closed the PostgreSQL 17.6 true two-session claim/session/privacy race gate; deleted `r21` closed Attempt 1 historical replay across Attempt 2 success and post-purge state; deleted `r22` closed the hosted registration historical-retention gate with the exact 15/15 manifest, 7/7 suites and independent postcheck. The disposable local PostgreSQL 16.15 gate then closed the current database-engine, serial and true-two-session version path with 27/27 repository migrations, exact V1 15/15, 7/7 suites and 3/3 races. No worker-RPC Preview or local cluster was retained. The five types still lack owner A/B runtime integration, a runtime database repository, deployed worker, nested exact-key database vectors, account-delete/purge recovery, provider-start binding, safe sequential numeric parsing, vault/KMS/retention, worker credentials, real provider/model/STT integration, Points and complete per-type golden sets; runtime activation remains open.
+3. The registration-retention source worktree passed its historical 1,381 tests across 125 files and all three focused migration contracts 39/39, with the `r21` 1,377-test / 124-file result, the `r9` 1,337-test / 122-file result and earlier baselines retained. The strict-local harness batch subsequently passed 1,400 tests across the same 125 files. All five Note types share a Production-unapplied private metadata/RPC layer with nine exact RPC identities and no caller execute grant. Deleted PostgreSQL 17.6 disposable `r9` proved the exact 14-migration, seven-suite and independent postcheck gate; deleted `r20` closed the PostgreSQL 17.6 true two-session claim/session/privacy race gate; deleted `r21` closed Attempt 1 historical replay across Attempt 2 success and post-purge state; deleted `r22` closed the hosted registration historical-retention gate with the exact 15/15 manifest, 7/7 suites and independent postcheck. The disposable local PostgreSQL 16.15 gate then closed the current database-engine, serial and true-two-session version path with 27/27 repository migrations, exact V1 15/15, 7/7 suites and 3/3 races. No worker-RPC Preview or local cluster was retained. The current batch closes only the worker-half owner A/B adapter-to-database boundary. The five types still lack the full runtime database repository and owner admission/enqueue/status/cancel flow, a deployed worker, nested exact-key database vectors, account-delete/purge recovery, provider-start binding, safe sequential numeric parsing, vault/KMS/retention, worker credentials, real provider/model/STT integration, Points and complete per-type golden sets; runtime activation remains open.
 4. Canonical document/revision/checkpoint states exist as memory/domain contracts plus historical isolated schema/RPC evidence and a Production-unapplied mobile-sync migration draft that was clean-applied only on a deleted disposable branch; there is no retained schema activation, editor, renderer or cross-device recovery E2E.
 5. Points lots/rates/reservations passed isolated serial database tests but remain shadow-only. There is no runtime entitlement integration, welcome eligibility decision, concurrent reservation proof or legacy-credit conversion/reconciliation test.
 6. No payment provider sandbox, webhook replay, refund or reconciliation harness exists.

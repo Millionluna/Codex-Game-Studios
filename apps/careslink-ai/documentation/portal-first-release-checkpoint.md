@@ -954,9 +954,66 @@ repository migrations. It closes the current PostgreSQL 16 database-engine,
 serial and true-two-session compatibility gate. It does not prove GoTrue,
 PostgREST, `supautils`, Advisors or hosted Supabase parity.
 
-Owner A/B runtime integration, nested database exact-key vectors,
+The worker-half owner A/B adapter-to-database boundary is closed below. The full
+owner admission/enqueue/status/cancel runtime repository, nested database exact-key vectors,
 account-delete/purge recovery, provider-start binding to a consumed grant with
 fresh lease/heartbeat, safe sequential numeric parsing, vault/KMS/retention,
 worker credentials, model/STT, Points and runtime activation remain open.
 Production was never a target; no retained Preview, deployment, caller grant,
 runtime flag, capability or paid resource was created.
+
+## 21. Registered-worker owner A/B database integration boundary — 2026-08-24
+
+The current batch closes only the worker-half owner A/B adapter-to-database
+boundary. The existing `TEST_ONLY`, default-off registered-worker adapter is
+connected through `note-generation-registered-worker-postgres.server.ts` and an
+explicitly injected server-private query port to the current nine private worker
+RPC identities. The port creates no connection, environment lookup, role or
+grant. Database-owned owner/session/privacy and job relationships remain
+authoritative, while cross-owner
+job/attempt/payload/grant/lease composition fails closed and acknowledgements
+remain metadata-only.
+
+This does not make the five-Note service usable. The full durable runtime
+repository still lacks owner admission and enqueue, owner-safe job status/read,
+attempt listing and cancellation. There is also no caller credential or grant,
+runtime registry, scheduler, served job route, payload vault, provider/model/STT
+traffic, Points settlement, deployment or Production schema apply. Application
+readiness and the Production/default database setting remain off; only the
+disposable TEST_ONLY window temporarily enabled its private local setting, and
+cleanup restored hard-off.
+
+The next implementation sequence therefore remains: database exact-key and safe
+numeric parsing hardening; account-delete/purge recovery; approved
+vault/KMS/retention, worker credential and provider/model policy decisions;
+real consume plus provider-start/lease freshness; then the complete
+enqueue/status/cancel repository, caller grant, registry and scheduler. A
+same-revision protected Preview and explicit activation approval remain later
+gates, with Points only after a usable canonical revision exists.
+
+The gate ran from source base
+`ec29430dec7a79c611a552a52e36277e3512166e` on disposable vanilla PostgreSQL
+16.15 at passwordless loopback `127.0.0.1:55432`. The current migrations applied
+27/27 before fixed setup. Setup/quiesce/cleanup SHA-256 values were
+`a2b4ddd54acbbc621aa886b70b1c80dfac56de4b722154f4e9820f16b2aeea7b`,
+`e6ea88f8a280626c0059ee3a7e9d131382520630f2a7733d3983e5161f2a4ef0`
+and `e490809e3c39cb17d8d407399200743378df2b29d84bbd9da35da0cec18ff203`.
+The exact non-superuser runner held no effective application-table or
+`TEMPORARY` privilege or owner/executor membership; exact ACLs admitted only
+each function owner plus the runner for nine worker RPCs and eight fixed helpers.
+
+The explicit live test passed 2/2: owner A/B success, five cross-owner
+capability denials, response-loss resolve without a duplicate commit, privacy
+denial before vault access, all nine RPCs observed and unqualified owner
+projections A=1/B=1/C=0. The A/B success path used fixed TEST_ONLY consumed
+metadata helpers, not a payload vault. The full source tree passed 128 files /
+1,425 tests, Preview policy 4 files / 75 tests, TypeScript, lint, 63/63-page
+build, 73-file adapter sync and diff checks.
+
+Independent quiesce committed `NOLOGIN`, rejected a new runner connection and
+found no runner session. Cleanup committed and independent postcheck reported zero Auth, privacy,
+canonical and generation/catalog fixtures, absent runner/helper schema,
+hard-off settings, restored PUBLIC `TEMPORARY`, zero unexpected RPC ACLs and 9/9
+API/service-role RPC denials. The local server and
+exact temporary directory were deleted. No Preview was retained and no
+Production, deployment, model/STT, Points or paid resource action occurred.
