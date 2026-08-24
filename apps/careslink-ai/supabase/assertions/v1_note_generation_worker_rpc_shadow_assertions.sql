@@ -6,7 +6,17 @@
 -- attempt invariant; a separately authorized disposable Preview must run the
 -- real two-connection concurrency gate before any execute grant or activation.
 -- Deleted r20 separately closed that PostgreSQL 17.6 race subset; this file
--- remains serial evidence and PostgreSQL 16 remains unproved.
+-- remains serial evidence.
+-- On 2026-08-24, from a worktree based on HEAD
+-- 93c5c2aa956d20e5f1f704e24e5dd17a478fc2ea plus this batch's uncommitted
+-- concurrency-harness changes, a clean local PostgreSQL 16.15 cluster
+-- (server_version_num = 160015) closed the PostgreSQL 16 engine, serial and
+-- true-two-session race gates: all 27/27 repository migrations (V1 15/15),
+-- all 7/7 rollback suites, the independent postcheck and all 3/3 real
+-- two-connection concurrency scenarios passed. The loopback-only endpoint used
+-- no password and no TLS. Fixed SQL cleanup deleted the local runner, helper
+-- surface and fixtures. The outer gate then stopped the server and permanently
+-- deleted the exact temporary cluster directory. Production was never touched.
 -- The historical pre-retention body, from the worktree based on HEAD
 -- 000f17af88eff9266a92e484ba2080335d20fd2d, passed on deleted PostgreSQL
 -- 17.6 r21: 14/14 migrations, 7/7 rollback suites and the independent

@@ -8,6 +8,12 @@ import {
   parsePreviewDatabaseTarget,
   validateNoteWorkerRpcConcurrencyDatabaseUrl,
 } from "./note-worker-rpc-concurrency-policy.mjs";
+import {
+  NOTE_WORKER_RPC_CONCURRENCY_LOCAL_PG16_POLICY,
+  assertLocalPg16LoopbackPolicyRegression,
+  parseLocalPg16LoopbackDatabaseTarget,
+  validateLocalPg16LoopbackDatabaseUrl,
+} from "./note-worker-rpc-concurrency-local-pg16-policy.mjs";
 
 const PREVIEW_REF = "abcdefghijklmnopqrst";
 const OTHER_PREVIEW_REF = "zyxwvutsrqponmlkjihg";
@@ -38,6 +44,21 @@ function poolerUrl({
   hostname = "aws-0-ap-southeast-2.pooler.supabase.com",
 } = {}) {
   return `postgres://${username}:${password}@${hostname}:${port}/${database}?${query}`;
+}
+
+function localPg16Url({
+  scheme = "postgresql:",
+  hostname = "127.0.0.1",
+  port = "55432",
+  database = "postgres",
+  username = RUNNER_ROLE,
+  password = "",
+  suffix = "",
+} = {}) {
+  const credentials = password.length === 0
+    ? username
+    : `${username}:${password}`;
+  return `${scheme}//${credentials}@${hostname}:${port}/${database}${suffix}`;
 }
 
 function expectPolicyCode(operation, code) {
@@ -327,5 +348,98 @@ describe("Note worker RPC two-session connection policy", () => {
         }),
       NOTE_WORKER_RPC_CONCURRENCY_ERROR_CODES.productionTargetDenied,
     );
+  });
+});
+
+describe("Note worker RPC local PostgreSQL 16 loopback policy", () => {
+  it("accepts only a canonical passwordless high-port loopback target", () => {
+    const descriptor = validateLocalPg16LoopbackDatabaseUrl(localPg16Url());
+    expect(descriptor).toEqual({
+      ok: true,
+      policyVersion: "2026-08-24.local-pg16.1",
+      connectionMode: "local_pg16_loopback",
+      projectRef: null,
+      databaseRole: RUNNER_ROLE,
+      hostname: "127.0.0.1",
+      port: 55432,
+      database: "postgres",
+      postgresMajor: 16,
+      sslMode: "disabled",
+      passwordMaterial: "absent",
+    });
+    expect(Object.isFrozen(descriptor)).toBe(true);
+    expect(JSON.stringify(descriptor)).not.toContain("postgresql://");
+  });
+
+  it("accepts canonical localhost input but pins the connection host to IPv4 loopback", () => {
+    expect(
+      parseLocalPg16LoopbackDatabaseTarget(
+        localPg16Url({ hostname: "localhost" }),
+      ),
+    ).toMatchObject({
+      connectionMode: "local_pg16_loopback",
+      hostname: "127.0.0.1",
+      port: 55432,
+      postgresMajor: 16,
+    });
+  });
+
+  it.each([
+    [localPg16Url({ hostname: "127.0.0.2" }), "targetDenied"],
+    [localPg16Url({ hostname: "0.0.0.0" }), "targetDenied"],
+    [localPg16Url({ hostname: "[::1]" }), "targetDenied"],
+    [localPg16Url({ hostname: "localhost.evil" }), "targetDenied"],
+    [localPg16Url({ port: "5432" }), "portDenied"],
+    [localPg16Url({ port: "49151" }), "portDenied"],
+    [localPg16Url().replace(":55432/postgres", "/postgres"), "portDenied"],
+    [localPg16Url({ username: "postgres" }), "credentialsDenied"],
+    [localPg16Url({ password: "forbidden" }), "credentialsDenied"],
+    [localPg16Url({ database: "template1" }), "databaseNameDenied"],
+    [localPg16Url({ suffix: "?sslmode=disable" }), "queryDenied"],
+    [localPg16Url({ suffix: "#fragment" }), "queryDenied"],
+  ])("rejects local target drift without returning input evidence", (value, codeKey) => {
+    const error = expectPolicyCode(
+      () => validateLocalPg16LoopbackDatabaseUrl(value),
+      NOTE_WORKER_RPC_CONCURRENCY_ERROR_CODES[codeKey],
+    );
+    expect(JSON.stringify(error)).not.toContain(value);
+  });
+
+  it("keeps hosted and local target policies mutually exclusive", () => {
+    expectPolicyCode(
+      () =>
+        validateNoteWorkerRpcConcurrencyDatabaseUrl(localPg16Url(), {
+          expectedProjectRef: PREVIEW_REF,
+        }),
+      NOTE_WORKER_RPC_CONCURRENCY_ERROR_CODES.portDenied,
+    );
+    expectPolicyCode(
+      () =>
+        validateLocalPg16LoopbackDatabaseUrl(
+          directUrl().replace(":5432/", ":55432/").split("?")[0],
+        ),
+      NOTE_WORKER_RPC_CONCURRENCY_ERROR_CODES.targetDenied,
+    );
+  });
+
+  it("exposes a frozen offline local regression gate", () => {
+    expect(assertLocalPg16LoopbackPolicyRegression()).toEqual({
+      ok: true,
+      policyVersion: "2026-08-24.local-pg16.1",
+      expectedPostgresMajor: 16,
+      deniedPort: 5432,
+      requiredDatabase: "postgres",
+      allowedHosts: ["127.0.0.1", "localhost"],
+      sslMode: "disabled",
+      passwordMaterial: "absent",
+    });
+    expect(
+      Object.isFrozen(NOTE_WORKER_RPC_CONCURRENCY_LOCAL_PG16_POLICY),
+    ).toBe(true);
+    expect(
+      Object.isFrozen(
+        NOTE_WORKER_RPC_CONCURRENCY_LOCAL_PG16_POLICY.allowedHosts,
+      ),
+    ).toBe(true);
   });
 });

@@ -1,6 +1,6 @@
 # CaresLink AI Test Evidence
 
-> Evidence date: 2026-08-23. This document separates **Existing**, **Proposed**, and **Gaps**. Passing current tests does not mean Product Baseline V1.0 is implemented.
+> Evidence date: 2026-08-24. This document separates **Existing**, **Proposed**, and **Gaps**. Passing current tests does not mean Product Baseline V1.0 is implemented.
 
 ## Existing
 
@@ -710,6 +710,63 @@ account-delete/purge recovery, provider-start binding, sequential numeric
 parsing and all vault/runtime gates remain open. No retained Preview,
 deployment, caller grant, runtime flag or capability was created.
 
+### Durable Note PostgreSQL 16.15 local isolated gate — 2026-08-24
+
+The `r22` result immediately above remains historical PostgreSQL 17.6 hosted
+evidence. A subsequent worktree based on HEAD
+`93c5c2aa956d20e5f1f704e24e5dd17a478fc2ea` used a disposable Homebrew
+PostgreSQL 16.15 server with exact `server_version_num=160015`. Its clean apply
+covered 27/27 repository migrations: the 12 pre-V1 migrations followed by the
+exact current V1 manifest 15/15. The five adjacent suites plus the durable and
+worker rollback suites passed 7/7 with the same current bodies recorded above:
+37547 bytes / SHA-256
+`2a2af2e8c7c745b769a731a4892b27f65fcf311321e813c3cc190e54167772a6`
+for durable foundation and 153956 bytes / SHA-256
+`1c9f65bdc7f1de86e1c7398399ecf029207ba1b2bdf9fa3634dadb482424fdbb`
+for worker RPC.
+
+The independent postcheck confirmed exactly 12 private generation tables, nine
+private worker RPC identities, hard-off settings, zero checked fixture rows,
+denied API table/RPC access, only the two expected admin-only creator edges and
+the exact validated registration-retention FK/index.
+
+The strict local-only harness used two independent backend PIDs at loopback
+`127.0.0.1:55432`, with no TLS, password or credential material. It passed 3/3
+`SKIP LOCKED`, session-revocation-first and privacy-authorization-first races.
+The fixed setup body had SHA-256
+`ba183bacf8b35a2493b520563ce2fe2d1193e0638af17d2be62c8b58076112bc`;
+the fixed cleanup body had SHA-256
+`e4aa567f372885137f2b0251f51ea1818a5ca329ec9ed8a9a9f8355cc3ecbecb`.
+Setup, quiesce, drain and cleanup all passed.
+
+| Current local command/gate | Result |
+|---|---|
+| two focused strict-local harness/policy files | 59/59 passed |
+| `pnpm test:preview:e2e:policy` | 3 files / 72 tests passed; preserves the prior 53 and adds 19 strict-local cases |
+| `pnpm test` | 125 files / 1,400 tests passed; preserves historical `r22` source result 125 / 1,381 and adds 19 strict-local cases |
+| `pnpm exec tsc --noEmit --incremental false` | passed |
+| `pnpm lint` | passed |
+| `pnpm build` | passed; Next static generation 63/63 |
+| Codex-adapter sync check | 73 files passed |
+
+Fixed SQL cleanup removed the database runner, `TEST_ONLY` helper surface and
+fixtures. The outer gate then stopped the server and deleted the exact
+PostgreSQL cluster directory, Colima profile and disk. Production was never a
+target, and no retained Preview, deployment, caller grant, runtime activation
+or paid resource was created.
+
+Supabase CLI 2.115.0 accepts local `db.major_version` only for 13, 14, 15 and
+17, not 16. The gate therefore used vanilla PostgreSQL 16 plus only the minimum
+Supabase-compatible roles, Auth stubs and `pgcrypto` surface needed by the
+repository migrations. This closes the current PostgreSQL 16 database-engine,
+serial and true-two-session compatibility gate; it is not GoTrue, PostgREST,
+`supautils`, Advisors or hosted Supabase parity evidence.
+
+Owner A/B runtime integration, nested database exact-key envelopes,
+account-delete/purge recovery, provider-start binding to a consumed grant plus
+fresh lease/heartbeat, sequential numeric parsing, vault/KMS/retention, worker
+credentials, model/STT, Points and runtime activation remain open.
+
 ### Mobile V1 protected Product API Preview E2E — 2026-08-14
 
 A protected, non-Production Preview exercised the default-off Product API against
@@ -873,7 +930,7 @@ This does not prove a live, data-bearing cross-migration upgrade. The `202608100
 | Canonical document shadow | `src/lib/v1/canonical-document-shadow.test.ts` | owner deny, immutable revision sequence, stale base, full-request idempotency, checkpoint, self-review invalidation and tombstone/purge domain rules |
 | Points shadow | `src/lib/v1/points-shadow.test.ts` | lot ordering/expiry, quote boundaries, reserve/commit/release, replay, insufficient balance and cross-owner deny in memory |
 | Legacy NDIS projection | `src/lib/v1/legacy-ndis-adapter.test.ts` | deterministic read-only projection, no approval upgrade, no invented facts and metadata-only migration candidate |
-| Production-unapplied SQL boundary | `src/lib/v1/v1-shadow-migration-contract.test.ts`, `mobile-sync-migration-contract.test.ts`, isolated historical guarded-live evidence | additive/no legacy DML, owner isolation and explicit grants are source-checked; historical deleted `r4` passed the 13-file foundation manifest 13/13 and six rollback suites. At HEAD `c7b70e9f84b9b804779039711b85cc7eda55bd57`, deleted `r9` passed the exact 14-file worker manifest 14/14, seven rollback suites and independent hard-off/zero-row/role/RLS/ACL/9-RPC postchecks. Deleted `r20` additionally passed the PostgreSQL 17.6 true two-session claim/session/privacy race gate; deleted `r21` passed the Attempt 1/Attempt 2 historical-replay and post-purge matrix. Deleted `r22` then passed the exact 15-file registration-retention manifest 15/15, the seven rollback suites and the independent retention/posture postcheck with both current assertion bodies. All worker Preview branches were removed. This is isolated schema/transaction evidence only; runtime writes remain withheld |
+| Production-unapplied SQL boundary | `src/lib/v1/v1-shadow-migration-contract.test.ts`, `mobile-sync-migration-contract.test.ts`, isolated guarded-live and local engine evidence | additive/no legacy DML, owner isolation and explicit grants are source-checked; historical deleted `r4` passed the 13-file foundation manifest 13/13 and six rollback suites. At HEAD `c7b70e9f84b9b804779039711b85cc7eda55bd57`, deleted `r9` passed the exact 14-file worker manifest 14/14, seven rollback suites and independent hard-off/zero-row/role/RLS/ACL/9-RPC postchecks. Deleted `r20` additionally passed the PostgreSQL 17.6 true two-session claim/session/privacy race gate; deleted `r21` passed the Attempt 1/Attempt 2 historical-replay and post-purge matrix. Deleted `r22` then passed the exact 15-file registration-retention manifest 15/15, the seven rollback suites and the independent retention/posture postcheck with both current assertion bodies. The subsequent isolated PostgreSQL 16.15 gate passed all 27 repository migrations, the exact current V1 15/15 manifest, 7/7 suites, the independent posture/retention postcheck and all three strict two-backend races. All worker Preview branches and local test resources were removed. This is isolated schema/transaction evidence only; runtime writes remain withheld |
 | Runtime isolation | `src/lib/v1/runtime-boundary.test.ts` | audited NDIS routes and the new `/v1` adapter are the only allowed server boundaries; `/v1` remains disabled without explicit adapters |
 
 ### Current live/read-only evidence
@@ -944,7 +1001,7 @@ The following suites are required before the corresponding V1 slice can be calle
 
 1. The native App exists in a separate repository and is outside this task; this AI repository does not execute or attest its iOS/Android, offline, purchase or store gates.
 2. The OpenAPI/TypeScript contract and default-off durable `/v1` route adapter now exist, but there is no Preview- or Production-served Product API, generated client package, schema registry or previous-version compatibility fixture.
-3. The registration-retention source worktree passed 1,381 tests across 125 files and all three focused migration contracts 39/39, with the `r21` 1,377-test / 124-file result, the `r9` 1,337-test / 122-file result and earlier baselines retained. All five Note types share a Production-unapplied private metadata/RPC layer with nine exact RPC identities and no caller execute grant. Deleted PostgreSQL 17.6 disposable `r9` proved the exact 14-migration, seven-suite and independent postcheck gate; deleted `r20` closed the true two-session claim/session/privacy race gate; deleted `r21` closed Attempt 1 historical replay across Attempt 2 success and post-purge state; deleted `r22` closed the hosted registration historical-retention gate with the exact 15/15 manifest, 7/7 suites and independent postcheck. No worker-RPC Preview was retained. The five types still lack a runtime database repository, deployed worker, real provider/STT integration and complete per-type golden sets; PostgreSQL 16 and runtime/activation gates remain open.
+3. The registration-retention source worktree passed its historical 1,381 tests across 125 files and all three focused migration contracts 39/39, with the `r21` 1,377-test / 124-file result, the `r9` 1,337-test / 122-file result and earlier baselines retained. The strict-local harness batch subsequently passed 1,400 tests across the same 125 files. All five Note types share a Production-unapplied private metadata/RPC layer with nine exact RPC identities and no caller execute grant. Deleted PostgreSQL 17.6 disposable `r9` proved the exact 14-migration, seven-suite and independent postcheck gate; deleted `r20` closed the PostgreSQL 17.6 true two-session claim/session/privacy race gate; deleted `r21` closed Attempt 1 historical replay across Attempt 2 success and post-purge state; deleted `r22` closed the hosted registration historical-retention gate with the exact 15/15 manifest, 7/7 suites and independent postcheck. The disposable local PostgreSQL 16.15 gate then closed the current database-engine, serial and true-two-session version path with 27/27 repository migrations, exact V1 15/15, 7/7 suites and 3/3 races. No worker-RPC Preview or local cluster was retained. The five types still lack owner A/B runtime integration, a runtime database repository, deployed worker, nested exact-key database vectors, account-delete/purge recovery, provider-start binding, safe sequential numeric parsing, vault/KMS/retention, worker credentials, real provider/model/STT integration, Points and complete per-type golden sets; runtime activation remains open.
 4. Canonical document/revision/checkpoint states exist as memory/domain contracts plus historical isolated schema/RPC evidence and a Production-unapplied mobile-sync migration draft that was clean-applied only on a deleted disposable branch; there is no retained schema activation, editor, renderer or cross-device recovery E2E.
 5. Points lots/rates/reservations passed isolated serial database tests but remain shadow-only. There is no runtime entitlement integration, welcome eligibility decision, concurrent reservation proof or legacy-credit conversion/reconciliation test.
 6. No payment provider sandbox, webhook replay, refund or reconciliation harness exists.

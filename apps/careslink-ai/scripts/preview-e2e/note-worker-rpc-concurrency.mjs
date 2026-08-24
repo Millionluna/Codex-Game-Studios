@@ -1,11 +1,18 @@
 import {
-  NOTE_WORKER_RPC_CONCURRENCY_POLICY,
   NoteWorkerRpcConcurrencyPolicyError,
   assertNoteWorkerRpcConcurrencyPolicyRegression,
   parsePreviewDatabaseTarget,
 } from "./note-worker-rpc-concurrency-policy.mjs";
+import {
+  assertLocalPg16LoopbackPolicyRegression,
+  parseLocalPg16LoopbackDatabaseTarget,
+} from "./note-worker-rpc-concurrency-local-pg16-policy.mjs";
 
 const DATABASE_URL_ENV = "CARESLINK_V1_WORKER_RPC_PREVIEW_DATABASE_URL";
+const LOCAL_PG16_DATABASE_URL_ENV =
+  "CARESLINK_V1_WORKER_RPC_LOCAL_PG16_DATABASE_URL";
+const LOCAL_PG16_TARGET_MODE = "local-pg16";
+const PREVIEW_TARGET_MODE = "preview";
 const RUNNER_ROLE = "careslink_v1_generation_concurrency_runner";
 const TEST_SUPPORT_SCHEMA =
   "careslink_v1_generation_concurrency_test_support";
@@ -57,6 +64,7 @@ const WORKER_RPC_NAMES = Object.freeze([
 const ERROR_CODES = new Set([
   "NOTE_WORKER_RPC_CONCURRENCY_ARGUMENT_INVALID",
   "NOTE_WORKER_RPC_CONCURRENCY_ENV_MISSING",
+  "NOTE_WORKER_RPC_CONCURRENCY_ENV_CONFLICT",
   "NOTE_WORKER_RPC_CONCURRENCY_TLS_ENV_DENIED",
   "NOTE_WORKER_RPC_CONCURRENCY_PG_ENV_DENIED",
   "NOTE_WORKER_RPC_CONCURRENCY_DRIVER_INVALID",
@@ -96,7 +104,7 @@ function assert(condition, code) {
   }
 }
 
-function parseArguments(argv) {
+export function parseNoteWorkerRpcConcurrencyArguments(argv) {
   if (!Array.isArray(argv)) {
     fail("NOTE_WORKER_RPC_CONCURRENCY_ARGUMENT_INVALID");
   }
@@ -123,16 +131,30 @@ function parseArguments(argv) {
     values.set(key, value);
   }
 
-  if (
-    values.size !== 2 ||
-    !values.has("expected-branch-ref") ||
-    !values.has("expected-pg-major")
-  ) {
+  if (values.size !== 2 || !values.has("expected-pg-major")) {
+    fail("NOTE_WORKER_RPC_CONCURRENCY_ARGUMENT_INVALID");
+  }
+
+  const expectedPgMajorText = values.get("expected-pg-major");
+  if (values.has("target-mode")) {
+    if (
+      values.get("target-mode") !== LOCAL_PG16_TARGET_MODE ||
+      expectedPgMajorText !== "16"
+    ) {
+      fail("NOTE_WORKER_RPC_CONCURRENCY_ARGUMENT_INVALID");
+    }
+    return Object.freeze({
+      targetMode: LOCAL_PG16_TARGET_MODE,
+      expectedBranchRef: null,
+      expectedPgMajor: 16,
+    });
+  }
+
+  if (!values.has("expected-branch-ref")) {
     fail("NOTE_WORKER_RPC_CONCURRENCY_ARGUMENT_INVALID");
   }
 
   const expectedBranchRef = values.get("expected-branch-ref");
-  const expectedPgMajorText = values.get("expected-pg-major");
   if (!/^[a-z0-9]{20}$/.test(expectedBranchRef)) {
     fail("NOTE_WORKER_RPC_CONCURRENCY_ARGUMENT_INVALID");
   }
@@ -141,6 +163,7 @@ function parseArguments(argv) {
   }
 
   return Object.freeze({
+    targetMode: PREVIEW_TARGET_MODE,
     expectedBranchRef,
     expectedPgMajor: Number(expectedPgMajorText),
   });
@@ -362,6 +385,34 @@ export function assertVerifiedTlsConnection(client) {
     fail("NOTE_WORKER_RPC_CONCURRENCY_PREFLIGHT_FAILED");
   }
   return Object.freeze({ encrypted: true, authorized: true });
+}
+
+export function assertPlaintextConnection(client) {
+  const stream = client?.connection?.stream;
+  if (!stream || stream.encrypted === true) {
+    fail("NOTE_WORKER_RPC_CONCURRENCY_PREFLIGHT_FAILED");
+  }
+  return Object.freeze({ encrypted: false });
+}
+
+export function observeClientConnectionErrors(client) {
+  if (!client || typeof client.on !== "function") {
+    fail("NOTE_WORKER_RPC_CONCURRENCY_PREFLIGHT_FAILED");
+  }
+
+  let failureObserved = false;
+  client.on("error", () => {
+    failureObserved = true;
+  });
+
+  return Object.freeze({
+    assertNone() {
+      assert(
+        !failureObserved,
+        "NOTE_WORKER_RPC_CONCURRENCY_CONNECTION_FAILED",
+      );
+    },
+  });
 }
 
 export function assertClaimRaceEnvelope(first, second) {
@@ -837,6 +888,10 @@ async function configureAndInspectConnection(client, applicationName) {
       current_user,
       session_user,
       current_database() as database_name,
+      host(inet_server_addr()) as server_address,
+      host(inet_client_addr()) as client_address,
+      inet_server_port()::integer as server_port,
+      current_setting('listen_addresses') as listen_addresses,
       current_setting('session_replication_role') as replication_role,
       current_setting('row_security') as row_security,
       current_setting('client_encoding') as client_encoding,
@@ -942,18 +997,22 @@ async function runLiveHarness({
   setupSha256,
   cleanupSha256,
 }) {
+  const localLoopback =
+    descriptor.connectionMode === "local_pg16_loopback";
   const clientA = new Client({
     ...connectionConfig,
     application_name: "careslink-worker-rpc-race-a",
     connectionTimeoutMillis: 10_000,
     query_timeout: 9_000,
   });
+  const clientAErrors = observeClientConnectionErrors(clientA);
   const clientB = new Client({
     ...connectionConfig,
     application_name: "careslink-worker-rpc-race-b",
     connectionTimeoutMillis: 10_000,
     query_timeout: 9_000,
   });
+  const clientBErrors = observeClientConnectionErrors(clientB);
 
   let connectedA = false;
   let connectedB = false;
@@ -967,8 +1026,13 @@ async function runLiveHarness({
       fail("NOTE_WORKER_RPC_CONCURRENCY_CONNECTION_FAILED");
     }
 
-    assertVerifiedTlsConnection(clientA);
-    assertVerifiedTlsConnection(clientB);
+    if (localLoopback) {
+      assertPlaintextConnection(clientA);
+      assertPlaintextConnection(clientB);
+    } else {
+      assertVerifiedTlsConnection(clientA);
+      assertVerifiedTlsConnection(clientB);
+    }
 
     const [identityA, identityB] = await Promise.all([
       configureAndInspectConnection(clientA, "careslink-worker-rpc-race-a"),
@@ -984,12 +1048,23 @@ async function runLiveHarness({
       "NOTE_WORKER_RPC_CONCURRENCY_PREFLIGHT_FAILED",
     );
     for (const identity of [identityA, identityB]) {
+      const transportPostureValid = localLoopback
+        ? expectedPgMajor === 16 &&
+          descriptor.hostname === "127.0.0.1" &&
+          descriptor.port !== 5432 &&
+          identity.server_address === "127.0.0.1" &&
+          identity.client_address === "127.0.0.1" &&
+          identity.server_port === descriptor.port &&
+          identity.listen_addresses === "127.0.0.1" &&
+          identity.ssl_active === false
+        : descriptor.connectionMode === "session_pooler" ||
+          identity.ssl_active === true;
       assert(
         Math.trunc(identity.server_version_num / 10_000) === expectedPgMajor &&
           identity.current_user === RUNNER_ROLE &&
           identity.session_user === RUNNER_ROLE &&
           descriptor.databaseRole === RUNNER_ROLE &&
-          identity.database_name === "postgres" &&
+          identity.database_name === descriptor.database &&
           identity.replication_role === "origin" &&
           identity.row_security === "on" &&
           identity.client_encoding === "UTF8" &&
@@ -1007,8 +1082,7 @@ async function runLiveHarness({
           identity.generation_schema_usage === true &&
           identity.required_functions_executable === true &&
           identity.sensitive_table_privileges_absent === true &&
-          (descriptor.connectionMode === "session_pooler" ||
-            identity.ssl_active === true) &&
+          transportPostureValid &&
           identity.transaction_read_only === "off",
         "NOTE_WORKER_RPC_CONCURRENCY_PREFLIGHT_FAILED",
       );
@@ -1031,12 +1105,14 @@ async function runLiveHarness({
 
     return Object.freeze({
       ok: true,
-      policyVersion: NOTE_WORKER_RPC_CONCURRENCY_POLICY.version,
+      policyVersion: descriptor.policyVersion,
       target: descriptor,
       postgresMajor: expectedPgMajor,
       distinctBackendPids: true,
-      sslActive: true,
-      clientTlsVerified: true,
+      sslActive: !localLoopback,
+      clientTlsVerified: !localLoopback,
+      loopbackVerified: localLoopback,
+      credentialMaterialLoaded: !localLoopback,
       setupSha256,
       cleanupSha256,
       scenarios: Object.freeze({
@@ -1053,13 +1129,16 @@ async function runLiveHarness({
     if (connectedA) {
       await clientA.end().catch(() => undefined);
     }
+    clientAErrors.assertNone();
+    clientBErrors.assertNone();
   }
 }
 
 async function main() {
   assertNoteWorkerRpcConcurrencyPolicyRegression();
+  assertLocalPg16LoopbackPolicyRegression();
 
-  const args = parseArguments(process.argv.slice(2));
+  const args = parseNoteWorkerRpcConcurrencyArguments(process.argv.slice(2));
   if (process.env.NODE_TLS_REJECT_UNAUTHORIZED === "0") {
     fail("NOTE_WORKER_RPC_CONCURRENCY_TLS_ENV_DENIED");
   }
@@ -1070,14 +1149,37 @@ async function main() {
   ) {
     fail("NOTE_WORKER_RPC_CONCURRENCY_PG_ENV_DENIED");
   }
-  const databaseUrl = process.env[DATABASE_URL_ENV];
-  if (typeof databaseUrl !== "string" || databaseUrl.length === 0) {
+  const previewDatabaseUrl = process.env[DATABASE_URL_ENV];
+  const localPg16DatabaseUrl = process.env[LOCAL_PG16_DATABASE_URL_ENV];
+  const previewUrlPresent =
+    typeof previewDatabaseUrl === "string" && previewDatabaseUrl.length > 0;
+  const localUrlPresent =
+    typeof localPg16DatabaseUrl === "string" &&
+    localPg16DatabaseUrl.length > 0;
+  if (previewUrlPresent && localUrlPresent) {
+    fail("NOTE_WORKER_RPC_CONCURRENCY_ENV_CONFLICT");
+  }
+
+  const localLoopback = args.targetMode === LOCAL_PG16_TARGET_MODE;
+  if (
+    (localLoopback && !localUrlPresent) ||
+    (!localLoopback && !previewUrlPresent)
+  ) {
     fail("NOTE_WORKER_RPC_CONCURRENCY_ENV_MISSING");
   }
-  const descriptor = parsePreviewDatabaseTarget(
-    databaseUrl,
-    args.expectedBranchRef,
-  );
+  if (
+    (localLoopback && previewUrlPresent) ||
+    (!localLoopback && localUrlPresent)
+  ) {
+    fail("NOTE_WORKER_RPC_CONCURRENCY_ENV_CONFLICT");
+  }
+
+  const databaseUrl = localLoopback
+    ? localPg16DatabaseUrl
+    : previewDatabaseUrl;
+  const descriptor = localLoopback
+    ? parseLocalPg16LoopbackDatabaseTarget(databaseUrl)
+    : parsePreviewDatabaseTarget(databaseUrl, args.expectedBranchRef);
 
   const [{ readFile }, { createHash }, pgModule] = await Promise.all([
     import("node:fs/promises"),
@@ -1098,14 +1200,18 @@ async function main() {
     import.meta.url,
   );
   const parsedDatabaseUrl = new URL(databaseUrl);
-  const sslRootCertificatePath =
-    parsedDatabaseUrl.searchParams.get("sslrootcert");
-  const [setupSql, cleanupSql, sslRootCertificate] = await Promise.all([
+  const [setupSql, cleanupSql] = await Promise.all([
     readFile(setupUrl, "utf8"),
     readFile(cleanupUrl, "utf8"),
-    readFile(sslRootCertificatePath, "utf8"),
   ]);
   assertNoteWorkerRpcConcurrencySqlPolicy(setupSql, cleanupSql);
+
+  let sslRootCertificate;
+  if (!localLoopback) {
+    const sslRootCertificatePath =
+      parsedDatabaseUrl.searchParams.get("sslrootcert");
+    sslRootCertificate = await readFile(sslRootCertificatePath, "utf8");
+  }
 
   let username;
   let password;
@@ -1115,20 +1221,31 @@ async function main() {
   } catch {
     fail("NOTE_WORKER_RPC_CONCURRENCY_CONNECTION_FAILED");
   }
-  const connectionConfig = Object.freeze({
-    host: parsedDatabaseUrl.hostname,
-    port: Number(parsedDatabaseUrl.port),
-    database: "postgres",
-    user: username,
-    password,
-    options: "-c row_security=on",
-    sslnegotiation: "postgres",
-    client_encoding: "UTF8",
-    ssl: Object.freeze({
-      ca: sslRootCertificate,
-      rejectUnauthorized: true,
-    }),
-  });
+  const connectionConfig = localLoopback
+    ? Object.freeze({
+        host: descriptor.hostname,
+        port: descriptor.port,
+        database: descriptor.database,
+        user: descriptor.databaseRole,
+        password: async () => "",
+        options: "-c row_security=on",
+        client_encoding: "UTF8",
+        ssl: false,
+      })
+    : Object.freeze({
+        host: parsedDatabaseUrl.hostname,
+        port: Number(parsedDatabaseUrl.port),
+        database: "postgres",
+        user: username,
+        password,
+        options: "-c row_security=on",
+        sslnegotiation: "postgres",
+        client_encoding: "UTF8",
+        ssl: Object.freeze({
+          ca: sslRootCertificate,
+          rejectUnauthorized: true,
+        }),
+      });
 
   const setupSha256 = createHash("sha256").update(setupSql).digest("hex");
   const cleanupSha256 = createHash("sha256").update(cleanupSql).digest("hex");

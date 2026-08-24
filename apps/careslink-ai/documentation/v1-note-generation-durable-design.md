@@ -7,7 +7,11 @@
 > `r9`. A subsequent fixed harness on deleted no-data `r20` proved the three
 > true two-session claim/session/privacy races on PostgreSQL 17.6; deleted
 > no-data `r21` then proved Attempt-2 historical replay through success and
-> purge. This is not a retained/applied runtime repository, callable worker,
+> purge. Deleted `r22` proved the current 15-migration retention gate on
+> PostgreSQL 17.6, and a later disposable local PostgreSQL 16.15 run closed the
+> current engine/serial/true-two-session version gate under the minimum
+> Supabase-compatibility bootstrap. This is not a retained/applied runtime
+> repository, callable worker,
 > route, Preview capability, model call or Production capability.
 
 ## 1. Scope and non-goals
@@ -477,9 +481,10 @@ active-session tests, privacy tests, owner A/B RLS tests and revoked-session
 cleanup tests. Deleted `r20` closed the true two-session/two-connection claim
 and concurrent session/privacy-revocation race subset on PostgreSQL 17.6; the
 deleted `r21` gate subsequently closed the Attempt-2 historical-replay subset.
-The PostgreSQL 16 path and owner A/B runtime integration remain open. Preview
-evidence for an earlier migration revision is not promotion evidence for this
-design.
+The later local PostgreSQL 16.15 gate closed the current database-engine,
+serial and true-two-session version path. Owner A/B runtime integration remains
+open. Preview evidence for an earlier migration revision is not promotion
+evidence for this design.
 
 ## 11. Current evidence boundary
 
@@ -721,10 +726,51 @@ current revision. The deleted `r9`, `r20` and `r21` results above remain evidenc
 only for their recorded revisions and are not rewritten as evidence for this
 migration.
 
-The current local source gate passed the three focused migration contracts
-(39/39), the full 125-file / 1,381-test suite, lint, TypeScript, the 63/63-page
-Next production build, the 73-file Codex-adapter sync check and
-`git diff --check`. These results are static/local evidence only.
+### PostgreSQL 16.15 local isolated gate — 2026-08-24
+
+On a worktree based on HEAD
+`93c5c2aa956d20e5f1f704e24e5dd17a478fc2ea`, a disposable Homebrew
+PostgreSQL 16.15 server (`server_version_num=160015`) applied the clean
+repository sequence 27/27: 12 pre-V1 migrations followed by the exact current
+V1 manifest 15/15. All seven rollback suites passed with the current durable
+assertion body (37547 bytes; SHA-256
+`2a2af2e8c7c745b769a731a4892b27f65fcf311321e813c3cc190e54167772a6`)
+and worker assertion body (153956 bytes; SHA-256
+`1c9f65bdc7f1de86e1c7398399ecf029207ba1b2bdf9fa3634dadb482424fdbb`).
+The independent postcheck proved all 12 private generation tables, nine worker
+RPCs, hard-off state, zero checked fixtures, API denial, only the two expected
+admin-only creator edges and the exact validated registration-retention FK plus
+index.
+
+The strict local-only harness connected to loopback `127.0.0.1:55432` without
+TLS, a password or any credential material and held two distinct backend PIDs.
+It passed the 3/3 `SKIP LOCKED`, session-revocation-first and
+privacy-authorization-first races. Its fixed setup and cleanup bodies had
+SHA-256
+`ba183bacf8b35a2493b520563ce2fe2d1193e0638af17d2be62c8b58076112bc`
+and `e4aa567f372885137f2b0251f51ea1818a5ca329ec9ed8a9a9f8355cc3ecbecb`;
+the two focused files passed 59/59 and the complete Preview E2E policy suite
+passed 3 files / 72 tests. Fixed SQL cleanup removed the database runner,
+`TEST_ONLY` helper surface and fixtures. The outer gate then stopped the server
+and deleted the exact cluster directory, Colima profile and disk. The
+complete current source handoff also passed 125 files / 1,400 tests, TypeScript,
+full lint, the 63/63-page Next production build and the 73-file Codex-adapter
+sync check.
+
+Supabase CLI 2.115.0 accepts local `db.major_version` only for 13, 14, 15 and
+17. This result therefore comes from vanilla PostgreSQL 16 plus the minimum
+Supabase-compatible roles, Auth stubs and `pgcrypto` surface used by these
+migrations. It closes the PostgreSQL 16 database-engine, serial and
+true-two-session compatibility gate, but does not claim GoTrue, PostgREST,
+`supautils`, Advisors or hosted Supabase parity. Production was never a target,
+and no deployment, grant, runtime activation or paid resource was created.
+
+The pre-harness registration-retention source gate passed the three focused
+migration contracts (39/39), the full 125-file / 1,381-test suite, lint,
+TypeScript, the 63/63-page Next production build, the 73-file Codex-adapter sync
+check and `git diff --check`. Those historical source results are static/local
+evidence only; the later strict-local batch's current 1,400-test result is
+recorded above.
 
 Independent review of this current source batch found no P0/P1/P2; the prior
 `r21` final source/security review also reported no P0/P1. Remaining
@@ -744,14 +790,15 @@ activation governance is explicit, not a hidden default:
 Deleted `r9` closed the PostgreSQL 17.6 serial assertion, role/ACL/function,
 scripted-fault and zero-fixture gates. Deleted `r20` subsequently closed the
 PostgreSQL 17.6 true two-session `SKIP LOCKED` claim and session/privacy-
-revocation race gate. Activation still requires the PostgreSQL 16 path and
+revocation race gate. The local PostgreSQL 16.15 run subsequently closed the
+current engine/serial/true-two-session version path. Activation still requires
 owner A/B runtime integration. Deleted `r21` closed the Attempt-2 historical
 replay gate. The current source batch chooses and implements the registration
 retention FK/index design, and deleted `r22` closes its exact PostgreSQL 17.6
-hosted gate. PostgreSQL 16, owner A/B runtime integration, nested exact-key
-vectors, account-delete/purge recovery, provider-start binding, numeric parsing
-and the runtime/vault governance items above remain open before any caller grant
-or registry entry. Only after those results and the vault/KMS/retention, worker
+hosted gate. Owner A/B runtime integration, nested exact-key vectors,
+account-delete/purge recovery, provider-start binding, numeric parsing and the
+runtime/vault governance items above remain open before any caller grant or
+registry entry. Only after those results and the vault/KMS/retention, worker
 credential, model/provider/STT and Points decisions are separately approved
 may runtime activation be considered. Nothing in this handoff authorizes
 Preview retention, Production apply, route activation, model/STT traffic or

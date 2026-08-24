@@ -38,7 +38,10 @@ the isolated PostgreSQL 17.6 migration/assertion gate on deleted disposable
 two-session claim/session/privacy race gate, and deleted no-data `r21` passed
 the Attempt-2 historical-replay gate on PostgreSQL 17.6. Deleted no-data `r22`
 then passed the exact 15-migration registration-retention gate. None is a
-runtime apply.
+runtime apply. A subsequent disposable local PostgreSQL 16.15 run closed the
+current database-engine, serial and true-two-session version gate under a
+minimal Supabase-compatibility bootstrap; it was not a Preview or Production
+runtime apply and is not full hosted Supabase parity.
 Disposable Preview databases were used only for the isolated gates recorded
 below and then deleted; no Preview application deployment or Production
 database was used as the SQL target.
@@ -62,7 +65,7 @@ availability.
 | Admin access requests/material usage | real/mixed | Yes | Manages AI access/metadata, not providers or referrals | Reuse its auth-first action pattern, not its business schema |
 | `/plan-and-usage` | legacy credits | Read-only | Runtime is still 3 legacy credits although the 300-Point/Pro product baseline is approved | Do not show both systems; implement and reconcile the approved wallet before cutover |
 | NDIS Case Note | real legacy server flow plus local shared-job evidence | Legacy generate/save only | Uses synchronous model and old credits; the new shared job is source-only and does not call it | Preserve legacy; keep the shared provider and canonical write default-off |
-| Other four Note types | catalog plus local shared-job/durable/RPC source evidence | No | Communication, Handover, Progress and Incident Factual share the dispatcher/output boundary, default-off durable contracts and the Production-unapplied private RPC source, but have no retained/applied runtime repository, registered/deployed worker, served route, real provider or golden safety set | Complete the PostgreSQL 16 and reviewed runtime boundaries, then validate each type without forking orchestration |
+| Other four Note types | catalog plus local shared-job/durable/RPC source evidence | No | Communication, Handover, Progress and Incident Factual share the dispatcher/output boundary, default-off durable contracts and the Production-unapplied private RPC source, but have no retained/applied runtime repository, registered/deployed worker, served route, real provider or golden safety set; PostgreSQL 16 engine/serial/two-session compatibility is now locally proved | Complete the remaining reviewed runtime boundaries, then validate each type without forking orchestration |
 | `/ai-documents` | real legacy generated drafts | Delete only | Not canonical documents; store errors can appear as an empty list; no revision/export | Feature-gated canonical list only after current Preview evidence |
 | Shared `/v1` documents/sync | local durable adapter | Default-off | Exact current migrations are Production-unapplied and exist on no retained Preview; write grants withheld; no current base URL | M0 permits only me/list/pull after all identity/RLS gates pass |
 | Library/Guides/Updates | absent | No | No page, store, content version or API | After referral + Notes/documents/export |
@@ -909,3 +912,51 @@ PostgreSQL 16, owner A/B runtime integration, nested exact-key database vectors,
 account-delete/purge recovery, provider-start binding, sequential numeric
 parsing and all real vault/runtime/activation gates remain open. No retained
 Preview, deployment, caller grant, runtime flag or capability was created.
+
+## 20. Durable Note PostgreSQL 16.15 local isolated gate — 2026-08-24
+
+The `r22` conclusion above remains the state at that historical hosted
+checkpoint. A later worktree based on HEAD
+`93c5c2aa956d20e5f1f704e24e5dd17a478fc2ea` used a disposable Homebrew
+PostgreSQL 16.15 server with exact `server_version_num=160015`. The clean
+repository path applied 27/27 migrations: 12 pre-V1 migrations plus the exact
+current V1 manifest 15/15. The five adjacent suites and the durable-foundation
+and worker rollback bodies passed 7/7. Those current bodies were the 37547-byte
+durable assertion at SHA-256
+`2a2af2e8c7c745b769a731a4892b27f65fcf311321e813c3cc190e54167772a6`
+and the 153956-byte worker assertion at SHA-256
+`1c9f65bdc7f1de86e1c7398399ecf029207ba1b2bdf9fa3634dadb482424fdbb`.
+
+The independent postcheck retained exactly 12 private generation tables, nine
+private worker RPCs, the hard-off setting, zero checked fixtures, denied API
+access and only the two expected admin-only creator edges. It also proved the
+exact validated registration-retention foreign key and its exact referencing
+index.
+
+The strict local-only concurrency harness opened two independent backend PIDs
+against loopback `127.0.0.1:55432`, with no TLS, password or credential
+material. It passed 3/3 `SKIP LOCKED`, session-revocation-first and
+privacy-authorization-first races. Fixed setup and cleanup bodies had SHA-256
+`ba183bacf8b35a2493b520563ce2fe2d1193e0638af17d2be62c8b58076112bc`
+and `e4aa567f372885137f2b0251f51ea1818a5ca329ec9ed8a9a9f8355cc3ecbecb`.
+The two focused harness/policy files passed 59/59; the complete Preview E2E
+policy suite passed 3 files / 72 tests. Fixed SQL cleanup removed the database
+runner, `TEST_ONLY` helper surface and fixtures. The outer gate then stopped the
+server and deleted the exact cluster directory, Colima profile and Colima disk.
+The complete current source handoff also passed 125 files /
+1,400 tests, TypeScript, full lint, the 63/63-page Next production build and the
+73-file Codex-adapter sync check.
+
+Supabase CLI 2.115.0 accepts local `db.major_version` 13, 14, 15 or 17, but not
+16. This gate therefore used vanilla PostgreSQL 16 plus only the minimum
+Supabase-compatible roles, Auth stubs and `pgcrypto` surface needed by the
+repository migrations. It closes the current PostgreSQL 16 database-engine,
+serial and true-two-session compatibility gate. It does not prove GoTrue,
+PostgREST, `supautils`, Advisors or hosted Supabase parity.
+
+Owner A/B runtime integration, nested database exact-key vectors,
+account-delete/purge recovery, provider-start binding to a consumed grant with
+fresh lease/heartbeat, safe sequential numeric parsing, vault/KMS/retention,
+worker credentials, model/STT, Points and runtime activation remain open.
+Production was never a target; no retained Preview, deployment, caller grant,
+runtime flag, capability or paid resource was created.

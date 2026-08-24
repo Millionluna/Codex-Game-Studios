@@ -1,4 +1,5 @@
 import { readFile } from "node:fs/promises";
+import { EventEmitter } from "node:events";
 import { describe, expect, it } from "vitest";
 import {
   NoteWorkerRpcConcurrencyHarnessError,
@@ -6,7 +7,10 @@ import {
   assertDeniedEnvelope,
   assertDistinctBackendPids,
   assertNoteWorkerRpcConcurrencySqlPolicy,
+  assertPlaintextConnection,
   assertVerifiedTlsConnection,
+  observeClientConnectionErrors,
+  parseNoteWorkerRpcConcurrencyArguments,
 } from "./note-worker-rpc-concurrency.mjs";
 
 const SETUP_URL = new URL(
@@ -70,6 +74,45 @@ function validDenied(reason) {
 }
 
 describe("Note worker RPC concurrency harness policy", () => {
+  it("keeps the hosted CLI contract and adds one explicit PG16-only local shape", () => {
+    expect(
+      parseNoteWorkerRpcConcurrencyArguments([
+        "--expected-branch-ref=abcdefghijklmnopqrst",
+        "--expected-pg-major=17",
+      ]),
+    ).toEqual({
+      targetMode: "preview",
+      expectedBranchRef: "abcdefghijklmnopqrst",
+      expectedPgMajor: 17,
+    });
+    expect(
+      parseNoteWorkerRpcConcurrencyArguments([
+        "--target-mode=local-pg16",
+        "--expected-pg-major=16",
+      ]),
+    ).toEqual({
+      targetMode: "local-pg16",
+      expectedBranchRef: null,
+      expectedPgMajor: 16,
+    });
+
+    for (const invalid of [
+      ["--target-mode=local-pg16", "--expected-pg-major=17"],
+      ["--target-mode=preview", "--expected-pg-major=16"],
+      [
+        "--target-mode=local-pg16",
+        "--expected-pg-major=16",
+        "--expected-branch-ref=abcdefghijklmnopqrst",
+      ],
+      ["--target-mode=local-pg16"],
+    ]) {
+      expectHarnessCode(
+        () => parseNoteWorkerRpcConcurrencyArguments(invalid),
+        "NOTE_WORKER_RPC_CONCURRENCY_ARGUMENT_INVALID",
+      );
+    }
+  });
+
   it("locks Management-plane setup and cleanup around the fixed helper boundary", async () => {
     const [setupSql, cleanupSql] = await Promise.all([
       readFile(SETUP_URL, "utf8"),
@@ -248,6 +291,37 @@ describe("Note worker RPC concurrency harness policy", () => {
     }
   });
 
+  it("checks plaintext separately from the SQL-verified loopback boundary", () => {
+    expect(
+      assertPlaintextConnection({
+        connection: { stream: { encrypted: undefined } },
+      }),
+    ).toEqual({ encrypted: false });
+    for (const client of [
+      null,
+      { connection: {} },
+      { connection: { stream: { encrypted: true } } },
+    ]) {
+      expectHarnessCode(
+        () => assertPlaintextConnection(client),
+        "NOTE_WORKER_RPC_CONCURRENCY_PREFLIGHT_FAILED",
+      );
+    }
+  });
+
+  it("converts asynchronous client errors to a fixed code without retaining details", () => {
+    const client = new EventEmitter();
+    const observer = observeClientConnectionErrors(client);
+    const sentinel = "driver-and-server-detail-must-not-escape";
+
+    expect(() => client.emit("error", new Error(sentinel))).not.toThrow();
+    expectHarnessCode(
+      () => observer.assertNone(),
+      "NOTE_WORKER_RPC_CONCURRENCY_CONNECTION_FAILED",
+    );
+    expect(JSON.stringify(observer)).not.toContain(sentinel);
+  });
+
   it("accepts only CLAIMED-versus-IDLE arbitration without payload leakage", () => {
     expect(
       assertClaimRaceEnvelope(validClaim(), { status: "IDLE", claim: null }),
@@ -306,12 +380,20 @@ describe("Note worker RPC concurrency harness policy", () => {
       "assertNoteWorkerRpcConcurrencyPolicyRegression();",
     );
     const targetGate = source.lastIndexOf("parsePreviewDatabaseTarget(");
+    const localTargetGate = source.lastIndexOf(
+      "parseLocalPg16LoopbackDatabaseTarget(",
+    );
     const driverLoad = source.lastIndexOf('import("pg")');
 
     expect(offlineGate).toBeGreaterThan(0);
     expect(targetGate).toBeGreaterThan(offlineGate);
+    expect(localTargetGate).toBeGreaterThan(offlineGate);
     expect(driverLoad).toBeGreaterThan(targetGate);
+    expect(driverLoad).toBeGreaterThan(localTargetGate);
     expect(source.match(/new Client\(/g)).toHaveLength(2);
+    expect(source.match(/observeClientConnectionErrors\(client[AB]\)/g)).toHaveLength(
+      2,
+    );
     expect(source).toContain('process.env.NODE_TLS_REJECT_UNAUTHORIZED === "0"');
     expect(source).toContain("/^PG[A-Z0-9_]*$/.test(key)");
     expect(source.match(/rejectUnauthorized: true/g)).toHaveLength(1);
@@ -346,6 +428,14 @@ describe("Note worker RPC concurrency harness policy", () => {
     expect(source).toContain(
       '"CARESLINK_V1_WORKER_RPC_PREVIEW_DATABASE_URL"',
     );
+    expect(source).toContain(
+      '"CARESLINK_V1_WORKER_RPC_LOCAL_PG16_DATABASE_URL"',
+    );
+    expect(source).toContain('password: async () => ""');
+    expect(source).toContain("ssl: false");
+    expect(source).toContain('identity.server_address === "127.0.0.1"');
+    expect(source).toContain('identity.client_address === "127.0.0.1"');
+    expect(source).toContain('identity.listen_addresses === "127.0.0.1"');
     expect(source).not.toMatch(/process\.env\.(DATABASE_URL|DIRECT_URL|POSTGRES_URL)/);
     expect(source).not.toMatch(/process\.env\.(PGHOST|PGPASSWORD|SUPABASE_DB_PASSWORD)/);
   });

@@ -465,7 +465,26 @@ describe("V1 Note durable generation foundation migration contract", () => {
     expect(assertionHeader).toContain(
       "Deleted r20 separately closed that PostgreSQL 17.6 subset",
     );
-    expect(assertionHeader).toContain("PostgreSQL 16 remains unproved");
+    for (const marker of [
+      "On 2026-08-24, from a worktree based on HEAD",
+      "93c5c2aa956d20e5f1f704e24e5dd17a478fc2ea",
+      "plus this batch's uncommitted concurrency-harness changes",
+      "a clean local PostgreSQL 16.15 cluster",
+      "server_version_num = 160015",
+      "closed the PostgreSQL 16 engine, serial and true-two-session race gates",
+      "all 27/27 repository migrations (V1 15/15)",
+      "all 7/7 rollback suites",
+      "independent postcheck",
+      "all 3/3 real two-connection concurrency scenarios passed",
+      "loopback-only endpoint used no password and no TLS",
+      "Fixed SQL cleanup deleted the local runner, helper",
+      "The outer gate then stopped the server and permanently",
+      "deleted the exact temporary cluster directory",
+      "Production was never touched",
+    ]) {
+      expect(assertionHeader).toContain(marker);
+    }
+    expect(assertionHeader).not.toContain("PostgreSQL 16 remains unproved");
     expect(assertions).not.toContain("information_schema.table_constraints");
     expect(
       assertions.match(/^  from pg_constraint as constraint_metadata$/gm),
