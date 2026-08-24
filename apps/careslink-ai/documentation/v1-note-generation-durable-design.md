@@ -1,6 +1,6 @@
 # V1 Note generation durable design handoff
 
-> Status: default-off design plus three Production-unapplied migrations. The
+> Status: default-off design plus four Production-unapplied migrations. The
 > schema-only foundation passed its historical deleted-`r4` gate; at source HEAD
 > `c7b70e9f84b9b804779039711b85cc7eda55bd57`, the exact worker RPC bundle passed
 > isolated PostgreSQL 17.6 migration/assertion evidence on deleted disposable
@@ -87,12 +87,16 @@ durable repository:
 5. only their required constraints and indexes.
 
 At its deleted-`r4` checkpoint it created no function, view, trigger or RLS
-policy. The subsequent migration adds payload metadata,
+policy. The subsequent worker migration adds payload metadata,
 one-time grants, provider-evidence detail, purge outbox, immutable policy and
 registration catalogs, executor policies and the nine reviewed worker RPC
 identities. The original three-table foundation and its historical evidence
 must still never be described as the atomic transaction in section 7; the
 additive revision has separate deleted-`r9` assertion evidence and runtime gates.
+The later owner-runtime migration adds a thirteenth private table for
+database-owned admission bindings, a distinct owner-API executor and three
+private owner RPC identities. It seeds no active binding and does not turn the
+four migrations into a retained or callable runtime.
 
 No enum type is required; bounded text checks keep migration and rollback
 inspection explicit. Every foreign-key column used for lookup or cascade must
@@ -310,10 +314,11 @@ lots.
 
 ## 8. ACL, RLS and RPC exposure
 
-The three foundation tables and all nine additive private metadata tables
-enable **and force** RLS as defence in depth. The foundation had no policy at
-its historical schema-only checkpoint; the additive migration now defines only
-the command-specific executor policies required by the private RPCs.
+The three foundation tables, nine additive worker metadata tables and the later
+admission-binding table enable **and force** RLS as defence in depth. The
+foundation had no policy at its historical schema-only checkpoint; the worker
+and owner-runtime migrations define only the command-specific policies required
+by their private RPCs.
 `FORCE ROW LEVEL SECURITY` makes the table owner subject
 to policies, but it does not constrain a superuser or a role with
 `BYPASSRLS`. Therefore the schema/table owner is distinct from the reviewed
@@ -322,6 +327,13 @@ definer executor, and the executor must be `NOLOGIN`, `NOSUPERUSER` and
 permit only the operations required by reviewed wrappers. Schema and table privileges
 are revoked from `PUBLIC`, `anon`, `authenticated` and `service_role`; API
 roles receive neither private schema usage nor direct table access.
+
+The owner-runtime migration does not widen the worker executor. It creates a
+separate `careslink_v1_generation_owner_api_executor` with `NOLOGIN`,
+`NOINHERIT`, `NOSUPERUSER` and `NOBYPASSRLS`, and grants it only the reviewed
+schema, column, helper and RLS surface needed by admit/enqueue, status and
+cancel. Function ownership is not a caller grant. No API role or application
+credential may assume either executor.
 
 On PostgreSQL 16+, a non-superuser creator with `CREATEROLE` automatically
 retains an admin-only edge to each new dedicated role. That edge is not runtime
@@ -394,6 +406,14 @@ normal payload consume can only settle `DENIED_SETTLED` /
 facts. The SQL assertion's direct rollback-only `TEST_ONLY` transition of a
 grant to `CONSUMED` exists solely to exercise canonical transaction atomicity;
 it is not a vault/payload-consume E2E path.
+
+The later additive owner-runtime file is
+`supabase/migrations/20260824092037_add_v1_note_generation_owner_runtime_rpc_shadow.sql`.
+It creates no route, connection, environment lookup, active policy binding or
+API execute grant. Its three exact `SECURITY DEFINER` identities admit and
+enqueue, return owner-safe status and cancel. New admission remains default-off;
+status and cancellation intentionally remain available while that admission
+switch is off so accepted work can be recovered or stopped during an incident.
 
 ## 10. Disposable Preview assertion gate
 
@@ -792,15 +812,16 @@ Deleted `r9` closed the PostgreSQL 17.6 serial assertion, role/ACL/function,
 scripted-fault and zero-fixture gates. Deleted `r20` subsequently closed the
 PostgreSQL 17.6 true two-session `SKIP LOCKED` claim and session/privacy-
 revocation race gate. The local PostgreSQL 16.15 run subsequently closed the
-current engine/serial/true-two-session version path. Activation still requires
-the full owner admission/enqueue/status/cancel runtime repository; the worker-half
-adapter-to-database boundary is closed below. Deleted `r21` closed the Attempt-2 historical
+current engine/serial/true-two-session version path. The worker-half
+adapter-to-database boundary is recorded below, and the later
+admission/enqueue/status/cancel source/local-SQL closure is recorded in section
+14. Deleted `r21` closed the Attempt-2 historical
 replay gate. The current source batch chooses and implements the registration
 retention FK/index design, and deleted `r22` closes its exact PostgreSQL 17.6
-hosted gate. The remaining full owner runtime repository, nested exact-key vectors,
-account-delete/purge recovery, provider-start binding, numeric parsing and the
-runtime/vault governance items above remain open before any caller grant or
-registry entry. Only after those results and the vault/KMS/retention, worker
+hosted gate. Attempt listing, nested exact-key vectors, account-delete/purge and
+orphan recovery, provider-start binding, numeric parsing and the runtime/vault
+governance items above remain open before any caller grant or registry entry.
+Only after those results and the vault/KMS/retention, worker
 credential, model/provider/STT and Points decisions are separately approved
 may runtime activation be considered. Nothing in this handoff authorizes
 Preview retention, Production apply, route activation, model/STT traffic or
@@ -808,7 +829,7 @@ Points settlement.
 
 ## 13. Worker-half owner A/B database integration boundary — 2026-08-24
 
-The current batch closes the narrowly defined worker-half owner A/B runtime
+This recorded checkpoint closes the narrowly defined worker-half owner A/B runtime
 integration boundary. The existing default-off registered-worker composite
 adapter is joined through `note-generation-registered-worker-postgres.server.ts`
 to the exact nine private database RPC identities using an explicitly injected,
@@ -820,7 +841,7 @@ success commit intentionally carries canonical NoteContent. Owner A and owner B 
 job, attempt, payload, grant and privacy relationships, and cross-owner
 composition must fail closed without exposing private row content.
 
-This boundary is not the complete implementation of
+This worker-half boundary was not the complete implementation of
 `CaresLinkV1NoteGenerationDurableRepository`. In particular, it does not add
 owner admission or enqueue, private idempotency lookup, owner-safe status/read,
 attempt listing or cancellation. It also adds no caller credential or execute
@@ -829,7 +850,8 @@ model/STT call, Points settlement or activation flag. Every application
 readiness latch and the Production/default database state remain off. Fixed
 TEST_ONLY setup temporarily enabled the disposable local private setting only
 for the live window; cleanup restored its hard-off constraint. The migrations
-remain Production-unapplied.
+remain Production-unapplied. Section 14 records the later owner source/database
+boundary; it does not retroactively widen this worker gate.
 
 Normal payload consumption remains fail-closed until the vault/KMS/retention
 contract exists. The disposable, cleanup-bounded `TEST_ONLY` consumed-grant bridge used to
@@ -873,3 +895,97 @@ hard-off settings, restored PUBLIC `TEMPORARY`, zero unexpected RPC ACLs and 9/9
 API/service-role RPC denials. The server stopped and
 the exact temporary cluster directory was deleted. No hosted database,
 Production apply, deployment, paid resource or activation was involved.
+
+## 14. Owner admission/status/cancel source boundary — 2026-08-24
+
+Migration
+`20260824092037_add_v1_note_generation_owner_runtime_rpc_shadow.sql` closes the
+source/database half of the owner repository without activating it. It creates
+the dedicated `careslink_v1_generation_owner_api_executor` described in section
+8 and one database-owned `admission_policy_bindings` table. The table is empty
+by default: there is no active registration choice, fallback selection or seed.
+The existing settings row remains hard-off. The migration and its final ACL
+cleanup grant no `EXECUTE` to `PUBLIC`, `anon`, `authenticated`, `service_role`,
+the worker executor or an application caller.
+
+The binding is a policy-bundle selector, not a unique-worker allowlist. A
+different complete and currently valid Five-Note registration may claim when
+its worker policy, payload policy and the queued Note type's provider policy
+match the job's frozen subset. Its other four provider policies do not have to
+match for that job.
+
+The three new private `SECURITY DEFINER` identities are:
+
+1. `admit_and_enqueue_v1_shadow_note_generation_job(...)`;
+2. `get_v1_shadow_note_generation_job_status(...)`;
+3. `cancel_v1_shadow_note_generation_job(...)`.
+
+Admission takes the authenticated owner/session/transport plus pre-staged
+metadata identifiers and hashes. It owns authoritative time, rechecks the
+active session and current privacy proof, selects one exact active admission
+binding and validates its complete worker/provider/payload catalogs. Callers
+cannot pick policy versions. An owner-plus-idempotency advisory lock serializes
+replay and changed-input races. A first acceptance writes the job and `AVAILABLE`
+payload metadata in one transaction. An exact replay returns the existing
+owner-safe job; changed request content fails with an idempotency conflict, and
+same staged payload identity with a changed job/handle/expiry fails with an
+identity-link conflict. A different replacement payload ID is not silently
+linked and is reported only through the server-private `payloadAccepted`
+receipt.
+
+Status and cancellation still require a fresh session, but they do not require
+the admission flag to be on. This is intentional incident behavior: disabling
+new admission must not strand existing work. Cancellation locks the job before
+session/state resolution so it has one linearization point against worker claim
+or settlement. `QUEUED` cancellation creates no attempt. `RUNNING`
+cancellation terminates the one live attempt; both paths revoke every issued
+grant, logically revoke the payload, enqueue one purge-outbox request and finish
+the job atomically. Existing contradictory purge state or a broken terminal
+shape fails closed with no partial mutation.
+
+The paired `note-generation-owner-repository.server.ts` adapter is server-only,
+fixed `false` readiness and constructible only with the exact `TEST_ONLY`
+capability, an explicitly injected direct-query function and an authenticated
+principal. Its SQL is schema-qualified. It does not read an environment value,
+create a URL/connection/pool, use PostgREST or expose internal policy, payload
+or locator data. Its public repository shape is enqueue/get/cancel only;
+attempt listing is not implemented or claimed.
+
+The disposable local PostgreSQL 16.15 evidence applied #1-#24 and the #26-#28
+tail as the non-superuser migration actor, including a fresh exact replay of
+final migration #28. The hand-built
+minimum Supabase-compatible bootstrap treated #25 as a bootstrap-superuser
+ownership transition. Therefore this is not an all-28-migrations non-superuser
+claim, and it does not replace the earlier historical PostgreSQL 16.15 evidence
+for its recorded revision.
+
+The owner-runtime, additive-aware worker-RPC and durable-foundation assertions
+all completed through `ROLLBACK`. The frozen owner assertion is 100936 bytes /
+SHA-256
+`05a3e4b95559981a1919a4dae83157ecef60f7485c1afd76150199a50f7990b8`
+for the full file and 100156 bytes / SHA-256
+`c8ad3fca9432afa1410807eec38c4c451ba885713a54ddec15149c26f1706bfa`
+for the executable body. The additive-aware worker assertion is 158635 bytes /
+SHA-256
+`a2c1da6c7a94bd43f5a2d93ce7ecdbe5832fad53e2756d0b0cc4dc1d3b0bfe9c`
+for the full file and 154903 bytes / SHA-256
+`6ed296b0764cf80b13915758209797d2de8b4a247296652f3ea63ad01bd50b94`
+for the executable body.
+The independent final postcheck confirmed 13/13 forced-RLS tables, 27 owner
+policies, three correctly owned RPCs, 19 direct function `EXECUTE` ACL entries
+including those RPCs, one hard-off
+settings row and zero rows in the other 12 tables. A real two-connection
+auth-session lock wait ended with `P0001 SESSION_REVOKED` after expiry while
+blocked.
+The final source gate passed 130 test files / 1522 tests, TypeScript, full lint,
+the 63/63-page Next production build, the 73-file Codex-adapter sync check and
+`git diff --check`.
+
+This closes only the Production-unapplied source and local database boundary.
+It is not hosted GoTrue/PostgREST parity, a retained Preview, caller credential
+or grant, served route, deployment, model/STT, payload-vault or end-to-end
+evidence. Attempt listing, real vault/KMS/retention and orphan recovery, hosted
+Auth/Data API validation, account deletion, provider/model/STT integration and
+Points remain activation blockers. Registration lifecycle/retirement requires
+a separate reviewed migration because only `APPROVED` is currently valid and
+the retention FK prevents deleting a registration referenced by an attempt.

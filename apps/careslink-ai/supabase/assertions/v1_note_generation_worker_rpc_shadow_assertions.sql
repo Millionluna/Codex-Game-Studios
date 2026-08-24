@@ -35,7 +35,7 @@
 -- Historical r21 executed BEGIN-through-ROLLBACK body SHA-256:
 -- bdcd479473ed1c6ae0782127eb1d8e5765e3de2ede829aadeb3eb35c2eeadaac;
 -- 146488 bytes.
--- The current source body adds the separately CLI-generated
+-- The historical deleted-r22 source body added the separately CLI-generated
 -- registration-retention migration catalog and enforcement proof. From exact
 -- execution source HEAD 4cae6f1a08ce2bcc7e43456c275cf5e743f13fdf it
 -- passed on deleted PostgreSQL 17.6 r22: 15/15 migrations, 7/7 rollback suites
@@ -48,8 +48,8 @@
 -- generation scope. Performance advisors were 144 INFO + 11 WARN globally;
 -- generation scope had 20 INFO (14 unindexed FKs + 6 unused indexes) and zero
 -- WARN/ERROR. Deletion was confirmed with r22 id and ref absent; Production
--- remained the sole healthy default and was never a SQL target. Current
--- BEGIN-through-ROLLBACK source SHA-256:
+-- remained the sole healthy default and was never a SQL target. Historical
+-- deleted-r22 executed BEGIN-through-ROLLBACK source SHA-256:
 -- 1c9f65bdc7f1de86e1c7398399ecf029207ba1b2bdf9fa3634dadb482424fdbb;
 -- 153956 bytes.
 
@@ -72,6 +72,7 @@ do $$
 declare
   v_schema oid := to_regnamespace('careslink_v1_generation');
   v_actual text[];
+  v_expected text[];
 begin
   if current_setting('server_version_num')::integer < 160000 then
     raise exception 'worker RPC shadow requires PostgreSQL 16 or newer';
@@ -87,12 +88,24 @@ begin
   where relation.relnamespace = v_schema
     and relation.relkind = 'r';
 
-  if v_actual is distinct from array[
+  v_expected := array[
     'attempts', 'jobs', 'payload_grants', 'payload_policies',
     'payload_purge_outbox', 'payloads', 'provider_evidence',
     'provider_policies', 'settings', 'worker_policies',
     'worker_registration_provider_policies', 'worker_registrations'
-  ]::text[] then
+  ]::text[];
+  if to_regclass(
+      'careslink_v1_generation.admission_policy_bindings'
+    ) is not null
+  then
+    select array_agg(table_name order by table_name)
+    into v_expected
+    from unnest(
+      array_append(v_expected, 'admission_policy_bindings')
+    ) as expected_table(table_name);
+  end if;
+
+  if v_actual is distinct from v_expected then
     raise exception 'worker RPC private table scope drifted: %', v_actual;
   end if;
 
@@ -134,7 +147,25 @@ alter table careslink_v1_generation.payload_purge_outbox
   no force row level security;
 
 do $$
+declare
+  v_owner_extension_fixture_count bigint := 0;
 begin
+  if to_regclass(
+      'careslink_v1_generation.admission_policy_bindings'
+    ) is not null
+  then
+    execute
+      'alter table careslink_v1_generation.admission_policy_bindings '
+      || 'no force row level security';
+    execute
+      'select count(*) from '
+      || 'careslink_v1_generation.admission_policy_bindings'
+    into v_owner_extension_fixture_count;
+    execute
+      'alter table careslink_v1_generation.admission_policy_bindings '
+      || 'force row level security';
+  end if;
+
   if (
     select count(*)
     from careslink_v1_generation.settings
@@ -163,6 +194,7 @@ begin
     or (
       select count(*) from careslink_v1_generation.payload_purge_outbox
     ) <> 0
+    or v_owner_extension_fixture_count <> 0
   then
     raise exception 'worker RPC migration persisted policy or business fixtures';
   end if;

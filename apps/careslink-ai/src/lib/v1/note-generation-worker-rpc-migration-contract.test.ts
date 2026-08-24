@@ -975,7 +975,7 @@ describe("V1 Note registered-worker RPC shadow migration contract", () => {
     expect(migration).toContain("reserve/commit Points");
   });
 
-  it("proves all twelve private tables before any assertion-only FORCE-RLS relaxation", () => {
+  it("proves the strict twelve-table baseline or additive owner catalog before any FORCE-RLS relaxation", () => {
     const beginIndex = assertions.indexOf("\nbegin;");
     const ownerGrantIndex = assertions.indexOf(
       `grant ${ownerRole} to current_user`,
@@ -1012,10 +1012,18 @@ describe("V1 Note registered-worker RPC shadow migration contract", () => {
     const catalogProof = assertions.slice(catalogProofStart, catalogProofEnd);
     expect(normalizeSql(catalogProof)).toContain(
       normalizeSql(
-        `v_actual is distinct from array[ ${allPrivateTableNames
+        `v_expected := array[ ${allPrivateTableNames
           .map((table) => `'${table}'`)
           .join(", ")} ]::text[]`,
       ),
+    );
+    expect(normalizeSql(catalogProof)).toContain(
+      normalizeSql(
+        `if to_regclass('${schemaName}.admission_policy_bindings') is not null then select array_agg(table_name order by table_name) into v_expected from unnest(array_append(v_expected, 'admission_policy_bindings')) as expected_table(table_name); end if;`,
+      ),
+    );
+    expect(normalizeSql(catalogProof)).toContain(
+      "if v_actual is distinct from v_expected then",
     );
     expect(catalogProof).toContain("relation.relkind = 'r'");
     expect(catalogProof).toContain("not relation.relrowsecurity");
@@ -1285,10 +1293,10 @@ describe("V1 Note registered-worker RPC shadow migration contract", () => {
       expect(assertionHeader).toContain(marker);
     }
     expect(assertionBodyStart).toBeGreaterThanOrEqual(0);
-    expect(Buffer.byteLength(assertionBody, "utf8")).toBe(153_956);
+    expect(Buffer.byteLength(assertionBody, "utf8")).toBe(154_903);
     expect(
       createHash("sha256").update(assertionBody, "utf8").digest("hex"),
-    ).toBe("1c9f65bdc7f1de86e1c7398399ecf029207ba1b2bdf9fa3634dadb482424fdbb");
+    ).toBe("6ed296b0764cf80b13915758209797d2de8b4a247296652f3ea63ad01bd50b94");
     expect(assertions).toContain("transaction-only TEST_ONLY fixtures");
     expect(assertions).toContain("pg_get_function_identity_arguments");
     expect(assertions).toContain("aclexplode(");
@@ -1307,6 +1315,12 @@ describe("V1 Note registered-worker RPC shadow migration contract", () => {
     expect(assertions).toContain("procedure.proconfig[1] is null");
     expect(assertions).not.toMatch(
       /(?:->>|#>>|#>)\s*'[^']+'\s*<>/,
+    );
+    expect(assertions).toContain("v_owner_extension_fixture_count bigint := 0");
+    expect(normalizeSql(assertions)).toContain(
+      normalizeSql(
+        `if to_regclass('${schemaName}.admission_policy_bindings') is not null then execute 'alter table ${schemaName}.admission_policy_bindings ' || 'no force row level security'; execute 'select count(*) from ' || '${schemaName}.admission_policy_bindings' into v_owner_extension_fixture_count; execute 'alter table ${schemaName}.admission_policy_bindings ' || 'force row level security'; end if;`,
+      ),
     );
     for (const marker of [
       "worker RPC private table scope drifted",

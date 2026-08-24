@@ -954,11 +954,13 @@ repository migrations. It closes the current PostgreSQL 16 database-engine,
 serial and true-two-session compatibility gate. It does not prove GoTrue,
 PostgREST, `supautils`, Advisors or hosted Supabase parity.
 
-The worker-half owner A/B adapter-to-database boundary is closed below. The full
-owner admission/enqueue/status/cancel runtime repository, nested database exact-key vectors,
-account-delete/purge recovery, provider-start binding to a consumed grant with
-fresh lease/heartbeat, safe sequential numeric parsing, vault/KMS/retention,
-worker credentials, model/STT, Points and runtime activation remain open.
+The worker-half owner A/B adapter-to-database boundary is closed below. At this
+checkpoint the owner admission/enqueue/status/cancel repository remained open;
+its later source/local-SQL closure is recorded in section 22. Attempt listing,
+nested database exact-key vectors, account-delete/purge and orphan recovery,
+provider-start binding to a consumed grant with fresh lease/heartbeat, safe
+sequential numeric parsing, vault/KMS/retention, worker credentials, hosted
+Auth/Data API, model/STT, Points and runtime activation remain open.
 Production was never a target; no retained Preview, deployment, caller grant,
 runtime flag, capability or paid resource was created.
 
@@ -974,22 +976,23 @@ authoritative, while cross-owner
 job/attempt/payload/grant/lease composition fails closed and acknowledgements
 remain metadata-only.
 
-This does not make the five-Note service usable. The full durable runtime
-repository still lacks owner admission and enqueue, owner-safe job status/read,
-attempt listing and cancellation. There is also no caller credential or grant,
+This does not make the five-Note service usable. At this worker-half checkpoint,
+the durable repository still lacked owner admission/enqueue, owner-safe status
+and cancellation; section 22 records the later source/local-SQL boundary.
+Attempt listing remains absent. There is also no caller credential or grant,
 runtime registry, scheduler, served job route, payload vault, provider/model/STT
 traffic, Points settlement, deployment or Production schema apply. Application
 readiness and the Production/default database setting remain off; only the
 disposable TEST_ONLY window temporarily enabled its private local setting, and
 cleanup restored hard-off.
 
-The next implementation sequence therefore remains: database exact-key and safe
-numeric parsing hardening; account-delete/purge recovery; approved
+The remaining implementation sequence is database exact-key and safe numeric
+parsing hardening; account-delete/purge and orphan recovery; approved
 vault/KMS/retention, worker credential and provider/model policy decisions;
-real consume plus provider-start/lease freshness; then the complete
-enqueue/status/cancel repository, caller grant, registry and scheduler. A
-same-revision protected Preview and explicit activation approval remain later
-gates, with Points only after a usable canonical revision exists.
+real consume plus provider-start/lease freshness; then attempt listing, caller
+grant/route, registry and scheduler. A same-revision protected Preview and
+explicit activation approval remain later gates, with Points only after a usable
+canonical revision exists.
 
 The gate ran from source base
 `ec29430dec7a79c611a552a52e36277e3512166e` on disposable vanilla PostgreSQL
@@ -1017,3 +1020,76 @@ hard-off settings, restored PUBLIC `TEMPORARY`, zero unexpected RPC ACLs and 9/9
 API/service-role RPC denials. The local server and
 exact temporary directory were deleted. No Preview was retained and no
 Production, deployment, model/STT, Points or paid resource action occurred.
+
+## 22. Note generation owner repository source/local gate — 2026-08-24
+
+The next owner-repository source boundary is now present without changing the
+release checkpoint to active. Production-unapplied migration
+`20260824092037_add_v1_note_generation_owner_runtime_rpc_shadow.sql` creates a
+dedicated `careslink_v1_generation_owner_api_executor` with `NOLOGIN`,
+`NOINHERIT`, `NOSUPERUSER` and `NOBYPASSRLS`. It does not reuse the worker
+executor and is not a caller credential. The new database-owned
+`admission_policy_bindings` catalog is empty by default, the database capability
+remains hard-off and no API role, `service_role` or application caller receives
+`EXECUTE`.
+
+This catalog selects a policy bundle; it is not a unique-worker allowlist. A
+second complete valid Five-Note registration may claim only when its worker,
+payload and current Note-type provider policies match the frozen job subset;
+its other four provider policies are outside that claim comparison.
+
+Exactly three private `SECURITY DEFINER` RPCs cover admit-and-enqueue,
+owner-safe status and cancel. The private
+`note-generation-owner-repository.server.ts` adapter is direct-query and
+`TEST_ONLY`, with factory-injected authenticated identity. It creates no
+connection, pool, environment selection, PostgREST/Data API path, route or
+runtime registry entry.
+
+Admission takes its clock, fresh session/privacy authority and exact active
+worker/provider/payload selection from the database. An owner-scoped advisory
+lock serializes the idempotency lane, and the first acceptance atomically
+creates the metadata-only job and available payload. Exact replay is returned
+without duplicate work; request or staged identity conflicts fail closed.
+Status and cancellation intentionally remain available when new admission is
+disabled. Cancellation locks the job first and atomically cancels a running
+attempt when one exists, revokes issued grants and payload, enqueues one purge
+request and finishes the job. A queued cancellation creates no fake attempt.
+No attempt-list API or adapter exists.
+
+The disposable local PostgreSQL 16.15 run applied #1-#24 and the #26-#28 tail
+as the non-superuser migration actor, including a fresh exact replay of final
+migration #28. Its hand-built minimum
+compatibility bootstrap used #25 as a bootstrap-superuser ownership transition;
+therefore this is not evidence that all 28 migrations applied as a
+non-superuser, and it does not rewrite the earlier historical 27/27 result.
+The new owner assertion, additive-aware worker assertion and durable-foundation
+assertion all completed through `ROLLBACK`.
+
+Frozen owner assertion evidence is 100936 bytes / SHA-256
+`05a3e4b95559981a1919a4dae83157ecef60f7485c1afd76150199a50f7990b8`
+for the full file and 100156 bytes / SHA-256
+`c8ad3fca9432afa1410807eec38c4c451ba885713a54ddec15149c26f1706bfa`
+for the executable body. The additive-aware worker assertion is 158635 bytes /
+SHA-256
+`a2c1da6c7a94bd43f5a2d93ce7ecdbe5832fad53e2756d0b0cc4dc1d3b0bfe9c`
+for the full file and 154903 bytes / SHA-256
+`6ed296b0764cf80b13915758209797d2de8b4a247296652f3ea63ad01bd50b94`
+for the executable body.
+The independent final postcheck confirmed 13 forced-RLS tables, 27 owner
+policies, three correctly owned RPCs, 19 direct function `EXECUTE` ACL entries
+including those RPCs, hard-off settings
+and zero other generation rows. A true two-connection auth-session lock wait
+returned `P0001 SESSION_REVOKED` after expiry during the wait.
+The final source gate passed 130 test files / 1522 tests, TypeScript, full lint,
+the 63/63-page Next production build, the 73-file Codex-adapter sync check and
+`git diff --check`.
+
+This checkpoint is source and local database evidence only. It is not a hosted
+Preview/Production apply, GoTrue/PostgREST validation, caller grant/route,
+deployment, vault consume, model/STT, Points or end-to-end result. Attempt
+listing, real vault/KMS/retention and orphan recovery, account deletion, hosted
+Auth/Data API, provider/model/STT integration and all activation wiring remain
+release blockers. Registration rotation additionally requires a reviewed
+lifecycle/retirement migration because the catalog currently permits only
+`APPROVED` and the validated retention FK prevents deleting a used
+registration.
