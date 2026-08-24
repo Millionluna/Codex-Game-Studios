@@ -294,6 +294,66 @@ describe("Portal referral workflow contract", () => {
     );
   });
 
+  it("does not treat residual provider fields on other roles as provider access", () => {
+    const workflow = createWorkflow();
+    const accepted = createAcceptedReferral(workflow);
+    const followedUp = workflow.recordFollowUp(
+      PROVIDER_A,
+      {
+        referralId: accepted.referralId,
+        expectedVersion: accepted.rowVersion,
+        outcomeCode: "CONTACT_CONFIRMED",
+      },
+      mutation("residual-followup-01"),
+    );
+    const linked = workflow.linkDocument(
+      PROVIDER_A,
+      {
+        referralId: accepted.referralId,
+        canonicalDocumentId: "residual-canonical-document",
+        expectedVersion: followedUp.rowVersion,
+      },
+      mutation("residual-link-doc-01"),
+    );
+    workflow.recordExport(
+      PROVIDER_A,
+      {
+        referralId: accepted.referralId,
+        exportJobId: "residual-export-job",
+        expectedVersion: linked.rowVersion,
+      },
+      mutation("residual-export-0001"),
+    );
+
+    expect(workflow.getReferral(PROVIDER_A, accepted.referralId)).toMatchObject({
+      summary: referralInput().summary,
+      contact: referralInput().contact,
+      canonicalDocumentId: "residual-canonical-document",
+      exportJobId: "residual-export-job",
+    });
+
+    const actorsWithResidualProviderFields: PortalReferralActor[] = [
+      {
+        ...SOURCE_B,
+        providerId: PROVIDER_A.providerId,
+        providerReviewStatus: "approved",
+      },
+      {
+        ...OPERATOR_A,
+        organizationId: SOURCE_B.organizationId,
+        providerId: PROVIDER_A.providerId,
+        providerReviewStatus: "approved",
+      },
+    ];
+    for (const actor of actorsWithResidualProviderFields) {
+      expectError(
+        () => workflow.getReferral(actor, accepted.referralId),
+        "NOT_FOUND",
+      );
+      expect(workflow.listReferrals(actor)).toEqual([]);
+    }
+  });
+
   it("scopes a partner operator membership to one referral-source tenant", () => {
     const workflow = createWorkflow();
     const sourceAReferral = workflow.createReferral(

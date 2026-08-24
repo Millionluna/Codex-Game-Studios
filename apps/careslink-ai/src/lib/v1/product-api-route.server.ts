@@ -3,6 +3,10 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 
 import {
+  RequestBodyTooLargeError,
+  readBoundedRequestText,
+} from "../bounded-request-text.server";
+import {
   type CaresLinkV1ProductApiAuthResolution,
 } from "./product-api-auth.server";
 import {
@@ -63,6 +67,8 @@ export type CaresLinkV1ProductApiRouteDependencies = {
     | Promise<CaresLinkV1ProductApi | undefined>;
   createCorrelationId?: () => string;
 };
+
+const MAX_PRODUCT_API_REQUEST_BYTES = 1_048_576;
 
 const DEFAULT_DEPENDENCIES: Required<CaresLinkV1ProductApiRouteDependencies> = {
   resolveAuth: (request) =>
@@ -500,7 +506,10 @@ function assertMutationTransport(
 
 async function readJsonObject(request: Request) {
   const contentLength = Number(request.headers.get("content-length") ?? "0");
-  if (Number.isFinite(contentLength) && contentLength > 1_048_576) {
+  if (
+    Number.isFinite(contentLength) &&
+    contentLength > MAX_PRODUCT_API_REQUEST_BYTES
+  ) {
     throw new CaresLinkV1ContractError(
       "VALIDATION_ERROR",
       "The request body is too large",
@@ -508,12 +517,18 @@ async function readJsonObject(request: Request) {
   }
   let value: unknown;
   try {
-    const text = await request.text();
-    if (text.length > 1_048_576) {
-      throw new Error("body_too_large");
-    }
+    const text = await readBoundedRequestText(
+      request,
+      MAX_PRODUCT_API_REQUEST_BYTES,
+    );
     value = JSON.parse(text);
-  } catch {
+  } catch (error) {
+    if (error instanceof RequestBodyTooLargeError) {
+      throw new CaresLinkV1ContractError(
+        "VALIDATION_ERROR",
+        "The request body is too large",
+      );
+    }
     throw new CaresLinkV1ContractError(
       "VALIDATION_ERROR",
       "The request body must be valid JSON",

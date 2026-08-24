@@ -97,6 +97,14 @@ export type PortalReferralActor = Readonly<{
   providerReviewStatus?: "approved" | "pending" | "rejected" | "suspended";
 }>;
 
+type ApprovedPortalProviderActor = PortalReferralActor &
+  Readonly<{
+    role: "provider_member";
+    organizationType: "PROVIDER";
+    providerId: string;
+    providerReviewStatus: "approved";
+  }>;
+
 export type PortalReferralContact = Readonly<{
   name: string;
   phone: string;
@@ -777,7 +785,8 @@ export function createMemoryPortalReferralWorkflow(
     const isSource =
       actor.role === "referral_source" &&
       actor.organizationId === referral.sourceOrganizationId;
-    const providerMaySeeContact =
+    const providerMayReadPrivateReferral =
+      isApprovedProviderActor(actor) &&
       actor.providerId === referral.assignedProviderId &&
       [
         "ACCEPTED",
@@ -786,7 +795,7 @@ export function createMemoryPortalReferralWorkflow(
         "EXPORTED",
         "COMPLETED",
       ].includes(referral.currentStatus);
-    if (!isOperator && !isSource && !providerMaySeeContact) {
+    if (!isOperator && !isSource && !providerMayReadPrivateReferral) {
       throw new PortalReferralWorkflowError("NOT_FOUND", "Referral was not found");
     }
     return clone({
@@ -910,8 +919,7 @@ function assertActiveActor(
     (actor.role === "provider_member" &&
       actor.organizationType === "PROVIDER");
   const providerIsEligible =
-    actor.role !== "provider_member" ||
-    (!!actor.providerId && actor.providerReviewStatus === "approved");
+    actor.role !== "provider_member" || isApprovedProviderActor(actor);
   if (
     actor.organizationStatus !== "active" ||
     actor.membershipStatus !== "active" ||
@@ -921,6 +929,18 @@ function assertActiveActor(
   ) {
     throw new PortalReferralWorkflowError("FORBIDDEN", "Actor is not eligible");
   }
+}
+
+function isApprovedProviderActor(
+  actor: PortalReferralActor,
+): actor is ApprovedPortalProviderActor {
+  return (
+    actor.role === "provider_member" &&
+    actor.organizationType === "PROVIDER" &&
+    typeof actor.providerId === "string" &&
+    actor.providerId.length > 0 &&
+    actor.providerReviewStatus === "approved"
+  );
 }
 
 function assertAllowedKeys(value: object, allowed: readonly string[]) {

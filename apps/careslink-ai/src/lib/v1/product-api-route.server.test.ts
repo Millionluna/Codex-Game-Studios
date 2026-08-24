@@ -39,6 +39,7 @@ const STALE_REVISION_ID = "20000000-0000-4000-8000-000000000099";
 const CORRELATION_ID = "mobile.request:0001";
 const ACCESS_TOKEN = "header-only-sensitive.jwt.value";
 const CREATED_AT = "2026-08-10T01:00:00.000Z";
+const MAX_PRODUCT_API_REQUEST_BYTES = 1_048_576;
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -225,6 +226,90 @@ describe("CaresLink V1 Product API HTTP route boundary", () => {
     });
     expect(resolveAuth).toHaveBeenCalledOnce();
     expect(getProductApi).not.toHaveBeenCalled();
+  });
+
+  it("cancels an oversized body stream without Content-Length before reading the remaining chunks", async () => {
+    const store = deterministicStore([]);
+    const onPull = vi.fn();
+    const onCancel = vi.fn();
+    const chunk = new Uint8Array(256 * 1_024).fill(0x20);
+    const request = streamedDocumentRequest(
+      "mutation:oversized:stream",
+      Array.from({ length: 6 }, () => chunk),
+      { onPull, onCancel },
+    );
+
+    expect(request.headers.has("content-length")).toBe(false);
+    const response = await handleCaresLinkV1CreateDocument(
+      request,
+      authenticatedDependencies(store, "bearer"),
+    );
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({
+      error: {
+        code: "VALIDATION_ERROR",
+        message: "The request body is too large",
+        correlationId: CORRELATION_ID,
+      },
+    });
+    expect(onPull).toHaveBeenCalledTimes(5);
+    expect(onCancel).toHaveBeenCalledOnce();
+  });
+
+  it("uses UTF-8 bytes at the body limit and decodes a multibyte character split across chunks", async () => {
+    const encoder = new TextEncoder();
+    const content = noteContent("A factual 🐾 support note.");
+    const serialized = JSON.stringify({
+      ...createBody(),
+      content,
+      contentHash: createCaresLinkV1ProductApiContentHash(content),
+    });
+    const markerOffset = encoder.encode(
+      serialized.slice(0, serialized.indexOf("🐾")),
+    ).byteLength;
+    const paddingLength =
+      MAX_PRODUCT_API_REQUEST_BYTES - encoder.encode(serialized).byteLength;
+    const exactText = `${serialized}${" ".repeat(paddingLength)}`;
+    const exactBytes = encoder.encode(exactText);
+    const splitOffset = markerOffset + 2;
+
+    expect(exactBytes.byteLength).toBe(MAX_PRODUCT_API_REQUEST_BYTES);
+    const exactResponse = await handleCaresLinkV1CreateDocument(
+      streamedDocumentRequest(
+        "mutation:utf8:exact",
+        [exactBytes.slice(0, splitOffset), exactBytes.slice(splitOffset)],
+        { onCancel: vi.fn() },
+      ),
+      authenticatedDependencies(
+        deterministicStore([DOCUMENT_ID, REVISION_ID]),
+        "bearer",
+      ),
+    );
+    expect(exactResponse.status).toBe(201);
+
+    const overText = `${exactText} `;
+    const overBytes = encoder.encode(overText);
+    const onCancel = vi.fn();
+    expect(overText.length).toBeLessThanOrEqual(MAX_PRODUCT_API_REQUEST_BYTES);
+    expect(overBytes.byteLength).toBe(MAX_PRODUCT_API_REQUEST_BYTES + 1);
+
+    const overResponse = await handleCaresLinkV1CreateDocument(
+      streamedDocumentRequest(
+        "mutation:utf8:over",
+        [overBytes.slice(0, splitOffset), overBytes.slice(splitOffset)],
+        { onCancel },
+      ),
+      authenticatedDependencies(deterministicStore([]), "bearer"),
+    );
+    expect(overResponse.status).toBe(400);
+    expect(await overResponse.json()).toMatchObject({
+      error: {
+        code: "VALIDATION_ERROR",
+        message: "The request body is too large",
+      },
+    });
+    expect(onCancel).toHaveBeenCalledOnce();
   });
 
   it.each([
@@ -726,6 +811,40 @@ function createDocumentRequest(
     },
     body: JSON.stringify(body),
   });
+}
+
+function streamedDocumentRequest(
+  idempotencyKey: string,
+  chunks: Uint8Array[],
+  callbacks: { onPull?: () => void; onCancel?: () => void } = {},
+) {
+  let nextChunk = 0;
+  const body = new ReadableStream<Uint8Array>({
+    type: "bytes",
+    pull(controller) {
+      callbacks.onPull?.();
+      const chunk = chunks[nextChunk];
+      nextChunk += 1;
+      if (chunk) {
+        controller.enqueue(chunk.slice());
+      } else {
+        controller.close();
+      }
+    },
+    cancel() {
+      callbacks.onCancel?.();
+    },
+  });
+  const init: RequestInit & { duplex: "half" } = {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      [CARESLINK_V1_HEADER_NAMES.idempotencyKey]: idempotencyKey,
+    },
+    body,
+    duplex: "half",
+  };
+  return versionedRequest("/v1/documents", init);
 }
 
 function authenticatedDependencies(

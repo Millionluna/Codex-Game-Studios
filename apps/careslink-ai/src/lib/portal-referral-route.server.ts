@@ -2,6 +2,7 @@ import "server-only";
 
 import { randomUUID } from "node:crypto";
 
+import { readBoundedRequestText } from "./bounded-request-text.server";
 import type { PortalReferralApi } from "./portal-referral-adapter.server";
 import {
   PORTAL_REFERRAL_FOLLOW_UP_OUTCOME_CODES,
@@ -370,7 +371,13 @@ async function readJsonObject(request: Request) {
   ) {
     throw validationError();
   }
-  const raw = await readBoundedRequestText(request);
+  let raw: string;
+  try {
+    raw = await readBoundedRequestText(request, MAX_REQUEST_BYTES);
+  } catch (error) {
+    if (error instanceof PortalReferralWorkflowError) throw error;
+    throw validationError();
+  }
   if (!raw) {
     throw validationError();
   }
@@ -379,33 +386,6 @@ async function readJsonObject(request: Request) {
   } catch (error) {
     if (error instanceof PortalReferralWorkflowError) throw error;
     throw validationError();
-  }
-}
-
-async function readBoundedRequestText(request: Request) {
-  if (!request.body) throw validationError();
-  const reader = request.body.getReader();
-  const decoder = new TextDecoder("utf-8", { fatal: true });
-  let byteLength = 0;
-  let text = "";
-  try {
-    while (true) {
-      const chunk = await reader.read();
-      if (chunk.done) break;
-      byteLength += chunk.value.byteLength;
-      if (byteLength > MAX_REQUEST_BYTES) {
-        await reader.cancel();
-        throw validationError();
-      }
-      text += decoder.decode(chunk.value, { stream: true });
-    }
-    text += decoder.decode();
-    return text;
-  } catch (error) {
-    if (error instanceof PortalReferralWorkflowError) throw error;
-    throw validationError();
-  } finally {
-    reader.releaseLock();
   }
 }
 
