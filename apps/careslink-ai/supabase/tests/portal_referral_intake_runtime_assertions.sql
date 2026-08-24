@@ -165,6 +165,10 @@ insert into auth.users (
   ('a5000000-0000-4000-8000-000000000005',
    '00000000-0000-0000-0000-000000000000',
    'authenticated', 'authenticated', 'intake-revoked-session@example.invalid',
+   'test-only-no-login', now(), '{}'::jsonb, '{}'::jsonb, now(), now()),
+  ('a6000000-0000-4000-8000-000000000006',
+   '00000000-0000-0000-0000-000000000000',
+   'authenticated', 'authenticated', 'intake-expired-session@example.invalid',
    'test-only-no-login', now(), '{}'::jsonb, '{}'::jsonb, now(), now());
 
 insert into auth.sessions (id, user_id, created_at, updated_at, not_after)
@@ -178,7 +182,10 @@ values
   ('b4000000-0000-4000-8000-000000000004',
    'a4000000-0000-4000-8000-000000000004', now(), now(), null),
   ('b5000000-0000-4000-8000-000000000005',
-   'a5000000-0000-4000-8000-000000000005', now(), now(), null);
+   'a5000000-0000-4000-8000-000000000005', now(), now(), null),
+  ('b6000000-0000-4000-8000-000000000006',
+   'a6000000-0000-4000-8000-000000000006', now(), now(),
+   pg_catalog.clock_timestamp() - interval '1 second');
 
 insert into public.portal_organizations (
   id, organization_type, display_name, status
@@ -208,6 +215,9 @@ insert into public.portal_organization_memberships (
    'referral_source', 'REVOKED'),
   ('c1000000-0000-4000-8000-000000000001',
    'a5000000-0000-4000-8000-000000000005',
+   'referral_source', 'ACTIVE'),
+  ('c1000000-0000-4000-8000-000000000001',
+   'a6000000-0000-4000-8000-000000000006',
    'referral_source', 'ACTIVE');
 
 -- Hard-off is checked before any body-bearing operation.
@@ -326,6 +336,24 @@ begin
     raise exception 'missing auth identity unexpectedly authorized';
   exception when sqlstate 'P0001' then
     if sqlerrm <> 'PORTAL_AUTH_REQUIRED' then raise; end if;
+  end;
+end
+$$;
+reset role;
+
+select set_config(
+  'request.jwt.claims',
+  '{"role":"authenticated","sub":"a6000000-0000-4000-8000-000000000006","session_id":"b6000000-0000-4000-8000-000000000006"}',
+  true
+);
+set local role authenticated;
+do $$
+begin
+  begin
+    perform public.portal_referral_intake_authorize();
+    raise exception 'expired session unexpectedly authorized';
+  exception when sqlstate 'P0001' then
+    if sqlerrm <> 'PORTAL_SESSION_REVOKED' then raise; end if;
   end;
 end
 $$;

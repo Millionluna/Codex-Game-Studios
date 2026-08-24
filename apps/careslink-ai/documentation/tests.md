@@ -92,7 +92,9 @@ Supabase client is cookie-only; Bearer is rejected and no service-role client or
 memory fallback exists. The route resolves database authorization before a
 private mutation body. The database revalidates the flag, current Auth
 session/user and exactly one active referral-source membership in an active
-referral-source organization.
+referral-source organization. After every potentially blocking authorization
+lock is held, it refreshes wall-clock time and repeats the complete Auth
+session/user eligibility predicate before returning the protected context.
 
 The new authorize, metadata list and atomic create RPCs are `SECURITY DEFINER`
 with `search_path=''` and grant execution only to `authenticated`; `PUBLIC`,
@@ -119,19 +121,23 @@ The frozen disposable-local PostgreSQL 16.15 gate clean-applied all 30
 repository migrations and passed all 10 explicit-rollback assertion suites,
 followed by an independent zero-fixture/default-off/owner/ACL/role-edge
 postcheck. The Portal migration SHA-256 was
-`d69684088af021bb51a8e0886cbb2de0e4ac2f131e72a321ded6221f8f7b8838` and
+`5a98154b254050b3140f5f185d52e3ff7e070da05fbdfa99dbdd60665b382e1c` and
 the corrected Portal assertion SHA-256 was
-`95da9e415569fde633361a5b0ae6ad19e550dd7844cf884d4d7504387d5f59ed`.
-The seven true two-session cases passed: same-key replay, same-key changed-body
-conflict, session expiry while waiting on the mutation advisory lock, and real
+`206ba671f2960ab9eb88552092975eeb9caddc302dbcedf2bacc5d65819ad666`.
+The eight true two-session cases passed: same-key replay, same-key changed-body
+conflict, session expiry while waiting on the mutation advisory lock, real
 writer blocking for capability flag, Auth session, membership and organization
-locks. Exact fixture cleanup restored both append-only triggers, the full
-postcheck passed again, the server stopped and the temporary cluster was
-deleted with zero matching local roots retained. Migrations that require the
-existing generation-owner bootstrap used atomic owner-grant/session-authorization/
-owner-revoke wrappers; the final migrator generation-schema privileges remained
-false. This is a minimal Supabase-compatible local bootstrap, not hosted
-GoTrue/PostgREST or Supabase platform parity.
+locks, and the post-lock wall-clock regression. In that final case the caller
+waited on the exact Auth-session row across `not_after`, then received
+`PORTAL_SESSION_REVOKED` with zero writes across referral, private contact,
+audit and receipt tables. Exact fixture cleanup restored both append-only
+triggers, the full postcheck passed again, the server stopped and the temporary
+cluster was deleted with zero matching local roots retained. Migrations that
+require the existing generation-owner bootstrap used atomic owner-grant/
+session-authorization/owner-revoke wrappers; the final migrator
+generation-schema privileges remained false. This is a minimal
+Supabase-compatible local bootstrap, not hosted GoTrue/PostgREST or Supabase
+platform parity.
 
 These are source and disposable-local-database claims only. No hosted
 GoTrue/PostgREST cookie E2E, hosted Preview or Production migration, deployment,
@@ -1170,7 +1176,7 @@ This does not prove a live, data-bearing cross-migration upgrade. The `202608100
 | Production-unapplied SQL boundary | `src/lib/v1/v1-shadow-migration-contract.test.ts`, `mobile-sync-migration-contract.test.ts`, isolated guarded-live and local engine evidence | additive/no legacy DML, owner isolation and explicit grants are source-checked; historical deleted `r4` passed the 13-file foundation manifest 13/13 and six rollback suites. At HEAD `c7b70e9f84b9b804779039711b85cc7eda55bd57`, deleted `r9` passed the exact 14-file worker manifest 14/14, seven rollback suites and independent hard-off/zero-row/role/RLS/ACL/9-RPC postchecks. Deleted `r20` additionally passed the PostgreSQL 17.6 true two-session claim/session/privacy race gate; deleted `r21` passed the Attempt 1/Attempt 2 historical-replay and post-purge matrix. Deleted `r22` then passed the exact 15-file registration-retention manifest 15/15, the seven rollback suites and the independent retention/posture postcheck with both current assertion bodies. The subsequent isolated PostgreSQL 16.15 gate passed all 27 repository migrations, the exact current V1 15/15 manifest, 7/7 suites, the independent posture/retention postcheck and all three strict two-backend races. All worker Preview branches and local test resources were removed. This is isolated schema/transaction evidence only; runtime writes remain withheld |
 | Owner generation repository boundary | `note-generation-owner-repository.server.test.ts`, `note-generation-owner-runtime-migration-contract.test.ts` and `v1_note_generation_owner_runtime_rpc_shadow_assertions.sql` | exact private direct-query calls, owner-safe envelopes, default-empty admission, fresh session/privacy/catalog selection, idempotent atomic enqueue, status/cancel while hard-off and atomic cancellation are source/local-SQL tested. The current local PG16.15 run passed owner, additive-aware worker and durable assertions through rollback, with #1-#24 and #26-#28 applied by the non-super migration actor, including a fresh exact replay of final #28; #25 remained a bootstrap-superuser transition. The independent posture postcheck and auth-session lock-wait race passed. No hosted, route, caller-grant, vault/model/Points or Production evidence |
 | Worker-registration graceful retirement | `note-generation-registration-retirement-shadow-migration-contract.test.ts` and `v1_note_generation_registration_retirement_shadow_assertions.sql` | migration #29 preserves immutable digest-bound `APPROVED` registrations, adds the fourteenth forced-RLS table and validates append-only retirement, fixed reasons, exact sorted active-binding compare-and-retire, idempotent replay, new-admission/new-claim denial and existing-attempt drain/recovery. The ninth current assertion passed strict local PostgreSQL 16.15 rollback within a clean 29/29 migration, 9/9 aggregate, independent posture and two-ordering race gate. No caller grant, route, credential, seed, activation, emergency revoke or Production evidence |
-| Portal Referral intake runtime | `portal-referral-intake-runtime-migration-contract.test.ts`, route/runtime/Supabase/UI tests and `portal_referral_intake_runtime_assertions.sql` | default-off cookie-only list/create, auth-before-body, exact authenticated RPC grants, database-derived source tenant, metadata-only readback, atomic PII-separated create and replay/conflict boundaries passed source tests plus a clean 30/30 migration, 10/10 rollback-suite, independent-posture and 7/7 two-session PostgreSQL 16.15 gate; the exact local cluster was deleted. Hosted GoTrue/PostgREST and activation remain unproved |
+| Portal Referral intake runtime | `portal-referral-intake-runtime-migration-contract.test.ts`, route/runtime/Supabase/UI tests and `portal_referral_intake_runtime_assertions.sql` | default-off cookie-only list/create, auth-before-body, exact authenticated RPC grants, database-derived source tenant, post-lock wall-clock/session revalidation, metadata-only readback, atomic PII-separated create and replay/conflict boundaries passed source tests plus a clean 30/30 migration, 10/10 rollback-suite, independent-posture and 8/8 two-session PostgreSQL 16.15 gate; the exact local cluster was deleted. Hosted GoTrue/PostgREST and activation remain unproved |
 | Runtime isolation | `src/lib/v1/runtime-boundary.test.ts` | audited NDIS routes and the new `/v1` adapter are the only allowed server boundaries; `/v1` remains disabled without explicit adapters |
 
 ### Current live/read-only evidence

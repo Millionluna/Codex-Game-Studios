@@ -346,26 +346,31 @@ The column default and existing capability row remain false and
 `authenticated`; `PUBLIC`, `anon` and `service_role` remain revoked, and no
 direct Portal table privilege is granted. The database revalidates the current
 Auth user/session and exactly one active referral-source membership in an active
-referral-source organization. Create recomputes the canonical payload hash with
-that database-derived actor and atomically writes referral, private contact,
-audit and receipt rows. List is source-tenant scoped and metadata-only. Triage,
-offer, response, follow-up, detail and audit remain disabled.
+referral-source organization. Once every potentially blocking authorization
+lock is held, it refreshes wall-clock time and repeats the complete Auth
+session/user eligibility predicate. Create recomputes the canonical payload
+hash with that database-derived actor and atomically writes referral, private
+contact, audit and receipt rows. List is source-tenant scoped and metadata-only.
+Triage, offer, response, follow-up, detail and audit remain disabled.
 
 The frozen disposable-local PostgreSQL 16.15 gate clean-applied 30/30
 repository migrations and passed 10/10 explicit-rollback suites plus the
 independent zero-fixture/default-off/ACL/owner/role-edge postcheck. The Portal
 migration SHA-256 was
-`d69684088af021bb51a8e0886cbb2de0e4ac2f131e72a321ded6221f8f7b8838` and
+`5a98154b254050b3140f5f185d52e3ff7e070da05fbdfa99dbdd60665b382e1c` and
 the Portal assertion SHA-256 was
-`95da9e415569fde633361a5b0ae6ad19e550dd7844cf884d4d7504387d5f59ed`.
-All seven true two-session cases passed: same-key replay, same-key changed-body
-conflict, session expiry after advisory-lock waiting, and capability-flag,
-Auth-session, membership and organization writer blocking. Exact cleanup
-restored both append-only triggers and removed every fixture; the full postcheck
-passed again, the server stopped and the temporary cluster was deleted with no
-matching local root retained. Existing generation-owner migrations used atomic
-temporary-visibility wrappers under the minimal local bootstrap; their final
-privilege/role-edge posture passed independently.
+`206ba671f2960ab9eb88552092975eeb9caddc302dbcedf2bacc5d65819ad666`.
+All eight true two-session cases passed: same-key replay, same-key changed-body
+conflict, session expiry after advisory-lock waiting, capability-flag,
+Auth-session, membership and organization writer blocking, plus the exact
+Auth-session lock wait across `not_after`. That final caller received
+`PORTAL_SESSION_REVOKED` and wrote zero referral, private-contact, audit or
+receipt rows. Exact cleanup restored both append-only triggers and removed
+every fixture; the full postcheck passed again, the server stopped and the
+temporary cluster was deleted with no matching local root retained. Existing
+generation-owner migrations used atomic temporary-visibility wrappers under
+the minimal local bootstrap; their final privilege/role-edge posture passed
+independently.
 
 This is source and disposable-local-PostgreSQL evidence only. It does not claim
 a hosted GoTrue/PostgREST cookie E2E, hosted Preview or Production migration,

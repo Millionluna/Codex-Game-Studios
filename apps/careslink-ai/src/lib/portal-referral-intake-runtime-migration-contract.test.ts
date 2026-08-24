@@ -56,9 +56,22 @@ describe("Portal referral intake runtime migration contract", () => {
     expect(context).toContain(
       "v_now timestamptz := pg_catalog.clock_timestamp()",
     );
-    expect(context).toContain("active_session.not_after > v_now");
-    expect(context).toContain("active_user.banned_until <= v_now");
-    expect(context).toContain("for share of active_session, active_user");
+    for (const eligibilityPredicate of [
+      "from auth.sessions as active_session",
+      "active_user.id = active_session.user_id",
+      "active_session.id = v_session_id",
+      "active_session.user_id = v_user_id",
+      "active_session.not_after > v_now",
+      "active_user.deleted_at is null",
+      "active_user.banned_until <= v_now",
+      "active_user.email_confirmed_at is not null",
+      "active_user.aud = 'authenticated'",
+      "active_user.role = 'authenticated'",
+      "coalesce(active_user.is_anonymous, false) = false",
+      "for share of active_session, active_user",
+    ]) {
+      expect(countOccurrences(context, eligibilityPredicate)).toBe(2);
+    }
     expect(context).toContain(
       "lock table public.portal_organizations in share mode",
     );
@@ -72,6 +85,23 @@ describe("Portal referral intake runtime migration contract", () => {
     expect(context).toContain("cardinality(v_organizations), 0) <> 1");
     expect(context).not.toMatch(/p_(?:user|actor|organization|role)/i);
     expect(context).not.toContain("for key share");
+
+    const exactMembershipLock = context.indexOf(
+      "for share of membership, organization",
+    );
+    const refreshedWallClock = context.indexOf(
+      "v_now := pg_catalog.clock_timestamp()",
+    );
+    const finalSessionValidation = context.lastIndexOf(
+      "from auth.sessions as active_session",
+    );
+    const authorizationReturn = context.indexOf(
+      "return query select v_user_id, v_organization_id",
+    );
+    expect(exactMembershipLock).toBeGreaterThan(-1);
+    expect(refreshedWallClock).toBeGreaterThan(exactMembershipLock);
+    expect(finalSessionValidation).toBeGreaterThan(refreshedWallClock);
+    expect(authorizationReturn).toBeGreaterThan(finalSessionValidation);
   });
 
   it("recomputes the canonical payload and writes one atomic metadata receipt", () => {
@@ -156,6 +186,7 @@ describe("Portal referral intake runtime migration contract", () => {
       "PORTAL_CAPABILITY_DISABLED",
       "PORTAL_AUTH_REQUIRED",
       "PORTAL_SESSION_REVOKED",
+      "expired session unexpectedly authorized",
       "PORTAL_FORBIDDEN",
       "PORTAL_VALIDATION_ERROR",
       "PORTAL_IDEMPOTENCY_CONFLICT",
@@ -199,4 +230,8 @@ function lastSqlToken(sql: string) {
     .trim()
     .match(/([a-z]+)\s*;\s*$/i)?.[1]
     ?.toLowerCase();
+}
+
+function countOccurrences(value: string, needle: string) {
+  return value.split(needle).length - 1;
 }

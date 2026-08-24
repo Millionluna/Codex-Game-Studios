@@ -384,6 +384,38 @@ begin
       message = 'PORTAL_FORBIDDEN';
   end if;
 
+  -- Every authorization lock is now held. Refresh wall-clock time and repeat
+  -- the complete online session/user eligibility check so a wait on any of
+  -- the locks above cannot carry an expired session into the protected work.
+  v_now := pg_catalog.clock_timestamp();
+
+  perform 1
+  from auth.sessions as active_session
+  join auth.users as active_user
+    on active_user.id = active_session.user_id
+  where active_session.id = v_session_id
+    and active_session.user_id = v_user_id
+    and (
+      active_session.not_after is null
+      or active_session.not_after > v_now
+    )
+    and active_user.deleted_at is null
+    and (
+      active_user.banned_until is null
+      or active_user.banned_until <= v_now
+    )
+    and active_user.email_confirmed_at is not null
+    and active_user.aud = 'authenticated'
+    and active_user.role = 'authenticated'
+    and coalesce(active_user.is_anonymous, false) = false
+  for share of active_session, active_user;
+
+  if not found then
+    raise exception using
+      errcode = 'P0001',
+      message = 'PORTAL_SESSION_REVOKED';
+  end if;
+
   return query select v_user_id, v_organization_id;
 end;
 $$;
