@@ -1089,7 +1089,58 @@ Preview/Production apply, GoTrue/PostgREST validation, caller grant/route,
 deployment, vault consume, model/STT, Points or end-to-end result. Attempt
 listing, real vault/KMS/retention and orphan recovery, account deletion, hosted
 Auth/Data API, provider/model/STT integration and all activation wiring remain
-release blockers. Registration rotation additionally requires a reviewed
-lifecycle/retirement migration because the catalog currently permits only
-`APPROVED` and the validated retention FK prevents deleting a used
-registration.
+release blockers. Graceful registration rotation is supplied by the subsequent
+source/local-only boundary below; emergency revocation and its in-flight
+authority/grant/payload/purge semantics remain a separate blocker.
+
+## 23. Note generation worker-registration graceful-retirement source/local gate — 2026-08-24
+
+Supabase CLI 2.115.0 generated the fifth Production-unapplied generation
+migration and repository migration #29,
+`20260824110537_add_v1_note_generation_worker_registration_retirement_shadow.sql`.
+It does not add `REVOKED` or rewrite the canonical worker manifest. The
+registration remains immutable, digest-bound and `status='APPROVED'`; a new
+append-only `worker_registration_retirements` ledger records the separate
+operational decision.
+
+The migration adds the distinct
+`careslink_v1_generation_registration_control_executor` with `NOLOGIN`,
+`NOINHERIT`, `NOSUPERUSER` and `NOBYPASSRLS`. Its one private control RPC
+accepts an operation UUID, one of the fixed `ROTATED`, `DECOMMISSIONED` or
+`POLICY_SUPERSEDED` reasons and the exact unique, sorted set of active admission
+binding versions. It locks bindings before the registration, rechecks fresh
+state after the lock wait, atomically retires the confirmed active bindings and
+inserts one immutable ledger row. Exact replay is write-free; changed operation
+input or a stale binding set fails closed.
+
+A committed retirement blocks only new work authority: owner admission and
+worker claim reject the registration, and defense-in-depth triggers reject a
+new `RUNNING` attempt or reactivated binding. Existing attempts may continue
+heartbeat, fence, payload authorization/consume, success commit, failure
+settle, resolve and recovery. Recovery can still record terminal `FAILED`
+history; owner status and cancellation also remain available. This is graceful
+drain, not emergency revocation.
+
+The ledger is the fourteenth private generation table with RLS and FORCE RLS.
+The control identity is executable only by its non-login owner. No retirement
+row or active binding is seeded, and no API/service/application caller receives
+`EXECUTE`; there is no route, credential, registry activation, worker
+deployment, Preview retention, paid resource or Production change.
+
+The dedicated
+`v1_note_generation_registration_retirement_shadow_assertions.sql` suite has
+passed as a strict BEGIN-through-ROLLBACK assertion on the disposable local
+PostgreSQL 16.15 harness. Its full file is 50,987 bytes with SHA-256
+`0a58b4b6731e48525af4b9eaf395cb4d20bebc4e77baea5c0207b9e2c92f7cbc`;
+the exact BEGIN-through-ROLLBACK body is 50,584 bytes with SHA-256
+`3c9b1d9cfd0919bdf1213d3272923261cc9399cc88fcdd85e46469c8e026440f`.
+It is the ninth current rollback-only suite because the owner suite had already
+raised the historical seven-suite inventory to eight. The final clean gate
+applied all 29 repository migrations, passed all 9 rollback suites, the
+independent 14-table/four-role/hard-off/zero-fixture posture postcheck and both
+real retirement-first and claim-first lock orderings. The full application gate
+then passed 131 Vitest files / 1,534 tests, TypeScript, lint, 63/63 static-page
+generation and the 73-file Codex-adapter sync check. This remains source/local
+evidence and does not claim promotion readiness. All earlier `r22` manifests,
+assertion identities and hashes remain historical evidence for their recorded
+revision and are not rewritten.

@@ -6,9 +6,15 @@ import { describe, expect, it } from "vitest";
 
 const migrationPath =
   "supabase/migrations/20260824092037_add_v1_note_generation_owner_runtime_rpc_shadow.sql";
+const retirementMigrationPath =
+  "supabase/migrations/20260824110537_add_v1_note_generation_worker_registration_retirement_shadow.sql";
 const assertionsPath =
   "supabase/assertions/v1_note_generation_owner_runtime_rpc_shadow_assertions.sql";
 const migration = readFileSync(join(process.cwd(), migrationPath), "utf8");
+const retirementMigration = readFileSync(
+  join(process.cwd(), retirementMigrationPath),
+  "utf8",
+);
 const assertions = readFileSync(join(process.cwd(), assertionsPath), "utf8");
 const assertionHeader = assertions.slice(
   0,
@@ -24,6 +30,8 @@ const schemaName = "careslink_v1_generation";
 const ownerRole = "careslink_v1_generation_owner";
 const workerExecutorRole = "careslink_v1_generation_executor";
 const ownerExecutorRole = "careslink_v1_generation_owner_api_executor";
+const registrationControlRole =
+  "careslink_v1_generation_registration_control_executor";
 const ownerGuc = "careslink.v1_generation_owner_user_id";
 
 const rpcIdentities = {
@@ -87,14 +95,17 @@ const privateTableNames = [
 ] as const;
 
 describe("V1 Note owner runtime RPC shadow migration contract", () => {
-  it("is the 28th CLI-named additive migration and cannot activate or seed itself", () => {
+  it("remains the historical 28th migration in the current 29-migration manifest", () => {
     const topLevel = withoutDollarQuotedBodies(migration);
 
     expect(migrationPath).toMatch(
       /^supabase\/migrations\/\d{14}_add_v1_note_generation_owner_runtime_rpc_shadow\.sql$/,
     );
-    expect(migrations).toHaveLength(28);
-    expect(migrations.at(-1)).toBe(migrationPath.split("/").at(-1));
+    expect(migrations).toHaveLength(29);
+    expect(migrations.at(27)).toBe(migrationPath.split("/").at(-1));
+    expect(migrations.at(-1)).toBe(
+      retirementMigrationPath.split("/").at(-1),
+    );
     expect(Buffer.byteLength(migration, "utf8")).toBe(52_387);
     expect(
       createHash("sha256").update(migration, "utf8").digest("hex"),
@@ -787,6 +798,90 @@ describe("V1 Note owner runtime RPC shadow migration contract", () => {
     expect(normalizedCancel).toContain("'CANCELLED'");
   });
 
+  it("extends the effective owner surface only for graceful retirement admission gating", () => {
+    const normalizedRetirement = normalizeSql(retirementMigration);
+    const effectiveEnqueue = normalizeSql(
+      functionBlock(
+        "admit_and_enqueue_v1_shadow_note_generation_job",
+        retirementMigration,
+      ),
+    );
+    const helper = `${schemaName}._registration_accepts_new_work`;
+    const ledger = `${schemaName}.worker_registration_retirements`;
+
+    expect(migrations.at(-1)).toBe(
+      retirementMigrationPath.split("/").at(-1),
+    );
+    expect(effectiveEnqueue).toMatch(
+      /^create or replace function careslink_v1_generation\.admit_and_enqueue_v1_shadow_note_generation_job\b/,
+    );
+    expect(
+      occurrenceCount(
+        effectiveEnqueue,
+        "date_trunc('milliseconds', pg_catalog.clock_timestamp())",
+      ),
+    ).toBe(10);
+    expect(
+      occurrenceCount(
+        effectiveEnqueue,
+        `${schemaName}.fresh_session_is_active(`,
+      ),
+    ).toBe(10);
+    expect(
+      occurrenceCount(
+        effectiveEnqueue,
+        `${schemaName}.fresh_privacy_proof_expires_at(`,
+      ),
+    ).toBe(3);
+    expect(occurrenceCount(effectiveEnqueue, `${helper}(`)).toBe(1);
+
+    const replayReceipt = effectiveEnqueue.indexOf("'created', false");
+    const bindingPreLock = effectiveEnqueue.indexOf(
+      "select binding.registration_digest into v_binding_registration_digest",
+    );
+    const retirementGate = effectiveEnqueue.indexOf(
+      `if not ${helper}( v_binding_registration_digest ) then`,
+    );
+    const bindingDetailRead = effectiveEnqueue.indexOf(
+      "select binding.registration_digest, binding.activated_at",
+      retirementGate,
+    );
+    const firstJobInsert = effectiveEnqueue.indexOf(
+      `insert into ${schemaName}.jobs`,
+    );
+    expect(replayReceipt).toBeGreaterThanOrEqual(0);
+    expect(bindingPreLock).toBeGreaterThan(replayReceipt);
+    expect(
+      effectiveEnqueue.slice(bindingPreLock, retirementGate),
+    ).toContain("for share of binding;");
+    expect(retirementGate).toBeGreaterThan(bindingPreLock);
+    expect(bindingDetailRead).toBeGreaterThan(retirementGate);
+    expect(
+      effectiveEnqueue.slice(bindingDetailRead, firstJobInsert),
+    ).toContain(
+      "binding.registration_digest = v_binding_registration_digest",
+    );
+    expect(firstJobInsert).toBeGreaterThan(bindingDetailRead);
+    expect(effectiveEnqueue.slice(retirementGate, bindingDetailRead)).toContain(
+      "message = 'PRODUCT_API_DISABLED'",
+    );
+
+    expect(normalizedRetirement).toContain(
+      `create policy worker_registration_retirements_owner_api_select on ${ledger} for select to ${ownerExecutorRole} using (true);`,
+    );
+    expect(normalizedRetirement).toContain(
+      `grant select on ${ledger} to ${workerExecutorRole}, ${ownerExecutorRole}, ${registrationControlRole};`,
+    );
+    expect(normalizedRetirement).toContain(
+      `grant execute on function ${helper}(text) to ${workerExecutorRole}, ${ownerExecutorRole};`,
+    );
+    expect(normalizedRetirement).not.toMatch(
+      new RegExp(
+        `grant (?:insert|update|delete|truncate)[^;]*on (?:table )?${ledger.replace(".", "\\.")}[^;]*to [^;]*\\b${ownerExecutorRole}\\b`,
+      ),
+    );
+  });
+
   it("leaves no caller grant, CREATE privilege or temporary membership edge", () => {
     const normalized = normalizeSql(migration);
     const schemaCreateAcl = statementMatches(
@@ -861,13 +956,13 @@ describe("V1 Note owner runtime RPC shadow migration contract", () => {
     expect(assertionsPath).toBe(
       "supabase/assertions/v1_note_generation_owner_runtime_rpc_shadow_assertions.sql",
     );
-    expect(Buffer.byteLength(assertions, "utf8")).toBe(100_936);
+    expect(Buffer.byteLength(assertions, "utf8")).toBe(102_605);
     expect(
       createHash("sha256").update(assertions, "utf8").digest("hex"),
-    ).toBe("05a3e4b95559981a1919a4dae83157ecef60f7485c1afd76150199a50f7990b8");
+    ).toBe("daad15afec6de4f0ecc9c866d66157c56e34ba49fcbcbf189c77ddbf375da16c");
     for (const marker of [
       "Manual rollback-only assertions for a fresh disposable PostgreSQL 16+ database",
-      "after all 28 repository migrations have been applied",
+      "after all 29 repository migrations have been applied",
       "BEGIN through ROLLBACK",
       "TEST_ONLY fixtures",
       "Production must never be the SQL target",
@@ -880,10 +975,10 @@ describe("V1 Note owner runtime RPC shadow migration contract", () => {
     expect(assertionBody.startsWith("begin;\n")).toBe(true);
     expect(assertionBody.endsWith("rollback;\n")).toBe(true);
     expect(assertionBody).not.toMatch(/^commit\s*;/im);
-    expect(Buffer.byteLength(assertionBody, "utf8")).toBe(100_156);
+    expect(Buffer.byteLength(assertionBody, "utf8")).toBe(101_810);
     expect(
       createHash("sha256").update(assertionBody, "utf8").digest("hex"),
-    ).toBe("c8ad3fca9432afa1410807eec38c4c451ba885713a54ddec15149c26f1706bfa");
+    ).toBe("a611de18f8ab7269414d8a4f3c2579f0524e00fd3dc224316235e70625bf02ba");
 
     for (const marker of [
       "owner runtime RPC shadow requires PostgreSQL 16 or newer",
@@ -902,6 +997,7 @@ describe("V1 Note owner runtime RPC shadow migration contract", () => {
       "owner RPC wall-clock/session/privacy proof-point set drifted",
       "owner RPC post-lock wall-clock source ordering drifted",
       "owner API executor direct helper/RPC ACL drifted",
+      "owner API executor table ACL drifted",
       "owner API executor column DML ACL drifted",
       "owner API RLS policy shape drifted",
       "owner runtime RPC migration is not default-off and empty",
@@ -938,7 +1034,7 @@ describe("V1 Note owner runtime RPC shadow migration contract", () => {
       );
     }
     for (const [rpc, count] of [
-      ["enqueue", 9],
+      ["enqueue", 10],
       ["status", 2],
       ["cancel", 4],
     ] as const) {
@@ -951,6 +1047,15 @@ describe("V1 Note owner runtime RPC shadow migration contract", () => {
     );
     expect(normalizedAssertionBody).toContain(
       "('extensions.digest(bytea,text)'::regprocedure::oid)",
+    );
+    expect(normalizedAssertionBody).toContain(
+      "('careslink_v1_generation._registration_accepts_new_work(text)'::regprocedure::oid)",
+    );
+    expect(normalizedAssertionBody).toContain(
+      "('worker_registration_retirements', 'SELECT')",
+    );
+    expect(normalizedAssertionBody).toContain(
+      "('worker_registration_retirements', 'worker_registration_retirements_owner_api_select', 'r')",
     );
     expect(assertionBody).toContain("inserts have cleared those waits");
     for (const name of rpcNames) {
@@ -967,21 +1072,21 @@ function statementMatches(value: string, pattern: RegExp): string[] {
   });
 }
 
-function functionStart(name: string): number {
+function functionStart(name: string, source = migration): number {
   const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const marker = new RegExp(
     `^\\s*create(?:\\s+or\\s+replace)?\\s+function\\s+${schemaName.replace(".", "\\.")}\\.${escapedName}\\s*\\(`,
     "im",
   );
-  return migration.search(marker);
+  return source.search(marker);
 }
 
-function functionBlock(name: string): string {
-  const start = functionStart(name);
+function functionBlock(name: string, source = migration): string {
+  const start = functionStart(name, source);
   expect(start).toBeGreaterThanOrEqual(0);
-  const end = migration.indexOf("\n$$;", start);
+  const end = source.indexOf("\n$$;", start);
   expect(end).toBeGreaterThan(start);
-  return migration.slice(start, end + "\n$$;".length);
+  return source.slice(start, end + "\n$$;".length);
 }
 
 function normalizeIdentityArguments(block: string): string {

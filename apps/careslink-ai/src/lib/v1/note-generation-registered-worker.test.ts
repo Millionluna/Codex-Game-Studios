@@ -122,6 +122,58 @@ describe("CaresLink V1 registered Note worker", () => {
     ).toEqual(setup.registration);
   });
 
+  it("keeps operational retirement outside the digest-bound registration shape", () => {
+    const setup = policySetup();
+    const { registrationDigest, ...core } = setup.registration;
+
+    expect(() =>
+      createCaresLinkV1NoteGenerationWorkerRegistration({
+        ...core,
+        status: "RETIRED",
+      }),
+    ).toThrowError(CaresLinkV1ContractError);
+    expect(() =>
+      createCaresLinkV1NoteGenerationWorkerRegistration({
+        ...core,
+        retiredAt: "2026-08-24T11:05:37.000Z",
+      }),
+    ).toThrowError(CaresLinkV1ContractError);
+    expect(() =>
+      validateCaresLinkV1NoteGenerationWorkerRegistration({
+        ...setup.registration,
+        retiredAt: "2026-08-24T11:05:37.000Z",
+      }),
+    ).toThrowError(CaresLinkV1ContractError);
+    expect(setup.registration.registrationDigest).toBe(registrationDigest);
+    expect(
+      validateCaresLinkV1NoteGenerationWorkerRegistration(setup.registration),
+    ).toEqual(setup.registration);
+  });
+
+  it("uses a new digest for a replacement while the historical registration stays stable", () => {
+    const setup = policySetup();
+    const historical = setup.registration;
+    const historicalDigest = historical.registrationDigest;
+    const { registrationDigest: replacementSourceDigest, ...core } = historical;
+    const replacement = createCaresLinkV1NoteGenerationWorkerRegistration({
+      ...core,
+      registrationVersion: "registered-worker.test-only.v2",
+    });
+
+    expect(replacementSourceDigest).toBe(historicalDigest);
+    expect(replacement.registrationDigest).not.toBe(historicalDigest);
+    expect(replacement).toMatchObject({
+      status: "APPROVED",
+      workerIdentityHash: historical.workerIdentityHash,
+      workerPolicyDigest: historical.workerPolicyDigest,
+      payloadPolicySnapshotHash: historical.payloadPolicySnapshotHash,
+    });
+    expect(historical.registrationDigest).toBe(historicalDigest);
+    expect(
+      validateCaresLinkV1NoteGenerationWorkerRegistration(historical),
+    ).toEqual(historical);
+  });
+
   it("round-trips provider policy versions that use the provider-safe slash", () => {
     const setup = policySetup();
     const providerPolicies = setup.providerPolicies.map((policy) =>

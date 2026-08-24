@@ -29,9 +29,12 @@
 -- v1-note-worker-rpc-r22, id 0bc8db56-0e4a-42ec-9595-1f32a3d74a6b and ref
 -- wuzcjcfrkctelcnbbgtg; deletion was confirmed with id/ref absent and
 -- Production remained the sole healthy default and was never a SQL target.
--- Current BEGIN-through-ROLLBACK source SHA-256:
+-- Historical deleted-r22 BEGIN-through-ROLLBACK source SHA-256:
 -- 2a2af2e8c7c745b769a731a4892b27f65fcf311321e813c3cc190e54167772a6;
 -- 37547 bytes.
+-- Current #29 additive-aware BEGIN-through-ROLLBACK source SHA-256:
+-- 9b0d0bca7cb91466ffa7d0bf626b6915947c4fb5021b0a1e9e513bb54dfc967b;
+-- 39962 bytes. This source has not replaced the historical Preview evidence.
 -- This remains metadata-schema evidence only; it does not prove or enable a
 -- live worker, payload vault or canonical persistence RPC.
 -- Run it after the foundation migration, with or without later separately
@@ -226,12 +229,73 @@ declare
     to_regclass('careslink_v1_generation.payload_policies');
   v_registration_catalog regclass :=
     to_regclass('careslink_v1_generation.worker_registrations');
+  v_retirement_ledger regclass :=
+    to_regclass(
+      'careslink_v1_generation.worker_registration_retirements'
+    );
+  v_retirement_count bigint := 0;
+  v_role text;
 begin
   if (v_worker_catalog is null) <> (v_provider_catalog is null)
     or (v_worker_catalog is null) <> (v_payload_catalog is null)
     or (v_worker_catalog is null) <> (v_registration_catalog is null)
+    or (v_retirement_ledger is not null and v_registration_catalog is null)
   then
     raise exception 'durable generation additive catalog fixture scope drifted';
+  end if;
+
+  if v_retirement_ledger is not null then
+    if (
+      select count(*)
+      from pg_class as relation
+      where relation.oid = v_retirement_ledger
+        and relation.relkind = 'r'
+        and relation.relowner =
+          'careslink_v1_generation_owner'::regrole
+        and relation.relrowsecurity
+        and relation.relforcerowsecurity
+    ) <> 1 then
+      raise exception 'durable generation retirement ledger posture drifted';
+    end if;
+
+    foreach v_role in array array[
+      'anon', 'authenticated', 'service_role'
+    ] loop
+      if has_table_privilege(
+          v_role,
+          v_retirement_ledger,
+          'SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER'
+        )
+        or has_any_column_privilege(
+          v_role,
+          v_retirement_ledger,
+          'SELECT, INSERT, UPDATE, REFERENCES'
+        )
+        or exists (
+          select 1
+          from pg_type as object_type
+          where object_type.typrelid = v_retirement_ledger
+            and has_type_privilege(v_role, object_type.oid, 'USAGE')
+        )
+      then
+        raise exception 'durable generation API retirement surface leaked: %',
+          v_role;
+      end if;
+    end loop;
+
+    execute
+      'alter table ' || v_retirement_ledger::text ||
+      ' no force row level security';
+    execute
+      'select count(*) from ' || v_retirement_ledger::text
+    into v_retirement_count;
+    execute
+      'alter table ' || v_retirement_ledger::text ||
+      ' force row level security';
+
+    if v_retirement_count <> 0 then
+      raise exception 'durable generation retirement ledger is not empty';
+    end if;
   end if;
 
   if v_worker_catalog is not null then
@@ -985,7 +1049,7 @@ begin
       'a6000000-0000-4000-8000-000000000002',
       'a3000000-0000-4000-8000-000000000001',
       'a0000000-0000-4000-8000-000000000001',
-      2, 'RUNNING', repeat('4', 64), repeat('5', 64), repeat('6', 64),
+      2, 'RUNNING', repeat('4', 64), repeat('2', 64), repeat('6', 64),
       transaction_timestamp(), transaction_timestamp(),
       transaction_timestamp() + interval '10 minutes'
     );
@@ -1032,6 +1096,23 @@ begin
         and relation.relrowsecurity
         and relation.relforcerowsecurity
     ) <> 4 then
+      raise exception
+        'durable generation additive catalog FORCE cleanup failed';
+    end if;
+
+    if to_regclass(
+        'careslink_v1_generation.worker_registration_retirements'
+      ) is not null
+      and (
+        select count(*)
+        from pg_class as relation
+        where relation.oid =
+          'careslink_v1_generation.worker_registration_retirements'::regclass
+          and relation.relkind = 'r'
+          and relation.relrowsecurity
+          and relation.relforcerowsecurity
+      ) <> 1
+    then
       raise exception
         'durable generation additive catalog FORCE cleanup failed';
     end if;

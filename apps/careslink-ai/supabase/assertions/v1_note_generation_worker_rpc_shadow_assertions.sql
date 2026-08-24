@@ -52,6 +52,9 @@
 -- deleted-r22 executed BEGIN-through-ROLLBACK source SHA-256:
 -- 1c9f65bdc7f1de86e1c7398399ecf029207ba1b2bdf9fa3634dadb482424fdbb;
 -- 153956 bytes.
+-- The current #29 additive-aware BEGIN-through-ROLLBACK source SHA-256 is:
+-- b9b55ab15118761c8a75a5ded3a3360bcebffac666ac9d7bb86882cd111189ba;
+-- 160372 bytes. This source has not replaced the historical Preview evidence.
 
 \set ON_ERROR_STOP on
 
@@ -105,6 +108,17 @@ begin
     ) as expected_table(table_name);
   end if;
 
+  if to_regclass(
+      'careslink_v1_generation.worker_registration_retirements'
+    ) is not null
+  then
+    select array_agg(table_name order by table_name)
+    into v_expected
+    from unnest(
+      array_append(v_expected, 'worker_registration_retirements')
+    ) as expected_table(table_name);
+  end if;
+
   if v_actual is distinct from v_expected then
     raise exception 'worker RPC private table scope drifted: %', v_actual;
   end if;
@@ -121,6 +135,158 @@ begin
       )
   ) then
     raise exception 'worker RPC private RLS or ownership posture is unsafe';
+  end if;
+end
+$$;
+
+-- The optional #29 retirement layer replaces only claim admission. Prove its
+-- additive empty/RLS/API posture and the executor's exact helper, ledger-read
+-- and registration-row-lock capabilities before any owner fixture relaxation.
+set local role careslink_v1_generation_executor;
+do $$
+declare
+  v_schema oid := 'careslink_v1_generation'::regnamespace;
+  v_retirement_ledger regclass := to_regclass(
+    'careslink_v1_generation.worker_registration_retirements'
+  );
+  v_retirement_count bigint := 0;
+  v_denied_role text;
+begin
+  if v_retirement_ledger is not null then
+    execute
+      'select count(*) from ' || v_retirement_ledger::text
+    into v_retirement_count;
+    if v_retirement_count <> 0 then
+      raise exception 'worker RPC retirement ledger is not empty';
+    end if;
+
+    if not has_table_privilege(
+        'careslink_v1_generation_executor',
+        v_retirement_ledger,
+        'SELECT'
+      )
+      or has_table_privilege(
+        'careslink_v1_generation_executor',
+        v_retirement_ledger,
+        'INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER'
+      )
+      or has_any_column_privilege(
+        'careslink_v1_generation_executor',
+        v_retirement_ledger,
+        'INSERT, UPDATE, REFERENCES'
+      )
+      or not has_function_privilege(
+        'careslink_v1_generation_executor',
+        'careslink_v1_generation._registration_accepts_new_work(text)',
+        'EXECUTE'
+      )
+      or (
+        select count(*)
+        from pg_policy as policy
+        where policy.polrelid = v_retirement_ledger
+          and policy.polname =
+            'worker_registration_retirements_generation_executor_select'
+          and policy.polcmd = 'r'
+          and policy.polpermissive
+          and policy.polroles = array[
+            'careslink_v1_generation_executor'::regrole::oid
+          ]::oid[]
+          and pg_get_expr(policy.polqual, policy.polrelid) = 'true'
+          and policy.polwithcheck is null
+      ) <> 1
+    then
+      raise exception 'worker executor retirement compatibility drifted';
+    end if;
+
+    if exists (
+      with expected(column_name, privilege_type) as (
+        values ('registration_digest', 'UPDATE')
+      ),
+      actual(column_name, privilege_type) as (
+        select attribute.attname::text, acl.privilege_type
+        from pg_attribute as attribute
+        cross join lateral aclexplode(attribute.attacl) as acl
+        where attribute.attrelid =
+            'careslink_v1_generation.worker_registrations'::regclass
+          and attribute.attnum > 0
+          and not attribute.attisdropped
+          and attribute.attacl is not null
+          and acl.grantee =
+            'careslink_v1_generation_executor'::regrole
+      ),
+      drift as (
+        (select * from actual except all select * from expected)
+        union all
+        (select * from expected except all select * from actual)
+      )
+      select 1 from drift
+    )
+      or (
+        select count(*)
+        from pg_policy as policy
+        where policy.polrelid =
+            'careslink_v1_generation.worker_registrations'::regclass
+          and policy.polname =
+            'worker_registrations_generation_executor_lock'
+          and policy.polcmd = 'w'
+          and policy.polpermissive
+          and policy.polroles is distinct from array[
+            'careslink_v1_generation_executor'::regrole::oid
+          ]::oid[]
+      ) <> 0
+      or (
+        select count(*)
+        from pg_policy as policy
+        where policy.polrelid =
+            'careslink_v1_generation.worker_registrations'::regclass
+          and policy.polname =
+            'worker_registrations_generation_executor_lock'
+          and policy.polcmd = 'w'
+          and policy.polpermissive
+          and policy.polroles = array[
+            'careslink_v1_generation_executor'::regrole::oid
+          ]::oid[]
+          and pg_get_expr(policy.polqual, policy.polrelid) = 'true'
+          and pg_get_expr(policy.polwithcheck, policy.polrelid) = 'false'
+      ) <> 1
+    then
+      raise exception 'worker registration lock-only ACL or policy drifted';
+    end if;
+
+    foreach v_denied_role in array array[
+      'anon', 'authenticated', 'service_role'
+    ] loop
+      if has_table_privilege(
+          v_denied_role,
+          v_retirement_ledger,
+          'SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER'
+        )
+        or has_any_column_privilege(
+          v_denied_role,
+          v_retirement_ledger,
+          'SELECT, INSERT, UPDATE, REFERENCES'
+        )
+        or has_function_privilege(
+          v_denied_role,
+          'careslink_v1_generation._registration_accepts_new_work(text)',
+          'EXECUTE'
+        )
+        or exists (
+          select 1
+          from pg_type as object_type
+          where object_type.typrelid = v_retirement_ledger
+            and object_type.typnamespace = v_schema
+            and has_type_privilege(
+              v_denied_role,
+              object_type.oid,
+              'USAGE'
+            )
+        )
+      then
+        raise exception 'Data API retirement surface leaked to %',
+          v_denied_role;
+      end if;
+    end loop;
   end if;
 end
 $$;

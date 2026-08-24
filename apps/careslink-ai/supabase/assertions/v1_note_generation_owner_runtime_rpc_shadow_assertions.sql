@@ -1,8 +1,9 @@
 -- Manual rollback-only assertions for a fresh disposable PostgreSQL 16+
--- database after all 28 repository migrations have been applied. Submit this
+-- database after all 29 repository migrations have been applied. Submit this
 -- whole file as one request: BEGIN through ROLLBACK share transaction-only
--- TEST_ONLY fixtures. This assertion creates no durable policy, binding, job,
--- payload, caller credential, route, model, vault object or Points mutation.
+-- TEST_ONLY fixtures. This assertion creates no durable policy, retirement,
+-- binding, job, payload, caller credential, route, model, vault object or
+-- Points mutation.
 -- Production must never be the SQL target. No hosted execution evidence is
 -- claimed by this source-only gate until an independently authorized Preview
 -- run records and then destroys its exact no-data branch.
@@ -106,7 +107,8 @@ begin
     'admission_policy_bindings', 'attempts', 'jobs', 'payload_grants',
     'payload_policies', 'payload_purge_outbox', 'payloads',
     'provider_evidence', 'provider_policies', 'settings', 'worker_policies',
-    'worker_registration_provider_policies', 'worker_registrations'
+    'worker_registration_provider_policies', 'worker_registration_retirements',
+    'worker_registrations'
   ]::text[] then
     raise exception 'owner runtime RPC private table scope drifted: %', v_actual;
   end if;
@@ -221,7 +223,8 @@ begin
         or grantee.rolname in (
           'anon', 'authenticated', 'service_role',
           'careslink_v1_generation_owner',
-          'careslink_v1_generation_executor'
+          'careslink_v1_generation_executor',
+          'careslink_v1_generation_registration_control_executor'
         )
     ) then
       raise exception 'owner API executor global default ACL leaked: %',
@@ -241,7 +244,8 @@ begin
         or grantee.rolname in (
           'anon', 'authenticated', 'service_role',
           'careslink_v1_generation_owner',
-          'careslink_v1_generation_executor'
+          'careslink_v1_generation_executor',
+          'careslink_v1_generation_registration_control_executor'
         )
       )
   ) then
@@ -354,7 +358,8 @@ begin
   foreach v_denied_role in array array[
     'anon', 'authenticated', 'service_role',
     'careslink_v1_generation_executor',
-    'careslink_v1_generation_owner'
+    'careslink_v1_generation_owner',
+    'careslink_v1_generation_registration_control_executor'
   ] loop
     if has_function_privilege(
         v_denied_role,
@@ -432,7 +437,7 @@ begin
     (length(v_cancel) - length(replace(v_cancel, v_clock, '')))
       / length(v_clock);
 
-  if v_enqueue_clock_count <> 9
+  if v_enqueue_clock_count <> 10
     or v_status_clock_count <> 2
     or v_cancel_clock_count <> 4
     or v_enqueue like '%_server_now(%'
@@ -444,7 +449,7 @@ begin
         'fresh_session_is_active(',
         ''
       ))
-    ) / length('fresh_session_is_active(') <> 9
+    ) / length('fresh_session_is_active(') <> 10
     or (
       length(v_enqueue) - length(replace(
         v_enqueue,
@@ -475,6 +480,18 @@ begin
     or position(v_clock in v_enqueue) <
       position('pg_catalog.pg_advisory_xact_lock' in v_enqueue)
     or position('v_existing_job_found := found' in v_enqueue) = 0
+    or position('for share of binding;' in v_enqueue) = 0
+    or position('_registration_accepts_new_work(' in v_enqueue) <
+      position('for share of binding;' in v_enqueue)
+    or position('and binding.registration_digest = v_binding_registration_digest' in v_enqueue) <
+      position('_registration_accepts_new_work(' in v_enqueue)
+    or (
+      length(v_enqueue) - length(replace(
+        v_enqueue,
+        '_registration_accepts_new_work(',
+        ''
+      ))
+    ) / length('_registration_accepts_new_work(') <> 1
     or position('binding.activated_at' in v_enqueue) = 0
     or position('v_binding.activated_at > v_now' in v_enqueue) = 0
     or position('inserts have cleared those waits' in v_enqueue) = 0
@@ -494,8 +511,9 @@ begin
 end
 $$;
 
--- The new executor has one exact direct helper/function surface, SELECT on
--- twelve metadata tables, and only the column DML needed by the three RPCs.
+-- The owner executor has the exact helper/RPC surface, SELECT on thirteen
+-- metadata tables, and only the column DML needed by the three RPCs. The
+-- retirement ledger is read-only here; its control-plane writer stays private.
 do $$
 declare
   v_owner_api oid := 'careslink_v1_generation_owner_api_executor'::regrole;
@@ -509,6 +527,7 @@ begin
         ('careslink_v1_generation._worker_policy_is_valid(text,text)'::regprocedure::oid),
         ('careslink_v1_generation._provider_policy_is_valid(text,text,text)'::regprocedure::oid),
         ('careslink_v1_generation._registration_is_valid(text,text,text,text,text,text)'::regprocedure::oid),
+        ('careslink_v1_generation._registration_accepts_new_work(text)'::regprocedure::oid),
         ('careslink_v1_generation._payload_snapshot_is_valid(text,text,text,text)'::regprocedure::oid),
         ('careslink_v1_generation._enqueue_payload_purge(uuid,uuid,uuid,uuid,text,timestamptz)'::regprocedure::oid),
         ('careslink_v1_generation.fresh_session_is_active(uuid,uuid,timestamptz)'::regprocedure::oid),
@@ -556,6 +575,7 @@ begin
         ('settings', 'SELECT'),
         ('worker_policies', 'SELECT'),
         ('worker_registration_provider_policies', 'SELECT'),
+        ('worker_registration_retirements', 'SELECT'),
         ('worker_registrations', 'SELECT')
     ),
     actual(table_name, privilege_type) as (
@@ -710,6 +730,16 @@ begin
     )
     or has_table_privilege(
       v_owner_api,
+      'careslink_v1_generation.worker_registration_retirements',
+      'INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER'
+    )
+    or has_any_column_privilege(
+      v_owner_api,
+      'careslink_v1_generation.worker_registration_retirements',
+      'INSERT, UPDATE, REFERENCES'
+    )
+    or has_table_privilege(
+      v_owner_api,
       'auth.users',
       'SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER'
     )
@@ -748,7 +778,7 @@ begin
 end
 $$;
 
--- Exact singleton-role policies: seven read-only catalogs plus owner-GUC
+-- Exact singleton-role policies: eight read-only catalogs plus owner-GUC
 -- isolation for jobs, attempts, payloads, grants and purge outbox.
 do $$
 declare
@@ -767,6 +797,8 @@ begin
           'worker_registrations_owner_api_select', 'r'),
         ('worker_registration_provider_policies',
           'registration_provider_owner_api_select', 'r'),
+        ('worker_registration_retirements',
+          'worker_registration_retirements_owner_api_select', 'r'),
         ('settings', 'settings_owner_api_lock', 'w'),
         ('admission_policy_bindings',
           'admission_policy_bindings_owner_api_lock', 'w'),
@@ -1216,6 +1248,10 @@ begin
     or (
       select count(*)
       from careslink_v1_generation.worker_registration_provider_policies
+    ) <> 0
+    or (
+      select count(*)
+      from careslink_v1_generation.worker_registration_retirements
     ) <> 0
     or (select count(*) from careslink_v1_generation.jobs) <> 0
     or (select count(*) from careslink_v1_generation.attempts) <> 0
@@ -2861,6 +2897,10 @@ begin
       select count(*)
       from careslink_v1_generation.admission_policy_bindings
       where status = 'ACTIVE'
+    ) <> 0
+    or (
+      select count(*)
+      from careslink_v1_generation.worker_registration_retirements
     ) <> 0
     or (
       select count(*)

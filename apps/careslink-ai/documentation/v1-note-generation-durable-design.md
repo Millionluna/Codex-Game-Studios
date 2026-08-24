@@ -1,6 +1,6 @@
 # V1 Note generation durable design handoff
 
-> Status: default-off design plus four Production-unapplied migrations. The
+> Status: default-off design plus five Production-unapplied migrations. The
 > schema-only foundation passed its historical deleted-`r4` gate; at source HEAD
 > `c7b70e9f84b9b804779039711b85cc7eda55bd57`, the exact worker RPC bundle passed
 > isolated PostgreSQL 17.6 migration/assertion evidence on deleted disposable
@@ -10,7 +10,11 @@
 > purge. Deleted `r22` proved the current 15-migration retention gate on
 > PostgreSQL 17.6, and a later disposable local PostgreSQL 16.15 run closed the
 > current engine/serial/true-two-session version gate under the minimum
-> Supabase-compatibility bootstrap. This is not a retained/applied runtime
+> Supabase-compatibility bootstrap. Migration #29 subsequently adds a
+> source/local-only graceful registration-retirement control plane. Its final
+> local gate clean-applied 29/29 migrations and passed all 9 rollback suites,
+> the independent posture postcheck and both lock orderings. This is not a
+> retained/applied runtime
 > repository, callable worker,
 > route, Preview capability, model call or Production capability.
 
@@ -96,7 +100,9 @@ additive revision has separate deleted-`r9` assertion evidence and runtime gates
 The later owner-runtime migration adds a thirteenth private table for
 database-owned admission bindings, a distinct owner-API executor and three
 private owner RPC identities. It seeds no active binding and does not turn the
-four migrations into a retained or callable runtime.
+first four migrations into a retained or callable runtime. The subsequent
+graceful-retirement migration adds a fourteenth private table and a distinct
+control-plane executor/RPC, but no retirement row, caller grant or activation.
 
 No enum type is required; bounded text checks keep migration and rollback
 inspection explicit. Every foreign-key column used for lookup or cascade must
@@ -314,11 +320,12 @@ lots.
 
 ## 8. ACL, RLS and RPC exposure
 
-The three foundation tables, nine additive worker metadata tables and the later
-admission-binding table enable **and force** RLS as defence in depth. The
+The three foundation tables, nine additive worker metadata tables, the later
+admission-binding table and the retirement ledger enable **and force** RLS as
+defence in depth. The
 foundation had no policy at its historical schema-only checkpoint; the worker
-and owner-runtime migrations define only the command-specific policies required
-by their private RPCs.
+owner-runtime and retirement migrations define only the command-specific
+policies required by their private RPCs.
 `FORCE ROW LEVEL SECURITY` makes the table owner subject
 to policies, but it does not constrain a superuser or a role with
 `BYPASSRLS`. Therefore the schema/table owner is distinct from the reviewed
@@ -334,6 +341,12 @@ separate `careslink_v1_generation_owner_api_executor` with `NOLOGIN`,
 schema, column, helper and RLS surface needed by admit/enqueue, status and
 cancel. Function ownership is not a caller grant. No API role or application
 credential may assume either executor.
+
+The retirement migration similarly creates the separate
+`careslink_v1_generation_registration_control_executor` with `NOLOGIN`,
+`NOINHERIT`, `NOSUPERUSER` and `NOBYPASSRLS`. It owns only the reviewed
+graceful-retirement control RPC and its narrow table/RLS surface. It is not a
+worker executor, owner API, caller credential or emergency-revocation role.
 
 On PostgreSQL 16+, a non-superuser creator with `CREATEROLE` automatically
 retains an admin-only edge to each new dedicated role. That edge is not runtime
@@ -414,6 +427,17 @@ API execute grant. Its three exact `SECURITY DEFINER` identities admit and
 enqueue, return owner-safe status and cancel. New admission remains default-off;
 status and cancellation intentionally remain available while that admission
 switch is off so accepted work can be recovered or stopped during an incident.
+
+The fifth additive generation file and repository migration #29 is
+`supabase/migrations/20260824110537_add_v1_note_generation_worker_registration_retirement_shadow.sql`.
+It preserves immutable digest-bound `APPROVED` registration rows and records
+graceful retirement in a separate append-only ledger. The exact control RPC
+requires one fixed reason plus the exact unique, sorted active-binding version
+set, retires that set atomically and blocks only new owner admission and worker
+claim. It does not block existing-attempt heartbeat, fence, payload
+authorize/consume, success commit, failure settle, resolve or recovery, nor
+owner status/cancel. It creates no seed, retirement, caller `EXECUTE` grant,
+route, credential, activation or emergency-revocation capability.
 
 ## 10. Disposable Preview assertion gate
 
@@ -986,6 +1010,49 @@ It is not hosted GoTrue/PostgREST parity, a retained Preview, caller credential
 or grant, served route, deployment, model/STT, payload-vault or end-to-end
 evidence. Attempt listing, real vault/KMS/retention and orphan recovery, hosted
 Auth/Data API validation, account deletion, provider/model/STT integration and
-Points remain activation blockers. Registration lifecycle/retirement requires
-a separate reviewed migration because only `APPROVED` is currently valid and
-the retention FK prevents deleting a registration referenced by an attempt.
+Points remain activation blockers. The subsequent migration below now supplies
+graceful registration retirement without changing the immutable `APPROVED`
+manifest; emergency revocation remains a separate blocker.
+
+## 15. Worker-registration graceful retirement source/local boundary — 2026-08-24
+
+Migration #29,
+`20260824110537_add_v1_note_generation_worker_registration_retirement_shadow.sql`,
+adds `worker_registration_retirements` as the fourteenth private generation
+table. Its row is an append-only operational fact linked by restrictive foreign
+key to the canonical registration. The worker registration remains immutable,
+`status='APPROVED'` and digest-bound; retirement is intentionally not encoded as
+`REVOKED` or as a new manifest digest.
+
+The distinct `careslink_v1_generation_registration_control_executor` owns one
+private `SECURITY DEFINER` control identity. It is `NOLOGIN`, `NOINHERIT`,
+`NOSUPERUSER` and `NOBYPASSRLS` and is not granted to an API, service,
+application, worker or owner caller. The RPC accepts only `ROTATED`,
+`DECOMMISSIONED` or `POLICY_SUPERSEDED`, plus an operation UUID and the exact
+unique, sorted active-binding version list. It uses binding-to-registration
+lock order and fresh post-wait reads, changes the confirmed bindings to
+`RETIRED` and inserts the ledger fact atomically. Exact operation replay is
+write-free; a different operation payload or stale expected set fails closed.
+
+The operational boundary is graceful drain. Retirement blocks a new owner
+admission and a new worker claim, with triggers also preventing a new `RUNNING`
+attempt or reactivation of a retired registration's binding. It does not
+invalidate an existing attempt, whose heartbeat, fence, payload authorization,
+consume, success commit, failure settle, resolve and recovery paths remain
+available. Recovery may still append terminal `FAILED` history, while owner
+status and cancellation continue to function. Emergency revocation of
+in-flight authority, grants or payload/purge work is out of scope.
+
+The ledger enables and forces RLS, and its insert path is confined to the
+control executor. The migration seeds no retirement or binding and creates no
+caller `EXECUTE` grant, route, credential, environment selection, runtime
+registry entry, worker deployment, retained Preview or Production capability.
+Its dedicated strict assertion passed BEGIN-through-ROLLBACK on the disposable
+local PostgreSQL 16.15 harness. It is the ninth current rollback-only suite;
+the owner suite had already raised the historical seven-suite inventory to
+eight. The final clean gate applied all 29 repository migrations, passed all 9
+suites, independently retained 14 forced-RLS tables, four locked generation
+roles, hard-off settings and zero generation fixtures, and passed both real
+retirement-first and claim-first lock orderings. Historical `r22` manifests and
+assertion hashes continue to describe only their recorded revision and are not
+rewritten by this handoff.

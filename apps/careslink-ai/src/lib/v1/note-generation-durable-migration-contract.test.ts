@@ -450,14 +450,19 @@ describe("V1 Note durable generation foundation migration contract", () => {
       "deletion was confirmed with id/ref absent",
       "2a2af2e8c7c745b769a731a4892b27f65fcf311321e813c3cc190e54167772a6",
       "37547 bytes",
+      "Historical deleted-r22 BEGIN-through-ROLLBACK source SHA-256",
+      "Current #29 additive-aware BEGIN-through-ROLLBACK source SHA-256",
+      "9b0d0bca7cb91466ffa7d0bf626b6915947c4fb5021b0a1e9e513bb54dfc967b",
+      "39962 bytes",
+      "has not replaced the historical Preview evidence",
     ]) {
       expect(assertionHeader).toContain(marker);
     }
     expect(assertionBodyStart).toBeGreaterThanOrEqual(0);
-    expect(Buffer.byteLength(assertionBody, "utf8")).toBe(37_547);
+    expect(Buffer.byteLength(assertionBody, "utf8")).toBe(39_962);
     expect(
       createHash("sha256").update(assertionBody, "utf8").digest("hex"),
-    ).toBe("2a2af2e8c7c745b769a731a4892b27f65fcf311321e813c3cc190e54167772a6");
+    ).toBe("9b0d0bca7cb91466ffa7d0bf626b6915947c4fb5021b0a1e9e513bb54dfc967b");
     expect(assertionHeader).toContain(
       "serial rollback proof does not itself prove true two-connection SKIP LOCKED",
     );
@@ -505,6 +510,9 @@ describe("V1 Note durable generation foundation migration contract", () => {
       "durable generation settings are not hard-off and unconfigured",
       "durable generation RLS posture is unsafe",
       "durable generation API or executor privilege leaked",
+      "durable generation retirement ledger posture drifted",
+      "durable generation API retirement surface leaked",
+      "durable generation retirement ledger is not empty",
       "durable generation sensitive column leaked",
       "durable generation constraint scope drifted",
       "durable generation index scope drifted",
@@ -521,6 +529,10 @@ describe("V1 Note durable generation foundation migration contract", () => {
       expect(assertions).toContain(marker);
     }
     expect(assertions).toContain("v_registration_catalog");
+    expect(assertions).toContain("v_retirement_ledger regclass");
+    expect(assertions).toContain(
+      "to_regclass(\n      'careslink_v1_generation.worker_registration_retirements'",
+    );
     expect(assertions).toContain(
       "insert into careslink_v1_generation.worker_registrations",
     );
@@ -563,14 +575,19 @@ describe("V1 Note durable generation foundation migration contract", () => {
     );
     expect(assertions).toContain("if not v_worker_extension_present then");
 
+    const foundationCatalogProof = assertions.indexOf(
+      "v_worker_extension_present boolean :=",
+    );
     const apiRoleLoopStart = assertions.indexOf(
       "foreach v_role in array array[",
+      foundationCatalogProof,
     );
     const apiRoleLoopEnd = assertions.indexOf(
       "\n  end loop;",
       apiRoleLoopStart,
     );
-    expect(apiRoleLoopStart).toBeGreaterThanOrEqual(0);
+    expect(foundationCatalogProof).toBeGreaterThanOrEqual(0);
+    expect(apiRoleLoopStart).toBeGreaterThan(foundationCatalogProof);
     expect(apiRoleLoopEnd).toBeGreaterThan(apiRoleLoopStart);
     expect(
       assertions.slice(apiRoleLoopStart, apiRoleLoopEnd),

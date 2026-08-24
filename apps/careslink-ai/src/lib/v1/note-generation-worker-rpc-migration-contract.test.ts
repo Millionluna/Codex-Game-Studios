@@ -8,8 +8,14 @@ const migrationPath =
   "supabase/migrations/20260821071044_add_v1_note_generation_worker_rpc_shadow.sql";
 const assertionsPath =
   "supabase/assertions/v1_note_generation_worker_rpc_shadow_assertions.sql";
+const retirementMigrationPath =
+  "supabase/migrations/20260824110537_add_v1_note_generation_worker_registration_retirement_shadow.sql";
 const migration = readFileSync(join(process.cwd(), migrationPath), "utf8");
 const assertions = readFileSync(join(process.cwd(), assertionsPath), "utf8");
+const retirementMigration = readFileSync(
+  join(process.cwd(), retirementMigrationPath),
+  "utf8",
+);
 const assertionHeader = assertions
   .slice(0, assertions.indexOf("\\set ON_ERROR_STOP on"))
   .replace(/^-- ?/gm, "")
@@ -456,6 +462,63 @@ describe("V1 Note registered-worker RPC shadow migration contract", () => {
       "limit greatest(v_policy.recovery_batch_limit - v_recovered, 0)",
     );
     expect(migration).not.toMatch(/\bclock_timestamp\s*\(/i);
+  });
+
+  it("accepts the #29 claim gate while leaving the other eight worker RPCs unchanged", () => {
+    const redefinedWorkerRpcs = [
+      ...retirementMigration.matchAll(
+        new RegExp(
+          `create\\s+or\\s+replace\\s+function\\s+${schemaName}\\.([a-z0-9_]+)\\s*\\(`,
+          "gi",
+        ),
+      ),
+    ]
+      .map((match) => match[1])
+      .filter((name): name is keyof typeof rpcIdentities =>
+        rpcNames.includes(name as keyof typeof rpcIdentities),
+      );
+    const replacementClaim = normalizeSql(
+      functionBlockFrom(
+        retirementMigration,
+        "claim_v1_shadow_note_generation_job",
+      ),
+    );
+    const normalizedRetirement = normalizeSql(retirementMigration);
+
+    expect(redefinedWorkerRpcs).toEqual([
+      "claim_v1_shadow_note_generation_job",
+    ]);
+    expect(replacementClaim).toContain(
+      `create or replace function ${schemaName}.claim_v1_shadow_note_generation_job(${rpcIdentities.claim_v1_shadow_note_generation_job}) returns jsonb`,
+    );
+    expect(replacementClaim).toContain(
+      `if not ${schemaName}._registration_accepts_new_work(p_registration_digest) then`,
+    );
+    expect(replacementClaim.indexOf("_registration_accepts_new_work")).toBeLessThan(
+      replacementClaim.indexOf("select job.*"),
+    );
+    expect(normalizedRetirement).toContain(
+      `grant select on ${schemaName}.worker_registration_retirements to ${executorRole}, careslink_v1_generation_owner_api_executor, careslink_v1_generation_registration_control_executor;`,
+    );
+    expect(normalizedRetirement).toContain(
+      `grant update (registration_digest) on ${schemaName}.worker_registrations to ${executorRole}, careslink_v1_generation_registration_control_executor;`,
+    );
+    expect(normalizedRetirement).toContain(
+      `create policy worker_registrations_generation_executor_lock on ${schemaName}.worker_registrations for update to ${executorRole} using (true) with check (false);`,
+    );
+    expect(normalizedRetirement).toContain(
+      `grant execute on function ${schemaName}._registration_accepts_new_work(text) to ${executorRole}, careslink_v1_generation_owner_api_executor;`,
+    );
+    for (const rpc of rpcNames.filter(
+      (name) => name !== "claim_v1_shadow_note_generation_job",
+    )) {
+      expect(retirementMigration).not.toMatch(
+        new RegExp(
+          `(?:create(?:\\s+or\\s+replace)?|alter|drop)\\s+function\\s+${schemaName}\\.${rpc}\\s*\\(`,
+          "i",
+        ),
+      );
+    }
   });
 
   it("rejects NULL lease tokens in all seven token-bearing RPCs", () => {
@@ -1289,14 +1352,18 @@ describe("V1 Note registered-worker RPC shadow migration contract", () => {
       "Deletion was confirmed with r22 id and ref absent",
       "1c9f65bdc7f1de86e1c7398399ecf029207ba1b2bdf9fa3634dadb482424fdbb",
       "153956 bytes",
+      "current #29 additive-aware BEGIN-through-ROLLBACK source SHA-256",
+      "b9b55ab15118761c8a75a5ded3a3360bcebffac666ac9d7bb86882cd111189ba",
+      "160372 bytes",
+      "has not replaced the historical Preview evidence",
     ]) {
       expect(assertionHeader).toContain(marker);
     }
     expect(assertionBodyStart).toBeGreaterThanOrEqual(0);
-    expect(Buffer.byteLength(assertionBody, "utf8")).toBe(154_903);
+    expect(Buffer.byteLength(assertionBody, "utf8")).toBe(160_372);
     expect(
       createHash("sha256").update(assertionBody, "utf8").digest("hex"),
-    ).toBe("6ed296b0764cf80b13915758209797d2de8b4a247296652f3ea63ad01bd50b94");
+    ).toBe("b9b55ab15118761c8a75a5ded3a3360bcebffac666ac9d7bb86882cd111189ba");
     expect(assertions).toContain("transaction-only TEST_ONLY fixtures");
     expect(assertions).toContain("pg_get_function_identity_arguments");
     expect(assertions).toContain("aclexplode(");
@@ -1325,6 +1392,10 @@ describe("V1 Note registered-worker RPC shadow migration contract", () => {
     for (const marker of [
       "worker RPC private table scope drifted",
       "worker RPC private RLS or ownership posture is unsafe",
+      "worker RPC retirement ledger is not empty",
+      "worker executor retirement compatibility drifted",
+      "worker registration lock-only ACL or policy drifted",
+      "Data API retirement surface leaked",
       "worker RPC setting is not hard-off",
       "worker RPC migration persisted policy or business fixtures",
       "worker RPC private metadata boundary leaked sensitive data",
@@ -1446,6 +1517,20 @@ function functionBlock(name: string) {
   const end = migration.indexOf("$$;", start);
   expect(end).toBeGreaterThan(start);
   return migration.slice(start, end + 3);
+}
+
+function functionBlockFrom(source: string, name: string) {
+  const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const start = source.search(
+    new RegExp(
+      `create(?:\\s+or\\s+replace)?\\s+function\\s+${schemaName}\\.${escapedName}\\s*\\(`,
+      "i",
+    ),
+  );
+  expect(start).toBeGreaterThanOrEqual(0);
+  const end = source.indexOf("\n$$;", start);
+  expect(end).toBeGreaterThan(start);
+  return source.slice(start, end + "\n$$;".length);
 }
 
 function functionIdentityArguments(name: string) {

@@ -62,6 +62,11 @@ export const CARESLINK_V1_REGISTERED_WORKER_SETTLE_REASONS = [
 export type CaresLinkV1RegisteredWorkerSettleReason =
   (typeof CARESLINK_V1_REGISTERED_WORKER_SETTLE_REASONS)[number];
 
+/**
+ * `status` is the immutable, digest-bound approval attestation. Operational
+ * retirement belongs to the database control plane and must never be added to
+ * this worker-supplied shape or used to recompute a historical registration.
+ */
 export type CaresLinkV1NoteGenerationWorkerRegistrationCore = Readonly<{
   registrationVersion: string;
   status: "APPROVED";
