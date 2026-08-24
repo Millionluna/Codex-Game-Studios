@@ -10,6 +10,11 @@ const migration = readFileSync(
   "utf8",
 );
 
+const sqlAssertions = readFileSync(
+  join(process.cwd(), "supabase/tests/v1_shadow_contract_assertions.sql"),
+  "utf8",
+);
+
 describe("V1 shadow foundation migration contract", () => {
   it("is additive and does not rewrite or delete legacy product truth", () => {
     expect(migration).not.toMatch(/\bdrop\s+(?:table|column|constraint)\b/i);
@@ -160,6 +165,85 @@ describe("V1 shadow foundation migration contract", () => {
       /grant\s+(?:insert|update|delete)[^;]+to\s+authenticated/i,
     );
     expect(migration).toContain("using ((select auth.uid()) = owner_user_id)");
+  });
+
+  it("keeps owner policy assertions exact with the optional worker extension", () => {
+    const start = sqlAssertions.indexOf(
+      "select count(*) into v_count\n  from pg_policies",
+    );
+    const end = sqlAssertions.indexOf(
+      "select count(*) into v_count\n  from information_schema.role_table_grants",
+      start,
+    );
+    expect(start).toBeGreaterThanOrEqual(0);
+    expect(end).toBeGreaterThan(start);
+    const ownerPolicyAssertions = sqlAssertions.slice(start, end);
+
+    expect(sqlAssertions).toContain(
+      "v_worker_policy_table_present boolean :=\n    to_regclass('careslink_v1_generation.worker_policies') is not null",
+    );
+    expect(sqlAssertions).toContain(
+      "v_worker_claim_rpc_present boolean :=\n    to_regprocedure(\n      'careslink_v1_generation.claim_v1_shadow_note_generation_job(text,text,text,text,text,text)'\n    ) is not null",
+    );
+    expect(sqlAssertions).toContain(
+      "if v_worker_policy_table_present is distinct from\n    v_worker_claim_rpc_present",
+    );
+    expect(sqlAssertions).toContain("Partial worker extension detected");
+    expect(ownerPolicyAssertions).toContain(
+      "if v_worker_extension_present then",
+    );
+    expect(ownerPolicyAssertions).toContain("if v_count <> 16 then");
+    expect(ownerPolicyAssertions).toContain("elsif v_count <> 14 then");
+    expect(ownerPolicyAssertions).toContain(
+      "roles = array['careslink_v1_generation_executor']::name[]",
+    );
+    expect(ownerPolicyAssertions).toContain(
+      "('ai_documents_generation_executor_select', 'ai_documents')",
+    );
+    expect(ownerPolicyAssertions).toContain(
+      "'ai_document_revisions_generation_executor_select',\n            'ai_document_revisions'",
+    );
+    expect(ownerPolicyAssertions).toContain(
+      "Worker canonical SELECT policy identities are invalid",
+    );
+    expect(ownerPolicyAssertions).toContain(
+      "expected_owner_policies(policyname, tablename, roles)",
+    );
+    expect(ownerPolicyAssertions).toContain(
+      "select * from expected_owner_policies\n      except\n      select * from actual_owner_policies",
+    );
+    expect(ownerPolicyAssertions).toContain(
+      "select * from actual_owner_policies\n      except\n      select * from expected_owner_policies",
+    );
+    expect(ownerPolicyAssertions).toContain(
+      "Owner SELECT policy identity/table/role set is invalid",
+    );
+
+    for (const [policy, table] of [
+      ["ai_documents_owner_select", "ai_documents"],
+      ["privacy_reviews_owner_select", "privacy_reviews"],
+      ["ai_document_revisions_owner_select", "ai_document_revisions"],
+      ["document_checkpoints_owner_select", "document_checkpoints"],
+      ["self_review_events_owner_select", "self_review_events"],
+      ["generation_jobs_owner_select", "generation_jobs"],
+      ["export_jobs_owner_select", "export_jobs"],
+      ["export_events_owner_select", "export_events"],
+      ["point_wallets_owner_select", "point_wallets"],
+      ["point_lots_owner_select", "point_lots"],
+      ["point_quotes_owner_select", "point_quotes"],
+      ["point_reservations_owner_select", "point_reservations"],
+      [
+        "point_reservation_allocations_owner_select",
+        "point_reservation_allocations",
+      ],
+      ["point_ledger_entries_owner_select", "point_ledger_entries"],
+    ] as const) {
+      expect(ownerPolicyAssertions).toMatch(
+        new RegExp(
+          `'${policy}'::name,\\s*'${table}'::name,\\s*array\\['authenticated'\\]::name\\[\\]`,
+        ),
+      );
+    }
   });
 
   it("binds every cross-resource shadow reference to the same owner", () => {

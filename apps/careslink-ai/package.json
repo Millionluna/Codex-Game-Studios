@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:preview:e2e:policy": "vitest run scripts/preview-e2e",
+    "test:preview:e2e:worker-rpc": "node scripts/preview-e2e/note-worker-rpc-concurrency.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "0.12.0",
@@ -25,6 +27,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.2.9",
+    "pg": "8.23.0",
     "playwright-core": "^1.61.0",
     "tailwindcss": "^4",
     "typescript": "^5",

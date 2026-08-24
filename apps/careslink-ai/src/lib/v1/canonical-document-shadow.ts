@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { stringifyCaresLinkV1CanonicalJson } from "./canonical-json";
 import {
   CARESLINK_V1_CONTRACT_VERSION,
   CARESLINK_V1_NOTE_SCHEMA_VERSION,
@@ -6,6 +7,7 @@ import {
   assertCaresLinkV1IdempotencyKey,
   assertValidStateTransition,
   canTransitionDocumentLifecycle,
+  validateCaresLinkV1CleanedFacts,
   type CaresLinkV1Document,
   type CaresLinkV1DocumentCheckpoint,
   type CaresLinkV1DocumentLifecycleStatus,
@@ -204,7 +206,18 @@ export function createMemoryCanonicalDocumentShadowStore(): CaresLinkV1Canonical
     }) {
       assertIdentity(id, "Revision ID");
       assertCaresLinkV1IdempotencyKey(mutationId);
-      const normalizedContent = normalizeNoteContent(content);
+      const document = requireOwnedWritableDocument(
+        documents,
+        documentId,
+        ownerUserId,
+      );
+      const normalizedContent = normalizeNoteContent({
+        ...content,
+        factsSummary: validateCaresLinkV1CleanedFacts(
+          document.noteType,
+          content.factsSummary,
+        ),
+      });
       const contentHash = createCanonicalContentHash(normalizedContent);
       const fingerprint = mutationFingerprint({
         id,
@@ -213,11 +226,6 @@ export function createMemoryCanonicalDocumentShadowStore(): CaresLinkV1Canonical
         privacyReviewId: privacyReviewId ?? null,
         contentHash,
       });
-      const document = requireOwnedWritableDocument(
-        documents,
-        documentId,
-        ownerUserId,
-      );
 
       const existingMutation = mutations.get(mutationKey(ownerUserId, mutationId));
       if (existingMutation) {
@@ -479,7 +487,9 @@ export function createMemoryCanonicalDocumentShadowStore(): CaresLinkV1Canonical
 }
 
 export function createCanonicalContentHash(content: CaresLinkV1NoteContent) {
-  return createHash("sha256").update(stableStringify(content)).digest("hex");
+  return createHash("sha256")
+    .update(stringifyCaresLinkV1CanonicalJson(content))
+    .digest("hex");
 }
 
 function requireOwnedDocument(
@@ -543,29 +553,14 @@ function normalizeStringList(values: string[]) {
   return values.map((value) => value.trim()).filter(Boolean);
 }
 
-function stableStringify(value: unknown): string {
-  if (Array.isArray(value)) {
-    return `[${value.map(stableStringify).join(",")}]`;
-  }
-
-  if (value && typeof value === "object") {
-    const entries = Object.entries(value as Record<string, unknown>).sort(
-      ([left], [right]) => left.localeCompare(right),
-    );
-    return `{${entries
-      .map(([key, child]) => `${JSON.stringify(key)}:${stableStringify(child)}`)
-      .join(",")}}`;
-  }
-
-  return JSON.stringify(value);
-}
-
 function mutationKey(ownerUserId: string, mutationId: string) {
   return `${ownerUserId}:${mutationId}`;
 }
 
 function mutationFingerprint(value: unknown) {
-  return createHash("sha256").update(stableStringify(value)).digest("hex");
+  return createHash("sha256")
+    .update(stringifyCaresLinkV1CanonicalJson(value))
+    .digest("hex");
 }
 
 function normalizeShortCode(value: string, label: string) {

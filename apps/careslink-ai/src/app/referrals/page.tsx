@@ -25,6 +25,16 @@ export default function ReferralBoardPage() {
         actions={<ButtonLink href="/referrals/intake">新建 referral</ButtonLink>}
       />
 
+      <Card className="mb-4 border-[#f0d28a] bg-[#fffaf0] p-4">
+        <p className="text-sm font-semibold text-[#7a4b00]">
+          Legacy demo board / 旧版演示看板
+        </p>
+        <p className="mt-1 text-sm leading-6 text-[#6c5a38]">
+          下方数量、状态列和卡片来自本地 mock，不是 Preview
+          数据库或 canonical Referral。真实 list adapter 尚未接入，所有新流程保持关闭。
+        </p>
+      </Card>
+
       <div className="grid gap-4 xl:grid-cols-3 2xl:grid-cols-6">
         {columns.map((status) => {
           const items = referrals.filter((referral) => referral.status === status);

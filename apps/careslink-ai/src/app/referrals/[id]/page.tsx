@@ -1,7 +1,9 @@
-import { ArrowRight, CalendarClock, MessageSquarePlus } from "lucide-react";
+import { ArrowRight, CalendarClock } from "lucide-react";
+import { notFound } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { PageHeader } from "@/components/page-header";
-import { ButtonLink, Card, ReferralStatusBadge, TextArea } from "@/components/ui";
+import { PortalReferralWorkflowBoundary } from "@/components/portal-referral-workflow-controls";
+import { ButtonLink, Card, ReferralStatusBadge } from "@/components/ui";
 import {
   displayArea,
   displayFrequency,
@@ -18,7 +20,8 @@ export default async function ReferralDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const referral = referrals.find((item) => item.id === id) ?? referrals[0];
+  const referral = referrals.find((item) => item.id === id);
+  if (!referral) notFound();
   const assignedProvider = providers.find(
     (provider) => provider.id === referral.assignedProviderId,
   );
@@ -28,7 +31,7 @@ export default async function ReferralDetailPage({
       <PageHeader
         eyebrow="Referral 详情"
         title={`${displayArea(referral.clientArea)} · ${displayService(referral.needType)}`}
-        description={referral.summary}
+        description="这是旧版 demo fixture，不是 Preview 数据库记录。页面只展示非敏感演示 metadata；联系人、私密摘要与后续记录在权威角色验证前保持隐藏。"
         actions={
           <ButtonLink href={`/referrals/${referral.id}/matches`}>
             查看匹配 <ArrowRight className="size-4" />
@@ -53,8 +56,6 @@ export default async function ReferralDetailPage({
               ["区域", displayArea(referral.clientArea)],
               ["语言", displayList(referral.languageRequirements, displayLanguage)],
               ["频率", displayFrequency(referral.frequency)],
-              ["来源群", referral.sourceGroupName],
-              ["联系人", `${referral.contactName} · ${referral.contactPhone}`],
               ["已分配服务商", assignedProvider?.name ?? "未分配"],
             ].map(([label, value]) => (
               <div key={label} className="rounded-lg bg-[#f7faf8] p-3">
@@ -66,12 +67,9 @@ export default async function ReferralDetailPage({
             ))}
           </dl>
 
-          <div className="mt-5">
-            <label className="grid gap-2 text-sm font-medium">
-              跟进备注
-              <TextArea defaultValue={referral.notes} />
-            </label>
-          </div>
+          <p className="mt-5 rounded-lg bg-[#f7faf8] p-3 text-sm leading-6 text-[#5d6d68]">
+            私密摘要、联系人和自由文本备注不会出现在未授权页面、URL、错误或 mutation ACK 中。
+          </p>
         </Card>
 
         <Card className="p-5">
@@ -79,19 +77,10 @@ export default async function ReferralDetailPage({
             <CalendarClock className="size-5 text-[#0f766e]" /> 跟进控制
           </h2>
           <p className="mt-2 text-sm text-[#5d6d68]">
-            下次跟进：{referral.followUpDate}
+            跟进时间与历史记录只会在 request-scoped 角色检查通过后返回。
           </p>
-          <div className="mt-4 grid gap-2">
-            {["标记已联系", "标记已接受", "标记已完成", "标记无法服务"].map(
-              (label) => (
-                <button
-                  key={label}
-                  className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-[#cfded8] bg-white px-3 text-sm font-semibold"
-                >
-                  <MessageSquarePlus className="size-4" /> {label}
-                </button>
-              ),
-            )}
+          <div className="mt-4">
+            <PortalReferralWorkflowBoundary operation="follow-up" />
           </div>
         </Card>
       </div>

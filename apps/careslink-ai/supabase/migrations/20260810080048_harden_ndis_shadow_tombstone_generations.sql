@@ -20,7 +20,73 @@ begin
       created_at
     );
 exception
-  when duplicate_object then null;
+  when duplicate_object or duplicate_table then null;
+end
+$$;
+
+-- PostgreSQL 17 may report an existing named UNIQUE constraint as either
+-- duplicate_object or duplicate_table. Never treat either signal as success
+-- unless the existing catalog object is the exact recorded generation key.
+do $$
+declare
+  v_expected_columns smallint[];
+begin
+  select array_agg(attribute.attnum order by expected.ordinality)
+    into v_expected_columns
+  from unnest(array[
+    'legacy_source_owner_user_id',
+    'legacy_source_draft_id',
+    'created_at'
+  ]) with ordinality as expected(column_name, ordinality)
+  join pg_attribute as attribute
+    on attribute.attrelid = 'public.ai_documents'::regclass
+   and attribute.attname = expected.column_name
+   and attribute.attnum > 0
+   and not attribute.attisdropped;
+
+  if coalesce(array_length(v_expected_columns, 1), 0) <> 3
+    or (
+      select count(*)
+      from pg_constraint as constraint_record
+      join pg_index as backing_index
+        on backing_index.indexrelid = constraint_record.conindid
+       and backing_index.indrelid = constraint_record.conrelid
+      where constraint_record.conrelid = 'public.ai_documents'::regclass
+        and constraint_record.conname = 'ai_documents_legacy_source_generation_key'
+        and constraint_record.contype = 'u'
+        and constraint_record.conkey = v_expected_columns
+        and constraint_record.convalidated
+        and coalesce(
+          (to_jsonb(constraint_record)->>'conenforced')::boolean,
+          true
+        )
+        and not constraint_record.condeferrable
+        and not constraint_record.condeferred
+        and coalesce(
+          (to_jsonb(constraint_record)->>'conparentid')::oid,
+          0
+        ) = 0
+        and backing_index.indisunique
+        and backing_index.indisvalid
+        and backing_index.indisready
+        and backing_index.indimmediate
+        and not coalesce(
+          (to_jsonb(backing_index)->>'indnullsnotdistinct')::boolean,
+          false
+        )
+        and coalesce(
+          (to_jsonb(backing_index)->>'indnkeyatts')::integer,
+          backing_index.indnatts
+        ) = 3
+        and backing_index.indnatts = 3
+        and backing_index.indexprs is null
+        and backing_index.indpred is null
+    ) <> 1
+  then
+    raise exception using
+      errcode = '55000',
+      message = 'LEGACY_SOURCE_GENERATION_CONSTRAINT_INVALID';
+  end if;
 end
 $$;
 

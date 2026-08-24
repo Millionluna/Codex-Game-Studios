@@ -1,0 +1,12 @@
+# Offline Preview E2E harnesses and generated runtime evidence are never deploy inputs.
+# Keep the one policy module imported by the registered-worker live test so remote
+# TypeScript validation sees the same module graph as local builds.
+scripts/preview-e2e/*
+!scripts/preview-e2e/note-worker-rpc-owner-ab-local-pg16-policy.mjs
+preview-http-e2e-ledger.json
+vercel-preview-manifest.json
+vercel-preview-recovery-manifest.json
+vercel-preview-staging/
+requests/
+
+documentation/mobile-v1-preview-e2e-runbook.md

@@ -7,6 +7,7 @@ import {
   CARESLINK_V1_CONTRACT_VERSION,
   type CaresLinkV1NoteContent,
 } from "./shared-contracts";
+import { createValidCaresLinkV1CleanedFacts } from "./cleaned-facts-test-fixtures";
 
 const ownerA = "11111111-1111-4111-8111-111111111111";
 const ownerB = "22222222-2222-4222-8222-222222222222";
@@ -268,18 +269,27 @@ describe("canonical document shadow store", () => {
 
   it("hashes equivalent object key order identically", () => {
     const first = caseNoteContent();
+    const facts = createValidCaresLinkV1CleanedFacts("ndis");
     const second: CaresLinkV1NoteContent = {
       ...first,
       factsSummary: {
-        supportDelivered: "Community access support.",
-        count: 2,
+        occurred_at: facts.occurred_at,
+        support_type: facts.support_type,
+        support_delivered: facts.support_delivered,
+        observable_facts: facts.observable_facts,
+        action_taken: facts.action_taken,
+        provided_goal_context: facts.provided_goal_context,
       },
     };
     const reordered: CaresLinkV1NoteContent = {
       ...first,
       factsSummary: {
-        count: 2,
-        supportDelivered: "Community access support.",
+        provided_goal_context: facts.provided_goal_context,
+        action_taken: facts.action_taken,
+        observable_facts: facts.observable_facts,
+        support_delivered: facts.support_delivered,
+        support_type: facts.support_type,
+        occurred_at: facts.occurred_at,
       },
     };
 
@@ -313,15 +323,15 @@ async function storeWithFirstRevision() {
 function caseNoteContent(
   observableFact = "The participant requested a short seated break.",
 ): CaresLinkV1NoteContent {
+  const factsSummary = createValidCaresLinkV1CleanedFacts("ndis");
+  factsSummary.observable_facts = observableFact;
   return {
     englishDraft: observableFact,
     reviewVersions: {
       "zh-Hans": "参与者提出短暂坐下休息。",
       "zh-Hant": "參與者提出短暫坐下休息。",
     },
-    factsSummary: {
-      observableFact,
-    },
+    factsSummary,
     missingFacts: [],
     neutralWordingChecks: [],
     followUpPrompts: [],

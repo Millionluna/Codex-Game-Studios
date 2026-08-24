@@ -1,6 +1,6 @@
 # CaresLink AI Variables
 
-> Variable inventory audited from code on 2026-08-09. No secret values are recorded here. Product Baseline V1 target variables are not configured or authorized by this document.
+> Variable inventory audited from code on 2026-08-16. No secret values are recorded here. Product Baseline V1 target variables are not configured or authorized by this document.
 
 ## Classification
 
@@ -65,11 +65,30 @@ Table overrides are server configuration. Production should normally use migrati
 | `CARESLINK_ENABLE_DEMO_AUTH` | Server configuration | local/test demo auth | must be false/unset in production |
 | `NEXT_PUBLIC_CARESLINK_SHOW_LEGACY_DEMO_NAV` | Public feature setting | local legacy navigation | must be false/unset for real users |
 | `CARESLINK_ALLOW_COMPANION_MEMORY_STORE` | Server configuration | development-only store fallback | production code rejects missing durable store |
+| `CARESLINK_V1_PRODUCT_API_ENABLED` | Server configuration | master gate for the local shared `/v1` route adapter | only exact `true` passes the first application gate; default/unset is off |
+| `CARESLINK_V1_PRODUCT_API_DURABLE_ADAPTER_ENABLED` | Server configuration | independent gate for request-scoped Supabase persistence and active-session validation | only exact `true`; also requires the master gate, verified Preview target, server configuration, the unapplied database migration and its separate default-off database flag |
+| `CARESLINK_V1_PRODUCT_API_EXPECTED_SUPABASE_REF` | Server configuration | binds the Product API runtime to one reviewed Preview branch | must exactly match the ref parsed from the server Supabase URL; missing/mismatch, non-Preview Vercel environment and the known Production ref all fail closed before any client is created |
+| `CARESLINK_V1_PRODUCT_API_M0_READ_ENABLED` | Server configuration | operation gate for only `GET /v1/me`, `GET /v1/documents` and `GET /v1/sync/pull` | exact `true` is insufficient alone and remains `false` in the example; it never enables detail or writes |
+| `CARESLINK_V1_PRODUCT_API_DOCUMENT_DETAIL_ENABLED` | Server configuration | future independent gate for `GET /v1/documents/{id}` | default/unset is off; not part of the Mobile M0 read slice |
+| `CARESLINK_V1_PRODUCT_API_PRIVACY_REVIEW_ENABLED` | Server configuration | future independent gate for atomic privacy review | default/unset is off; also requires the dedicated Preview service role and DB evidence |
+| `CARESLINK_V1_PRODUCT_API_DOCUMENT_WRITE_ENABLED` | Server configuration | future independent gate for create/PATCH/checkpoint/tombstone | default/unset is off; current database write RPC grants remain withheld |
+| `CARESLINK_V1_PRIVACY_REVIEW_PREVIEW_SERVICE_ROLE_KEY` | Server secret | dedicated key for the atomic privacy-review confirmation RPC on one reviewed Preview target | unset by default; no fallback to `SUPABASE_SERVICE_ROLE_KEY`; the runtime repeats the exact non-Production Preview/ref guard before creating this privileged client |
+| `CARESLINK_V1_NATIVE_AUTH_ENABLED` | Reserved server configuration name | future Preview-only native PKCE/session/device/revoke gate | **do not configure**; default/unset is off and the compile-time implementation latch is `false`, so even exact `true` cannot enable a token exchange or revoke runtime |
+| `CARESLINK_V1_NATIVE_AUTH_EXPECTED_SUPABASE_REF` | Reserved server configuration name | future exact-ref binding for the native-auth Preview boundary | **do not configure**; currently used only by injected static tests, and no matching ref can bypass the compile-time disabled latch or target Production |
+| `CARESLINK_PORTAL_REFERRAL_API_ENABLED` | Server configuration | master gate reserved for the Portal Referral route slice | default/unset is off; a compile-time readiness latch is also `false`, so configuration cannot currently serve the workflow |
+| `CARESLINK_PORTAL_REFERRAL_DURABLE_ADAPTER_ENABLED` | Server configuration | independent durable-adapter gate for Portal Referral | default/unset is off; no default database adapter or memory fallback is registered |
+| `CARESLINK_PORTAL_REFERRAL_EXPECTED_SUPABASE_REF` | Server configuration | binds a future Referral runtime to one reviewed disposable Preview branch | must exactly match the ref parsed from the server Supabase URL; non-Preview, missing/mismatch and the known Production ref fail closed |
 | `CARESLINK_V1_SHADOW_ENABLED` | Server configuration | master NDIS shadow kill switch | exact `true`; insufficient alone; unset/off outside disposable Preview |
 | `CARESLINK_V1_NDIS_DUAL_WRITE_ENABLED` | Server configuration | permits post-legacy-save projection | exact `true`; requires master + `VERCEL_ENV=preview` + verified branch ref |
 | `CARESLINK_V1_NDIS_SHADOW_READ_ENABLED` | Server configuration | permits metadata-only hash/status comparison | exact `true`; cannot enable independently of dual-write |
 | `CARESLINK_V1_SHADOW_EXPECTED_SUPABASE_REF` | Server configuration | binds the runtime to the one approved development branch | non-secret project ref; must equal the ref parsed from server Supabase URL and must not be Production |
 | `CARESLINK_V1_NDIS_SHADOW_TIMEOUT_MS` | Server configuration | bounds shadow latency after legacy success | optional, clamped 250-5000 ms; default 1500 ms |
+
+The two reserved native-auth names are intentionally absent from `.env.example` because the capability is not activatable. Adding placeholders would incorrectly imply that configuration is an approved next step. Their guard tests use synthetic in-memory objects only; no deployment environment or secret is read.
+
+The privacy proof TTL is a code/contract constant of 1800 seconds for this
+temporary Preview gate. It is not configured through an environment variable
+and is not a Production retention or product decision.
 
 ## Platform-provided variables
 
@@ -80,6 +99,7 @@ Table overrides are server configuration. Production should normally use migrati
 | Secret | Rotation impact | Minimum response |
 |---|---|---|
 | Supabase service role | all server-side private data/RPC access | revoke/rotate, redeploy, audit server logs and privileged actions |
+| Dedicated Preview privacy-review key | Preview-only proof issuance | revoke/rotate, keep the Product API gates off, inspect metadata-only proof issuance and redeploy only to the exact reviewed Preview |
 | OpenAI API key | model access and spend | rotate, check provider usage/cost, redeploy |
 | fingerprint pepper | pseudonymous quota identity | rotate, expect counters to start a new hash epoch, record change metadata |
 
@@ -87,11 +107,13 @@ Publishable Supabase keys are not secrets, but their RLS boundary must be treate
 
 The protected App Preview gate used branch-specific configuration for non-default branch `odrdlsrdlmtjczhmsbnj`; no Production secret was read or copied and no secret value was written to repository or evidence. After E2E, Preview `NEXT_PUBLIC_SUPABASE_URL` was fixed to that branch, the two existing branch key values were left unchanged, and a controlled audit checked only presence/non-empty state. The six temporary activation/test variables were removed. The retained base connection is inactive because the master/dual-write/read flags are absent. Any future activation must repeat the exact Preview/ref guard and cleanup sequence in `documentation/ndis-shadow-preview-runbook.md`.
 
+The mobile-sync migration also defines a database-side `mobile_sync_v1` feature flag that defaults off. It is not an environment variable and the migration has not been applied; setting the application flag alone cannot create a durable or served Product API.
+
 ## Intended V1 configuration (mostly not present)
 
 The following are configuration **categories**, not approved variable names or current environment entries:
 
-- Product API version/minimum client version and additional feature flags; the NDIS shadow flags are defined and one audited save route is wired, but the temporary Preview values were removed after the gate and remain unset/off;
+- Product API version/minimum client version and additional feature flags; the local `/v1` master/durable gates and NDIS shadow flags are defined but remain unset/off, while the mobile-sync database migration and flag remain inactive;
 - canonical Note schema/privacy/prompt/model/parser policy versions;
 - Points rate catalog version and quote/reservation TTL;
 - generation/transcription/export queue and artifact TTL;

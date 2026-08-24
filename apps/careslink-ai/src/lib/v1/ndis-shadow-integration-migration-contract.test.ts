@@ -50,6 +50,22 @@ const generationTombstoneMigration = readFileSync(
   "utf8",
 );
 
+const noteFactsAndSessionMigration = readFileSync(
+  join(
+    process.cwd(),
+    "supabase/migrations/20260811134719_harden_v1_note_facts_schema_and_active_sessions.sql",
+  ),
+  "utf8",
+);
+
+const sqlAssertions = readFileSync(
+  join(
+    process.cwd(),
+    "supabase/tests/v1_ndis_shadow_integration_assertions.sql",
+  ),
+  "utf8",
+);
+
 describe("NDIS canonical shadow integration migration", () => {
   it("applies atomically and locks the current source before reading it", () => {
     expect(migration).toMatch(/\bbegin;[\s\S]*\bcommit;\s*$/i);
@@ -478,6 +494,98 @@ describe("NDIS canonical shadow integration migration", () => {
     expect(tombstone.trim()).toBe(freshTombstone.trim());
     expect(generationTombstoneMigration).not.toMatch(
       /(?:insert\s+into|update|delete\s+from)\s+public\.(?:account_entitlements|credit_ledger|point_)/i,
+    );
+  });
+
+  it("tolerates the PostgreSQL 17 duplicate-table signal for the recorded generation key", () => {
+    expect(migration).toContain(
+      "add constraint ai_documents_legacy_source_generation_key",
+    );
+    expect(generationTombstoneMigration).toContain(
+      "add constraint ai_documents_legacy_source_generation_key",
+    );
+    expect(generationTombstoneMigration).toContain(
+      "when duplicate_object or duplicate_table then null",
+    );
+    expect(generationTombstoneMigration).toContain(
+      "constraint_record.conkey = v_expected_columns",
+    );
+    expect(generationTombstoneMigration).toContain(
+      "to_jsonb(backing_index)->>'indnullsnotdistinct'",
+    );
+    expect(generationTombstoneMigration).toContain("backing_index.indisunique");
+    expect(generationTombstoneMigration).toContain("backing_index.indisvalid");
+    expect(generationTombstoneMigration).toContain("backing_index.indisready");
+    expect(generationTombstoneMigration).toContain("backing_index.indimmediate");
+    expect(generationTombstoneMigration).toContain(
+      "to_jsonb(constraint_record)->>'conenforced'",
+    );
+    expect(generationTombstoneMigration).toContain(
+      "backing_index.indexprs is null",
+    );
+    expect(generationTombstoneMigration).toContain(
+      "backing_index.indpred is null",
+    );
+    expect(generationTombstoneMigration).toContain(
+      "message = 'LEGACY_SOURCE_GENERATION_CONSTRAINT_INVALID'",
+    );
+    for (const exactAssertion of [
+      "constraint_record.conkey = v_expected_columns",
+      "backing_index.indisunique",
+      "backing_index.indisvalid",
+      "backing_index.indisready",
+      "backing_index.indimmediate",
+      "to_jsonb(constraint_record)->>'conenforced'",
+      "to_jsonb(backing_index)->>'indnullsnotdistinct'",
+      "backing_index.indexprs is null",
+      "backing_index.indpred is null",
+    ]) {
+      expect(sqlAssertions).toContain(exactAssertion);
+    }
+  });
+
+  it("keeps the legacy NDIS projection outside the frozen Product V1 Note validator", () => {
+    const revisionTrigger = sectionBetweenIn(
+      noteFactsAndSessionMigration,
+      "create or replace function public.enforce_v1_shadow_revision_privacy_review",
+      "$$;",
+    );
+    const legacyBypass = revisionTrigger.indexOf(
+      "v_document.schema_version <> '2026-08-09.v1-shadow'",
+    );
+    const bypassReturn = revisionTrigger.indexOf("return new;", legacyBypass);
+    const noteValidator = revisionTrigger.indexOf(
+      "perform public.assert_v1_shadow_note_facts(",
+    );
+    expect(legacyBypass).toBeGreaterThanOrEqual(0);
+    expect(bypassReturn).toBeGreaterThan(legacyBypass);
+    expect(noteValidator).toBeGreaterThan(bypassReturn);
+    expect(sqlAssertions).toContain(
+      "Legacy NDIS revision bypass moved behind Note validator",
+    );
+    expect(sqlAssertions).toContain("through 20260811134719 are applied");
+  });
+
+  it("expects Mobile ACL hardening to deny direct authenticated document reads", () => {
+    expect(sqlAssertions).toMatch(/^--[\s\S]*\nbegin;/i);
+    expect(sqlAssertions).toMatch(/rollback;\s*$/i);
+    expect(sqlAssertions).toContain(
+      "Pending delete cleanup direct authenticated read unexpectedly succeeded",
+    );
+    expect(sqlAssertions).toContain(
+      "ai_documents direct authenticated read unexpectedly succeeded",
+    );
+    expect(sqlAssertions).toContain(
+      "ai_document_revisions direct authenticated read unexpectedly succeeded",
+    );
+    expect(sqlAssertions).toContain(
+      "document_checkpoints direct authenticated read unexpectedly succeeded",
+    );
+    expect(sqlAssertions.match(/when sqlstate '42501' then null;/g)).toHaveLength(
+      4,
+    );
+    expect(sqlAssertions).not.toContain(
+      "legacy source generation RLS isolation failed",
     );
   });
 });
