@@ -1,6 +1,12 @@
 import "server-only";
 
+import { createCareslinkServerSupabaseClient } from "./supabase-server";
 import type { PortalReferralApi } from "./portal-referral-adapter.server";
+import {
+  authorizePortalReferralSupabaseClient,
+  createSupabasePortalReferralApi,
+  type PortalReferralSessionScopedSupabaseRpcClient,
+} from "./portal-referral-supabase.server";
 import {
   CARESLINK_PRODUCTION_SUPABASE_REF,
   getSupabaseProjectRef,
@@ -10,21 +16,24 @@ export const CARESLINK_PORTAL_REFERRAL_API_FLAG =
   "CARESLINK_PORTAL_REFERRAL_API_ENABLED" as const;
 export const CARESLINK_PORTAL_REFERRAL_DURABLE_ADAPTER_FLAG =
   "CARESLINK_PORTAL_REFERRAL_DURABLE_ADAPTER_ENABLED" as const;
+export const CARESLINK_PORTAL_REFERRAL_INTAKE_FLAG =
+  "CARESLINK_PORTAL_REFERRAL_INTAKE_ENABLED" as const;
 export const CARESLINK_PORTAL_REFERRAL_EXPECTED_SUPABASE_REF_FLAG =
   "CARESLINK_PORTAL_REFERRAL_EXPECTED_SUPABASE_REF" as const;
 
-/**
- * This latch deliberately cannot be configured. A later reviewed batch must
- * replace it only after disposable-Preview database and identity evidence.
- */
 export const CARESLINK_PORTAL_REFERRAL_RUNTIME_IMPLEMENTATION_READY =
-  false as const;
+  true as const;
 
 export type PortalReferralRuntimeEnv = Readonly<{
   CARESLINK_PORTAL_REFERRAL_API_ENABLED?: string;
   CARESLINK_PORTAL_REFERRAL_DURABLE_ADAPTER_ENABLED?: string;
+  CARESLINK_PORTAL_REFERRAL_INTAKE_ENABLED?: string;
   CARESLINK_PORTAL_REFERRAL_EXPECTED_SUPABASE_REF?: string;
+  NEXT_PUBLIC_SUPABASE_ANON_KEY?: string;
+  NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY?: string;
   NEXT_PUBLIC_SUPABASE_URL?: string;
+  SUPABASE_ANON_KEY?: string;
+  SUPABASE_PUBLISHABLE_KEY?: string;
   SUPABASE_URL?: string;
   VERCEL_ENV?: string;
 }>;
@@ -59,6 +68,13 @@ export type PortalReferralApiResolver = (
   operation: PortalReferralOperation,
 ) => Promise<PortalReferralApiResolution>;
 
+export type PortalReferralRuntimeOptions = Readonly<{
+  env?: PortalReferralRuntimeEnv;
+  createCookieRpcClient?: () => Promise<
+    PortalReferralSessionScopedSupabaseRpcClient | undefined
+  >;
+}>;
+
 export function isPortalReferralPreviewTargetAllowed(
   env: PortalReferralRuntimeEnv = process.env as PortalReferralRuntimeEnv,
 ) {
@@ -84,33 +100,83 @@ export function isPortalReferralRuntimeEnabled(
     CARESLINK_PORTAL_REFERRAL_RUNTIME_IMPLEMENTATION_READY &&
       env.CARESLINK_PORTAL_REFERRAL_API_ENABLED === "true" &&
       env.CARESLINK_PORTAL_REFERRAL_DURABLE_ADAPTER_ENABLED === "true" &&
+      env.CARESLINK_PORTAL_REFERRAL_INTAKE_ENABLED === "true" &&
       isPortalReferralPreviewTargetAllowed(env),
   );
 }
 
 /**
- * No default database or memory adapter exists in this batch. Tests inject an
- * actor-bound adapter explicitly; production code fails before auth/body/DB.
+ * Builds the request-scoped cookie adapter only after every environment and
+ * operation gate passes. Authorization is re-derived by the database RPC;
+ * request bodies never supply actor, organization, role or session identity.
  */
-export const resolveDefaultPortalReferralApi: PortalReferralApiResolver = async (
-  request,
-  operation,
-) => {
-  void request;
-  void operation;
-  if (!isPortalReferralRuntimeEnabled()) {
+export function createPortalReferralApiResolver(
+  options: PortalReferralRuntimeOptions = {},
+): PortalReferralApiResolver {
+  const env = options.env ?? (process.env as PortalReferralRuntimeEnv);
+  return async (request, operation) => {
+    if (
+      !isPortalReferralRuntimeEnabled(env) ||
+      !isPortalReferralIntakeOperation(operation)
+    ) {
+      return disabled();
+    }
+
+    // This surface is intentionally cookie-only. A caller-supplied bearer is
+    // never parsed, copied into an RPC argument, or used to construct a client.
+    if (request.headers.get("authorization") !== null) {
+      return { ok: false, reason: "auth_required", status: 401 };
+    }
+
+    let client: PortalReferralSessionScopedSupabaseRpcClient | undefined;
+    try {
+      client = options.createCookieRpcClient
+        ? await options.createCookieRpcClient()
+        : ((await createCareslinkServerSupabaseClient({ env })) as unknown as
+            | PortalReferralSessionScopedSupabaseRpcClient
+            | undefined);
+    } catch {
+      return unavailable();
+    }
+    if (!client) return unavailable();
+
+    const authorization = await authorizePortalReferralSupabaseClient(client);
+    if (!authorization.ok) {
+      switch (authorization.reason) {
+        case "auth_required":
+          return { ok: false, reason: "auth_required", status: 401 };
+        case "session_revoked":
+          return { ok: false, reason: "session_revoked", status: 401 };
+        case "forbidden":
+          return { ok: false, reason: "forbidden", status: 403 };
+        case "capability_disabled":
+          return disabled();
+        default:
+          return unavailable();
+      }
+    }
+
     return {
-      ok: false,
-      reason: "capability_disabled",
-      status: 503,
+      ok: true,
+      api: createSupabasePortalReferralApi(client, authorization.authorization),
     };
-  }
-  return {
-    ok: false,
-    reason: "adapter_unavailable",
-    status: 503,
   };
-};
+}
+
+export const resolveDefaultPortalReferralApi: PortalReferralApiResolver =
+  createPortalReferralApiResolver();
+
+function isPortalReferralIntakeOperation(operation: PortalReferralOperation) {
+  return operation === "LIST_REFERRALS" || operation === "CREATE_REFERRAL";
+}
+
+function disabled(): PortalReferralApiResolution {
+  return { ok: false, reason: "capability_disabled", status: 503 };
+}
+
+function unavailable(): PortalReferralApiResolution {
+  return { ok: false, reason: "adapter_unavailable", status: 503 };
+}
 
 function normalizeExpectedProjectRef(value: string | undefined) {
   const normalized = value?.trim().toLowerCase();

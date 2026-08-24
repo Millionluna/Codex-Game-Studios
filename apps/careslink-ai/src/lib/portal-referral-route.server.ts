@@ -38,7 +38,7 @@ export async function handlePortalReferralCollection(
       request,
       "LIST_REFERRALS",
       dependencies,
-      async (api) => ({ body: { items: api.listReferrals() } }),
+      async (api) => ({ body: { items: await api.listReferrals() } }),
     );
   }
   if (request.method !== "POST") return methodNotAllowed("GET, POST");
@@ -46,16 +46,19 @@ export async function handlePortalReferralCollection(
     request,
     "CREATE_REFERRAL",
     dependencies,
-    async (api) => {
+    async (api, correlationId) => {
       assertMutationTransport(request);
-      const mutation = getMutationMetadata(request);
+      const mutation = {
+        ...getMutationMetadata(request),
+        correlationId,
+      };
       const body = await readJsonObject(request);
       assertExactKeys(body, ["summary", "region", "serviceType", "contact"]);
       const contact = requiredObject(body.contact);
       assertExactKeys(contact, ["name", "phone", "email"]);
       return {
         status: 201,
-        body: api.createReferral(
+        body: await api.createReferral(
           {
             summary: body.summary as string,
             region: body.region as string,
@@ -83,7 +86,9 @@ export async function handlePortalReferralGet(
     request,
     "GET_REFERRAL",
     dependencies,
-    async (api) => ({ body: { referral: api.getReferral(assertUuid(referralId)) } }),
+    async (api) => ({
+      body: { referral: await api.getReferral(assertUuid(referralId)) },
+    }),
   );
 }
 
@@ -103,7 +108,7 @@ export async function handlePortalReferralTriage(
       const body = await readJsonObject(request);
       assertExactKeys(body, ["expectedVersion"]);
       return {
-        body: api.triageReferral(
+        body: await api.triageReferral(
           assertUuid(referralId),
           requiredVersion(body.expectedVersion),
           mutation,
@@ -125,7 +130,7 @@ export async function handlePortalReferralCandidates(
     dependencies,
     async (api) => ({
       body: {
-        items: api.listProviderCandidates(assertUuid(referralId)),
+        items: await api.listProviderCandidates(assertUuid(referralId)),
       },
     }),
   );
@@ -147,7 +152,7 @@ export async function handlePortalReferralOffer(
       const body = await readJsonObject(request);
       assertExactKeys(body, ["providerId", "expectedVersion"]);
       return {
-        body: api.offerReferral(
+        body: await api.offerReferral(
           assertUuid(referralId),
           {
             providerId: assertUuid(body.providerId),
@@ -169,7 +174,7 @@ export async function handlePortalReferralOffers(
     request,
     "LIST_MY_OFFERS",
     dependencies,
-    async (api) => ({ body: { items: api.listMyOffers() } }),
+    async (api) => ({ body: { items: await api.listMyOffers() } }),
   );
 }
 
@@ -193,7 +198,7 @@ export async function handlePortalReferralResponse(
         throw validationError();
       }
       return {
-        body: api.respondToOffer(
+        body: await api.respondToOffer(
           assertUuid(matchId),
           {
             decision,
@@ -223,7 +228,7 @@ export async function handlePortalReferralFollowUp(
       assertExactKeys(body, ["outcomeCode", "expectedVersion"]);
       const outcomeCode = requiredOutcomeCode(body.outcomeCode);
       return {
-        body: api.recordFollowUp(
+        body: await api.recordFollowUp(
           assertUuid(referralId),
           {
             outcomeCode,
@@ -247,7 +252,7 @@ export async function handlePortalReferralAudit(
     "LIST_AUDIT",
     dependencies,
     async (api) => ({
-      body: { items: api.listAudit(assertUuid(referralId)) },
+      body: { items: await api.listAudit(assertUuid(referralId)) },
     }),
   );
 }
@@ -256,7 +261,10 @@ async function withPortalReferralApi(
   request: Request,
   operation: PortalReferralOperation,
   dependencies: PortalReferralRouteDependencies | undefined,
-  execute: (api: PortalReferralApi) => Promise<RouteResult>,
+  execute: (
+    api: PortalReferralApi,
+    correlationId: string,
+  ) => Promise<RouteResult>,
 ) {
   const correlationId = createServerCorrelationId(dependencies);
   const resolveApi = dependencies?.resolveApi ?? resolveDefaultPortalReferralApi;
@@ -265,7 +273,7 @@ async function withPortalReferralApi(
     if (!resolution.ok) {
       return resolutionError(resolution, correlationId);
     }
-    const result = await execute(resolution.api);
+    const result = await execute(resolution.api, correlationId);
     return jsonResponse(result.body, result.status ?? 200, correlationId);
   } catch (error) {
     if (error instanceof PortalReferralWorkflowError) {
@@ -296,6 +304,9 @@ function resolutionError(
 function workflowError(error: PortalReferralWorkflowError, correlationId: string) {
   const statusByCode = {
     AUTH_REQUIRED: 401,
+    SESSION_REVOKED: 401,
+    CAPABILITY_DISABLED: 503,
+    ADAPTER_UNAVAILABLE: 503,
     FORBIDDEN: 403,
     NOT_FOUND: 404,
     VALIDATION_ERROR: 400,

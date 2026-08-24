@@ -75,15 +75,16 @@ Current admin pages may display access-request metadata, feature counts, statuse
 
 ## V1 shadow permission contract and isolated evidence
 
-### Portal Referral foundation (local and unapplied)
+### Portal Referral foundation and intake runtime (source/local and unapplied)
 
 The Portal Referral foundation introduces organization membership, provider,
 referral, separately protected contact, match, follow-up, receipt, audit,
-document-link and export tables in an unapplied migration. It does not grant
-authenticated table access or any state-changing RPC. A future adapter must
-derive the actor, organization, role and provider identity from a freshly
-validated session and current database membership; none may be accepted from a
-request body.
+document-link and export tables. It grants no Portal table privilege to
+`public`, `anon`, `authenticated` or `service_role`. The newer source-only intake
+migration adds exactly three public `SECURITY DEFINER` RPCs—authorize, source
+metadata list and atomic create—with `search_path=''` and `EXECUTE` only for
+`authenticated`; `PUBLIC`, `anon` and `service_role` remain revoked. Its two
+private helpers grant no caller execution.
 
 The local actor-bound test adapter enforces Source A/B, Provider A/B and
 partner-operator tenant isolation. Providers receive only frozen region/service
@@ -95,12 +96,18 @@ copy contact, summary, client correlation or raw idempotency values. Raw match
 and audit rows are limited to platform admin or the tenant partner operator in
 the draft RLS contract.
 
-These are source/static guarantees. The route runtime has no default durable
-adapter and a non-configurable `false` readiness latch, so physical
-`/api/portal/referrals*` and `/api/portal/referral-offers*` handlers return a
-metadata-only `503` before body parsing. The migration and rollback-only SQL
-assertions have not run against a database; real RLS, ACL, active-session and
-concurrent transaction behavior remain disposable-Preview gates.
+The default runtime now supplies a request-scoped cookie client only after all
+three application gates and the exact non-Production Preview ref pass. It
+rejects caller Bearer authorization, never creates a service-role client and
+executes database authorization before a private mutation body is parsed. The
+database revalidates the current Auth user/session and exactly one active
+referral-source membership in an active referral-source organization; actor,
+organization and role are never accepted from the body. List is source-scoped
+and metadata-only. Create atomically writes referral, private contact, audit and
+receipt rows with hashed mutation/correlation identifiers. The database flag
+and all application gates remain off, and this is source/local disposable-SQL
+evidence only: no hosted Preview or Production migration, activation or
+deployment is claimed.
 
 `supabase/migrations/20260809120000_create_v1_shadow_foundation.sql` defines the following controls. It was applied only to a disposable `with_data=false` branch and has not been applied to Production Supabase:
 

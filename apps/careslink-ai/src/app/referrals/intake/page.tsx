@@ -3,8 +3,11 @@ import { AppShell } from "@/components/app-shell";
 import { PageHeader } from "@/components/page-header";
 import { PortalReferralIntakeControls } from "@/components/portal-referral-workflow-controls";
 import { Card } from "@/components/ui";
+import { isPortalReferralRuntimeEnabled } from "@/lib/portal-referral-runtime.server";
 
 export default function ReferralIntakePage() {
+  const portalReferralRuntimeEnabled = isPortalReferralRuntimeEnabled();
+
   return (
     <AppShell>
       <PageHeader
@@ -15,7 +18,9 @@ export default function ReferralIntakePage() {
 
       <div className="grid gap-5 xl:grid-cols-[1fr_360px]">
         <Card className="p-5">
-          <PortalReferralIntakeControls />
+          <PortalReferralIntakeControls
+            enabled={portalReferralRuntimeEnabled}
+          />
         </Card>
 
         <Card className="p-5">
@@ -23,8 +28,10 @@ export default function ReferralIntakePage() {
             <MessageSquareText className="size-5 text-[#0f766e]" /> 粘贴消息转结构化
           </h2>
           <p className="mt-3 text-sm leading-6 text-[#5d6d68]">
-            当前只展示已审核的维州区域、服务类型、私密联系人和摘要字段。运行时能力保持关闭，
-            因此本页不会发送或保存任何资料。
+            当前只展示已审核的维州区域、服务类型、私密联系人和摘要字段。
+            {portalReferralRuntimeEnabled
+              ? "创建成功后，下方只回读当前账号可见的 Preview 持久化元数据；不会显示摘要或联系人。"
+              : "Preview 运行时当前关闭，因此本页不会发送请求、保存资料或显示持久化记录。"}
           </p>
         </Card>
       </div>

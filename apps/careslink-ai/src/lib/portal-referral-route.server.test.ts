@@ -2,7 +2,10 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 
-import { createActorBoundPortalReferralApi } from "./portal-referral-adapter.server";
+import {
+  createActorBoundPortalReferralApi,
+  type PortalReferralApi,
+} from "./portal-referral-adapter.server";
 import {
   handlePortalReferralAudit,
   handlePortalReferralCandidates,
@@ -20,6 +23,7 @@ import type {
   PortalReferralApiResolver,
 } from "./portal-referral-runtime.server";
 import {
+  PortalReferralWorkflowError,
   createMemoryPortalReferralWorkflow,
   type PortalReferralActor,
   type PortalReferralAuditEvent,
@@ -664,6 +668,178 @@ describe("Portal referral route adapter", () => {
     expect(response.headers.get("allow")).toBe("GET, POST");
     expect(response.headers.get("cache-control")).toBe("no-store");
     expect(resolveApi).not.toHaveBeenCalled();
+  });
+
+  it("awaits every API method so durable promises never serialize as empty objects", async () => {
+    const referralId = "70000000-0000-4000-8000-000000000901";
+    const matchId = "70000000-0000-4000-8000-000000000902";
+    const updatedAt = "2026-08-24T00:00:00.000Z";
+    const ack = {
+      referralId,
+      matchId: null,
+      currentStatus: "SUBMITTED",
+      rowVersion: 1,
+      updatedAt,
+    } as const;
+    const api = {
+      listReferrals: vi.fn(async () => []),
+      createReferral: vi.fn(async () => ack),
+      getReferral: vi.fn(async () => ({
+        referralId,
+        sourceOrganizationId: IDS.sourceAOrg,
+        summary: SUMMARY,
+        region: "VIC_MELBOURNE",
+        serviceType: "SUPPORT_COORDINATION",
+        currentStatus: "SUBMITTED" as const,
+        assignedProviderId: null,
+        rowVersion: 1,
+        contact: CONTACT,
+        canonicalDocumentId: null,
+        exportJobId: null,
+        createdAt: updatedAt,
+        updatedAt,
+      })),
+      triageReferral: vi.fn(async () => ack),
+      listProviderCandidates: vi.fn(async () => []),
+      offerReferral: vi.fn(async () => ({ ...ack, matchId })),
+      listMyOffers: vi.fn(async () => []),
+      respondToOffer: vi.fn(async () => ({ ...ack, matchId })),
+      recordFollowUp: vi.fn(async () => ack),
+      listAudit: vi.fn(async () => []),
+    } satisfies PortalReferralApi;
+    const dependencies = {
+      resolveApi: async () => ({ ok: true as const, api }),
+      createCorrelationId: () => SERVER_CORRELATION_ID,
+    };
+
+    const responses = [
+      await handlePortalReferralCollection(
+        getRequest("/api/portal/referrals", "source-a"),
+        dependencies,
+      ),
+      await handlePortalReferralCollection(
+        mutationRequest(
+          "/api/portal/referrals",
+          "source-a",
+          "portal-async-create-0001",
+          {
+            summary: SUMMARY,
+            region: "VIC_MELBOURNE",
+            serviceType: "SUPPORT_COORDINATION",
+            contact: CONTACT,
+          },
+        ),
+        dependencies,
+      ),
+      await handlePortalReferralGet(
+        getRequest(`/api/portal/referrals/${referralId}`, "source-a"),
+        referralId,
+        dependencies,
+      ),
+      await handlePortalReferralTriage(
+        mutationRequest(
+          `/api/portal/referrals/${referralId}/triage`,
+          "operator-a",
+          "portal-async-triage-001",
+          { expectedVersion: 1 },
+        ),
+        referralId,
+        dependencies,
+      ),
+      await handlePortalReferralCandidates(
+        getRequest(`/api/portal/referrals/${referralId}/candidates`, "operator-a"),
+        referralId,
+        dependencies,
+      ),
+      await handlePortalReferralOffer(
+        mutationRequest(
+          `/api/portal/referrals/${referralId}/offers`,
+          "operator-a",
+          "portal-async-offer-00001",
+          { providerId: IDS.providerA, expectedVersion: 1 },
+        ),
+        referralId,
+        dependencies,
+      ),
+      await handlePortalReferralOffers(
+        getRequest("/api/portal/referral-offers", "provider-a"),
+        dependencies,
+      ),
+      await handlePortalReferralResponse(
+        mutationRequest(
+          `/api/portal/referral-offers/${matchId}/response`,
+          "provider-a",
+          "portal-async-response-001",
+          { decision: "ACCEPT", expectedVersion: 1 },
+        ),
+        matchId,
+        dependencies,
+      ),
+      await handlePortalReferralFollowUp(
+        mutationRequest(
+          `/api/portal/referrals/${referralId}/follow-ups`,
+          "provider-a",
+          "portal-async-followup-001",
+          { outcomeCode: "CONTACT_CONFIRMED", expectedVersion: 1 },
+        ),
+        referralId,
+        dependencies,
+      ),
+      await handlePortalReferralAudit(
+        getRequest(`/api/portal/referrals/${referralId}/audit`, "operator-a"),
+        referralId,
+        dependencies,
+      ),
+    ];
+    const bodies = await Promise.all(responses.map((response) => responseJson(response)));
+
+    expect(bodies).toEqual([
+      { items: [] },
+      ack,
+      expect.objectContaining({ referral: expect.objectContaining({ referralId }) }),
+      ack,
+      { items: [] },
+      { ...ack, matchId },
+      { items: [] },
+      { ...ack, matchId },
+      ack,
+      { items: [] },
+    ]);
+    for (const method of Object.values(api)) expect(method).toHaveBeenCalledOnce();
+    expect(api.createReferral).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ correlationId: SERVER_CORRELATION_ID }),
+    );
+  });
+
+  it.each([
+    ["SESSION_REVOKED", 401],
+    ["CAPABILITY_DISABLED", 503],
+  ] as const)("maps a post-authorize %s race without leaking adapter text", async (code, status) => {
+    const baseApi = createActorBoundPortalReferralApi(createWorkflow(), SOURCE_A);
+    const api = {
+      ...baseApi,
+      listReferrals: async () => {
+        throw new PortalReferralWorkflowError(code, CONTACT.phone, {
+          privateContact: CONTACT.email,
+        });
+      },
+    };
+    const response = await handlePortalReferralCollection(
+      getRequest("/api/portal/referrals", "source-a"),
+      {
+        resolveApi: async () => ({ ok: true, api }),
+        createCorrelationId: () => SERVER_CORRELATION_ID,
+      },
+    );
+
+    expect(response.status).toBe(status);
+    const body = await responseJson(response);
+    expect(body).toEqual({
+      error: { code },
+      correlationId: SERVER_CORRELATION_ID,
+    });
+    expectRedacted(body, CONTACT.phone, CONTACT.email);
   });
 });
 

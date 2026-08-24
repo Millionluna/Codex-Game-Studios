@@ -1,9 +1,9 @@
 # Portal-first release checkpoint
 
-Date: 2026-08-24
+Date: 2026-08-25
 
-Branch: `codex/careslink-ai-mobile-sync-v1`
-Base HEAD inspected: `fe5b708c488853418bfec3822369429e8fe9ff8f`
+Branch: `codex/careslink-ai-portal-referral-intake-v1`
+Base HEAD inspected: `6067782bbe2a23c4dafb59ba812f977cb2524cd0`
 
 Current five-Note local batch base: `63c10ea2e94ee4efdba7ffdbeb5aabbee6fcfa3b`
 
@@ -27,7 +27,8 @@ Current registration-retention hosted gate HEAD:
 `4cae6f1a08ce2bcc7e43456c275cf5e743f13fdf`
 
 This checkpoint covers the AI Web Portal reality audit, release sequencing,
-local Referral foundation and source-only five-Note generation contracts. It
+local Referral foundation and default-off intake runtime, plus source-only
+five-Note generation contracts. It
 does not modify the native App, Main Website, Native Auth/M0 implementation or
 served shared Product API routes. Those are prerequisites recorded in the
 existing versioned contract documentation. All new Referral and Note
@@ -58,8 +59,8 @@ availability.
 | `/providers/onboarding`, `/providers/review` | static/mock | No | Forms/buttons imply a save/review that does not occur | Add canonical provider profile and admin review command after identity proof |
 | Provider profile generator | mixed: real `provider_drafts`, mock editing seed | Partial | Draft handoff can use an in-memory fallback and is not a canonical provider | Treat claimed draft only as intake seed |
 | `/provider-portal` | mock referrals | No | Accept/decline/request-info controls do nothing; provider identity is not DB-bound | Owner-scoped offered referrals plus atomic response command |
-| `/referrals`, `/referrals/intake`, `/referrals/[id]`, match page | mock plus pure scoring function | No | No referrals/matches/status/audit tables; invalid detail ID can show the first mock | First Portal workflow replacement: real intake, triage, offer and response |
-| `/referral-source-portal` | mock | No | Buttons do not submit; apparent requests are lost | Reuse the same versioned create-referral command as intake |
+| `/referrals`, `/referrals/intake`, `/referrals/[id]`, match page | legacy mock remains default; default-off source-only durable intake exists | List/create only when every gate passes; not deployed | Intake now has database-authorized create/list, but detail, triage, match, offer, response and audit remain disabled and surrounding data remains mock | Validate intake on an approved disposable Preview before replacing one page at a time |
+| `/referral-source-portal` | legacy mock remains default; same source-only intake controls are wired | List/create only when every gate passes; not deployed | No hosted runtime or activation; all later workflow actions remain unavailable | Reuse the same database-authorized list/create slice after exact-revision Preview approval |
 | `/referral-workspace/*` | mixed real access/material/outreach stores | Yes, for those tools | These are AI access and outreach tools, not the referral pipeline; some stores have memory fallback | Preserve and later link by canonical referral ID |
 | `/admin`, `/dashboard` | mock global metrics | No | Core pages have no real referral permission gate; must not receive real data yet | Add membership gate, then replace only the assignment queue |
 | Admin access requests/material usage | real/mixed | Yes | Manages AI access/metadata, not providers or referrals | Reuse its auth-first action pattern, not its business schema |
@@ -81,7 +82,8 @@ Two immediate Portal safety rules follow from this matrix:
 ## 2. Activation dependencies
 
 Referral activation depends on the separately versioned Native Auth/M0 and
-shared Product API contract. This foundation does not alter those contracts,
+shared Product API contract. The current intake adds only a Web-cookie Portal
+route/database slice and does not alter those shared Product contracts, native
 routes, flags or grants. In particular:
 
 - the existing workspace fallback role resolver is not authoritative for the
@@ -89,8 +91,9 @@ routes, flags or grants. In particular:
 - native redirect allowlists and the current Preview base URL remain absent;
 - Product API operation flags remain default-off and document write grants
   remain withheld;
-- `/v1/me`, current-session proof and cookie/Bearer identity parity must pass on
-  the exact same disposable Preview revision before Referral can be enabled.
+- the current intake slice is deliberately Web-cookie-only and rejects Bearer;
+  `/v1/me`, current-session proof and cookie/Bearer identity parity remain a
+  separate gate before any App/shared-Product handoff.
 
 ## 3. Referral vertical slice
 
@@ -151,11 +154,13 @@ authorized read.
 | Referral source | Create/read referrals in its organization; no provider assignment |
 | Provider member | Minimal offered referral; respond only to its own offer; contact only after acceptance |
 
-The foundation migration enables RLS but grants no table read/write privilege
-and creates no state-changing RPC. Read policies and active-session membership
-helpers are present for disposable-Preview testing. A later activation
-migration must add narrow atomic commands that write business row, receipt and
-audit in one transaction. Their execute grants remain withheld.
+The foundation and intake migrations grant no Portal table read/write privilege
+to API roles. The intake migration adds only authorize, source metadata list and
+atomic create as `SECURITY DEFINER` functions with `search_path=''`; it revokes
+`PUBLIC`, `anon` and `service_role`, then grants only `authenticated` execution.
+Create writes the referral, separately protected contact, audit and receipt in
+one transaction. All other state-changing operations and their execute grants
+remain absent.
 
 ### Acceptance gates
 
@@ -171,14 +176,16 @@ audit in one transaction. Their execute grants remain withheld.
 - an offered provider can read only its own match and never another candidate;
 - organization suspension/provider suspension fails closed on the next request;
 - no authenticated direct write and no accidental function execute grant;
-- Portal cookie and App Bearer resolve to the same principal/member;
+- Portal cookie resolves to the current database principal/member; App Bearer
+  parity remains required before an App/shared-Product handoff;
 - invalid route ID is not found, never fixture fallback.
 
 ### Rollback points
 
 - app, operation and database gates all default off;
 - migration is additive and does not import mocks or mutate legacy rows;
-- activation grants must be in a separate migration;
+- the narrow authenticated RPC grant is inert while app and database gates
+  remain off; activation requires a separately reviewed flag/deployment change;
 - rollback disables capability/grants without deleting audit evidence;
 - pages are replaced one at a time: intake, assignment, provider response,
   follow-up, then canonical document/export.
@@ -296,9 +303,9 @@ The original Portal assertion revision ran on deleted disposable `r3` and
 rolled back when its pre-privacy canonical revision fixture hit the current
 privacy trigger. At exact HEAD `7f214429d9cdb3a2a6f16fd6b91d0bd9e67a038f`,
 the privacy-bound repair passed that trigger on fresh deleted disposable `r4`
-as part of the complete six-suite cross-domain assertion gate. This closes the
-Portal schema/assertion gate only; it does not provide callable state-changing
-RPCs or enable the Portal workflow.
+as part of the complete six-suite cross-domain assertion gate. At that
+historical checkpoint this closed the Portal schema/assertion gate only; it did
+not provide callable state-changing RPCs or enable the Portal workflow.
 
 ## 7. Disposable Preview entry criteria
 
@@ -309,48 +316,62 @@ Do not provide a base URL to App/Main until all are true at the same revision:
 3. transactional assertions and ACL/RLS/SECURITY DEFINER negatives pass;
 4. Source A/B, Provider A/B, platform-admin and revoked-session fixtures prove
    organization, provider, contact and child-row isolation;
-5. replay, stale-version and competing accept/decline behavior pass against the
-   database implementation once narrow state-changing RPCs exist;
-6. Web cookie and App Bearer resolve to the same principal and membership;
+5. intake create/list replay, conflict, atomicity and lock behavior pass against
+   the exact database implementation; later stale-version and competing
+   accept/decline gates remain separate because those RPCs are still absent;
+6. the Web cookie path passes through hosted GoTrue/PostgREST; App Bearer parity
+   is added and proved separately before any App handoff;
 7. cleanup returns test users, sessions and Referral rows to zero;
-8. Referral, Product writes, AI, Points, billing and sync push remain disabled
-   until a separately reviewed activation migration and route slice exist.
+8. Referral flags, Product writes, AI, Points, billing and sync push remain
+   disabled until a separately reviewed exact-revision activation/deployment.
 
 The historical protected Preview evidence remains useful but does not satisfy
 these exact-current-revision gates and is not Production approval.
 
-## 8. Pre-database Portal route/page slice — 2026-08-16
+## 8. Portal Referral intake source/local runtime — 2026-08-25
 
-The next local batch connected the Referral contract to an actor-bound server
-adapter, nine physical route surfaces under `/api/portal/referrals*` and
-`/api/portal/referral-offers*`, plus shared Web controls. It is deliberately a
-pre-database slice:
+This batch replaces only Referral-source intake create/list in source. The
+runtime requires all three application gates, `VERCEL_ENV=preview`, an exact
+non-Production Supabase ref and the separate database flag. It uses a
+request-scoped cookie session client, rejects Bearer authorization and never
+creates a service-role client. Authorization is resolved before private body
+parsing. The UI keeps private inputs disabled until the metadata GET proves the
+current database authorization; a later 401/403/503 invalidates that
+preauthorization and prevents repeated private submission.
 
-- the default runtime has no memory or Supabase adapter and a compile-time
-  readiness latch fixed to `false`;
-- all three non-secret environment settings default off and cannot bypass that
-  latch;
-- Preview target validation requires an explicit exact non-Production project
-  ref and rejects Production;
-- mutations resolve the request-scoped API before reading JSON, require
-  same-origin HTTPS, `application/json`, a bounded body and a valid
-  idempotency key;
-- responses use a server-generated correlation ID, generic structured errors
-  and metadata-only ACKs; client correlation, token, contact, summary and raw
-  mutation IDs are not reflected;
-- list, offer and audit DTOs are role-specific, and declined providers disappear
-  from offer/detail reads while exact retry returns only the original ACK;
-- pages never turn legacy mock IDs into canonical route IDs. Intake remains
-  disabled, and actions needing a canonical UUID/row version render an explicit
-  database-identity boundary.
+The migration removes only the prior constraint that forced `enabled=false`.
+The column default and existing capability row remain false and
+`preview_only=true` remains enforced. Authorize, list and create are
+`SECURITY DEFINER` functions with `search_path=''`, executable only by
+`authenticated`; `PUBLIC`, `anon` and `service_role` remain revoked, and no
+direct Portal table privilege is granted. The database revalidates the current
+Auth user/session and exactly one active referral-source membership in an active
+referral-source organization. Create recomputes the canonical payload hash with
+that database-derived actor and atomically writes referral, private contact,
+audit and receipt rows. List is source-tenant scoped and metadata-only. Triage,
+offer, response, follow-up, detail and audit remain disabled.
 
-Local evidence at this checkpoint is 7 focused files / 73 tests, full 112 files
-/ 983 tests, TypeScript, ESLint and Next static generation 63/63. The exact
-Portal migration and privacy-bound transactional assertion later passed on
-deleted disposable `r4`, but the route/page slice still has no database adapter
-or callable mutation RPC. The memory arbitration test does not prove Postgres
-row-lock behavior. No Preview URL can be handed to the App or Main Website until
-the remaining entry criteria above pass for a served exact revision.
+The frozen disposable-local PostgreSQL 16.15 gate clean-applied 30/30
+repository migrations and passed 10/10 explicit-rollback suites plus the
+independent zero-fixture/default-off/ACL/owner/role-edge postcheck. The Portal
+migration SHA-256 was
+`d69684088af021bb51a8e0886cbb2de0e4ac2f131e72a321ded6221f8f7b8838` and
+the Portal assertion SHA-256 was
+`95da9e415569fde633361a5b0ae6ad19e550dd7844cf884d4d7504387d5f59ed`.
+All seven true two-session cases passed: same-key replay, same-key changed-body
+conflict, session expiry after advisory-lock waiting, and capability-flag,
+Auth-session, membership and organization writer blocking. Exact cleanup
+restored both append-only triggers and removed every fixture; the full postcheck
+passed again, the server stopped and the temporary cluster was deleted with no
+matching local root retained. Existing generation-owner migrations used atomic
+temporary-visibility wrappers under the minimal local bootstrap; their final
+privilege/role-edge posture passed independently.
+
+This is source and disposable-local-PostgreSQL evidence only. It does not claim
+a hosted GoTrue/PostgREST cookie E2E, hosted Preview or Production migration,
+deployment, flag activation, retained business row, model call or paid runtime
+resource. No Preview URL may be handed to the App or Main Website until the
+remaining entry criteria above pass on the exact served revision.
 
 ## 9. Five-Note source/offline generation foundation — 2026-08-20
 

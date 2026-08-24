@@ -75,9 +75,10 @@ Table overrides are server configuration. Production should normally use migrati
 | `CARESLINK_V1_PRIVACY_REVIEW_PREVIEW_SERVICE_ROLE_KEY` | Server secret | dedicated key for the atomic privacy-review confirmation RPC on one reviewed Preview target | unset by default; no fallback to `SUPABASE_SERVICE_ROLE_KEY`; the runtime repeats the exact non-Production Preview/ref guard before creating this privileged client |
 | `CARESLINK_V1_NATIVE_AUTH_ENABLED` | Reserved server configuration name | future Preview-only native PKCE/session/device/revoke gate | **do not configure**; default/unset is off and the compile-time implementation latch is `false`, so even exact `true` cannot enable a token exchange or revoke runtime |
 | `CARESLINK_V1_NATIVE_AUTH_EXPECTED_SUPABASE_REF` | Reserved server configuration name | future exact-ref binding for the native-auth Preview boundary | **do not configure**; currently used only by injected static tests, and no matching ref can bypass the compile-time disabled latch or target Production |
-| `CARESLINK_PORTAL_REFERRAL_API_ENABLED` | Server configuration | master gate reserved for the Portal Referral route slice | default/unset is off; a compile-time readiness latch is also `false`, so configuration cannot currently serve the workflow |
-| `CARESLINK_PORTAL_REFERRAL_DURABLE_ADAPTER_ENABLED` | Server configuration | independent durable-adapter gate for Portal Referral | default/unset is off; no default database adapter or memory fallback is registered |
-| `CARESLINK_PORTAL_REFERRAL_EXPECTED_SUPABASE_REF` | Server configuration | binds a future Referral runtime to one reviewed disposable Preview branch | must exactly match the ref parsed from the server Supabase URL; non-Preview, missing/mismatch and the known Production ref fail closed |
+| `CARESLINK_PORTAL_REFERRAL_API_ENABLED` | Server configuration | master gate for the Portal Referral route slice | only exact `true`; default/unset is off and is insufficient without every other Portal gate |
+| `CARESLINK_PORTAL_REFERRAL_DURABLE_ADAPTER_ENABLED` | Server configuration | independent gate for the request-scoped cookie Supabase adapter | only exact `true`; no memory fallback and no `service_role` fallback |
+| `CARESLINK_PORTAL_REFERRAL_INTAKE_ENABLED` | Server configuration | operation gate for only source referral list and create | only exact `true`; all triage, offer, response, follow-up, detail and audit operations remain disabled |
+| `CARESLINK_PORTAL_REFERRAL_EXPECTED_SUPABASE_REF` | Server configuration | binds the Referral runtime to one reviewed disposable Preview branch | must exactly match the ref parsed from the server Supabase URL; non-Preview, missing/mismatch and the known Production ref fail closed before client construction |
 | `CARESLINK_V1_SHADOW_ENABLED` | Server configuration | master NDIS shadow kill switch | exact `true`; insufficient alone; unset/off outside disposable Preview |
 | `CARESLINK_V1_NDIS_DUAL_WRITE_ENABLED` | Server configuration | permits post-legacy-save projection | exact `true`; requires master + `VERCEL_ENV=preview` + verified branch ref |
 | `CARESLINK_V1_NDIS_SHADOW_READ_ENABLED` | Server configuration | permits metadata-only hash/status comparison | exact `true`; cannot enable independently of dual-write |
@@ -85,6 +86,8 @@ Table overrides are server configuration. Production should normally use migrati
 | `CARESLINK_V1_NDIS_SHADOW_TIMEOUT_MS` | Server configuration | bounds shadow latency after legacy success | optional, clamped 250-5000 ms; default 1500 ms |
 
 The two reserved native-auth names are intentionally absent from `.env.example` because the capability is not activatable. Adding placeholders would incorrectly imply that configuration is an approved next step. Their guard tests use synthetic in-memory objects only; no deployment environment or secret is read.
+
+The database capability row `referral_workflow_v1` is a separate Portal gate. The source migration preserves `preview_only=true`, leaves the existing row and column default at `enabled=false`, and does not activate it. Portal intake introduces no new secret.
 
 The privacy proof TTL is a code/contract constant of 1800 seconds for this
 temporary Preview gate. It is not configured through an environment variable

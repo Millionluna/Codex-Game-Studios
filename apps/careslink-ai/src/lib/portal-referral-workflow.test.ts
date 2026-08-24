@@ -682,6 +682,19 @@ describe("Portal referral workflow contract", () => {
         ),
       "VALIDATION_ERROR",
     );
+    expectError(
+      () =>
+        workflow.createReferral(
+          SOURCE_A,
+          {
+            ...referralInput(),
+            summary: "Annual support review",
+            contact: { ...referralInput().contact, name: "Ann" },
+          },
+          mutation("summary-substring-name"),
+        ),
+      "VALIDATION_ERROR",
+    );
   });
 
   it("accepts only server catalog codes in pre-accept visible fields", () => {

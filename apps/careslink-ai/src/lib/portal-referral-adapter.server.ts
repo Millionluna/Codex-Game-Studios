@@ -8,6 +8,15 @@ import type {
   PortalReferralWorkflowPort,
 } from "./portal-referral-workflow";
 
+export type MaybePromise<T> = T | Promise<T>;
+
+export type PortalReferralApiMutationMetadata =
+  PortalReferralMutationMetadata &
+    Readonly<{
+      /** Server-created correlation id. Durable adapters hash it before RPC. */
+      correlationId: string;
+    }>;
+
 export type PortalReferralCreateCommand = Readonly<{
   summary: string;
   region: string;
@@ -31,41 +40,47 @@ export type PortalReferralFollowUpCommand = Readonly<{
 }>;
 
 export type PortalReferralApi = Readonly<{
-  listReferrals(): ReturnType<PortalReferralWorkflowPort["listReferrals"]>;
+  listReferrals(): MaybePromise<
+    ReturnType<PortalReferralWorkflowPort["listReferrals"]>
+  >;
   createReferral(
     command: PortalReferralCreateCommand,
-    mutation: PortalReferralMutationMetadata,
-  ): ReturnType<PortalReferralWorkflowPort["createReferral"]>;
+    mutation: PortalReferralApiMutationMetadata,
+  ): MaybePromise<ReturnType<PortalReferralWorkflowPort["createReferral"]>>;
   getReferral(
     referralId: string,
-  ): ReturnType<PortalReferralWorkflowPort["getReferral"]>;
+  ): MaybePromise<ReturnType<PortalReferralWorkflowPort["getReferral"]>>;
   triageReferral(
     referralId: string,
     expectedVersion: number,
     mutation: PortalReferralMutationMetadata,
-  ): ReturnType<PortalReferralWorkflowPort["triageReferral"]>;
+  ): MaybePromise<ReturnType<PortalReferralWorkflowPort["triageReferral"]>>;
   listProviderCandidates(
     referralId: string,
-  ): ReturnType<PortalReferralWorkflowPort["listProviderCandidates"]>;
+  ): MaybePromise<
+    ReturnType<PortalReferralWorkflowPort["listProviderCandidates"]>
+  >;
   offerReferral(
     referralId: string,
     command: PortalReferralOfferCommand,
     mutation: PortalReferralMutationMetadata,
-  ): ReturnType<PortalReferralWorkflowPort["offerReferral"]>;
-  listMyOffers(): ReturnType<PortalReferralWorkflowPort["listMyOffers"]>;
+  ): MaybePromise<ReturnType<PortalReferralWorkflowPort["offerReferral"]>>;
+  listMyOffers(): MaybePromise<
+    ReturnType<PortalReferralWorkflowPort["listMyOffers"]>
+  >;
   respondToOffer(
     matchId: string,
     command: PortalReferralResponseCommand,
     mutation: PortalReferralMutationMetadata,
-  ): ReturnType<PortalReferralWorkflowPort["respondToOffer"]>;
+  ): MaybePromise<ReturnType<PortalReferralWorkflowPort["respondToOffer"]>>;
   recordFollowUp(
     referralId: string,
     command: PortalReferralFollowUpCommand,
     mutation: PortalReferralMutationMetadata,
-  ): ReturnType<PortalReferralWorkflowPort["recordFollowUp"]>;
+  ): MaybePromise<ReturnType<PortalReferralWorkflowPort["recordFollowUp"]>>;
   listAudit(
     referralId: string,
-  ): ReturnType<PortalReferralWorkflowPort["getAudit"]>;
+  ): MaybePromise<ReturnType<PortalReferralWorkflowPort["getAudit"]>>;
 }>;
 
 /**

@@ -143,11 +143,15 @@ There is no app-owned notification preference, push token, in-app inbox, email f
 
 Security, reminders, content/digest, Points and marketing are separate preferences. Payloads contain only opaque IDs and safe type. Daily/Weekdays/Weekly/Off is explicit; content push is normally capped at one proactive item per day. Open requires reauthentication and resolves to a safe resource/recovery state.
 
-## 11. Legacy Profile / Readiness / Referrals
+## 11. Portal Referral intake (inactive source runtime)
+
+When every default-off application gate and the exact non-Production Preview ref pass, the browser first requests a metadata-only source list. The server creates a request-scoped cookie Supabase client, rejects Bearer authorization and calls the database authorize RPC before enabling private inputs. The database revalidates its separate flag, Auth session/user and one active referral-source membership. Only then may create atomically write the referral, separately protected contact, metadata-only audit and idempotency receipt; the UI renders only the metadata ACK/list. An authorization-boundary failure disables further submission. This path uses no OpenAI call, Points, service role, worker or background retry. It remains source/local only, with all gates and the database flag off and no hosted deployment.
+
+## 12. Legacy Profile / Readiness / Referrals
 
 These Web routes keep their current profile, access-code, guided material and outreach flow for regression compatibility. They are not part of App parity, do not create canonical AI Note documents and must not grant or debit the personal V1 Points wallet unless a future approved contract explicitly adds that service.
 
-## 12. Legacy NDIS projection (Preview-only shadow)
+## 13. Legacy NDIS projection (Preview-only shadow)
 
 `projectLegacyNdisDraftToCanonical` parses an existing `feature='ndis_case_note'` saved material through the current safe parser. The guarded server integration uses only that validated projection. It preserves English formal wording and available Simplified Chinese review wording, never invents original structured facts, and always leaves self-review `REQUIRED`; legacy `reviewed` or `archived` never becomes V1 approval.
 

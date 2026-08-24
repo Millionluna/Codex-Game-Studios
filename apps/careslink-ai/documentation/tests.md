@@ -1,6 +1,6 @@
 # CaresLink AI Test Evidence
 
-> Evidence date: 2026-08-24. This document separates **Existing**, **Proposed**, and **Gaps**. Passing current tests does not mean Product Baseline V1.0 is implemented.
+> Evidence date: 2026-08-25. This document separates **Existing**, **Proposed**, and **Gaps**. Passing current tests does not mean Product Baseline V1.0 is implemented.
 
 ## Existing
 
@@ -45,14 +45,14 @@ The historical 90-file / 653-test result above remains the implementation-readin
 
 The route adapter is not Preview- or Production-served: its master and durable-adapter flags both default off, and runtime target verification accepts only an explicitly matched non-Production Preview Supabase ref. The default runtime now assembles request-scoped persistence and active-session validation, but missing configuration fails closed before any client is created. Mobile uses `Authorization: Bearer`; cookie authentication is an additional Web transport through the same adapter. Web cookie mutations require same-origin HTTPS plus JSON, Bearer mutations remain independent of browser Origin, and sync pull is `GET /v1/sync/pull?cursor=` with no mutation body. Sync push remains unserved and `NOT_IMPLEMENTED`. Privacy confirmation authenticates before body parsing, scans bounded canonical structured facts with policy `2026-08-11.preview.1`, returns locator-only findings, and persists only hash/proof metadata through a dedicated service-only adapter. Its scanner is deterministic, not a guarantee of complete de-identification. Confirmed proofs use a temporary 30-minute Preview TTL; this is not a Production product decision. Create and append bind that proof to owner/type/canonical `factsSummary` hash/schema/status/expiry in the tested adapters; changing only `englishDraft` is valid and changing `factsSummary` is stale. The dedicated Preview privacy secret does not fall back to the generic service-role key. These are source-level guarantees only: this batch does not establish a live database RPC grant or route E2E. The five native routes physically return structured `501` envelopes, while their capability constants remain `false`; this is a fail-closed boundary, not implementation or service evidence. The four mobile-sync document write-RPC execute grants remain withheld pending disposable-database canonical-hash vectors and server-equivalent Note schema validation. Consequently, these source tests do not prove database RLS, revoked-session integration, write availability, native authentication, cross-device sync or end-to-end behavior.
 
-### Portal-first M0/M1 local checkpoint — updated 2026-08-16
+### Historical Portal-first M0/M1 local checkpoint — updated 2026-08-16
 
-The current Portal-first source snapshot retains the native M0 machine
+That Portal-first source snapshot retained the native M0 machine
 capability crosswalk, fixed native/sync-push `501` boundaries and Product API
-operation gates. It now adds a local actor-bound Referral adapter, physical
+operation gates. It added a local actor-bound Referral adapter, physical
 Portal route wrappers, default-disabled page controls and a complete
 dependency-injected intake → triage/offer → accept/decline → follow-up/audit
-test path. The route runtime has no default durable adapter and its compile-time
+test path. At that snapshot the route runtime had no default durable adapter and its compile-time
 readiness latch is `false`, so the physical routes fail with `503` before auth
 or body parsing rather than serving mock or process-memory data.
 
@@ -76,12 +76,66 @@ transaction-concurrency evidence.
 | `pnpm lint` | passed |
 | `pnpm build` | passed; Next static generation completed 63/63 |
 
-The Portal migration and transactional assertion script were not applied or
-executed. There is no current disposable Preview base URL, no native redirect
+The then-current Portal migration and transactional assertion script were not applied or
+executed. There was no disposable Preview base URL, no native redirect
 allowlist authority and no served Referral persistence. Five Portal pages now
 show fail-closed local controls or explicit database-identity boundaries, but
 their surrounding legacy demo sections remain mock and are not represented as
 canonical Referral data.
+
+### Portal Referral intake runtime source/local checkpoint — 2026-08-25
+
+The current source replaces only Referral-source list/create behind three
+default-off application gates, `VERCEL_ENV=preview`, an exact non-Production
+Supabase ref and the separate default-off database flag. The request-scoped
+Supabase client is cookie-only; Bearer is rejected and no service-role client or
+memory fallback exists. The route resolves database authorization before a
+private mutation body. The database revalidates the flag, current Auth
+session/user and exactly one active referral-source membership in an active
+referral-source organization.
+
+The new authorize, metadata list and atomic create RPCs are `SECURITY DEFINER`
+with `search_path=''` and grant execution only to `authenticated`; `PUBLIC`,
+`anon` and `service_role` remain revoked and no API role receives direct Portal
+table privilege. Create derives the actor/organization in the database,
+recomputes the canonical payload hash and writes referral, private contact,
+metadata-only audit and receipt rows atomically. Replay is stable, a changed
+payload conflicts and list returns only source-organization metadata. Triage,
+offer, response, follow-up, detail and audit remain disabled. The browser keeps
+private fields disabled until the authorization GET succeeds and disables them
+again on an authorization-boundary failure.
+
+| Command | Result |
+|---|---|
+| focused Portal Referral gate | 9 files / 165 tests passed |
+| `npm test` | 133 files / 1,628 tests passed |
+| `npx tsc --noEmit --incremental false` | passed |
+| `npm run lint` | passed |
+| `npm run build` | passed; Next static generation completed 63/63 |
+| `python3 tools/sync_codex_adapters.py --check` | passed; 73 files checked |
+| `git diff --check` | passed |
+
+The frozen disposable-local PostgreSQL 16.15 gate clean-applied all 30
+repository migrations and passed all 10 explicit-rollback assertion suites,
+followed by an independent zero-fixture/default-off/owner/ACL/role-edge
+postcheck. The Portal migration SHA-256 was
+`d69684088af021bb51a8e0886cbb2de0e4ac2f131e72a321ded6221f8f7b8838` and
+the corrected Portal assertion SHA-256 was
+`95da9e415569fde633361a5b0ae6ad19e550dd7844cf884d4d7504387d5f59ed`.
+The seven true two-session cases passed: same-key replay, same-key changed-body
+conflict, session expiry while waiting on the mutation advisory lock, and real
+writer blocking for capability flag, Auth session, membership and organization
+locks. Exact fixture cleanup restored both append-only triggers, the full
+postcheck passed again, the server stopped and the temporary cluster was
+deleted with zero matching local roots retained. Migrations that require the
+existing generation-owner bootstrap used atomic owner-grant/session-authorization/
+owner-revoke wrappers; the final migrator generation-schema privileges remained
+false. This is a minimal Supabase-compatible local bootstrap, not hosted
+GoTrue/PostgREST or Supabase platform parity.
+
+These are source and disposable-local-database claims only. No hosted
+GoTrue/PostgREST cookie E2E, hosted Preview or Production migration, deployment,
+flag activation, retained business row or paid runtime resource is claimed.
 
 ### Five-Note generation source/offline checkpoint — 2026-08-20
 
@@ -1116,6 +1170,7 @@ This does not prove a live, data-bearing cross-migration upgrade. The `202608100
 | Production-unapplied SQL boundary | `src/lib/v1/v1-shadow-migration-contract.test.ts`, `mobile-sync-migration-contract.test.ts`, isolated guarded-live and local engine evidence | additive/no legacy DML, owner isolation and explicit grants are source-checked; historical deleted `r4` passed the 13-file foundation manifest 13/13 and six rollback suites. At HEAD `c7b70e9f84b9b804779039711b85cc7eda55bd57`, deleted `r9` passed the exact 14-file worker manifest 14/14, seven rollback suites and independent hard-off/zero-row/role/RLS/ACL/9-RPC postchecks. Deleted `r20` additionally passed the PostgreSQL 17.6 true two-session claim/session/privacy race gate; deleted `r21` passed the Attempt 1/Attempt 2 historical-replay and post-purge matrix. Deleted `r22` then passed the exact 15-file registration-retention manifest 15/15, the seven rollback suites and the independent retention/posture postcheck with both current assertion bodies. The subsequent isolated PostgreSQL 16.15 gate passed all 27 repository migrations, the exact current V1 15/15 manifest, 7/7 suites, the independent posture/retention postcheck and all three strict two-backend races. All worker Preview branches and local test resources were removed. This is isolated schema/transaction evidence only; runtime writes remain withheld |
 | Owner generation repository boundary | `note-generation-owner-repository.server.test.ts`, `note-generation-owner-runtime-migration-contract.test.ts` and `v1_note_generation_owner_runtime_rpc_shadow_assertions.sql` | exact private direct-query calls, owner-safe envelopes, default-empty admission, fresh session/privacy/catalog selection, idempotent atomic enqueue, status/cancel while hard-off and atomic cancellation are source/local-SQL tested. The current local PG16.15 run passed owner, additive-aware worker and durable assertions through rollback, with #1-#24 and #26-#28 applied by the non-super migration actor, including a fresh exact replay of final #28; #25 remained a bootstrap-superuser transition. The independent posture postcheck and auth-session lock-wait race passed. No hosted, route, caller-grant, vault/model/Points or Production evidence |
 | Worker-registration graceful retirement | `note-generation-registration-retirement-shadow-migration-contract.test.ts` and `v1_note_generation_registration_retirement_shadow_assertions.sql` | migration #29 preserves immutable digest-bound `APPROVED` registrations, adds the fourteenth forced-RLS table and validates append-only retirement, fixed reasons, exact sorted active-binding compare-and-retire, idempotent replay, new-admission/new-claim denial and existing-attempt drain/recovery. The ninth current assertion passed strict local PostgreSQL 16.15 rollback within a clean 29/29 migration, 9/9 aggregate, independent posture and two-ordering race gate. No caller grant, route, credential, seed, activation, emergency revoke or Production evidence |
+| Portal Referral intake runtime | `portal-referral-intake-runtime-migration-contract.test.ts`, route/runtime/Supabase/UI tests and `portal_referral_intake_runtime_assertions.sql` | default-off cookie-only list/create, auth-before-body, exact authenticated RPC grants, database-derived source tenant, metadata-only readback, atomic PII-separated create and replay/conflict boundaries passed source tests plus a clean 30/30 migration, 10/10 rollback-suite, independent-posture and 7/7 two-session PostgreSQL 16.15 gate; the exact local cluster was deleted. Hosted GoTrue/PostgREST and activation remain unproved |
 | Runtime isolation | `src/lib/v1/runtime-boundary.test.ts` | audited NDIS routes and the new `/v1` adapter are the only allowed server boundaries; `/v1` remains disabled without explicit adapters |
 
 ### Current live/read-only evidence
@@ -1194,3 +1249,4 @@ The following suites are required before the corresponding V1 slice can be calle
 8. No signed PIA/data-map/subprocessor/NDB evidence is represented in automated tests.
 9. Current production refresh-token errors need a reproducible stale-cookie/session recovery test before V1 release.
 10. Build/test success is not a production V1 greenlight; migration, Preview/live safety and explicit owner approval remain mandatory.
+11. Portal Intake still lacks hosted GoTrue/PostgREST cookie E2E, actual Preview activation and every later triage/offer/response/follow-up/detail/audit operation.

@@ -174,6 +174,9 @@ export type PortalReferralAuditEvent = Readonly<{
 
 export type PortalReferralWorkflowErrorCode =
   | "AUTH_REQUIRED"
+  | "SESSION_REVOKED"
+  | "CAPABILITY_DISABLED"
+  | "ADAPTER_UNAVAILABLE"
   | "FORBIDDEN"
   | "NOT_FOUND"
   | "VALIDATION_ERROR"
@@ -977,12 +980,7 @@ function assertPrivateSummaryDoesNotRepeatContact(
 ) {
   const normalizedSummary = summary.toLocaleLowerCase("en-AU");
   const normalizedName = contact.name.trim().toLocaleLowerCase("en-AU");
-  const containsContactName = /^[a-z0-9 .'-]+$/i.test(normalizedName)
-    ? new RegExp(
-        `(^|[^a-z0-9])${escapeRegularExpression(normalizedName)}([^a-z0-9]|$)`,
-        "i",
-      ).test(normalizedSummary)
-    : normalizedSummary.includes(normalizedName);
+  const containsContactName = normalizedSummary.includes(normalizedName);
   const containsEmail = /\b[^\s@]+@[^\s@]+\.[^\s@]+\b/.test(summary);
   const containsPhoneLikeNumber =
     summary.replace(/[^0-9]/g, "").length >= 8;
@@ -996,10 +994,6 @@ function assertPrivateSummaryDoesNotRepeatContact(
       "summary must not duplicate private contact details",
     );
   }
-}
-
-function escapeRegularExpression(value: string) {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 function isMutationAck(value: unknown): value is PortalReferralMutationAck {

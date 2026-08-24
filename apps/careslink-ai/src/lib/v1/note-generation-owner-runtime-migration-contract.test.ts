@@ -95,15 +95,15 @@ const privateTableNames = [
 ] as const;
 
 describe("V1 Note owner runtime RPC shadow migration contract", () => {
-  it("remains the historical 28th migration in the current 29-migration manifest", () => {
+  it("remains the historical 28th migration before later additive migrations", () => {
     const topLevel = withoutDollarQuotedBodies(migration);
 
     expect(migrationPath).toMatch(
       /^supabase\/migrations\/\d{14}_add_v1_note_generation_owner_runtime_rpc_shadow\.sql$/,
     );
-    expect(migrations).toHaveLength(29);
+    expect(migrations.length).toBeGreaterThanOrEqual(29);
     expect(migrations.at(27)).toBe(migrationPath.split("/").at(-1));
-    expect(migrations.at(-1)).toBe(
+    expect(migrations.at(28)).toBe(
       retirementMigrationPath.split("/").at(-1),
     );
     expect(Buffer.byteLength(migration, "utf8")).toBe(52_387);
@@ -809,7 +809,7 @@ describe("V1 Note owner runtime RPC shadow migration contract", () => {
     const helper = `${schemaName}._registration_accepts_new_work`;
     const ledger = `${schemaName}.worker_registration_retirements`;
 
-    expect(migrations.at(-1)).toBe(
+    expect(migrations.at(28)).toBe(
       retirementMigrationPath.split("/").at(-1),
     );
     expect(effectiveEnqueue).toMatch(
