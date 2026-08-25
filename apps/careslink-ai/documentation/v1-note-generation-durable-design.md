@@ -1128,7 +1128,20 @@ performance scope retained 14 unindexed-FK INFO, four unused-index INFO and 13
 boundary. The Preview was deleted and exact id/ref absence was verified, leaving
 only the healthy default Production branch. Production was never a SQL target;
 no deployment, activation, business data or ongoing Preview charge resulted.
-The final source gate passed the 11 direct contract files (162 tests), the full
+The deleted-`r5` source snapshot gate passed the 11 direct contract files (162
+tests), the full
 134-file / 1,657-test Vitest suite, TypeScript, lint, the Next.js 16.2.9 webpack
 production build with 63/63 static pages, the 73-file adapter check and
 `git diff --check`.
+
+The subsequent source follow-up embeds exact `pg_proc.proowner` checks for the
+two #26 auth/privacy readers in the maintained worker rollback suite. Its
+current enhanced BEGIN-through-ROLLBACK body is 162,857 bytes with SHA-256
+`1c30fd7a8604ec8a279ac8d8cf00155bf54801ee15d91dc8ecbc7bc9bc9cf859`.
+The adjacent Portal-intake suite now embeds the corresponding five exact owner
+checks and has a current body of 39,728 bytes with SHA-256
+`2255331b99ff6c4ca05b3a79578c6daa601e26662633063aa004f43423e3729f`.
+This completes the source-maintenance follow-up without rewriting the deleted-
+`r5` evidence: `r5` executed the earlier bodies and proved the same underlying
+owner posture through its independent postcheck, but no fresh Hosted Preview
+has executed these enhanced exact bodies. Production has not been touched.

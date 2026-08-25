@@ -1199,7 +1199,19 @@ than a role/owner/ACL/RLS failure.
 The Preview was deleted and exact id/ref absence was verified. Production was
 never a SQL target, and no hosted Auth/Data API E2E, deployment, flag activation,
 caller route, retained fixture or ongoing Preview charge resulted.
-The final source gate passed the 11 direct contract files (162 tests), the full
+The deleted-`r5` source snapshot gate passed the 11 direct contract files (162
+tests), the full
 134-file / 1,657-test Vitest suite, TypeScript, lint, the Next.js 16.2.9 webpack
 production build with 63/63 static pages, the 73-file adapter check and diff
 checks.
+
+The source follow-up now pins all five #30 Portal function owners by exact
+signature inside the maintained Portal-intake rollback suite. Its current
+enhanced BEGIN-through-ROLLBACK body is 39,728 bytes with SHA-256
+`2255331b99ff6c4ca05b3a79578c6daa601e26662633063aa004f43423e3729f`.
+The paired generation-worker suite likewise pins the two #26 reader owners and
+has a current body of 162,857 bytes with SHA-256
+`1c30fd7a8604ec8a279ac8d8cf00155bf54801ee15d91dc8ecbc7bc9bc9cf859`.
+Deleted `r5`'s postcheck remains the historical Hosted proof of those owners,
+but `r5` did not execute these enhanced exact bodies. No fresh Hosted exact-
+body gate has occurred, and Production has not been touched.
