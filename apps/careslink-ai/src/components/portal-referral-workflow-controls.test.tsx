@@ -664,7 +664,7 @@ describe("Portal referral workflow controls", () => {
     expect(json).not.toHaveBeenCalled();
   });
 
-  it("whitelists metadata-only fields from a successful ACK", async () => {
+  it("rejects a successful ACK with any non-contract field", async () => {
     const serverSecret = "private-summary-from-server";
     const result = await submitPortalReferralMutation({
       enabled: true,
@@ -688,6 +688,94 @@ describe("Portal referral workflow controls", () => {
       })),
     });
 
+    expect(result).toEqual({ ok: false, code: "REQUEST_FAILED" });
+    expect(JSON.stringify(result)).not.toContain(serverSecret);
+  });
+
+  it.each([
+    {
+      referralId: "70000000-0000-4000-8000-000000000099",
+      matchId: null,
+      currentStatus: "TRIAGED",
+      rowVersion: 2,
+      updatedAt: "2026-08-16T00:00:00.000Z",
+    },
+    {
+      referralId: "A1111111-1111-4111-8111-111111111111",
+      matchId: null,
+      currentStatus: "TRIAGED",
+      rowVersion: 2,
+      updatedAt: "2026-08-16T00:00:00.000Z",
+    },
+    {
+      referralId: REFERRAL_ID,
+      matchId: "70000000-0000-4000-8000-000000000099",
+      currentStatus: "TRIAGED",
+      rowVersion: 2,
+      updatedAt: "2026-08-16T00:00:00.000Z",
+    },
+    {
+      referralId: REFERRAL_ID,
+      matchId: null,
+      currentStatus: "SUBMITTED",
+      rowVersion: 2,
+      updatedAt: "2026-08-16T00:00:00.000Z",
+    },
+    {
+      referralId: REFERRAL_ID,
+      matchId: null,
+      currentStatus: "TRIAGED",
+      rowVersion: 3,
+      updatedAt: "2026-08-16T00:00:00.000Z",
+    },
+    {
+      referralId: REFERRAL_ID,
+      matchId: null,
+      currentStatus: "TRIAGED",
+      rowVersion: 2,
+      updatedAt: "2026-02-31T00:00:00.000Z",
+    },
+  ])("rejects an ACK that is not bound to its triage request %#", async (ack) => {
+    const result = await submitPortalReferralMutation({
+      enabled: true,
+      mutation: {
+        kind: "TRIAGE_REFERRAL",
+        referralId: REFERRAL_ID,
+        expectedVersion: 1,
+      },
+      idempotencyKey: MUTATION_ID,
+      fetcher: vi.fn(async () => ({
+        ok: true,
+        status: 200,
+        json: async () => ack,
+      })),
+    });
+
+    expect(result).toEqual({ ok: false, code: "REQUEST_FAILED" });
+  });
+
+  it("accepts an exact mutation-bound metadata ACK", async () => {
+    const result = await submitPortalReferralMutation({
+      enabled: true,
+      mutation: {
+        kind: "TRIAGE_REFERRAL",
+        referralId: REFERRAL_ID,
+        expectedVersion: 1,
+      },
+      idempotencyKey: MUTATION_ID,
+      fetcher: vi.fn(async () => ({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          referralId: REFERRAL_ID,
+          matchId: null,
+          currentStatus: "TRIAGED",
+          rowVersion: 2,
+          updatedAt: "2026-08-16T00:00:00.000Z",
+        }),
+      })),
+    });
+
     expect(result).toEqual({
       ok: true,
       ack: {
@@ -698,7 +786,6 @@ describe("Portal referral workflow controls", () => {
         updatedAt: "2026-08-16T00:00:00.000Z",
       },
     });
-    expect(JSON.stringify(result)).not.toContain(serverSecret);
   });
 });
 

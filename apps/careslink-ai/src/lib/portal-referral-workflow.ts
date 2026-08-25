@@ -136,6 +136,44 @@ export type PortalReferralListItem = Readonly<{
   updatedAt: string;
 }>;
 
+export type PortalReferralAssignmentStatus = Extract<
+  PortalReferralStatus,
+  "SUBMITTED" | "TRIAGED" | "OFFERED"
+>;
+
+export type PortalReferralAssignmentQueueItem = Readonly<{
+  referralId: string;
+  sourceOrganizationId: string;
+  sourceOrganizationName: string;
+  region: string;
+  serviceType: string;
+  currentStatus: PortalReferralAssignmentStatus;
+  rowVersion: number;
+  updatedAt: string;
+}>;
+
+export type PortalReferralAssignmentActiveOffer = Readonly<{
+  matchId: string;
+  providerId: string;
+  displayName: string;
+  offeredAt: string;
+}>;
+
+export type PortalReferralAssignmentDetail = Readonly<{
+  referralId: string;
+  sourceOrganizationId: string;
+  sourceOrganizationName: string;
+  summary: string;
+  region: string;
+  serviceType: string;
+  currentStatus: PortalReferralAssignmentStatus;
+  rowVersion: number;
+  contact: PortalReferralContact;
+  activeOffer: PortalReferralAssignmentActiveOffer | null;
+  createdAt: string;
+  updatedAt: string;
+}>;
+
 export type PortalReferralOfferListItem = Readonly<{
   matchId: string;
   referralId: string;
@@ -217,6 +255,7 @@ type StoredMatch = {
   referralId: string;
   providerId: string;
   status: PortalReferralMatchStatus;
+  offeredAt: string;
 };
 
 type MutationReceipt = {
@@ -229,6 +268,7 @@ export type PortalReferralWorkflowOptions = Readonly<{
   now?: () => string;
   isProviderEligible?: (providerId: string) => boolean;
   providerCandidates?: readonly PortalReferralProviderCandidate[];
+  sourceOrganizationNames?: Readonly<Record<string, string>>;
 }>;
 
 export type PortalReferralMutationMetadata = Readonly<{
@@ -250,6 +290,12 @@ export function createMemoryPortalReferralWorkflow(
         providerId: requiredId(candidate.providerId, "providerId"),
         displayName: requiredText(candidate.displayName, "displayName", 200),
       }),
+  );
+  const sourceOrganizationNames = Object.fromEntries(
+    Object.entries(options.sourceOrganizationNames ?? {}).map(([id, name]) => [
+      requiredId(id, "sourceOrganizationId"),
+      requiredText(name, "sourceOrganizationName", 200),
+    ]),
   );
   const isProviderEligible =
     options.isProviderEligible ??
@@ -343,12 +389,6 @@ export function createMemoryPortalReferralWorkflow(
       expectedVersion: requiredVersion(request.expectedVersion),
     };
     return replayOrRun(actor, mutation, "OFFER_REFERRAL", command, () => {
-      if (!isProviderEligible(command.providerId)) {
-        throw new PortalReferralWorkflowError(
-          "NOT_FOUND",
-          "Eligible provider was not found",
-        );
-      }
       const referral = ownedReferralForOperator(actor, command.referralId);
       assertVersion(referral, command.expectedVersion);
       assertTransition(referral, ["TRIAGED"]);
@@ -364,14 +404,21 @@ export function createMemoryPortalReferralWorkflow(
           "Referral already has an active offer",
         );
       }
+      if (!isProviderEligible(command.providerId)) {
+        throw new PortalReferralWorkflowError(
+          "NOT_FOUND",
+          "Eligible provider was not found",
+        );
+      }
+      applyStatus(referral, "OFFERED");
       const match: StoredMatch = {
         matchId: createId(),
         referralId: referral.referralId,
         providerId: command.providerId,
         status: "OFFERED",
+        offeredAt: referral.updatedAt,
       };
       matches.set(match.matchId, match);
-      applyStatus(referral, "OFFERED");
       appendAudit(actor, referral, "OFFER_REFERRAL", "TRIAGED", mutation.mutationId, {
         matchId: match.matchId,
         providerId: match.providerId,
@@ -601,6 +648,102 @@ export function createMemoryPortalReferralWorkflow(
     );
   }
 
+  function listAssignmentReferrals(actor: PortalReferralActor) {
+    assertOperator(actor);
+    const items: PortalReferralAssignmentQueueItem[] = [];
+    for (const referral of referrals.values()) {
+      if (!isAssignmentStatus(referral.currentStatus)) continue;
+      if (
+        actor.role === "partner_operator" &&
+        actor.organizationId !== referral.sourceOrganizationId
+      ) {
+        continue;
+      }
+      items.push(
+        Object.freeze({
+          referralId: referral.referralId,
+          sourceOrganizationId: referral.sourceOrganizationId,
+          sourceOrganizationName:
+            sourceOrganizationNames[referral.sourceOrganizationId] ??
+            referral.sourceOrganizationId,
+          region: referral.region,
+          serviceType: referral.serviceType,
+          currentStatus: referral.currentStatus,
+          rowVersion: referral.rowVersion,
+          updatedAt: referral.updatedAt,
+        }),
+      );
+    }
+    return items
+      .sort(
+        (left, right) =>
+          right.updatedAt.localeCompare(left.updatedAt) ||
+          right.referralId.localeCompare(left.referralId),
+      )
+      .slice(0, 50);
+  }
+
+  function getAssignmentReferral(
+    actor: PortalReferralActor,
+    referralId: string,
+  ): PortalReferralAssignmentDetail {
+    assertOperator(actor);
+    const referral = ownedReferralForOperator(
+      actor,
+      requiredId(referralId, "referralId"),
+    );
+    if (!isAssignmentStatus(referral.currentStatus)) {
+      throw new PortalReferralWorkflowError("NOT_FOUND", "Referral was not found");
+    }
+    const activeMatch = [...matches.values()].find(
+      (match) =>
+        match.referralId === referral.referralId && match.status === "OFFERED",
+    );
+    if (
+      (referral.currentStatus === "OFFERED") !== Boolean(activeMatch)
+    ) {
+      throw new PortalReferralWorkflowError(
+        "INVALID_STATE_TRANSITION",
+        "Assignment offer state is inconsistent",
+      );
+    }
+    const activeCandidate = activeMatch
+      ? providerCandidates.find(
+          (candidate) => candidate.providerId === activeMatch.providerId,
+        )
+      : undefined;
+    if (activeMatch && !activeCandidate) {
+      throw new PortalReferralWorkflowError(
+        "INVALID_STATE_TRANSITION",
+        "Assignment provider is unavailable",
+      );
+    }
+    return clone({
+      referralId: referral.referralId,
+      sourceOrganizationId: referral.sourceOrganizationId,
+      sourceOrganizationName:
+        sourceOrganizationNames[referral.sourceOrganizationId] ??
+        referral.sourceOrganizationId,
+      summary: referral.summary,
+      region: referral.region,
+      serviceType: referral.serviceType,
+      currentStatus: referral.currentStatus,
+      rowVersion: referral.rowVersion,
+      contact: referral.contact,
+      activeOffer:
+        activeMatch && activeCandidate
+          ? {
+              matchId: activeMatch.matchId,
+              providerId: activeMatch.providerId,
+              displayName: activeCandidate.displayName,
+              offeredAt: activeMatch.offeredAt,
+            }
+          : null,
+      createdAt: referral.createdAt,
+      updatedAt: referral.updatedAt,
+    });
+  }
+
   function listMyOffers(actor: PortalReferralActor) {
     assertActiveActor(actor, ["provider_member"]);
     if (!actor.providerId) {
@@ -646,7 +789,8 @@ export function createMemoryPortalReferralWorkflow(
     return providerCandidates
       .filter((candidate) => isProviderEligible(candidate.providerId))
       .map(clone)
-      .sort((left, right) => left.providerId.localeCompare(right.providerId));
+      .sort((left, right) => left.providerId.localeCompare(right.providerId))
+      .slice(0, 50);
   }
 
   function getAudit(actor: PortalReferralActor, referralId: string) {
@@ -895,9 +1039,11 @@ export function createMemoryPortalReferralWorkflow(
     recordExport,
     completeReferral,
     listReferrals,
+    listAssignmentReferrals,
     listMyOffers,
     listProviderCandidates,
     getReferral,
+    getAssignmentReferral,
     getAudit,
   });
 }
@@ -944,6 +1090,12 @@ function isApprovedProviderActor(
     actor.providerId.length > 0 &&
     actor.providerReviewStatus === "approved"
   );
+}
+
+function isAssignmentStatus(
+  status: PortalReferralStatus,
+): status is PortalReferralAssignmentStatus {
+  return status === "SUBMITTED" || status === "TRIAGED" || status === "OFFERED";
 }
 
 function assertAllowedKeys(value: object, allowed: readonly string[]) {

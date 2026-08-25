@@ -21,6 +21,8 @@ export const CARESLINK_PORTAL_REFERRAL_INTAKE_FLAG =
   "CARESLINK_PORTAL_REFERRAL_INTAKE_ENABLED" as const;
 export const CARESLINK_PORTAL_REFERRAL_SOURCE_DETAIL_FLAG =
   "CARESLINK_PORTAL_REFERRAL_SOURCE_DETAIL_ENABLED" as const;
+export const CARESLINK_PORTAL_REFERRAL_ASSIGNMENT_FLAG =
+  "CARESLINK_PORTAL_REFERRAL_ASSIGNMENT_ENABLED" as const;
 export const CARESLINK_PORTAL_REFERRAL_EXPECTED_SUPABASE_REF_FLAG =
   "CARESLINK_PORTAL_REFERRAL_EXPECTED_SUPABASE_REF" as const;
 
@@ -32,6 +34,7 @@ export type PortalReferralRuntimeEnv = Readonly<{
   CARESLINK_PORTAL_REFERRAL_DURABLE_ADAPTER_ENABLED?: string;
   CARESLINK_PORTAL_REFERRAL_INTAKE_ENABLED?: string;
   CARESLINK_PORTAL_REFERRAL_SOURCE_DETAIL_ENABLED?: string;
+  CARESLINK_PORTAL_REFERRAL_ASSIGNMENT_ENABLED?: string;
   CARESLINK_PORTAL_REFERRAL_EXPECTED_SUPABASE_REF?: string;
   NEXT_PUBLIC_SUPABASE_ANON_KEY?: string;
   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY?: string;
@@ -46,6 +49,8 @@ export type PortalReferralOperation =
   | "LIST_REFERRALS"
   | "CREATE_REFERRAL"
   | "GET_REFERRAL"
+  | "LIST_ASSIGNMENT_REFERRALS"
+  | "GET_ASSIGNMENT_REFERRAL"
   | "TRIAGE_REFERRAL"
   | "LIST_PROVIDER_CANDIDATES"
   | "OFFER_REFERRAL"
@@ -130,6 +135,15 @@ export function isPortalReferralSourceDetailRuntimeEnabled(
   );
 }
 
+export function isPortalReferralAssignmentRuntimeEnabled(
+  env: PortalReferralRuntimeEnv = process.env as PortalReferralRuntimeEnv,
+) {
+  return (
+    isPortalReferralBaseRuntimeEnabled(env) &&
+    isPortalReferralOperationEnabled("LIST_ASSIGNMENT_REFERRALS", env)
+  );
+}
+
 export function isPortalReferralOperationEnabled(
   operation: PortalReferralOperation,
   env: PortalReferralRuntimeEnv = process.env as PortalReferralRuntimeEnv,
@@ -140,6 +154,12 @@ export function isPortalReferralOperationEnabled(
       return env.CARESLINK_PORTAL_REFERRAL_INTAKE_ENABLED === "true";
     case "GET_REFERRAL":
       return env.CARESLINK_PORTAL_REFERRAL_SOURCE_DETAIL_ENABLED === "true";
+    case "LIST_ASSIGNMENT_REFERRALS":
+    case "GET_ASSIGNMENT_REFERRAL":
+    case "TRIAGE_REFERRAL":
+    case "LIST_PROVIDER_CANDIDATES":
+    case "OFFER_REFERRAL":
+      return env.CARESLINK_PORTAL_REFERRAL_ASSIGNMENT_ENABLED === "true";
     default:
       return false;
   }
@@ -217,6 +237,12 @@ function authorizationScopeForOperation(
       return "INTAKE";
     case "GET_REFERRAL":
       return "SOURCE_DETAIL";
+    case "LIST_ASSIGNMENT_REFERRALS":
+    case "GET_ASSIGNMENT_REFERRAL":
+    case "TRIAGE_REFERRAL":
+    case "LIST_PROVIDER_CANDIDATES":
+    case "OFFER_REFERRAL":
+      return "ASSIGNMENT";
     default:
       return undefined;
   }

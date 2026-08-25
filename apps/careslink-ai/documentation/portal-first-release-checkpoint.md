@@ -27,7 +27,7 @@ Current registration-retention hosted gate HEAD:
 `4cae6f1a08ce2bcc7e43456c275cf5e743f13fdf`
 
 This checkpoint covers the AI Web Portal reality audit, release sequencing,
-local Referral foundation and default-off intake/source-detail runtimes, plus source-only
+local Referral foundation and default-off intake/source-detail/Assignment M1a runtimes, plus source-only
 five-Note generation contracts. It
 does not modify the native App, Main Website, Native Auth/M0 implementation or
 served shared Product API routes. Those are prerequisites recorded in the
@@ -59,8 +59,8 @@ availability.
 | `/providers/onboarding`, `/providers/review` | static/mock | No | Forms/buttons imply a save/review that does not occur | Add canonical provider profile and admin review command after identity proof |
 | Provider profile generator | mixed: real `provider_drafts`, mock editing seed | Partial | Draft handoff can use an in-memory fallback and is not a canonical provider | Treat claimed draft only as intake seed |
 | `/provider-portal` | mock referrals | No | Accept/decline/request-info controls do nothing; provider identity is not DB-bound | Owner-scoped offered referrals plus atomic response command |
-| `/referrals`, `/referrals/intake`, `/referrals/[id]`, match page | legacy mock remains default; default-off source-only durable intake and exact-tenant source detail exist | List/create/detail only behind independent gates; not deployed | Source detail now has database-authorized private read and no mock fallback, but triage, match, offer, response and audit remain disabled and surrounding data remains mock | Validate the exact intake/detail revision on an approved disposable Preview before replacing one page at a time |
-| `/referral-source-portal` | legacy mock remains default; source-only intake controls are wired and the UUID detail page has a separate gate | List/create/detail only behind independent gates; not deployed | No hosted runtime or activation; assignment and later workflow actions remain unavailable | Reuse the database-authorized source slice after exact-revision Preview approval |
+| `/referrals`, `/referrals/intake`, `/referrals/[id]`, match page | legacy mock remains default; default-off durable intake, exact-tenant source detail and operator Assignment M1a exist | List/create/source-detail plus operator queue/detail/triage/candidates/offer behind independent gates; not deployed | Gate-on assignment pages have no mock fallback and offer does not assign/accept; provider response, follow-up and audit remain disabled | Validate the exact four-gate revision on an approved disposable Preview before enabling one role surface at a time |
+| `/referral-source-portal` | legacy mock remains default; source-only intake controls are wired and the UUID detail page has a separate gate | List/create/detail only behind independent gates; not deployed | No hosted runtime or activation; the operator slice is independently gated and provider/later workflow actions remain unavailable | Reuse the database-authorized source slice after exact-revision Preview approval |
 | `/referral-workspace/*` | mixed real access/material/outreach stores | Yes, for those tools | These are AI access and outreach tools, not the referral pipeline; some stores have memory fallback | Preserve and later link by canonical referral ID |
 | `/admin`, `/dashboard` | mock global metrics | No | Core pages have no real referral permission gate; must not receive real data yet | Add membership gate, then replace only the assignment queue |
 | Admin access requests/material usage | real/mixed | Yes | Manages AI access/metadata, not providers or referrals | Reuse its auth-first action pattern, not its business schema |
@@ -82,7 +82,7 @@ Two immediate Portal safety rules follow from this matrix:
 ## 2. Activation dependencies
 
 Referral activation depends on the separately versioned Native Auth/M0 and
-shared Product API contract. The current intake/detail work adds only a
+shared Product API contract. The current intake/detail/assignment work adds only a
 Web-cookie Portal route/database slice and does not alter those shared Product contracts, native
 routes, flags or grants. In particular:
 
@@ -91,7 +91,7 @@ routes, flags or grants. In particular:
 - native redirect allowlists and the current Preview base URL remain absent;
 - Product API operation flags remain default-off and document write grants
   remain withheld;
-- the current intake and source-detail slices are deliberately Web-cookie-only and reject Bearer;
+- the current intake, source-detail and assignment slices are deliberately Web-cookie-only and reject Bearer;
   `/v1/me`, current-session proof and cookie/Bearer identity parity remain a
   separate gate before any App/shared-Product handoff.
 
@@ -1260,6 +1260,68 @@ removed.
 
 This source/local gate is not a 31/31 clean repository apply, hosted
 GoTrue/PostgREST E2E, retained Preview, deployment or activation. Production
-and cloud data were not touched. The next implementation slice is Portal
-Assignment M1a: operator queue/detail, triage, provider candidates and offer,
-behind its own default-off gate and without provider accept/decline.
+and cloud data were not touched. The following section records the later
+Assignment M1a implementation behind its own default-off gate.
+
+## 26. Portal Referral Assignment M1a source/local runtime — 2026-08-25
+
+Assignment M1a is the first real operator workflow slice. It adds a maximum-50
+assignment queue, one private operator detail, `SUBMITTED` → `TRIAGED`, exact
+eligible-provider candidates and `TRIAGED` → `OFFERED`. A platform admin in one
+active PLATFORM organization has global scope; a partner operator in one active
+REFERRAL_SOURCE organization has only that source tenant. Zero, multiple and
+mixed operator contexts fail closed. Cross-tenant, missing and null referral
+IDs share `PORTAL_NOT_FOUND`, and provider eligibility is checked only after the
+authorized referral boundary.
+
+`CARESLINK_PORTAL_REFERRAL_ASSIGNMENT_ENABLED` and database row
+`referral_assignment_v1` are independent from intake and source detail. The
+base API/durable gates, exact non-Production Preview ref, master database row
+and assignment row must all pass. All four Portal rows remain
+`enabled=false, preview_only=true`. The cookie-only resolver rejects Bearer
+before client creation; every database RPC independently holds master then
+assignment and refreshes the exact Auth session/operator authority. Direct Data
+API calls cannot open assignment using intake or source-detail flags.
+
+CLI-generated migration
+`20260825120908_add_portal_referral_assignment_runtime.sql` adds six
+authenticated-only `SECURITY DEFINER` RPCs and four private helpers with
+`search_path=''`, no API execution on helpers and no table grant. Candidate and
+offer share the same active/approved/capacity/region/service/provider-member
+eligibility query. Triage and offer serialize actor+mutation and referral/match
+resources, hash payload/idempotency/correlation identifiers, recheck the
+session after lock waits and atomically write one audit plus one receipt. Offer
+creates or promotes one match but leaves `assigned_provider_id=null`; exact
+completed replay survives later provider ineligibility, while a currently
+ineligible target remains uniform not-found even if a historical match exists.
+No accept/decline, assignment finalization, follow-up, audit list,
+document/export or Note/Points capability is added.
+
+The gate-on `/referrals` and `/referrals/{id}/matches` pages use real strict DTOs
+and never fall back to mock. Request/response UUID, status, row version, UTC
+time, maximum length/count and duplicate checks exist at Supabase, route and
+browser boundaries. A→B→A identity generations reject late detail, candidate
+and mutation responses. Candidate authorization failures remove private detail;
+409 and malformed mutation ACK paths refresh authoritative detail.
+
+`/referrals` remains a shared legacy URL for the source and operator surfaces.
+Assignment and source-role UI activation must therefore remain mutually
+exclusive for this slice; simultaneous role-surface activation is not approved.
+
+The focused gate passed 9 files / 292 tests; the full gate passed 138 files /
+1,821 tests, TypeScript, full lint, the Next.js 16.2.9 webpack build with 64/64
+static pages, 73-file adapter sync and diff checks. PostgreSQL 16.15 passed the
+minimum foundation → intake → source-detail → assignment chain, the rollback
+suite and eleven real two-backend scenarios: same-mutation single side effect,
+same-referral single winner, bounded provider locking, and eight `not_after`
+expiry checks across Auth, organization/membership, referral, match and provider
+lock stages. Expired calls returned `PORTAL_SESSION_REVOKED` before data-derived
+errors or writes. The migration/assertion/contract hashes are recorded in
+`documentation/tests.md`; all temporary local resources were removed.
+
+This is source/local evidence, not a full repository migration apply, hosted
+GoTrue/PostgREST/Auth E2E, retained Preview, deployment or activation.
+Production and cloud data were not touched. The next real workflow slice is
+provider response M1b—provider-scoped offer list plus atomic accept/decline—only
+after a separately approved disposable-Preview validation of this exact M1a
+revision.

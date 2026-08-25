@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 const supabaseServerMock = vi.hoisted(() => ({
   createCareslinkServerSupabaseClient: vi.fn(),
@@ -10,9 +10,11 @@ vi.mock("server-only", () => ({}));
 vi.mock("./supabase-server", () => supabaseServerMock);
 
 import {
+  CARESLINK_PORTAL_REFERRAL_ASSIGNMENT_FLAG,
   CARESLINK_PORTAL_REFERRAL_SOURCE_DETAIL_FLAG,
   CARESLINK_PORTAL_REFERRAL_RUNTIME_IMPLEMENTATION_READY,
   createPortalReferralApiResolver,
+  isPortalReferralAssignmentRuntimeEnabled,
   isPortalReferralBaseRuntimeEnabled,
   isPortalReferralOperationEnabled,
   isPortalReferralPreviewTargetAllowed,
@@ -22,9 +24,14 @@ import {
   type PortalReferralOperation,
   type PortalReferralRuntimeEnv,
 } from "./portal-referral-runtime.server";
+import * as portalReferralSupabase from "./portal-referral-supabase.server";
 import { CARESLINK_PRODUCTION_SUPABASE_REF } from "./v1/ndis-shadow-guard";
 
 const PREVIEW_REF = "abcdefghijklmnop";
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 function enabledPreviewEnv(
   overrides: Partial<PortalReferralRuntimeEnv> = {},
@@ -37,6 +44,7 @@ function enabledPreviewEnv(
     CARESLINK_PORTAL_REFERRAL_DURABLE_ADAPTER_ENABLED: "true",
     CARESLINK_PORTAL_REFERRAL_INTAKE_ENABLED: "true",
     CARESLINK_PORTAL_REFERRAL_SOURCE_DETAIL_ENABLED: "true",
+    CARESLINK_PORTAL_REFERRAL_ASSIGNMENT_ENABLED: "true",
     SUPABASE_PUBLISHABLE_KEY: "preview-publishable-key",
     ...overrides,
   };
@@ -48,9 +56,15 @@ describe("Portal referral runtime latch", () => {
     expect(CARESLINK_PORTAL_REFERRAL_SOURCE_DETAIL_FLAG).toBe(
       "CARESLINK_PORTAL_REFERRAL_SOURCE_DETAIL_ENABLED",
     );
+    expect(CARESLINK_PORTAL_REFERRAL_ASSIGNMENT_FLAG).toBe(
+      "CARESLINK_PORTAL_REFERRAL_ASSIGNMENT_ENABLED",
+    );
     expect(isPortalReferralBaseRuntimeEnabled(enabledPreviewEnv())).toBe(true);
     expect(isPortalReferralRuntimeEnabled(enabledPreviewEnv())).toBe(true);
     expect(isPortalReferralSourceDetailRuntimeEnabled(enabledPreviewEnv())).toBe(
+      true,
+    );
+    expect(isPortalReferralAssignmentRuntimeEnabled(enabledPreviewEnv())).toBe(
       true,
     );
   });
@@ -93,10 +107,11 @@ describe("Portal referral runtime latch", () => {
       }),
     ]) {
       expect(isPortalReferralBaseRuntimeEnabled(env)).toBe(false);
+      expect(isPortalReferralAssignmentRuntimeEnabled(env)).toBe(false);
     }
   });
 
-  it("separates exact-true intake and source-detail operation gates", () => {
+  it("separates exact-true intake, source-detail and assignment operation gates", () => {
     const detailOnly = enabledPreviewEnv({
       CARESLINK_PORTAL_REFERRAL_INTAKE_ENABLED: "false",
     });
@@ -130,10 +145,42 @@ describe("Portal referral runtime latch", () => {
       CARESLINK_PORTAL_REFERRAL_SOURCE_DETAIL_ENABLED: "TRUE",
     });
     expect(isPortalReferralOperationEnabled("GET_REFERRAL", wrongCase)).toBe(false);
-    for (const operation of [
+
+    const assignmentOperations = [
+      "LIST_ASSIGNMENT_REFERRALS",
+      "GET_ASSIGNMENT_REFERRAL",
       "TRIAGE_REFERRAL",
       "LIST_PROVIDER_CANDIDATES",
       "OFFER_REFERRAL",
+    ] satisfies PortalReferralOperation[];
+    const assignmentOnly = enabledPreviewEnv({
+      CARESLINK_PORTAL_REFERRAL_INTAKE_ENABLED: "false",
+      CARESLINK_PORTAL_REFERRAL_SOURCE_DETAIL_ENABLED: "false",
+    });
+    expect(isPortalReferralAssignmentRuntimeEnabled(assignmentOnly)).toBe(true);
+    expect(isPortalReferralRuntimeEnabled(assignmentOnly)).toBe(false);
+    expect(isPortalReferralSourceDetailRuntimeEnabled(assignmentOnly)).toBe(false);
+    for (const operation of assignmentOperations) {
+      expect(isPortalReferralOperationEnabled(operation, assignmentOnly)).toBe(
+        true,
+      );
+    }
+
+    for (const assignmentFlag of [undefined, "false", "TRUE", " true"]) {
+      const assignmentOff = enabledPreviewEnv({
+        CARESLINK_PORTAL_REFERRAL_ASSIGNMENT_ENABLED: assignmentFlag,
+      });
+      expect(isPortalReferralAssignmentRuntimeEnabled(assignmentOff)).toBe(false);
+      expect(isPortalReferralRuntimeEnabled(assignmentOff)).toBe(true);
+      expect(isPortalReferralSourceDetailRuntimeEnabled(assignmentOff)).toBe(true);
+      for (const operation of assignmentOperations) {
+        expect(isPortalReferralOperationEnabled(operation, assignmentOff)).toBe(
+          false,
+        );
+      }
+    }
+
+    for (const operation of [
       "LIST_MY_OFFERS",
       "RESPOND_TO_OFFER",
       "RECORD_FOLLOW_UP",
@@ -168,7 +215,9 @@ describe("Portal referral runtime latch", () => {
   it("rejects unopened operations before creating a client or reading a body", async () => {
     const createCookieRpcClient = vi.fn();
     const resolver = createPortalReferralApiResolver({
-      env: enabledPreviewEnv(),
+      env: enabledPreviewEnv({
+        CARESLINK_PORTAL_REFERRAL_ASSIGNMENT_ENABLED: "false",
+      }),
       createCookieRpcClient,
     });
     const bodyAccess = vi.fn(() => {
@@ -187,6 +236,49 @@ describe("Portal referral runtime latch", () => {
     expect(createCookieRpcClient).not.toHaveBeenCalled();
     expect(bodyAccess).not.toHaveBeenCalled();
   });
+
+  it.each([
+    "LIST_ASSIGNMENT_REFERRALS",
+    "GET_ASSIGNMENT_REFERRAL",
+    "TRIAGE_REFERRAL",
+    "LIST_PROVIDER_CANDIDATES",
+    "OFFER_REFERRAL",
+  ] as const)(
+    "maps %s to the ASSIGNMENT authorization scope",
+    async (operation) => {
+      const client = { rpc: vi.fn() };
+      const api = {};
+      const authorization = {
+        userId: "10000000-0000-4000-8000-000000000001",
+        organizationId: "20000000-0000-4000-8000-000000000001",
+        organizationType: "PLATFORM",
+        organizationStatus: "ACTIVE",
+        membershipRole: "platform_admin",
+        membershipStatus: "ACTIVE",
+      } as const;
+      const authorize = vi
+        .spyOn(portalReferralSupabase, "authorizePortalReferralSupabaseClient")
+        .mockResolvedValue({ ok: true, authorization });
+      const createApi = vi
+        .spyOn(portalReferralSupabase, "createSupabasePortalReferralApi")
+        .mockReturnValue(api as never);
+      const resolver = createPortalReferralApiResolver({
+        env: enabledPreviewEnv(),
+        createCookieRpcClient: vi.fn(async () => client),
+      });
+
+      await expect(
+        resolver(
+          new Request(
+            "https://preview.careslink.test/api/portal/referral-assignments",
+          ),
+          operation,
+        ),
+      ).resolves.toEqual({ ok: true, api });
+      expect(authorize).toHaveBeenCalledWith(client, "ASSIGNMENT");
+      expect(createApi).toHaveBeenCalledWith(client, authorization);
+    },
+  );
 
   it("uses the cookie client, authorizes first, then exposes only list/create", async () => {
     const env = enabledPreviewEnv({
@@ -326,7 +418,11 @@ describe("Portal referral runtime latch", () => {
     expect(createCookieRpcClient).not.toHaveBeenCalled();
   });
 
-  it.each(["LIST_REFERRALS", "GET_REFERRAL"] as const)(
+  it.each([
+    "LIST_REFERRALS",
+    "GET_REFERRAL",
+    "LIST_ASSIGNMENT_REFERRALS",
+  ] as const)(
     "does not accept a caller bearer for %s or construct any client for it",
     async (operation) => {
       const createCookieRpcClient = vi.fn();
@@ -395,6 +491,7 @@ describe("Portal referral runtime latch", () => {
   it.each([
     ["LIST_REFERRALS", "portal_referral_intake_authorize"],
     ["GET_REFERRAL", "portal_referral_source_detail_authorize"],
+    ["TRIAGE_REFERRAL", "portal_referral_assignment_authorize"],
   ] as const)(
     "maps identical authorize results for %s before returning an API",
     async (operation, expectedRpcName) => {

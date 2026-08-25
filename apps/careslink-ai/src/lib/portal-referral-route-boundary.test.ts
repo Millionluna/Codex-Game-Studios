@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const handlers = vi.hoisted(() => ({
+  assignmentCollection: vi.fn(),
+  assignmentGet: vi.fn(),
   audit: vi.fn(),
   candidates: vi.fn(),
   collection: vi.fn(),
@@ -13,6 +15,8 @@ const handlers = vi.hoisted(() => ({
 }));
 
 vi.mock("@/lib/portal-referral-route.server", () => ({
+  handlePortalReferralAssignmentCollection: handlers.assignmentCollection,
+  handlePortalReferralAssignmentGet: handlers.assignmentGet,
   handlePortalReferralAudit: handlers.audit,
   handlePortalReferralCandidates: handlers.candidates,
   handlePortalReferralCollection: handlers.collection,
@@ -24,6 +28,8 @@ vi.mock("@/lib/portal-referral-route.server", () => ({
   handlePortalReferralTriage: handlers.triage,
 }));
 
+import * as assignmentsRoute from "../app/api/portal/referral-assignments/route";
+import * as assignmentRoute from "../app/api/portal/referral-assignments/[referralId]/route";
 import * as offersRoute from "../app/api/portal/referral-offers/route";
 import * as responseRoute from "../app/api/portal/referral-offers/[matchId]/response/route";
 import * as referralsRoute from "../app/api/portal/referrals/route";
@@ -46,6 +52,7 @@ describe("Portal referral Next route wrappers", () => {
   });
 
   it.each([
+    ["assignment list", assignmentsRoute.GET, handlers.assignmentCollection, "GET"],
     ["referral list", referralsRoute.GET, handlers.collection, "GET"],
     ["referral create", referralsRoute.POST, handlers.collection, "POST"],
     ["provider offers", offersRoute.GET, handlers.offers, "GET"],
@@ -61,6 +68,7 @@ describe("Portal referral Next route wrappers", () => {
   });
 
   it.each([
+    ["assignment detail", assignmentRoute.GET, handlers.assignmentGet],
     ["detail", referralRoute.GET, handlers.get],
     ["triage", triageRoute.POST, handlers.triage],
     ["candidates", candidatesRoute.GET, handlers.candidates],

@@ -1,9 +1,11 @@
 import { AppShell } from "@/components/app-shell";
 import { PageHeader } from "@/components/page-header";
+import { PortalReferralAssignmentQueue } from "@/components/portal-referral-assignment-controls";
 import { ReferralCard } from "@/components/referral-card";
 import { ButtonLink, Card } from "@/components/ui";
 import { displayReferralStatus } from "@/lib/display";
 import { referrals } from "@/lib/mock-data";
+import { isPortalReferralAssignmentRuntimeEnabled } from "@/lib/portal-referral-runtime.server";
 import type { ReferralStatus } from "@/lib/types";
 
 const columns: ReferralStatus[] = [
@@ -16,6 +18,21 @@ const columns: ReferralStatus[] = [
 ];
 
 export default function ReferralBoardPage() {
+  const assignmentEnabled = isPortalReferralAssignmentRuntimeEnabled();
+
+  if (assignmentEnabled) {
+    return (
+      <AppShell>
+        <PageHeader
+          eyebrow="Referral assignment"
+          title="Authorized assignment queue / 已授权分配队列"
+          description="本页仅在独立 Preview assignment gate 通过后读取当前运营范围内的 canonical referrals。队列只显示分配所需 metadata，不显示私密摘要或联系人。"
+        />
+        <PortalReferralAssignmentQueue enabled={assignmentEnabled} />
+      </AppShell>
+    );
+  }
+
   return (
     <AppShell>
       <PageHeader

@@ -16,20 +16,32 @@ import {
   PortalReferralWorkflowError,
   createPortalReferralMutationIdHash,
   createPortalReferralMutationPayloadHash,
+  type PortalReferralAssignmentDetail,
+  type PortalReferralAssignmentQueueItem,
   type PortalReferralListItem,
   type PortalReferralMutationAck,
+  type PortalReferralProviderCandidate,
 } from "./portal-referral-workflow";
 import { assertCaresLinkV1IdempotencyKey } from "./v1/shared-contracts";
 
 export const PORTAL_REFERRAL_SUPABASE_RPC_NAMES = Object.freeze({
   authorize: "portal_referral_intake_authorize",
   sourceDetailAuthorize: "portal_referral_source_detail_authorize",
+  assignmentAuthorize: "portal_referral_assignment_authorize",
   list: "portal_referral_intake_list",
   create: "portal_referral_intake_create",
   sourceDetail: "portal_referral_source_detail",
+  assignmentQueue: "portal_referral_assignment_queue",
+  assignmentDetail: "portal_referral_assignment_detail",
+  assignmentTriage: "portal_referral_assignment_triage",
+  assignmentCandidates: "portal_referral_assignment_candidates",
+  assignmentOffer: "portal_referral_assignment_offer",
 } as const);
 
-export type PortalReferralAuthorizationScope = "INTAKE" | "SOURCE_DETAIL";
+export type PortalReferralAuthorizationScope =
+  | "INTAKE"
+  | "SOURCE_DETAIL"
+  | "ASSIGNMENT";
 
 export type PortalReferralSupabaseRpcError = Readonly<{
   code?: unknown;
@@ -52,7 +64,7 @@ export type PortalReferralSessionScopedSupabaseRpcClient = Readonly<{
   ): PromiseLike<PortalReferralSupabaseRpcResult>;
 }>;
 
-export type PortalReferralAuthorization = Readonly<{
+type PortalReferralSourceAuthorization = Readonly<{
   userId: string;
   organizationId: string;
   organizationType: "REFERRAL_SOURCE";
@@ -60,6 +72,28 @@ export type PortalReferralAuthorization = Readonly<{
   membershipRole: "referral_source";
   membershipStatus: "ACTIVE";
 }>;
+
+type PortalReferralAssignmentAuthorization =
+  | Readonly<{
+      userId: string;
+      organizationId: string;
+      organizationType: "PLATFORM";
+      organizationStatus: "ACTIVE";
+      membershipRole: "platform_admin";
+      membershipStatus: "ACTIVE";
+    }>
+  | Readonly<{
+      userId: string;
+      organizationId: string;
+      organizationType: "REFERRAL_SOURCE";
+      organizationStatus: "ACTIVE";
+      membershipRole: "partner_operator";
+      membershipStatus: "ACTIVE";
+    }>;
+
+export type PortalReferralAuthorization =
+  | PortalReferralSourceAuthorization
+  | PortalReferralAssignmentAuthorization;
 
 export type PortalReferralAuthorizationResolution =
   | Readonly<{ ok: true; authorization: PortalReferralAuthorization }>
@@ -97,7 +131,7 @@ export async function authorizePortalReferralSupabaseClient(
   try {
     return {
       ok: true,
-      authorization: parseAuthorizationEnvelope(result.data),
+      authorization: parseAuthorizationEnvelope(result.data, scope),
     };
   } catch {
     return { ok: false, reason: "adapter_unavailable" };
@@ -110,6 +144,8 @@ function authorizationRpcName(scope: PortalReferralAuthorizationScope) {
       return PORTAL_REFERRAL_SUPABASE_RPC_NAMES.authorize;
     case "SOURCE_DETAIL":
       return PORTAL_REFERRAL_SUPABASE_RPC_NAMES.sourceDetailAuthorize;
+    case "ASSIGNMENT":
+      return PORTAL_REFERRAL_SUPABASE_RPC_NAMES.assignmentAuthorize;
     default:
       return undefined;
   }
@@ -132,6 +168,7 @@ export function createSupabasePortalReferralApi(
 
   return Object.freeze({
     async listReferrals() {
+      assertSourceAuthorization(trustedAuthorization);
       const data = await callWorkflowRpc(
         client,
         PORTAL_REFERRAL_SUPABASE_RPC_NAMES.list,
@@ -148,6 +185,7 @@ export function createSupabasePortalReferralApi(
       command: PortalReferralCreateCommand,
       mutation: PortalReferralApiMutationMetadata,
     ) {
+      assertSourceAuthorization(trustedAuthorization);
       const normalizedCommand = normalizeCreateCommand(command);
       const mutationId = assertMutationId(mutation?.mutationId);
       const correlationId = assertServerCorrelationId(mutation?.correlationId);
@@ -179,6 +217,7 @@ export function createSupabasePortalReferralApi(
     },
 
     async getReferral(referralId: string) {
+      assertSourceAuthorization(trustedAuthorization);
       const requestedReferralId = requestUuid(referralId);
       const data = await callWorkflowRpc(
         client,
@@ -191,9 +230,126 @@ export function createSupabasePortalReferralApi(
       }
       return detail;
     },
-    triageReferral: unsupported,
-    listProviderCandidates: unsupported,
-    offerReferral: unsupported,
+
+    async listAssignmentReferrals() {
+      assertAssignmentAuthorization(trustedAuthorization);
+      const data = await callWorkflowRpc(
+        client,
+        PORTAL_REFERRAL_SUPABASE_RPC_NAMES.assignmentQueue,
+        {
+          p_limit: 50,
+          p_before_updated_at: null,
+          p_before_id: null,
+        },
+      );
+      const items = parseAssignmentQueueEnvelope(data);
+      for (const item of items) {
+        assertAssignmentProjectionTenant(
+          trustedAuthorization,
+          item.sourceOrganizationId,
+        );
+      }
+      return items;
+    },
+
+    async getAssignmentReferral(referralId: string) {
+      assertAssignmentAuthorization(trustedAuthorization);
+      const requestedReferralId = requestUuid(referralId);
+      const data = await callWorkflowRpc(
+        client,
+        PORTAL_REFERRAL_SUPABASE_RPC_NAMES.assignmentDetail,
+        { p_referral_id: requestedReferralId },
+      );
+      const detail = parseAssignmentDetailEnvelope(data);
+      if (detail.referralId !== requestedReferralId) {
+        throw invalidAdapterEnvelope();
+      }
+      assertAssignmentProjectionTenant(
+        trustedAuthorization,
+        detail.sourceOrganizationId,
+      );
+      return detail;
+    },
+
+    async triageReferral(referralId, expectedVersion, mutation) {
+      assertAssignmentAuthorization(trustedAuthorization);
+      const requestedReferralId = requestUuid(referralId);
+      const version = requestRowVersion(expectedVersion);
+      const command = Object.freeze({
+        referralId: requestedReferralId,
+        expectedVersion: version,
+      });
+      const hashes = createMutationRpcHashes(
+        trustedAuthorization,
+        "TRIAGE_REFERRAL",
+        command,
+        mutation,
+      );
+      const data = await callWorkflowRpc(
+        client,
+        PORTAL_REFERRAL_SUPABASE_RPC_NAMES.assignmentTriage,
+        {
+          p_referral_id: requestedReferralId,
+          p_expected_version: version,
+          ...hashes,
+        },
+      );
+      return parseAssignmentMutationEnvelope(data, {
+        referralId: requestedReferralId,
+        expectedVersion: version,
+        currentStatus: "TRIAGED",
+        match: "NULL",
+      });
+    },
+
+    async listProviderCandidates(referralId: string) {
+      assertAssignmentAuthorization(trustedAuthorization);
+      const requestedReferralId = requestUuid(referralId);
+      const data = await callWorkflowRpc(
+        client,
+        PORTAL_REFERRAL_SUPABASE_RPC_NAMES.assignmentCandidates,
+        { p_referral_id: requestedReferralId, p_limit: 50 },
+      );
+      return parseProviderCandidatesEnvelope(data);
+    },
+
+    async offerReferral(referralId, command, mutation) {
+      assertAssignmentAuthorization(trustedAuthorization);
+      const requestedReferralId = requestUuid(referralId);
+      const normalizedCommandRecord = exactRequestRecord(command, [
+        "providerId",
+        "expectedVersion",
+      ]);
+      const normalizedCommand = Object.freeze({
+        referralId: requestedReferralId,
+        providerId: requestUuid(normalizedCommandRecord.providerId),
+        expectedVersion: requestRowVersion(
+          normalizedCommandRecord.expectedVersion,
+        ),
+      });
+      const hashes = createMutationRpcHashes(
+        trustedAuthorization,
+        "OFFER_REFERRAL",
+        normalizedCommand,
+        mutation,
+      );
+      const data = await callWorkflowRpc(
+        client,
+        PORTAL_REFERRAL_SUPABASE_RPC_NAMES.assignmentOffer,
+        {
+          p_referral_id: normalizedCommand.referralId,
+          p_provider_id: normalizedCommand.providerId,
+          p_expected_version: normalizedCommand.expectedVersion,
+          ...hashes,
+        },
+      );
+      return parseAssignmentMutationEnvelope(data, {
+        referralId: requestedReferralId,
+        expectedVersion: normalizedCommand.expectedVersion,
+        currentStatus: "OFFERED",
+        match: "NON_NULL",
+      });
+    },
     listMyOffers: unsupported,
     respondToOffer: unsupported,
     recordFollowUp: unsupported,
@@ -201,7 +357,10 @@ export function createSupabasePortalReferralApi(
   });
 }
 
-function parseAuthorizationEnvelope(value: unknown): PortalReferralAuthorization {
+function parseAuthorizationEnvelope(
+  value: unknown,
+  scope: PortalReferralAuthorizationScope,
+): PortalReferralAuthorization {
   const envelope = exactRecord(value, [
     "authorized",
     "user_id",
@@ -212,17 +371,23 @@ function parseAuthorizationEnvelope(value: unknown): PortalReferralAuthorization
     "membership_status",
   ]);
   if (envelope.authorized !== true) throw invalidAdapterEnvelope();
-  return parseAuthorization({
-    userId: envelope.user_id,
-    organizationId: envelope.organization_id,
-    organizationType: envelope.organization_type,
-    organizationStatus: envelope.organization_status,
-    membershipRole: envelope.membership_role,
-    membershipStatus: envelope.membership_status,
-  });
+  return parseAuthorization(
+    {
+      userId: envelope.user_id,
+      organizationId: envelope.organization_id,
+      organizationType: envelope.organization_type,
+      organizationStatus: envelope.organization_status,
+      membershipRole: envelope.membership_role,
+      membershipStatus: envelope.membership_status,
+    },
+    scope,
+  );
 }
 
-function parseAuthorization(value: unknown): PortalReferralAuthorization {
+function parseAuthorization(
+  value: unknown,
+  scope?: PortalReferralAuthorizationScope,
+): PortalReferralAuthorization {
   const authorization = exactRecord(value, [
     "userId",
     "organizationId",
@@ -232,21 +397,51 @@ function parseAuthorization(value: unknown): PortalReferralAuthorization {
     "membershipStatus",
   ]);
   if (
-    authorization.organizationType !== "REFERRAL_SOURCE" ||
     authorization.organizationStatus !== "ACTIVE" ||
-    authorization.membershipRole !== "referral_source" ||
     authorization.membershipStatus !== "ACTIVE"
   ) {
     throw invalidAdapterEnvelope();
   }
-  return Object.freeze({
+  const base = {
     userId: canonicalUuid(authorization.userId),
     organizationId: canonicalUuid(authorization.organizationId),
-    organizationType: "REFERRAL_SOURCE",
-    organizationStatus: "ACTIVE",
-    membershipRole: "referral_source",
-    membershipStatus: "ACTIVE",
-  });
+    organizationStatus: "ACTIVE" as const,
+    membershipStatus: "ACTIVE" as const,
+  };
+  if (
+    authorization.organizationType === "REFERRAL_SOURCE" &&
+    authorization.membershipRole === "referral_source" &&
+    scope !== "ASSIGNMENT"
+  ) {
+    return Object.freeze({
+      ...base,
+      organizationType: "REFERRAL_SOURCE",
+      membershipRole: "referral_source",
+    });
+  }
+  if (
+    authorization.organizationType === "PLATFORM" &&
+    authorization.membershipRole === "platform_admin" &&
+    (scope === undefined || scope === "ASSIGNMENT")
+  ) {
+    return Object.freeze({
+      ...base,
+      organizationType: "PLATFORM",
+      membershipRole: "platform_admin",
+    });
+  }
+  if (
+    authorization.organizationType === "REFERRAL_SOURCE" &&
+    authorization.membershipRole === "partner_operator" &&
+    (scope === undefined || scope === "ASSIGNMENT")
+  ) {
+    return Object.freeze({
+      ...base,
+      organizationType: "REFERRAL_SOURCE",
+      membershipRole: "partner_operator",
+    });
+  }
+  throw invalidAdapterEnvelope();
 }
 
 function parseListEnvelope(value: unknown): PortalReferralListItem[] {
@@ -345,6 +540,194 @@ function parseSourceDetailEnvelope(value: unknown): PortalReferralSourceDetail {
   });
 }
 
+const PORTAL_REFERRAL_ASSIGNMENT_STATUSES = [
+  "SUBMITTED",
+  "TRIAGED",
+  "OFFERED",
+] as const;
+
+function parseAssignmentQueueEnvelope(
+  value: unknown,
+): PortalReferralAssignmentQueueItem[] {
+  const envelope = exactRecord(value, ["items"]);
+  if (!Array.isArray(envelope.items) || envelope.items.length > 50) {
+    throw invalidAdapterEnvelope();
+  }
+  const seen = new Set<string>();
+  return envelope.items.map((entry) => {
+    const item = exactRecord(entry, [
+      "referral_id",
+      "source_organization_id",
+      "source_organization_name",
+      "region",
+      "service_type",
+      "current_status",
+      "row_version",
+      "updated_at",
+    ]);
+    const referralId = canonicalUuid(item.referral_id);
+    if (seen.has(referralId)) throw invalidAdapterEnvelope();
+    seen.add(referralId);
+    return Object.freeze({
+      referralId,
+      sourceOrganizationId: canonicalUuid(item.source_organization_id),
+      sourceOrganizationName: safeResponseText(
+        item.source_organization_name,
+        200,
+      ),
+      region: catalogValue(item.region, PORTAL_REFERRAL_PREVIEW_REGION_CODES),
+      serviceType: catalogValue(
+        item.service_type,
+        PORTAL_REFERRAL_PREVIEW_SERVICE_TYPE_CODES,
+      ),
+      currentStatus: catalogValue(
+        item.current_status,
+        PORTAL_REFERRAL_ASSIGNMENT_STATUSES,
+      ),
+      rowVersion: safeRowVersion(item.row_version),
+      updatedAt: safeTimestamp(item.updated_at),
+    });
+  });
+}
+
+function parseAssignmentDetailEnvelope(
+  value: unknown,
+): PortalReferralAssignmentDetail {
+  const envelope = exactRecord(value, [
+    "referral_id",
+    "source_organization_id",
+    "source_organization_name",
+    "summary",
+    "region",
+    "service_type",
+    "current_status",
+    "row_version",
+    "contact",
+    "active_offer",
+    "created_at",
+    "updated_at",
+  ]);
+  const currentStatus = catalogValue(
+    envelope.current_status,
+    PORTAL_REFERRAL_ASSIGNMENT_STATUSES,
+  );
+  const contact = exactRecord(envelope.contact, ["name", "phone", "email"]);
+  const createdAt = safeTimestamp(envelope.created_at);
+  const updatedAt = safeTimestamp(envelope.updated_at);
+  if (Date.parse(createdAt) > Date.parse(updatedAt)) {
+    throw invalidAdapterEnvelope();
+  }
+  let activeOffer: PortalReferralAssignmentDetail["activeOffer"] = null;
+  if (envelope.active_offer !== null) {
+    const offer = exactRecord(envelope.active_offer, [
+      "match_id",
+      "provider_id",
+      "provider_display_name",
+      "match_status",
+      "offered_at",
+    ]);
+    const offeredAt = safeTimestamp(offer.offered_at);
+    if (
+      offer.match_status !== "OFFERED" ||
+      Date.parse(offeredAt) < Date.parse(createdAt) ||
+      Date.parse(offeredAt) > Date.parse(updatedAt)
+    ) {
+      throw invalidAdapterEnvelope();
+    }
+    activeOffer = Object.freeze({
+      matchId: canonicalUuid(offer.match_id),
+      providerId: canonicalUuid(offer.provider_id),
+      displayName: safeResponseText(offer.provider_display_name, 200),
+      offeredAt,
+    });
+  }
+  if ((currentStatus === "OFFERED") !== Boolean(activeOffer)) {
+    throw invalidAdapterEnvelope();
+  }
+  return Object.freeze({
+    referralId: canonicalUuid(envelope.referral_id),
+    sourceOrganizationId: canonicalUuid(envelope.source_organization_id),
+    sourceOrganizationName: safeResponseText(
+      envelope.source_organization_name,
+      200,
+    ),
+    summary: safeResponseText(envelope.summary, 4_000),
+    region: catalogValue(envelope.region, PORTAL_REFERRAL_PREVIEW_REGION_CODES),
+    serviceType: catalogValue(
+      envelope.service_type,
+      PORTAL_REFERRAL_PREVIEW_SERVICE_TYPE_CODES,
+    ),
+    currentStatus,
+    rowVersion: safeRowVersion(envelope.row_version),
+    contact: Object.freeze({
+      name: safeResponseText(contact.name, 200),
+      phone: safeResponseText(contact.phone, 100),
+      email:
+        contact.email === null ? null : safeResponseText(contact.email, 320),
+    }),
+    activeOffer,
+    createdAt,
+    updatedAt,
+  });
+}
+
+function parseProviderCandidatesEnvelope(
+  value: unknown,
+): PortalReferralProviderCandidate[] {
+  const envelope = exactRecord(value, ["items"]);
+  if (!Array.isArray(envelope.items) || envelope.items.length > 50) {
+    throw invalidAdapterEnvelope();
+  }
+  const seen = new Set<string>();
+  return envelope.items.map((entry) => {
+    const item = exactRecord(entry, ["provider_id", "display_name"]);
+    const providerId = canonicalUuid(item.provider_id);
+    if (seen.has(providerId)) throw invalidAdapterEnvelope();
+    seen.add(providerId);
+    return Object.freeze({
+      providerId,
+      displayName: safeResponseText(item.display_name, 200),
+    });
+  });
+}
+
+function parseAssignmentMutationEnvelope(
+  value: unknown,
+  expected: Readonly<{
+    referralId: string;
+    expectedVersion: number;
+    currentStatus: "TRIAGED" | "OFFERED";
+    match: "NULL" | "NON_NULL";
+  }>,
+): PortalReferralMutationAck {
+  const envelope = exactRecord(value, [
+    "referral_id",
+    "match_id",
+    "current_status",
+    "row_version",
+    "updated_at",
+  ]);
+  const referralId = canonicalUuid(envelope.referral_id);
+  const matchId =
+    envelope.match_id === null ? null : canonicalUuid(envelope.match_id);
+  const rowVersion = safeRowVersion(envelope.row_version);
+  if (
+    referralId !== expected.referralId ||
+    envelope.current_status !== expected.currentStatus ||
+    rowVersion !== expected.expectedVersion + 1 ||
+    (expected.match === "NULL" ? matchId !== null : matchId === null)
+  ) {
+    throw invalidAdapterEnvelope();
+  }
+  return Object.freeze({
+    referralId,
+    matchId,
+    currentStatus: expected.currentStatus,
+    rowVersion,
+    updatedAt: safeTimestamp(envelope.updated_at),
+  });
+}
+
 function normalizeCreateCommand(
   value: PortalReferralCreateCommand,
 ): PortalReferralCreateCommand {
@@ -376,6 +759,66 @@ function normalizeCreateCommand(
   });
   assertSummaryDoesNotContainContact(normalized.summary, normalized.contact);
   return normalized;
+}
+
+function createMutationRpcHashes(
+  authorization: PortalReferralAssignmentAuthorization,
+  kind: "TRIAGE_REFERRAL" | "OFFER_REFERRAL",
+  command: Readonly<Record<string, unknown>>,
+  mutation: PortalReferralApiMutationMetadata,
+) {
+  const mutationId = assertMutationId(mutation?.mutationId);
+  const correlationId = assertServerCorrelationId(mutation?.correlationId);
+  return Object.freeze({
+    p_mutation_id_hash: createPortalReferralMutationIdHash(mutationId),
+    p_payload_hash: createPortalReferralMutationPayloadHash({
+      actor: {
+        organizationId: authorization.organizationId,
+        role: authorization.membershipRole,
+        providerId: null,
+      },
+      kind,
+      command,
+    }),
+    p_correlation_id_hash: hashPrivateIdentifier(correlationId),
+  });
+}
+
+function assertSourceAuthorization(
+  authorization: PortalReferralAuthorization,
+): asserts authorization is PortalReferralSourceAuthorization {
+  if (authorization.membershipRole !== "referral_source") {
+    throw new PortalReferralWorkflowError(
+      "FORBIDDEN",
+      "Portal referral operation is not enabled",
+    );
+  }
+}
+
+function assertAssignmentAuthorization(
+  authorization: PortalReferralAuthorization,
+): asserts authorization is PortalReferralAssignmentAuthorization {
+  if (
+    authorization.membershipRole !== "platform_admin" &&
+    authorization.membershipRole !== "partner_operator"
+  ) {
+    throw new PortalReferralWorkflowError(
+      "FORBIDDEN",
+      "Portal referral operation is not enabled",
+    );
+  }
+}
+
+function assertAssignmentProjectionTenant(
+  authorization: PortalReferralAssignmentAuthorization,
+  sourceOrganizationId: string,
+) {
+  if (
+    authorization.membershipRole === "partner_operator" &&
+    authorization.organizationId !== sourceOrganizationId
+  ) {
+    throw invalidAdapterEnvelope();
+  }
 }
 
 async function callWorkflowRpc(
@@ -558,6 +1001,17 @@ function requestUuid(value: unknown) {
     throw validationError();
   }
   return canonical;
+}
+
+function requestRowVersion(value: unknown) {
+  if (
+    !Number.isSafeInteger(value) ||
+    (value as number) < 1 ||
+    (value as number) >= Number.MAX_SAFE_INTEGER
+  ) {
+    throw validationError();
+  }
+  return value as number;
 }
 
 function safeRowVersion(value: unknown) {

@@ -204,6 +204,65 @@ The updated intake BEGIN-through-ROLLBACK body is 40,774 bytes / SHA-256
 No cloud database, Preview deployment, Production migration, flag activation,
 retained user/business row or paid resource was used.
 
+### Portal Referral Assignment M1a source/local checkpoint — 2026-08-25
+
+This slice adds an independently gated operator queue/detail, triage,
+eligible-provider candidates and offer. The application and database gates are
+default-off. Runtime authorization remains cookie-only and exact-Preview-ref
+bound; database authorization resolves exactly one active platform admin or
+source-tenant partner operator and rechecks the live Auth session after lock
+waits. Queue and candidates are bounded; Supabase and browser envelopes plus
+route requests are exact-key parsed, while route responses are strictly
+validated and allowlist-projected. Gate-on pages never fall back to mock. Offer
+promotes or creates one `OFFERED` match while leaving `assigned_provider_id`
+null.
+Provider response, follow-up and audit list remain unsupported.
+
+| Command | Result |
+|---|---|
+| focused Assignment gate | 9 files / 292 tests passed |
+| `pnpm test` | 138 files / 1,821 tests passed |
+| `pnpm exec tsc --noEmit --incremental false` | passed |
+| `pnpm lint` | passed |
+| `pnpm exec next build --webpack` | passed; Next static generation completed 64/64 |
+| `python3 tools/sync_codex_adapters.py --check` | passed; 73 files checked |
+| `git diff --check` | passed |
+
+A temporary PostgreSQL 16.15 (`server_version_num=160015`) loaded the minimum
+compatible bootstrap and foundation → intake → source-detail → assignment
+migration chain with `ON_ERROR_STOP=1`, then passed the rollback-only Assignment
+suite. The suite proves default-off/master-before-operation and cross-gate
+denial; exact owner/definer/volatile/search-path/ACL posture; zero direct table
+grants; exact-one role/organization/session authority; tenant/not-found
+isolation; strict DTO, trimmed names, keyset/state boundaries; provider
+eligibility and uniform not-found for absent/currently ineligible targets even
+when a historical `DECLINED` or `EXPIRED` match exists; triage/offer hashes,
+replay, conflict, stale and corrupt-receipt handling; bigint increment
+protection; candidate promotion; metadata-only audit; stable replay after
+provider suspension; role restoration, cleanup and zero-write failure
+snapshots.
+
+Eleven real two-backend PostgreSQL scenarios also passed. Concurrent same-actor
+same-mutation triage returned one ACK and one audit/receipt side effect;
+triage/offer queued behind the same referral lock produced exactly one winner;
+and the provider helper locked only its bounded result. Eight wall-clock expiry
+scenarios crossed `not_after` while waiting at the triage referral, Auth row,
+organization/membership table, candidate referral/provider and offer
+referral/match/provider lock stages. Every expired call returned
+`PORTAL_SESSION_REVOKED` before a data-derived error or write, with zero
+referral/match/audit/receipt side effect. The temporary cluster and race scripts
+were removed.
+
+The migration is 36,128 bytes / SHA-256
+`e9ecd8ce68a70a69d0a611f5803aeaae195025cfc6a65235025d6e6544fdcb40`;
+the rollback assertion file is 62,944 bytes / SHA-256
+`eb77a92cf18ad602a9cdb6c6fb05ab58e63618ec4b97ade2e38b0d81775eedff`;
+the TypeScript migration contract is 20,783 bytes / SHA-256
+`65c13cae85e4f1e4e3d9b387965c0aae9e785a0f9162466f8a9869598be752e1`.
+This is a minimum local chain, not a full repository migration apply or hosted
+GoTrue/PostgREST/Auth E2E. No cloud database, deployment, flag activation,
+retained fixture, Production action or paid resource was used.
+
 ### Five-Note generation source/offline checkpoint — 2026-08-20
 
 Communication, Handover, Progress, NDIS and Incident Factual now share one
@@ -1320,7 +1379,7 @@ This does not prove a live, data-bearing cross-migration upgrade. The `202608100
 | Production-unapplied SQL boundary | `src/lib/v1/v1-shadow-migration-contract.test.ts`, `mobile-sync-migration-contract.test.ts`, isolated guarded-live and local engine evidence | additive/no legacy DML, owner isolation and explicit grants are source-checked; historical deleted `r4` passed the 13-file foundation manifest 13/13 and six rollback suites. At HEAD `c7b70e9f84b9b804779039711b85cc7eda55bd57`, deleted `r9` passed the exact 14-file worker manifest 14/14, seven rollback suites and independent hard-off/zero-row/role/RLS/ACL/9-RPC postchecks. Deleted `r20` additionally passed the PostgreSQL 17.6 true two-session claim/session/privacy race gate; deleted `r21` passed the Attempt 1/Attempt 2 historical-replay and post-purge matrix; deleted `r22` passed 15/15 and 7/7. The isolated PostgreSQL 16.15 gates added engine and strict two-backend evidence. Deleted Hosted r5 then passed the exact 30-file manifest, all 11 rollback suites and the independent owner/role/RLS/ACL/hard-off/zero-fixture postcheck. All diagnostic Previews and local test resources were removed. This is schema/transaction evidence only; runtime writes remain withheld |
 | Owner generation repository boundary | `note-generation-owner-repository.server.test.ts`, `note-generation-owner-runtime-migration-contract.test.ts` and `v1_note_generation_owner_runtime_rpc_shadow_assertions.sql` | exact private direct-query calls, owner-safe envelopes, default-empty admission, fresh session/privacy/catalog selection, idempotent atomic enqueue, status/cancel while hard-off and atomic cancellation are source/local-SQL tested. The local PG16.15 owner/posture/session-lock gate and deleted r5 Hosted 30/30 migration, 11/11 assertion and independent posture gate passed. No retained Preview, hosted Auth/Data API, route, caller grant, vault/model/Points or Production capability |
 | Worker-registration graceful retirement | `note-generation-registration-retirement-shadow-migration-contract.test.ts` and `v1_note_generation_registration_retirement_shadow_assertions.sql` | migration #29 preserves immutable digest-bound `APPROVED` registrations, adds the fourteenth forced-RLS table and validates append-only retirement, fixed reasons, exact sorted active-binding compare-and-retire, idempotent replay, new-admission/new-claim denial and existing-attempt drain/recovery. The local 29/29, 9/9, posture and two-ordering race gate plus deleted r5 Hosted 30/30, 11/11 and independent posture gate passed. No caller grant, route, credential, seed, activation, emergency revoke or Production capability |
-| Portal Referral intake and source-detail runtime | intake/source-detail migration contracts, route/runtime/Supabase/UI tests and both rollback suites | default-off cookie-only list/create/detail; auth-first request scope; independent operation gates; exact authenticated RPC grants; database-derived source tenant; post-lock session revalidation; uniform cross-tenant/not-found detail; strict private DTO parsing; atomic PII-separated create and write-free detail passed source tests. Historical intake evidence includes local 30/30, 10/10, 8/8 two-session and deleted r5 Hosted 30/30/11/11 gates. The later exact source-detail migration has only its separately recorded local evidence; hosted GoTrue/PostgREST and activation remain unproved |
+| Portal Referral intake, source-detail and Assignment M1a runtime | intake/source-detail/assignment migration contracts, route/runtime/Supabase/UI tests and rollback suites | default-off cookie-only source list/create/detail plus operator queue/detail/triage/candidates/offer; independent application/database operation gates; exact authenticated RPC grants; database-derived exact-one operator context; Source A/B isolation; post-lock session revalidation; shared provider eligibility; strict DTO/ACK parsing; PII-separated create; assignment offer keeps `assigned_provider_id` null. Historical intake evidence includes local 30/30, 10/10, 8/8 two-session and deleted r5 Hosted 30/30/11/11 gates. Source detail and Assignment M1a have only their separately recorded local evidence; hosted GoTrue/PostgREST and activation remain unproved |
 | Runtime isolation | `src/lib/v1/runtime-boundary.test.ts` | audited NDIS routes and the new `/v1` adapter are the only allowed server boundaries; `/v1` remains disabled without explicit adapters |
 
 ### Current live/read-only evidence
@@ -1399,4 +1458,4 @@ The following suites are required before the corresponding V1 slice can be calle
 8. No signed PIA/data-map/subprocessor/NDB evidence is represented in automated tests.
 9. Current production refresh-token errors need a reproducible stale-cookie/session recovery test before V1 release.
 10. Build/test success is not a production V1 greenlight; migration, Preview/live safety and explicit owner approval remain mandatory.
-11. Portal Intake/source detail still lack hosted GoTrue/PostgREST cookie E2E and actual Preview activation; triage, offer, provider response, follow-up and audit remain unimplemented.
+11. Portal intake/source detail/Assignment M1a still lack hosted GoTrue/PostgREST cookie E2E and actual Preview activation. Provider offer acceptance/decline, assignment finalization, follow-up and audit listing remain unimplemented.

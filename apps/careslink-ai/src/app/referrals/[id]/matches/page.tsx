@@ -2,10 +2,13 @@ import { CheckCircle2, CircleAlert } from "lucide-react";
 import { notFound } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { PageHeader } from "@/components/page-header";
+import { PortalReferralAssignmentCoordinator } from "@/components/portal-referral-assignment-controls";
 import { PortalReferralWorkflowBoundary } from "@/components/portal-referral-workflow-controls";
 import { Card } from "@/components/ui";
 import { displayArea, displayList, displayService } from "@/lib/display";
 import { providers, referrals } from "@/lib/mock-data";
+import { canonicalPortalReferralUuid } from "@/lib/portal-referral-id";
+import { isPortalReferralAssignmentRuntimeEnabled } from "@/lib/portal-referral-runtime.server";
 import { matchReferralToProviders } from "@/lib/referral-matching";
 
 export default async function ReferralMatchingPage({
@@ -14,6 +17,27 @@ export default async function ReferralMatchingPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
+  const assignmentEnabled = isPortalReferralAssignmentRuntimeEnabled();
+
+  if (assignmentEnabled) {
+    const referralId = canonicalPortalReferralUuid(id);
+    if (!referralId || referralId !== id) notFound();
+    return (
+      <AppShell>
+        <PageHeader
+          eyebrow="Referral assignment"
+          title="Authorized referral assignment / 已授权 Referral 分配"
+          description="本页从 Preview 数据库读取当前运营范围内的 canonical referral，并按服务器返回的版本依次执行分诊、候选读取和 provider offer。开启时不会回退到 mock。"
+        />
+        <PortalReferralAssignmentCoordinator
+          enabled={assignmentEnabled}
+          key={referralId}
+          referralId={referralId}
+        />
+      </AppShell>
+    );
+  }
+
   const referral = referrals.find((item) => item.id === id);
   if (!referral) notFound();
   const matches = matchReferralToProviders(referral, providers);

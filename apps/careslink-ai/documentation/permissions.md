@@ -75,7 +75,7 @@ Current admin pages may display access-request metadata, feature counts, statuse
 
 ## V1 shadow permission contract and isolated evidence
 
-### Portal Referral foundation, intake and source-detail runtime (source/local and unapplied)
+### Portal Referral foundation, intake, source-detail and Assignment M1a runtime (source/local and unapplied)
 
 The Portal Referral foundation introduces organization membership, provider,
 referral, separately protected contact, match, follow-up, receipt, audit,
@@ -105,6 +105,36 @@ authorize/list/create RPCs now hold master + intake before validation or write,
 so master + detail cannot open intake through a direct Data API call. Conversely,
 master + intake cannot open either detail RPC.
 
+Assignment M1a adds exactly six public `SECURITY DEFINER` RPCs—assignment
+authorize, queue, detail, triage, candidates and offer—with `search_path=''`,
+the migration-entry owner and `EXECUTE` only for `authenticated`. Four private
+assignment helpers have no API-role execution, and no Portal table grant is
+added. Every RPC holds master then `referral_assignment_v1`; the new row remains
+`enabled=false, preview_only=true`. Assignment context must resolve from the
+live database to exactly one active `platform_admin` membership in an active
+PLATFORM organization or one active `partner_operator` membership in an active
+REFERRAL_SOURCE organization. Mixed, multiple and zero contexts fail closed.
+Partner operators are source-tenant-scoped; platform admins are global.
+
+Queue is metadata-only and keyset-bounded. Assignment detail adds the source
+organization, private summary/contact and at most one active-offer projection,
+but excludes source user, membership, provider-member, audit, receipt,
+document and export identities. Candidate and offer share one private
+eligibility query: active PROVIDER organization, APPROVED review,
+AVAILABLE/LIMITED capacity, exact region/service and at least one active
+provider member. Offer checks the authorized referral before provider
+eligibility, promotes or creates one match and keeps
+`assigned_provider_id=null`; provider response remains unavailable. Triage and
+offer use actor+mutation advisory serialization, expected row versions, fresh
+post-lock session checks, SHA-256 payload/idempotency/correlation values and one
+audit plus one receipt. Session time is sampled only after Auth row locks; the
+context rechecks it after organization/membership table locks and before
+exact-one derivation, and candidates/offer recheck after their referral,
+match/provider lock stages. Currently ineligible providers retain uniform
+not-found even when a historical match exists. Exact completed offer replay
+remains stable if the provider later becomes ineligible; changed payload or kind
+conflicts.
+
 The local actor-bound test adapter enforces Source A/B, Provider A/B and
 partner-operator tenant isolation. Providers receive only frozen region/service
 codes before accepting their own offer; summary/contact become visible only to
@@ -120,15 +150,14 @@ base API and durable-adapter gates, the selected independent operation gate and
 the exact non-Production Preview ref pass. It
 rejects caller Bearer authorization, never creates a service-role client and
 executes database authorization before a private mutation body is parsed. The
-database revalidates the current Auth user/session and exactly one active
-referral-source membership in an active referral-source organization; actor,
-organization and role are never accepted from the body. List is source-scoped
-and metadata-only. Create atomically writes referral, private contact, audit and
-receipt rows with hashed mutation/correlation identifiers. The database flag
-and all application gates remain off. Source detail is read-only and cannot
-write referral, contact, audit or receipt rows. This is source/local disposable-SQL
-evidence only: no hosted Preview or Production migration, activation or
-deployment is claimed.
+database revalidates the current Auth user/session and the exact active
+membership required by the selected operation; actor, organization and role
+are never accepted from the body. Source list is metadata-only and create
+atomically writes referral, private contact, audit and receipt rows with hashed
+mutation/correlation identifiers. Source detail is read-only. Assignment reads
+or performs only triage/offer as described above. All application and database
+flags remain off. This is source/local disposable-SQL evidence only: no hosted
+Preview or Production migration, activation or deployment is claimed.
 
 `supabase/migrations/20260809120000_create_v1_shadow_foundation.sql` defines the following controls. It was applied only to a disposable `with_data=false` branch and has not been applied to Production Supabase:
 

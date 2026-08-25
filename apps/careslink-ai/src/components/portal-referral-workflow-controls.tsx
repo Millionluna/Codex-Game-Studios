@@ -239,7 +239,7 @@ export async function submitPortalReferralMutation({
       return { ok: false, code: failureCodeForStatus(response.status) };
     }
 
-    const ack = parseMetadataOnlyAck(await response.json());
+    const ack = parseMetadataOnlyAck(await response.json(), mutation);
     return ack
       ? { ok: true, ack }
       : { ok: false, code: "REQUEST_FAILED" };
@@ -1120,9 +1120,22 @@ function getMutationTarget(mutation: PortalReferralMutation) {
   }
 }
 
-function parseMetadataOnlyAck(value: unknown): PortalReferralMutationAck | undefined {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
-  const candidate = value as Partial<PortalReferralMutationAck>;
+function parseMetadataOnlyAck(
+  value: unknown,
+  mutation: PortalReferralMutation,
+): PortalReferralMutationAck | undefined {
+  if (
+    !hasExactKeys(value, [
+      "referralId",
+      "matchId",
+      "currentStatus",
+      "rowVersion",
+      "updatedAt",
+    ])
+  ) {
+    return undefined;
+  }
+  const candidate = value;
   const referralId = canonicalPortalReferralUuid(candidate.referralId);
   const matchId =
     candidate.matchId === null
@@ -1130,14 +1143,25 @@ function parseMetadataOnlyAck(value: unknown): PortalReferralMutationAck | undef
       : canonicalPortalReferralUuid(candidate.matchId);
   if (
     !referralId ||
+    referralId !== candidate.referralId ||
     (candidate.matchId !== null && !matchId) ||
+    (candidate.matchId !== null && matchId !== candidate.matchId) ||
     typeof candidate.currentStatus !== "string" ||
     !(PORTAL_REFERRAL_UI_STATUSES as readonly string[]).includes(
       candidate.currentStatus,
     ) ||
     !Number.isSafeInteger(candidate.rowVersion) ||
-    typeof candidate.updatedAt !== "string" ||
-    !ISO_INSTANT_PATTERN.test(candidate.updatedAt)
+    (candidate.rowVersion as number) < 1 ||
+    !strictUtcInstant(candidate.updatedAt) ||
+    !ackMatchesMutation(
+      {
+        referralId,
+        matchId: matchId ?? null,
+        currentStatus: candidate.currentStatus,
+        rowVersion: candidate.rowVersion as number,
+      },
+      mutation,
+    )
   ) {
     return undefined;
   }
@@ -1147,8 +1171,74 @@ function parseMetadataOnlyAck(value: unknown): PortalReferralMutationAck | undef
     matchId: matchId ?? null,
     currentStatus: candidate.currentStatus,
     rowVersion: candidate.rowVersion as number,
-    updatedAt: candidate.updatedAt,
+    updatedAt: candidate.updatedAt as string,
   });
+}
+
+function ackMatchesMutation(
+  ack: Pick<
+    PortalReferralMutationAck,
+    "referralId" | "matchId" | "currentStatus" | "rowVersion"
+  >,
+  mutation: PortalReferralMutation,
+) {
+  switch (mutation.kind) {
+    case "CREATE_REFERRAL":
+      return (
+        ack.matchId === null &&
+        ack.currentStatus === "SUBMITTED" &&
+        ack.rowVersion === 1
+      );
+    case "TRIAGE_REFERRAL": {
+      const referralId = canonicalPortalReferralUuid(mutation.referralId);
+      return (
+        Boolean(referralId) &&
+        ack.referralId === referralId &&
+        ack.matchId === null &&
+        ack.currentStatus === "TRIAGED" &&
+        isNextVersion(ack.rowVersion, mutation.expectedVersion)
+      );
+    }
+    case "OFFER_REFERRAL": {
+      const referralId = canonicalPortalReferralUuid(mutation.referralId);
+      return (
+        Boolean(referralId) &&
+        ack.referralId === referralId &&
+        ack.matchId !== null &&
+        ack.currentStatus === "OFFERED" &&
+        isNextVersion(ack.rowVersion, mutation.expectedVersion)
+      );
+    }
+    case "RESPOND_TO_OFFER": {
+      const matchId = canonicalPortalReferralUuid(mutation.matchId);
+      return (
+        Boolean(matchId) &&
+        ack.matchId === matchId &&
+        ack.currentStatus ===
+          (mutation.decision === "ACCEPT" ? "ACCEPTED" : "TRIAGED") &&
+        isNextVersion(ack.rowVersion, mutation.expectedVersion)
+      );
+    }
+    case "RECORD_FOLLOW_UP": {
+      const referralId = canonicalPortalReferralUuid(mutation.referralId);
+      return (
+        Boolean(referralId) &&
+        ack.referralId === referralId &&
+        ack.matchId === null &&
+        ack.currentStatus === "IN_PROGRESS" &&
+        isNextVersion(ack.rowVersion, mutation.expectedVersion)
+      );
+    }
+  }
+}
+
+function isNextVersion(actual: number, expected: number) {
+  return (
+    Number.isSafeInteger(expected) &&
+    expected >= 1 &&
+    expected < Number.MAX_SAFE_INTEGER &&
+    actual === expected + 1
+  );
 }
 
 function parseMetadataOnlyList(

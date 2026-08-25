@@ -8,6 +8,8 @@ import {
 } from "./portal-referral-adapter.server";
 import {
   handlePortalReferralAudit,
+  handlePortalReferralAssignmentCollection,
+  handlePortalReferralAssignmentGet,
   handlePortalReferralCandidates,
   handlePortalReferralCollection,
   handlePortalReferralFollowUp,
@@ -657,6 +659,163 @@ describe("Portal referral route adapter", () => {
     expect(await responseJson(cookie)).toEqual(await responseJson(bearer));
   });
 
+  it("serves an operator-scoped assignment queue and exact private detail", async () => {
+    const harness = createHarness();
+    const sourceA = harness.workflow.createReferral(
+      SOURCE_A,
+      {
+        summary: SUMMARY,
+        region: "VIC_MELBOURNE",
+        serviceType: "SUPPORT_COORDINATION",
+        contact: CONTACT,
+      },
+      { mutationId: "assignment-route-create-a" },
+    );
+    const sourceB = harness.workflow.createReferral(
+      SOURCE_B,
+      {
+        summary: SUMMARY,
+        region: "VIC_GEELONG",
+        serviceType: "COMMUNITY_PARTICIPATION",
+        contact: CONTACT,
+      },
+      { mutationId: "assignment-route-create-b" },
+    );
+
+    const queueResponse = await handlePortalReferralAssignmentCollection(
+      getRequest("/api/portal/referral-assignments", "operator-a"),
+      harness.dependencies,
+    );
+    const queue = await responseJson<{ items: Record<string, unknown>[] }>(
+      queueResponse,
+    );
+    expect(queueResponse.status).toBe(200);
+    expect(queue.items).toHaveLength(1);
+    expect(queue.items[0]).toMatchObject({
+      referralId: sourceA.referralId,
+      sourceOrganizationId: IDS.sourceAOrg,
+      currentStatus: "SUBMITTED",
+      rowVersion: 1,
+    });
+    expect(Object.keys(queue.items[0] ?? {}).sort()).toEqual(
+      [
+        "referralId",
+        "sourceOrganizationId",
+        "sourceOrganizationName",
+        "region",
+        "serviceType",
+        "currentStatus",
+        "rowVersion",
+        "updatedAt",
+      ].sort(),
+    );
+    expect(JSON.stringify(queue)).not.toContain(CONTACT.phone);
+    expect(JSON.stringify(queue)).not.toContain(SUMMARY);
+
+    const detailResponse = await handlePortalReferralAssignmentGet(
+      getRequest(
+        `/api/portal/referral-assignments/${sourceA.referralId}`,
+        "operator-a",
+      ),
+      sourceA.referralId,
+      harness.dependencies,
+    );
+    expect(await responseJson(detailResponse)).toEqual({
+      referral: expect.objectContaining({
+        referralId: sourceA.referralId,
+        summary: SUMMARY,
+        contact: CONTACT,
+        activeOffer: null,
+      }),
+    });
+
+    const crossTenant = await handlePortalReferralAssignmentGet(
+      getRequest(
+        `/api/portal/referral-assignments/${sourceB.referralId}`,
+        "operator-a",
+      ),
+      sourceB.referralId,
+      harness.dependencies,
+    );
+    expect(crossTenant.status).toBe(404);
+    expect(await responseJson(crossTenant)).toEqual({
+      error: { code: "NOT_FOUND" },
+      correlationId: SERVER_CORRELATION_ID,
+    });
+  });
+
+  it("projects candidates and fails closed on an unbound assignment ACK", async () => {
+    const workflow = createWorkflow();
+    const created = workflow.createReferral(
+      SOURCE_A,
+      {
+        summary: SUMMARY,
+        region: "VIC_MELBOURNE",
+        serviceType: "SUPPORT_COORDINATION",
+        contact: CONTACT,
+      },
+      { mutationId: "assignment-project-create" },
+    );
+    workflow.triageReferral(
+      OPERATOR_A,
+      created.referralId,
+      1,
+      { mutationId: "assignment-project-triage" },
+    );
+    const baseApi = createActorBoundPortalReferralApi(workflow, OPERATOR_A);
+    const api = {
+      ...baseApi,
+      listProviderCandidates: async () => [
+        {
+          providerId: IDS.providerA,
+          displayName: "Provider A Preview",
+          privateScore: 99,
+        },
+      ],
+      triageReferral: async () => ({
+        referralId: "70000000-0000-4000-8000-000000000999",
+        matchId: null,
+        currentStatus: "TRIAGED" as const,
+        rowVersion: 2,
+        updatedAt: "2026-08-16T00:00:00.000Z",
+      }),
+    } satisfies PortalReferralApi;
+    const dependencies = {
+      resolveApi: async () => ({ ok: true as const, api }),
+      createCorrelationId: () => SERVER_CORRELATION_ID,
+    };
+
+    const candidatesResponse = await handlePortalReferralCandidates(
+      getRequest(
+        `/api/portal/referrals/${created.referralId}/candidates`,
+        "operator-a",
+      ),
+      created.referralId,
+      dependencies,
+    );
+    expect(await responseJson(candidatesResponse)).toEqual({
+      items: [
+        { providerId: IDS.providerA, displayName: "Provider A Preview" },
+      ],
+    });
+
+    const triageResponse = await handlePortalReferralTriage(
+      mutationRequest(
+        `/api/portal/referrals/${created.referralId}/triage`,
+        "operator-a",
+        "assignment-unbound-ack",
+        { expectedVersion: 1 },
+      ),
+      created.referralId,
+      dependencies,
+    );
+    expect(triageResponse.status).toBe(503);
+    expect(await responseJson(triageResponse)).toEqual({
+      error: { code: "ADAPTER_UNAVAILABLE" },
+      correlationId: SERVER_CORRELATION_ID,
+    });
+  });
+
   it("rejects unsupported methods before resolving an adapter", async () => {
     const resolveApi = vi.fn<PortalReferralApiResolver>();
     const response = await handlePortalReferralCollection(
@@ -681,6 +840,31 @@ describe("Portal referral route adapter", () => {
       rowVersion: 1,
       updatedAt,
     } as const;
+    const triageAck = {
+      ...ack,
+      currentStatus: "TRIAGED" as const,
+      rowVersion: 2,
+    };
+    const offerAck = {
+      ...ack,
+      matchId,
+      currentStatus: "OFFERED" as const,
+      rowVersion: 2,
+    };
+    const assignmentDetail = {
+      referralId,
+      sourceOrganizationId: IDS.sourceAOrg,
+      sourceOrganizationName: "Source A",
+      summary: SUMMARY,
+      region: "VIC_MELBOURNE",
+      serviceType: "SUPPORT_COORDINATION",
+      currentStatus: "SUBMITTED" as const,
+      rowVersion: 1,
+      contact: CONTACT,
+      activeOffer: null,
+      createdAt: updatedAt,
+      updatedAt,
+    } as const;
     const api = {
       listReferrals: vi.fn(async () => []),
       createReferral: vi.fn(async () => ack),
@@ -699,9 +883,11 @@ describe("Portal referral route adapter", () => {
         createdAt: updatedAt,
         updatedAt,
       })),
-      triageReferral: vi.fn(async () => ack),
+      listAssignmentReferrals: vi.fn(async () => []),
+      getAssignmentReferral: vi.fn(async () => assignmentDetail),
+      triageReferral: vi.fn(async () => triageAck),
       listProviderCandidates: vi.fn(async () => []),
-      offerReferral: vi.fn(async () => ({ ...ack, matchId })),
+      offerReferral: vi.fn(async () => offerAck),
       listMyOffers: vi.fn(async () => []),
       respondToOffer: vi.fn(async () => ({ ...ack, matchId })),
       recordFollowUp: vi.fn(async () => ack),
@@ -733,6 +919,18 @@ describe("Portal referral route adapter", () => {
       ),
       await handlePortalReferralGet(
         getRequest(`/api/portal/referrals/${referralId}`, "source-a"),
+        referralId,
+        dependencies,
+      ),
+      await handlePortalReferralAssignmentCollection(
+        getRequest("/api/portal/referral-assignments", "operator-a"),
+        dependencies,
+      ),
+      await handlePortalReferralAssignmentGet(
+        getRequest(
+          `/api/portal/referral-assignments/${referralId}`,
+          "operator-a",
+        ),
         referralId,
         dependencies,
       ),
@@ -809,9 +1007,11 @@ describe("Portal referral route adapter", () => {
           updatedAt,
         },
       },
-      ack,
       { items: [] },
-      { ...ack, matchId },
+      { referral: assignmentDetail },
+      triageAck,
+      { items: [] },
+      offerAck,
       { items: [] },
       { ...ack, matchId },
       ack,
@@ -819,6 +1019,16 @@ describe("Portal referral route adapter", () => {
     ]);
     for (const method of Object.values(api)) expect(method).toHaveBeenCalledOnce();
     expect(api.createReferral).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ correlationId: SERVER_CORRELATION_ID }),
+    );
+    expect(api.triageReferral).toHaveBeenCalledWith(
+      referralId,
+      1,
+      expect.objectContaining({ correlationId: SERVER_CORRELATION_ID }),
+    );
+    expect(api.offerReferral).toHaveBeenCalledWith(
+      referralId,
       expect.anything(),
       expect.objectContaining({ correlationId: SERVER_CORRELATION_ID }),
     );
