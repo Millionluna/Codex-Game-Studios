@@ -1,6 +1,14 @@
 -- Manual rollback-only assertions for the Production-unapplied Portal Referral
 -- intake runtime. Run only after the exact foundation and intake migrations on
 -- a disposable database. No fixture may survive the final ROLLBACK.
+-- Deleted r5 executed the prior 38843-byte body at SHA-256
+-- d434f916ff0aece191b0754e35393c0ab03ada7ec9849c75add8c04c16536182.
+-- The current post-r5 proowner-hardened body is 39728 bytes at SHA-256
+-- 2255331b99ff6c4ca05b3a79578c6daa601e26662633063aa004f43423e3729f.
+-- It moves all five migration-entry function ownership checks from the
+-- one-time postcheck into this committed suite. This exact augmented body has
+-- source and static-contract evidence only until a fresh disposable Preview
+-- reruns it; the deleted-r5 postcheck separately proved the same invariant.
 
 begin;
 
@@ -17,7 +25,18 @@ declare
   v_table text;
   v_definition text;
   v_search_path text;
+  v_entry_actor oid := (
+    select role.oid
+    from pg_catalog.pg_roles as role
+    where role.rolname = pg_catalog.current_setting(
+      'careslink.assertion_entry_role'
+    )
+  );
 begin
+  if v_entry_actor is null then
+    raise exception 'assertion entry actor is missing';
+  end if;
+
   if exists (
     select 1 from pg_constraint
     where conrelid = 'public.portal_workflow_flags'::regclass
@@ -58,6 +77,14 @@ begin
     if to_regprocedure(v_signature) is null then
       raise exception 'portal intake RPC is missing: %', v_signature;
     end if;
+    if (
+      select routine.proowner
+      from pg_catalog.pg_proc as routine
+      where routine.oid = pg_catalog.to_regprocedure(v_signature)
+    ) is distinct from v_entry_actor then
+      raise exception 'portal intake public migration-entry owner drifted: %',
+        v_signature;
+    end if;
     select
       pg_get_functiondef(routine.oid),
       coalesce((
@@ -92,6 +119,14 @@ begin
   ] loop
     if to_regprocedure(v_signature) is null then
       raise exception 'portal intake private helper is missing: %', v_signature;
+    end if;
+    if (
+      select routine.proowner
+      from pg_catalog.pg_proc as routine
+      where routine.oid = pg_catalog.to_regprocedure(v_signature)
+    ) is distinct from v_entry_actor then
+      raise exception 'portal intake private migration-entry owner drifted: %',
+        v_signature;
     end if;
     foreach v_role in array array['anon', 'authenticated', 'service_role'] loop
       if has_function_privilege(v_role, v_signature, 'EXECUTE') then

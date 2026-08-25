@@ -1029,7 +1029,7 @@ assertion-entry actor once and restore it at all 82 completed windows, and the
 special suite checks direct temporary ACL state rather than privilege inherited
 through a SET-only role membership. Every diagnostic branch was deleted.
 
-The final executable assertion bodies were:
+The exact assertion bodies executed by deleted `r5` were:
 
 | Suite | Bytes | SHA-256 |
 |---|---:|---|
@@ -1045,6 +1045,16 @@ The final executable assertion bodies were:
 | Generation registration retirement | 51,410 | `7701051c4bd11159833ccd5c9a3604becc5b38d79d25e1e280aff80d4e9513a4` |
 | Migration-entry role restoration | 3,985 | `042e8ae2639de46cf6d82818e27c358a52ad0e1415cb75609c3e06cbc57cfde1` |
 
+The later source follow-up moved the seven exact `pg_proc.proowner` signature
+checks into the maintained rollback suites. The current enhanced generation-
+worker body is 162,857 bytes with SHA-256
+`1c30fd7a8604ec8a279ac8d8cf00155bf54801ee15d91dc8ecbc7bc9bc9cf859`;
+the current enhanced Portal-intake body is 39,728 bytes with SHA-256
+`2255331b99ff6c4ca05b3a79578c6daa601e26662633063aa004f43423e3729f`.
+These are current source identities, not replacements for the two historical
+`r5` rows above. No fresh Hosted Preview has executed either enhanced exact
+body, and Production has not been touched.
+
 The special suite proved the real Hosted topology with distinct
 `session_user` and entry `current_user`, entry-actor `CREATEROLE`, temporary
 grant, explicit restore, revoke and direct-ACL cleanup. A separate rollback-only
@@ -1054,12 +1064,13 @@ generation tables; four locked role identities and exact bootstrap edges; both
 hard-off settings; zero checked Auth, Portal and generation fixtures; and no
 API or schema-`CREATE` leak.
 
-That independent postcheck, rather than the long-lived rollback suites, is the
-current executable proof for the entry ownership of the two #26 readers and
-five #30 Portal functions. A follow-up must move those seven `pg_proc.proowner`
-signature checks into committed rollback assertions and rerun them on a fresh
-disposable Preview; until then the independent owner postcheck remains a
-mandatory Hosted gate.
+The source-maintenance follow-up is complete: the long-lived worker and Portal-
+intake rollback suites now check the exact signatures and entry ownership of
+the two #26 readers and five #30 Portal functions. Deleted `r5`'s independent
+postcheck remains the historical Hosted proof of the underlying owner posture,
+but `r5` did not execute the enhanced bodies identified above. A fresh
+disposable Preview would be required to create new exact-body Hosted evidence;
+that evidence refresh has not occurred and is not being attributed to `r5`.
 
 Security advisors returned 21 INFO and six WARN globally, zero findings in the
 generation scope, and one INFO plus three intended authenticated-
@@ -1070,7 +1081,8 @@ Portal scope contained 16 unused-index INFO and two `auth_rls_initplan` WARN.
 These remain recorded optimization/advisor work, not evidence of a role, owner,
 ACL, RLS, fixture-isolation or activation-boundary failure.
 
-The final source gate passed the 11 direct contract files (162 tests), the full
+The deleted-`r5` source snapshot gate passed the 11 direct contract files (162
+tests), the full
 134-file / 1,657-test Vitest suite, TypeScript, lint, the Next.js 16.2.9 webpack
 production build with 63/63 static pages, the 73-file Codex-adapter sync check
 and `git diff --check`.

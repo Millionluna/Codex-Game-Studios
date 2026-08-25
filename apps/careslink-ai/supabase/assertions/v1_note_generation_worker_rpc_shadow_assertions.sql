@@ -52,7 +52,7 @@
 -- deleted-r22 executed BEGIN-through-ROLLBACK source SHA-256:
 -- 1c9f65bdc7f1de86e1c7398399ecf029207ba1b2bdf9fa3634dadb482424fdbb;
 -- 153956 bytes.
--- The current #29 additive-aware BEGIN-through-ROLLBACK source SHA-256 is:
+-- The deleted-r5 executed BEGIN-through-ROLLBACK source SHA-256 was:
 -- 50b2b9cf03c7e23279cfed94f38958b949fefd722a3def9ff787d24c40b9a72f;
 -- 161598 bytes. On 2026-08-25, official Supabase CLI 2.115.0 executed this
 -- exact body in the final disposable no-data r5 gate: 30/30 migrations,
@@ -61,6 +61,13 @@
 -- d68d531a-55e6-4374-be68-494da7542c75 and ref eqqlvqqhvsogusqhzuaq;
 -- deletion and exact id/ref absence were confirmed. Production was never a
 -- SQL target.
+-- The current post-r5 proowner-hardened BEGIN-through-ROLLBACK source is
+-- 162857 bytes with SHA-256
+-- 1c30fd7a8604ec8a279ac8d8cf00155bf54801ee15d91dc8ecbc7bc9bc9cf859.
+-- It moves the two migration-entry reader ownership checks from the one-time
+-- postcheck into this committed suite. This exact augmented body has source and
+-- static-contract evidence only until a fresh disposable Preview reruns it;
+-- the deleted-r5 independent postcheck separately proved the same invariant.
 
 \set ON_ERROR_STOP on
 
@@ -401,6 +408,43 @@ begin
   ) then
     raise exception 'worker RPC private metadata boundary leaked sensitive data';
   end if;
+end
+$$;
+
+-- These two readers were deliberately created by the migration-entry actor:
+-- they cross into Supabase-owned auth and the existing privacy-review surface.
+-- Exact signatures prevent overloads from satisfying this ownership proof.
+do $$
+declare
+  v_entry_actor oid := (
+    select role.oid
+    from pg_catalog.pg_roles as role
+    where role.rolname = pg_catalog.current_setting(
+      'careslink.assertion_entry_role'
+    )
+  );
+  v_signature text;
+begin
+  if v_entry_actor is null then
+    raise exception 'assertion entry actor is missing';
+  end if;
+
+  foreach v_signature in array array[
+    'careslink_v1_generation.fresh_session_is_active(uuid,uuid,timestamp with time zone)',
+    'careslink_v1_generation.fresh_privacy_proof_expires_at(uuid,uuid,text,text,text,text,timestamp with time zone)'
+  ] loop
+    if pg_catalog.to_regprocedure(v_signature) is null then
+      raise exception 'migration-entry reader is missing: %', v_signature;
+    end if;
+
+    if (
+      select routine.proowner
+      from pg_catalog.pg_proc as routine
+      where routine.oid = pg_catalog.to_regprocedure(v_signature)
+    ) is distinct from v_entry_actor then
+      raise exception 'migration-entry reader owner drifted: %', v_signature;
+    end if;
+  end loop;
 end
 $$;
 

@@ -360,6 +360,35 @@ describe("V1 Note registered-worker RPC shadow migration contract", () => {
     );
   });
 
+  it("pins both migration-entry readers to the captured assertion actor", () => {
+    const proofStart = assertions.indexOf(
+      "-- These two readers were deliberately created by the migration-entry actor:",
+    );
+    const proofEnd = assertions.indexOf(
+      "\ndo $$\ndeclare\n  v_schema oid :=",
+      proofStart,
+    );
+    const ownerProof = assertions.slice(proofStart, proofEnd);
+
+    expect(proofStart).toBeGreaterThanOrEqual(0);
+    expect(proofEnd).toBeGreaterThan(proofStart);
+    for (const signature of [
+      "careslink_v1_generation.fresh_session_is_active(uuid,uuid,timestamp with time zone)",
+      "careslink_v1_generation.fresh_privacy_proof_expires_at(uuid,uuid,text,text,text,text,timestamp with time zone)",
+    ]) {
+      expect(ownerProof).toContain(`'${signature}'`);
+    }
+    expect(ownerProof).toContain("'careslink.assertion_entry_role'");
+    expect(ownerProof).toContain("from pg_catalog.pg_roles as role");
+    expect(ownerProof).toContain("select routine.proowner");
+    expect(ownerProof).toContain("from pg_catalog.pg_proc as routine");
+    expect(ownerProof).toContain(") is distinct from v_entry_actor then");
+    expect(ownerProof).toContain("migration-entry reader is missing");
+    expect(ownerProof).toContain("migration-entry reader owner drifted");
+    expect(ownerProof).not.toContain("session_user");
+    expect(ownerProof).not.toContain("current_user");
+  });
+
   it("creates helpers and RPCs as the executor with closed defaults and search paths", () => {
     const executorSetStatements = [
       ...migration.matchAll(/^set role careslink_v1_generation_executor;$/gm),
@@ -1374,7 +1403,7 @@ describe("V1 Note registered-worker RPC shadow migration contract", () => {
       "Deletion was confirmed with r22 id and ref absent",
       "1c9f65bdc7f1de86e1c7398399ecf029207ba1b2bdf9fa3634dadb482424fdbb",
       "153956 bytes",
-      "current #29 additive-aware BEGIN-through-ROLLBACK source SHA-256",
+      "deleted-r5 executed BEGIN-through-ROLLBACK source SHA-256 was",
       "50b2b9cf03c7e23279cfed94f38958b949fefd722a3def9ff787d24c40b9a72f",
       "161598 bytes",
       "official Supabase CLI 2.115.0",
@@ -1384,14 +1413,19 @@ describe("V1 Note registered-worker RPC shadow migration contract", () => {
       "d68d531a-55e6-4374-be68-494da7542c75",
       "eqqlvqqhvsogusqhzuaq",
       "deletion and exact id/ref absence were confirmed",
+      "current post-r5 proowner-hardened BEGIN-through-ROLLBACK source",
+      "162857 bytes",
+      "1c30fd7a8604ec8a279ac8d8cf00155bf54801ee15d91dc8ecbc7bc9bc9cf859",
+      "source and static-contract evidence only",
+      "independent postcheck separately proved the same invariant",
     ]) {
       expect(assertionHeader).toContain(marker);
     }
     expect(assertionBodyStart).toBeGreaterThanOrEqual(0);
-    expect(Buffer.byteLength(assertionBody, "utf8")).toBe(161_598);
+    expect(Buffer.byteLength(assertionBody, "utf8")).toBe(162_857);
     expect(
       createHash("sha256").update(assertionBody, "utf8").digest("hex"),
-    ).toBe("50b2b9cf03c7e23279cfed94f38958b949fefd722a3def9ff787d24c40b9a72f");
+    ).toBe("1c30fd7a8604ec8a279ac8d8cf00155bf54801ee15d91dc8ecbc7bc9bc9cf859");
     expect(assertions).toContain("transaction-only TEST_ONLY fixtures");
     expect(assertions).toContain("pg_get_function_identity_arguments");
     expect(assertions).toContain("aclexplode(");

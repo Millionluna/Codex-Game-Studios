@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -43,6 +44,59 @@ describe("Portal referral intake runtime migration contract", () => {
       /grant execute on function[\s\S]*portal_referral_intake_authorize\(\)[\s\S]*portal_referral_intake_list\(integer, timestamptz, uuid\)[\s\S]*portal_referral_intake_create\([\s\S]*\)\s*to authenticated;/,
     );
     expect(migration).not.toMatch(/\bto\s+(?:public|anon|service_role)\s*;/i);
+  });
+
+  it("pins all five Portal functions to the captured migration-entry actor", () => {
+    const bodyStart = assertions.indexOf("begin;");
+    const body = assertions.slice(bodyStart);
+    const header = assertions.slice(0, bodyStart);
+    const postureStart = assertions.indexOf("\ndo $$\n");
+    const postureEnd = assertions.indexOf("\nend\n$$;", postureStart);
+    const postureProof = assertions.slice(postureStart, postureEnd);
+
+    expect(bodyStart).toBeGreaterThanOrEqual(0);
+    for (const marker of [
+      "Deleted r5 executed the prior 38843-byte body",
+      "d434f916ff0aece191b0754e35393c0ab03ada7ec9849c75add8c04c16536182",
+      "current post-r5 proowner-hardened body is 39728 bytes",
+      "2255331b99ff6c4ca05b3a79578c6daa601e26662633063aa004f43423e3729f",
+      "source and static-contract evidence only",
+      "deleted-r5 postcheck separately proved the same invariant",
+    ]) {
+      expect(header).toContain(marker);
+    }
+    expect(Buffer.byteLength(body, "utf8")).toBe(39_728);
+    expect(createHash("sha256").update(body, "utf8").digest("hex")).toBe(
+      "2255331b99ff6c4ca05b3a79578c6daa601e26662633063aa004f43423e3729f",
+    );
+    expect(postureStart).toBeGreaterThanOrEqual(0);
+    expect(postureEnd).toBeGreaterThanOrEqual(0);
+    for (const signature of [
+      "careslink_portal_private.portal_referral_intake_assert_enabled()",
+      "careslink_portal_private.portal_referral_intake_context()",
+      "public.portal_referral_intake_authorize()",
+      "public.portal_referral_intake_list(integer,timestamp with time zone,uuid)",
+      "public.portal_referral_intake_create(text,text,text,text,text,text,text,text,text)",
+    ]) {
+      expect(postureProof).toContain(`'${signature}'`);
+    }
+    expect(postureProof).toContain("'careslink.assertion_entry_role'");
+    expect(postureProof).toContain("from pg_catalog.pg_roles as role");
+    expect(countOccurrences(postureProof, "select routine.proowner")).toBe(2);
+    expect(countOccurrences(postureProof, "from pg_catalog.pg_proc as routine")).toBe(
+      2,
+    );
+    expect(
+      countOccurrences(postureProof, ") is distinct from v_entry_actor then"),
+    ).toBe(2);
+    expect(postureProof).toContain(
+      "portal intake public migration-entry owner drifted",
+    );
+    expect(postureProof).toContain(
+      "portal intake private migration-entry owner drifted",
+    );
+    expect(postureProof).not.toContain("session_user");
+    expect(postureProof).not.toContain("current_user");
   });
 
   it("derives and stabilizes authorization from current database state", () => {
