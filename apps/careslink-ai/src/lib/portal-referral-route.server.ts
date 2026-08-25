@@ -534,6 +534,9 @@ function projectPortalReferralSourceDetail(
   expectedReferralId: string,
   value: Awaited<ReturnType<PortalReferralApi["getReferral"]>>,
 ): PortalReferralSourceDetail {
+  if (!value || typeof value !== "object") {
+    throw invalidAdapterResponse();
+  }
   const referralId = canonicalPortalReferralUuid(value.referralId);
   const contact = value.contact;
   const createdAt = responseInstant(value.createdAt);

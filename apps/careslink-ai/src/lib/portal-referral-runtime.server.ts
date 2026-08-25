@@ -140,7 +140,20 @@ export function isPortalReferralAssignmentRuntimeEnabled(
 ) {
   return (
     isPortalReferralBaseRuntimeEnabled(env) &&
-    isPortalReferralOperationEnabled("LIST_ASSIGNMENT_REFERRALS", env)
+    isPortalReferralOperationEnabled("LIST_ASSIGNMENT_REFERRALS", env) &&
+    !isPortalReferralSourceRoleSurfaceEnabled(env)
+  );
+}
+
+/**
+ * Assignment M1a and the source-role pages still share `/referrals`. Keep the
+ * page-level assignment latch closed if either source-role surface is active.
+ * The operation gates remain independent for request-scoped API authorization.
+ */
+function isPortalReferralSourceRoleSurfaceEnabled(env: PortalReferralRuntimeEnv) {
+  return (
+    env.CARESLINK_PORTAL_REFERRAL_INTAKE_ENABLED === "true" ||
+    env.CARESLINK_PORTAL_REFERRAL_SOURCE_DETAIL_ENABLED === "true"
   );
 }
 

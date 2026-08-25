@@ -417,7 +417,7 @@ begin
 
   if p_limit is null
     or p_limit < 1
-    or p_limit > 100
+    or p_limit > 50
     or ((p_before_updated_at is null) <> (p_before_id is null))
   then
     raise exception using

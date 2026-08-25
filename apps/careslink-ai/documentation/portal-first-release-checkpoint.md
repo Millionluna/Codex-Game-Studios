@@ -1,9 +1,9 @@
 # Portal-first release checkpoint
 
-Date: 2026-08-25
+Date: 2026-08-26
 
-Branch: `codex/careslink-ai-portal-referral-intake-v1`
-Base HEAD inspected: `6067782bbe2a23c4dafb59ba812f977cb2524cd0`
+Branch: `codex/careslink-portal-assignment-m1a`
+Base HEAD inspected: `4e582ffb7f9a61fde3364916dc517379dcdcc1d4`
 
 Current five-Note local batch base: `63c10ea2e94ee4efdba7ffdbeb5aabbee6fcfa3b`
 
@@ -26,7 +26,7 @@ Current registration-retention hardening source:
 Current registration-retention hosted gate HEAD:
 `4cae6f1a08ce2bcc7e43456c275cf5e743f13fdf`
 
-Current Portal Assignment M1a Hosted Cookie gate source:
+Historical Portal Assignment M1a Hosted Cookie gate source:
 `526aa1efba281ee1e6e671ffb2a20d40cce1999b`
 
 This checkpoint covers the AI Web Portal reality audit, release sequencing,
@@ -62,7 +62,7 @@ availability.
 | `/providers/onboarding`, `/providers/review` | static/mock | No | Forms/buttons imply a save/review that does not occur | Add canonical provider profile and admin review command after identity proof |
 | Provider profile generator | mixed: real `provider_drafts`, mock editing seed | Partial | Draft handoff can use an in-memory fallback and is not a canonical provider | Treat claimed draft only as intake seed |
 | `/provider-portal` | mock referrals | No | Accept/decline/request-info controls do nothing; provider identity is not DB-bound | Owner-scoped offered referrals plus atomic response command |
-| `/referrals`, `/referrals/intake`, `/referrals/[id]`, match page | legacy mock remains default; default-off durable intake, exact-tenant source detail and operator Assignment M1a exist | List/create/source-detail plus operator queue/detail/triage/candidates/offer behind independent gates; not deployed | Gate-on assignment pages have no mock fallback and offer does not assign/accept; provider response, follow-up and audit remain disabled | M1a exact-revision disposable Hosted gate passed; keep default-off and implement provider response M1b under a separate approval |
+| `/referrals`, `/referrals/intake`, `/referrals/[id]`, match page | legacy mock remains default; default-off durable intake, exact-tenant source detail and operator Assignment M1a exist | List/create/source-detail plus operator queue/detail/triage/candidates/offer behind independent gates; not deployed | Gate-on assignment pages have no mock fallback and offer does not assign/accept; provider response, follow-up and audit remain disabled | Pre-review M1a commit `526aa1e` passed a deleted exact-revision Hosted gate; the current queue-bound hardening is local-only and needs a new exact-current Preview before any M1b/activation step |
 | `/referral-source-portal` | legacy mock remains default; source-only intake controls are wired and the UUID detail page has a separate gate | List/create/detail only behind independent gates; not deployed | No hosted runtime or activation; the operator slice is independently gated and provider/later workflow actions remain unavailable | Reuse the database-authorized source slice after exact-revision Preview approval |
 | `/referral-workspace/*` | mixed real access/material/outreach stores | Yes, for those tools | These are AI access and outreach tools, not the referral pipeline; some stores have memory fallback | Preserve and later link by canonical referral ID |
 | `/admin`, `/dashboard` | mock global metrics | No | Core pages have no real referral permission gate; must not receive real data yet | Add membership gate, then replace only the assignment queue |
@@ -1217,8 +1217,10 @@ has a current body of 162,857 bytes with SHA-256
 `1c30fd7a8604ec8a279ac8d8cf00155bf54801ee15d91dc8ecbc7bc9bc9cf859`.
 Deleted `r5`'s postcheck remains the historical Hosted proof of those owners,
 but `r5` did not execute these enhanced exact bodies. The later exact-commit
-`526aa1e` disposable gate applied 32/32 and passed all 13 current rollback
-suites, superseding that exact-body gap without touching Production.
+`526aa1e` disposable gate applied 32/32 and passed all 13 then-current rollback
+suites, superseding that exact-body gap without touching Production. The
+Assignment assertion changed again in the 2026-08-26 local-only queue-bound
+hardening recorded in Sections 26–27.
 
 ## 25. Portal Referral source-detail source/local runtime — 2026-08-25
 
@@ -1310,7 +1312,9 @@ and mutation responses. Candidate authorization failures remove private detail;
 
 `/referrals` remains a shared legacy URL for the source and operator surfaces.
 Assignment and source-role UI activation must therefore remain mutually
-exclusive for this slice; simultaneous role-surface activation is not approved.
+exclusive for this slice. The Assignment page latch now enforces that boundary:
+if either source-role UI gate is also on, the Assignment pages stay closed while
+the request-scoped operation gates remain independently authorized.
 
 The focused gate passed 9 files / 292 tests; the full gate passed 138 files /
 1,821 tests, TypeScript, full lint, the Next.js 16.2.9 webpack build with 64/64
@@ -1323,12 +1327,24 @@ lock stages. Expired calls returned `PORTAL_SESSION_REVOKED` before data-derived
 errors or writes. The migration/assertion/contract hashes are recorded in
 `documentation/tests.md`; all temporary local resources were removed.
 
+PR review on 2026-08-26 tightened the public queue RPC from an unintended
+100-item direct-call ceiling to the documented maximum of 50 and added a live
+`51` rejection assertion. It also made the shared-URL UI exclusion executable,
+normalized null source-detail adapter envelopes to redacted `503`, and added
+real jsdom-mounted Coordinator tests for the happy path, duplicate-submit
+blocking, authoritative refresh, authorization invalidation and A→B→A late
+responses across the independent detail, candidate and mutation trackers. The
+current full gate passes 139 files / 1,830 tests; PostgreSQL
+16.15 re-passed the patched minimum chain and rollback suite with zero retained
+fixtures. Exact current hashes and the evidence boundary are recorded in
+`documentation/tests.md`.
+
 This is source/local evidence, not by itself a full repository migration apply,
 hosted GoTrue/PostgREST/Auth E2E, retained Preview, deployment or activation.
 Production and cloud data were not touched. The separately approved disposable
-Hosted validation of this exact M1a revision is recorded below; it removes that
-specific database/Cookie evidence blocker without authorizing deployment or
-provider response M1b.
+Hosted validation recorded below covers exact pre-review commit `526aa1e`; it
+does not cover the 2026-08-26 queue-bound hardening and does not authorize
+deployment or provider response M1b.
 
 ## 27. Portal Referral Assignment M1a disposable Hosted Cookie gate — 2026-08-25
 
@@ -1368,5 +1384,8 @@ and only the default `ACTIVE_HEALTHY` Production branch remained.
 
 This is Hosted Auth/Data API plus exact application-route Cookie evidence, not
 a Vercel Preview deployment, retained flag activation, Production approval or
-provider response M1b. Accept/decline, assignment finalization, follow-up and
-audit listing remain the next functional work.
+provider response M1b. It proves exact pre-review commit `526aa1e`; the
+2026-08-26 queue-bound hardening has local PostgreSQL/source evidence only and
+needs a new exact-current protected Preview before activation. Accept/decline,
+assignment finalization, follow-up and audit listing remain the next functional
+work.

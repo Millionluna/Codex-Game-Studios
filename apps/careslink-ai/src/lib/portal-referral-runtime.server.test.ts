@@ -65,8 +65,14 @@ describe("Portal referral runtime latch", () => {
       true,
     );
     expect(isPortalReferralAssignmentRuntimeEnabled(enabledPreviewEnv())).toBe(
-      true,
+      false,
     );
+    expect(
+      isPortalReferralOperationEnabled(
+        "LIST_ASSIGNMENT_REFERRALS",
+        enabledPreviewEnv(),
+      ),
+    ).toBe(true);
   });
 
   it("requires an exact non-Production Preview target", () => {
@@ -164,6 +170,27 @@ describe("Portal referral runtime latch", () => {
       expect(isPortalReferralOperationEnabled(operation, assignmentOnly)).toBe(
         true,
       );
+    }
+
+    for (const sourceSurfaceConflict of [
+      enabledPreviewEnv({
+        CARESLINK_PORTAL_REFERRAL_INTAKE_ENABLED: "true",
+        CARESLINK_PORTAL_REFERRAL_SOURCE_DETAIL_ENABLED: "false",
+      }),
+      enabledPreviewEnv({
+        CARESLINK_PORTAL_REFERRAL_INTAKE_ENABLED: "false",
+        CARESLINK_PORTAL_REFERRAL_SOURCE_DETAIL_ENABLED: "true",
+      }),
+      enabledPreviewEnv(),
+    ]) {
+      expect(
+        isPortalReferralAssignmentRuntimeEnabled(sourceSurfaceConflict),
+      ).toBe(false);
+      for (const operation of assignmentOperations) {
+        expect(
+          isPortalReferralOperationEnabled(operation, sourceSurfaceConflict),
+        ).toBe(true);
+      }
     }
 
     for (const assignmentFlag of [undefined, "false", "TRUE", " true"]) {

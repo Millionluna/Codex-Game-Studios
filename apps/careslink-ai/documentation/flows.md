@@ -176,6 +176,13 @@ queue contains only referral/source metadata. Opening
 rendering summary/contact, and missing/cross-tenant identifiers share the same
 not-found result. Gate-on pages do not fall back to legacy mock data.
 
+Because `/referrals` is still shared with the source-role surface, the
+page-level Assignment latch additionally requires both source-role UI gates to
+be off. A simultaneous UI configuration therefore fails closed instead of
+sending a source user into the operator queue. The request-scoped Assignment
+API operation gates remain independent and still enforce database-derived
+operator authorization.
+
 From `SUBMITTED`, triage atomically advances the expected row version to
 `TRIAGED`. The next authorized candidate read returns only IDs and trimmed
 display names for active approved providers with AVAILABLE/LIMITED capacity,

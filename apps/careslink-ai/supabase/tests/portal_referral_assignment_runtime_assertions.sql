@@ -560,7 +560,14 @@ begin
       v_authorization;
   end if;
 
-  v_queue := public.portal_referral_assignment_queue(100, null, null);
+  begin
+    perform public.portal_referral_assignment_queue(51, null, null);
+    raise exception 'Assignment queue accepted a limit above 50';
+  exception when sqlstate 'P0001' then
+    if sqlerrm <> 'PORTAL_VALIDATION_ERROR' then raise; end if;
+  end;
+
+  v_queue := public.portal_referral_assignment_queue(50, null, null);
   if jsonb_array_length(v_queue->'items') <> 2
     or exists (
       select 1
@@ -590,7 +597,7 @@ begin
   end if;
 
   v_page_two := public.portal_referral_assignment_queue(
-    100,
+    50,
     (v_page->'items'->0->>'updated_at')::timestamptz,
     (v_page->'items'->0->>'referral_id')::uuid
   );
@@ -687,7 +694,7 @@ declare
   v_queue jsonb;
 begin
   v_authorization := public.portal_referral_assignment_authorize();
-  v_queue := public.portal_referral_assignment_queue(100, null, null);
+  v_queue := public.portal_referral_assignment_queue(50, null, null);
   if v_authorization->>'organization_type' <> 'PLATFORM'
     or v_authorization->>'membership_role' <> 'platform_admin'
     or jsonb_array_length(v_queue->'items') <> 3

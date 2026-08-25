@@ -251,7 +251,7 @@ describe("Portal referral Assignment M1a runtime migration contract", () => {
 
   it("keeps queue and detail DTOs bounded, tenant-scoped and state-exact", () => {
     const queue = functionBlock("public.portal_referral_assignment_queue(");
-    expect(queue).toContain("p_limit > 100");
+    expect(queue).toContain("p_limit > 50");
     expect(queue).toContain("btrim(source_organization.display_name)");
     expect(queue).toContain(
       "((p_before_updated_at is null) <> (p_before_id is null))",

@@ -1070,6 +1070,37 @@ describe("Portal referral route adapter", () => {
     });
   });
 
+  it.each([null, undefined])(
+    "maps a missing source-detail adapter envelope to a redacted 503 (%s)",
+    async (adapterValue) => {
+      const requestedId = "70000000-0000-7000-8000-000000000901";
+      const baseApi = createActorBoundPortalReferralApi(createWorkflow(), SOURCE_A);
+      const response = await handlePortalReferralGet(
+        getRequest(`/api/portal/referrals/${requestedId}`, "source-a"),
+        requestedId,
+        {
+          resolveApi: async () => ({
+            ok: true,
+            api: {
+              ...baseApi,
+              getReferral: async () =>
+                adapterValue as unknown as Awaited<
+                  ReturnType<PortalReferralApi["getReferral"]>
+                >,
+            },
+          }),
+          createCorrelationId: () => SERVER_CORRELATION_ID,
+        },
+      );
+
+      expect(response.status).toBe(503);
+      expect(await responseJson(response)).toEqual({
+        error: { code: "ADAPTER_UNAVAILABLE" },
+        correlationId: SERVER_CORRELATION_ID,
+      });
+    },
+  );
+
   it.each([
     ["SESSION_REVOKED", 401],
     ["CAPABILITY_DISABLED", 503],

@@ -156,10 +156,13 @@ are never accepted from the body. Source list is metadata-only and create
 atomically writes referral, private contact, audit and receipt rows with hashed
 mutation/correlation identifiers. Source detail is read-only. Assignment reads
 or performs only triage/offer as described above. All application and database
-flags remain off. Exact commit `526aa1e` subsequently passed
-deleted-disposable Hosted 32/32 migration, 13/13 rollback and real GoTrue
-SSR-cookie route E2E with zero-residue teardown. No retained Preview, Vercel
-deployment, Production migration or activation is claimed.
+flags remain off. Exact pre-review commit `526aa1e` subsequently passed a
+deleted-disposable Hosted 32/32 migration, the then-current 13/13 rollback
+suites and real GoTrue SSR-cookie route E2E with zero-residue teardown. The
+2026-08-26 queue-bound, page-latch and route-adapter hardening has local
+PostgreSQL/source evidence only and requires a new exact-current Preview before
+Hosted attribution. No retained Preview, Vercel deployment, Production
+migration or activation is claimed.
 
 `supabase/migrations/20260809120000_create_v1_shadow_foundation.sql` defines the following controls. It was applied only to a disposable `with_data=false` branch and has not been applied to Production Supabase:
 
