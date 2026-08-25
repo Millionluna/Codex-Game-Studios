@@ -271,23 +271,39 @@ to the preceding migration actor. #26 also grants and revokes the temporary
 auth-reader schema `CREATE` privilege against the identifier-safe captured
 actor rather than `session_user`.
 
-A fresh local PostgreSQL 16.15 Hosted-like topology proved the rollback path,
-dynamic ACL path, post-commit role state and a full #25 apply. That apply kept
-the schema and three tables under the dedicated owner, removed the temporary
-SET edge and left neither entry nor transport role with schema `CREATE`.
-Focused source contracts passed 75/75, and the exact local cluster was stopped
-and deleted. The full gate also passed 134 files / 1,645 tests, TypeScript,
-lint, the 63/63-page production build, the 73-file adapter check and diff
-checks. No Hosted/Production database, deployment, activation or paid resource
-was used. This is not yet official CLI 30/30 evidence; the next disposable
-no-data Preview must clean-apply all 30 migrations, pass the 11 current
-assertion suites plus the independent owner/ACL/zero-fixture postcheck, and then
-be deleted.
+A fresh local PostgreSQL 16.15 Hosted-like topology first proved the rollback
+path, dynamic ACL path, post-commit role state and a full #25 apply. Hosted
+diagnostic Previews then exposed the same unsafe exit in nine rollback suites:
+they now capture their assertion-entry actor once and explicitly restore it at
+all 82 completed role windows. The dedicated role-restoration suite now checks
+the temporary direct table ACL rather than inherited effective privilege.
+
+The final non-default, `persistent=false`, `with_data=false` Preview was
+`hosted-role-restore-r5-20260825` (id
+`d68d531a-55e6-4374-be68-494da7542c75`, ref
+`eqqlvqqhvsogusqhzuaq`). One official Supabase CLI 2.115.0 remote reset applied
+the exact 30-migration manifest and passed all 11 rollback suites. A separate
+rollback-only postcheck retained 14 owner-correct forced-RLS generation tables,
+the four locked role identities and exact bootstrap edges, both #26 readers and
+all five #30 Portal definer functions under the entry actor, hard-off settings,
+zero checked fixtures, and no API or schema-`CREATE` leak. Security advisors
+reported zero generation findings; performance findings remain documented
+advisories rather than release-boundary failures. The Preview was deleted and
+its id/ref absence was verified. Production was never a SQL target, and no
+deployment, activation, retained data or ongoing Preview charge remains.
+The final source gate passed the 11 direct contract files (162 tests), the full
+134-file / 1,657-test Vitest suite, TypeScript, lint, the Next.js 16.2.9 webpack
+production build with 63/63 static pages, the 73-file adapter check and diff
+checks.
 
 ## Inactive shadow automation contracts
 
 - The contract and migrations define generation/export job states. Source-only memory contracts model leases, recovery, retry policy, provider evidence and single-use payload grants, and the registered-worker v2 facade composes those boundaries without a payload locator. All five generation migrations remain Production-unapplied; deleted `r9` supplied isolated PostgreSQL 17.6 execution evidence for database-clock claim/heartbeat/fence/commit/settle/resolve/recover/authorize/consume logic and payload/grant/evidence/purge-outbox metadata, deleted `r20` supplied the three true two-session race results, and deleted `r21` supplied exact historical transient-retry/success replay through payload/outbox purge. The later local owner-repository gate covers the three private owner RPCs, and migration #29 adds only the non-login control-executor-owned graceful-retirement identity described above. There is still no caller grant. Normal consume deliberately settles `DENIED_SETTLED` / `PAYLOAD_UNAVAILABLE` and returns no vault grant, locator or facts; the historical rollback-only `TEST_ONLY` `CONSUMED` fixture proves only scripted canonical transaction atomicity. There is still no payload vault, queue service, deployed worker, live retry loop or served cancellation endpoint.
-- No worker automation may be scheduled yet. Deleted `r20` closed the PostgreSQL 17.6 true two-session claim/session/privacy race gate, deleted `r21` closed the fixed Attempt-2 historical replay gate, deleted `r22` closed the hosted registration-retention gate, and the earlier isolated local PostgreSQL 16.15 run closed its recorded engine/serial/true-two-session version gate. Owner admission/enqueue/status/cancel and graceful worker-registration retirement now have **source and local SQL boundaries**, but emergency revocation, attempt listing, nested database exact-key envelopes, account-delete/purge and orphan recovery, provider-start binding to a consumed grant plus fresh lease/heartbeat, sequential JSON numeric parsing hardening, and the payload-vault/KMS/retention, caller/route, hosted Auth/Data API, model/STT, Points and runtime-activation blocks remain unproved explicit governance.
+- No worker automation may be scheduled yet. Deleted `r20` closed the PostgreSQL 17.6 true two-session claim/session/privacy race gate, deleted `r21` closed the fixed Attempt-2 historical replay gate, deleted `r22` closed the hosted registration-retention gate, the earlier isolated local PostgreSQL 16.15 run closed its recorded engine/serial/true-two-session version gate, and deleted r5 closed the current Hosted 30/30 migration, 11/11 assertion and independent posture gate. Owner admission/enqueue/status/cancel and graceful worker-registration retirement now have source, local SQL and deleted-Hosted schema/transaction boundaries, but emergency revocation, attempt listing, nested database exact-key envelopes, account-delete/purge and orphan recovery, provider-start binding to a consumed grant plus fresh lease/heartbeat, sequential JSON numeric parsing hardening, and the payload-vault/KMS/retention, caller/route, hosted Auth/Data API, model/STT, Points and runtime-activation blocks remain unproved explicit governance.
+- The r5 independent postcheck currently carries the executable `proowner`
+  proof for the two #26 readers and five #30 Portal functions. Before the next
+  Hosted gate, move those seven signature checks into committed rollback suites;
+  until then the independent owner postcheck remains mandatory.
 - The memory Points reference store proves quote/reserve/commit/release semantics. The SQL draft exposes five `security definer` shadow RPCs only to `service_role`; those RPCs passed isolated branch tests for settlement, replay/conflict, source-lot release, expiry, insufficient balance and cross-owner denial. The migration remains unapplied to Production and no server route calls it.
 - The legacy NDIS adapter remains pure. The server-only NDIS integration invokes it only after a successful legacy Save on an explicitly verified Preview. The RPC creates an owner-bound shadow revision and metadata-only outbox; optional read comparison records `MATCH/MISMATCH/MISSING/ERROR`. No call invokes OpenAI or settles Points.
 - There is no automatic retry worker. `audit_ndis_shadow_reconciliation` is a service-role-only, read-only operator surface that reports IDs/status/timestamps/hashes. Live legacy rows remain the projection retry source; a legacy-schema canonical document whose source has disappeared while the lifecycle is still non-terminal is reported as `SOURCE_DELETE_CLEANUP_PENDING` for operator cleanup.

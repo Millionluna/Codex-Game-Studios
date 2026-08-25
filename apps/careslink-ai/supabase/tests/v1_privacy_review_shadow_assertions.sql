@@ -5,6 +5,12 @@
 
 begin;
 
+select pg_catalog.set_config(
+  'careslink.assertion_entry_role',
+  current_user,
+  true
+);
+
 do $$
 declare
   v_count integer;
@@ -1051,7 +1057,11 @@ begin
   end if;
 end
 $$;
-reset role;
+select pg_catalog.set_config(
+  'role',
+  pg_catalog.current_setting('careslink.assertion_entry_role'),
+  false
+);
 
 select set_config(
   'request.jwt.claims',
@@ -1107,7 +1117,11 @@ begin
   end;
 end
 $$;
-reset role;
+select pg_catalog.set_config(
+  'role',
+  pg_catalog.current_setting('careslink.assertion_entry_role'),
+  false
+);
 
 select set_config('request.jwt.claim.role', 'authenticated', true);
 select set_config(

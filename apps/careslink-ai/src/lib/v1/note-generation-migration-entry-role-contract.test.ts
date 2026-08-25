@@ -67,6 +67,101 @@ const roleAssertion = readFileSync(
   join(process.cwd(), roleAssertionPath),
   "utf8",
 );
+const assertionCases = [
+  {
+    name: "durable foundation assertion",
+    path: "supabase/assertions/v1_note_generation_durable_foundation_assertions.sql",
+    roleSwitches: 1,
+    restores: 1,
+    rollbackClosesLastRole: false,
+    checksBootstrapMembership: true,
+    adjacentSwitches: [],
+  },
+  {
+    name: "worker RPC assertion",
+    path: "supabase/assertions/v1_note_generation_worker_rpc_shadow_assertions.sql",
+    roleSwitches: 12,
+    restores: 11,
+    rollbackClosesLastRole: false,
+    checksBootstrapMembership: false,
+    adjacentSwitches: [
+      {
+        eventIndex: 0,
+        roles: [
+          "careslink_v1_generation_executor",
+          "careslink_v1_generation_owner",
+        ],
+      },
+    ],
+  },
+  {
+    name: "owner runtime assertion",
+    path: "supabase/assertions/v1_note_generation_owner_runtime_rpc_shadow_assertions.sql",
+    roleSwitches: 22,
+    restores: 22,
+    rollbackClosesLastRole: false,
+    checksBootstrapMembership: true,
+    adjacentSwitches: [],
+  },
+  {
+    name: "registration retirement assertion",
+    path: "supabase/assertions/v1_note_generation_registration_retirement_shadow_assertions.sql",
+    roleSwitches: 7,
+    restores: 7,
+    rollbackClosesLastRole: false,
+    checksBootstrapMembership: true,
+    adjacentSwitches: [],
+  },
+  {
+    name: "NDIS integration assertion",
+    path: "supabase/tests/v1_ndis_shadow_integration_assertions.sql",
+    roleSwitches: 2,
+    restores: 2,
+    rollbackClosesLastRole: false,
+    checksBootstrapMembership: false,
+    adjacentSwitches: [],
+  },
+  {
+    name: "privacy review assertion",
+    path: "supabase/tests/v1_privacy_review_shadow_assertions.sql",
+    roleSwitches: 2,
+    restores: 2,
+    rollbackClosesLastRole: false,
+    checksBootstrapMembership: false,
+    adjacentSwitches: [],
+  },
+  {
+    name: "mobile sync assertion",
+    path: "supabase/tests/v1_mobile_sync_shadow_assertions.sql",
+    roleSwitches: 7,
+    restores: 6,
+    rollbackClosesLastRole: true,
+    checksBootstrapMembership: false,
+    adjacentSwitches: [],
+  },
+  {
+    name: "Portal workflow foundation assertion",
+    path: "supabase/tests/portal_referral_workflow_foundation_assertions.sql",
+    roleSwitches: 16,
+    restores: 16,
+    rollbackClosesLastRole: false,
+    checksBootstrapMembership: false,
+    adjacentSwitches: [],
+  },
+  {
+    name: "Portal intake runtime assertion",
+    path: "supabase/tests/portal_referral_intake_runtime_assertions.sql",
+    roleSwitches: 15,
+    restores: 15,
+    rollbackClosesLastRole: false,
+    checksBootstrapMembership: false,
+    adjacentSwitches: [],
+  },
+] as const;
+const assertionsWithRoleWindows = assertionCases.map((assertionCase) => ({
+  ...assertionCase,
+  source: readFileSync(join(process.cwd(), assertionCase.path), "utf8"),
+}));
 
 const capturePattern =
   /^select pg_catalog\.set_config\(\n  'careslink\.migration_entry_role',\n  current_user,\n  true\n\);$/gm;
@@ -74,6 +169,11 @@ const restorePattern =
   /^select pg_catalog\.set_config\(\n  'role',\n  pg_catalog\.current_setting\('careslink\.migration_entry_role'\),\n  false\n\);$/gm;
 const setRolePattern = /^set role ([a-z0-9_]+);$/gm;
 const resetRolePattern = /^reset role;$/gm;
+const assertionCapturePattern =
+  /^select pg_catalog\.set_config\(\n  'careslink\.assertion_entry_role',\n  current_user,\n  true\n\);$/gm;
+const assertionRestorePattern =
+  /^select pg_catalog\.set_config\(\n  'role',\n  pg_catalog\.current_setting\('careslink\.assertion_entry_role'\),\n  false\n\);$/gm;
+const assertionSetRolePattern = /^set(?: local)? role ([a-z0-9_]+);$/gm;
 
 describe("V1 Note migration entry-role restoration contract", () => {
   it.each(migrations)(
@@ -213,12 +313,82 @@ describe("V1 Note migration entry-role restoration contract", () => {
       "pg_catalog.current_setting('careslink.migration_entry_role')",
       "grant select on table pg_temp.careslink_migration_restore_acl_probe to %I",
       "revoke select on table pg_temp.careslink_migration_restore_acl_probe from %I",
+      "pg_catalog.aclexplode(relation.relacl)",
+      "privilege.grantee = pg_catalog.to_regrole(",
       "captured entry actor retained the temporary ACL",
       "drop role careslink_migration_restore_test_owner;",
     ]) {
       expect(roleAssertion).toContain(marker);
     }
   });
+
+  it.each(assertionsWithRoleWindows)(
+    "$name bounds fixture role transitions with entry restoration or rollback",
+    ({
+      adjacentSwitches,
+      restores,
+      roleSwitches: expectedRoleSwitches,
+      rollbackClosesLastRole,
+      source,
+    }) => {
+      const captures = matches(source, assertionCapturePattern);
+      const roleSwitches = matches(source, assertionSetRolePattern);
+      const roleRestores = matches(source, assertionRestorePattern);
+
+      expect(captures).toHaveLength(1);
+      expect(roleRestores).toHaveLength(restores);
+      expect(roleSwitches).toHaveLength(expectedRoleSwitches);
+      expect(captures[0].index).toBeLessThan(roleSwitches[0].index);
+      expect(source).not.toMatch(resetRolePattern);
+      expect(source).not.toContain("session_user");
+
+      const roleEvents = [
+        ...roleSwitches.map((event) => ({ ...event, kind: "switch" as const })),
+        ...roleRestores.map((event) => ({ ...event, kind: "restore" as const })),
+      ].sort((left, right) => left.index - right.index);
+      expect(roleEvents[0].kind).toBe("switch");
+      for (const [index, event] of roleEvents.entries()) {
+        if (event.kind === "restore") {
+          expect(roleEvents[index - 1]?.kind).toBe("switch");
+        }
+      }
+      expect(
+        roleEvents.flatMap((event, eventIndex) => {
+          const nextEvent = roleEvents[eventIndex + 1];
+          return event.kind === "switch" && nextEvent?.kind === "switch"
+            ? [
+                {
+                  eventIndex,
+                  roles: [event.groups?.[0], nextEvent.groups?.[0]],
+                },
+              ]
+            : [];
+        }),
+      ).toEqual(adjacentSwitches);
+
+      const rollback = source.lastIndexOf("rollback;");
+      expect(rollback).toBeGreaterThan(roleSwitches.at(-1)?.index ?? -1);
+      if (rollbackClosesLastRole) {
+        expect(roleEvents.at(-1)?.kind).toBe("switch");
+      } else {
+        expect(roleEvents.at(-1)?.kind).toBe("restore");
+      }
+    },
+  );
+
+  it.each(
+    assertionsWithRoleWindows.filter(
+      (assertion) => assertion.checksBootstrapMembership,
+    ),
+  )(
+    "$name checks bootstrap memberships against the entry actor",
+    ({ source }) => {
+      expect(source).toContain("current_user::regrole");
+      expect(source).not.toContain("session_user::regrole");
+      expect(source).toContain("v_entry_actor_super");
+      expect(source).not.toContain("v_session_super");
+    },
+  );
 });
 
 function matches(source: string, pattern: RegExp) {

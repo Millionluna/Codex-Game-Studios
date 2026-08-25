@@ -4,6 +4,12 @@
 
 begin;
 
+select pg_catalog.set_config(
+  'careslink.assertion_entry_role',
+  current_user,
+  true
+);
+
 do $$
 declare
   v_signature text;
@@ -253,7 +259,11 @@ begin
   end;
 end
 $$;
-reset role;
+select pg_catalog.set_config(
+  'role',
+  pg_catalog.current_setting('careslink.assertion_entry_role'),
+  false
+);
 
 update public.portal_workflow_flags
 set enabled = true, updated_at = now()
@@ -339,7 +349,11 @@ begin
   end;
 end
 $$;
-reset role;
+select pg_catalog.set_config(
+  'role',
+  pg_catalog.current_setting('careslink.assertion_entry_role'),
+  false
+);
 
 select set_config(
   'request.jwt.claims',
@@ -357,7 +371,11 @@ begin
   end;
 end
 $$;
-reset role;
+select pg_catalog.set_config(
+  'role',
+  pg_catalog.current_setting('careslink.assertion_entry_role'),
+  false
+);
 
 select set_config(
   'request.jwt.claims',
@@ -402,7 +420,11 @@ begin
   end if;
 end
 $$;
-reset role;
+select pg_catalog.set_config(
+  'role',
+  pg_catalog.current_setting('careslink.assertion_entry_role'),
+  false
+);
 
 select set_config(
   'request.jwt.claims',
@@ -420,7 +442,11 @@ begin
   end;
 end
 $$;
-reset role;
+select pg_catalog.set_config(
+  'role',
+  pg_catalog.current_setting('careslink.assertion_entry_role'),
+  false
+);
 
 select set_config(
   'request.jwt.claims',
@@ -438,7 +464,11 @@ begin
   end;
 end
 $$;
-reset role;
+select pg_catalog.set_config(
+  'role',
+  pg_catalog.current_setting('careslink.assertion_entry_role'),
+  false
+);
 
 select set_config(
   'request.jwt.claims',
@@ -456,7 +486,11 @@ begin
   end;
 end
 $$;
-reset role;
+select pg_catalog.set_config(
+  'role',
+  pg_catalog.current_setting('careslink.assertion_entry_role'),
+  false
+);
 
 select set_config(
   'request.jwt.claims',
@@ -511,7 +545,11 @@ begin
   ) values ('a1', v_created);
 end
 $$;
-reset role;
+select pg_catalog.set_config(
+  'role',
+  pg_catalog.current_setting('careslink.assertion_entry_role'),
+  false
+);
 
 do $$
 declare
@@ -683,7 +721,11 @@ begin
   end;
 end
 $$;
-reset role;
+select pg_catalog.set_config(
+  'role',
+  pg_catalog.current_setting('careslink.assertion_entry_role'),
+  false
+);
 
 create function pg_temp.portal_intake_test_fail_audit()
 returns trigger
@@ -730,7 +772,11 @@ begin
   end;
 end
 $$;
-reset role;
+select pg_catalog.set_config(
+  'role',
+  pg_catalog.current_setting('careslink.assertion_entry_role'),
+  false
+);
 
 drop trigger portal_intake_test_fail_audit on public.portal_audit_events;
 drop function pg_temp.portal_intake_test_fail_audit();
@@ -786,7 +832,11 @@ begin
   ) values ('a2', v_created);
 end
 $$;
-reset role;
+select pg_catalog.set_config(
+  'role',
+  pg_catalog.current_setting('careslink.assertion_entry_role'),
+  false
+);
 
 select set_config(
   'request.jwt.claims',
@@ -844,7 +894,11 @@ begin
   end if;
 end
 $$;
-reset role;
+select pg_catalog.set_config(
+  'role',
+  pg_catalog.current_setting('careslink.assertion_entry_role'),
+  false
+);
 
 select set_config(
   'request.jwt.claims',
@@ -941,7 +995,11 @@ begin
   end;
 end
 $$;
-reset role;
+select pg_catalog.set_config(
+  'role',
+  pg_catalog.current_setting('careslink.assertion_entry_role'),
+  false
+);
 
 do $$
 begin
@@ -1006,7 +1064,11 @@ begin
   end;
 end
 $$;
-reset role;
+select pg_catalog.set_config(
+  'role',
+  pg_catalog.current_setting('careslink.assertion_entry_role'),
+  false
+);
 
 update public.portal_workflow_flags
 set enabled = false, updated_at = now()
@@ -1043,7 +1105,11 @@ begin
   end;
 end
 $$;
-reset role;
+select pg_catalog.set_config(
+  'role',
+  pg_catalog.current_setting('careslink.assertion_entry_role'),
+  false
+);
 
 do $$
 begin

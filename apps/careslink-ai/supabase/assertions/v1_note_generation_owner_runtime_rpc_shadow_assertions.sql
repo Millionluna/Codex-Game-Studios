@@ -1,18 +1,28 @@
 -- Manual rollback-only assertions for a fresh disposable PostgreSQL 16+
--- database after all 29 repository migrations have been applied. Submit this
+-- database after every repository migration has been applied. Submit this
 -- whole file as one request: BEGIN through ROLLBACK share transaction-only
 -- TEST_ONLY fixtures. This assertion creates no durable policy, retirement,
 -- binding, job, payload, caller credential, route, model, vault object or
 -- Points mutation.
--- Production must never be the SQL target. No hosted execution evidence is
--- claimed by this source-only gate until an independently authorized Preview
--- run records and then destroys its exact no-data branch.
+-- Production must never be the SQL target. On 2026-08-25, official Supabase
+-- CLI 2.115.0 executed this exact assertion body in the final disposable
+-- no-data r5 gate: 30/30 migrations, 11/11 rollback suites and the independent
+-- posture postcheck passed. r5 was hosted-role-restore-r5-20260825, id
+-- d68d531a-55e6-4374-be68-494da7542c75 and ref eqqlvqqhvsogusqhzuaq;
+-- deletion and exact id/ref absence were confirmed. Production was never a
+-- SQL target.
 -- The wall-clock fixtures below distinguish clock time from transaction start
 -- time; they do not claim to replace a separate two-connection lock-wait race.
 
 \set ON_ERROR_STOP on
 
 begin;
+
+select pg_catalog.set_config(
+  'careslink.assertion_entry_role',
+  current_user,
+  true
+);
 
 -- Prove the migration posture before adding the three rollback-only SET-role
 -- edges used by the fixture. Catalog reads do not bypass or relax RLS.
@@ -29,7 +39,7 @@ declare
   v_effective_acl aclitem[];
   v_edge_count integer;
   v_expected_edges integer;
-  v_session_super boolean;
+  v_entry_actor_super boolean;
 begin
   if current_setting('server_version_num')::integer < 160000 then
     raise exception 'owner runtime RPC shadow requires PostgreSQL 16 or newer';
@@ -54,9 +64,9 @@ begin
   end if;
 
   select role.rolsuper
-  into v_session_super
+  into v_entry_actor_super
   from pg_roles as role
-  where role.oid = session_user::regrole;
+  where role.oid = current_user::regrole;
 
   select count(*)
   into v_edge_count
@@ -64,7 +74,7 @@ begin
   where membership.roleid = v_owner_api
     or membership.member = v_owner_api;
   v_expected_edges := case
-    when not v_session_super then 1
+    when not v_entry_actor_super then 1
     else 0
   end;
 
@@ -80,7 +90,7 @@ begin
     )
       and not (
         membership.roleid = v_owner_api
-        and member_role.oid = session_user::regrole
+        and member_role.oid = current_user::regrole
         and grantor_role.rolsuper
         and grantor_role.oid <> member_role.oid
         and membership.admin_option
@@ -1301,7 +1311,11 @@ begin
 end
 $$;
 
-reset role;
+select pg_catalog.set_config(
+  'role',
+  pg_catalog.current_setting('careslink.assertion_entry_role'),
+  false
+);
 
 -- Install a complete TEST_ONLY catalog and enable the capability, but leave
 -- admission unbound for the first policy-selection denial.
@@ -1480,7 +1494,11 @@ alter table careslink_v1_generation.admission_policy_bindings
   force row level security;
 alter table careslink_v1_generation.settings force row level security;
 
-reset role;
+select pg_catalog.set_config(
+  'role',
+  pg_catalog.current_setting('careslink.assertion_entry_role'),
+  false
+);
 
 set local role careslink_v1_generation_owner_api_executor;
 
@@ -1529,7 +1547,11 @@ begin
 end
 $$;
 
-reset role;
+select pg_catalog.set_config(
+  'role',
+  pg_catalog.current_setting('careslink.assertion_entry_role'),
+  false
+);
 
 -- Activate exactly one communication binding inside this transaction. The
 -- unique partial index remains the database-owned arbitration point.
@@ -1555,7 +1577,11 @@ insert into careslink_v1_generation.admission_policy_bindings (
 );
 alter table careslink_v1_generation.admission_policy_bindings
   force row level security;
-reset role;
+select pg_catalog.set_config(
+  'role',
+  pg_catalog.current_setting('careslink.assertion_entry_role'),
+  false
+);
 
 -- The seven identity-column UPDATE grants exist only so SELECT ... FOR SHARE
 -- can lock catalog rows. Always-false WITH CHECK policies must reject every
@@ -1596,7 +1622,11 @@ begin
   end if;
 end
 $$;
-reset role;
+select pg_catalog.set_config(
+  'role',
+  pg_catalog.current_setting('careslink.assertion_entry_role'),
+  false
+);
 
 -- Admission, exact replay, response-loss replay with replacement candidate
 -- IDs, changed-input conflict, payload identity conflict, owner scoping,
@@ -2069,7 +2099,11 @@ $$;
 -- Exact response-loss replay remains a fresh-session ownership receipt after
 -- both the stored proof and payload TTL expire. It must not re-run first-
 -- admission privacy/expiry gates or orphan cleanup loses its identity answer.
-reset role;
+select pg_catalog.set_config(
+  'role',
+  pg_catalog.current_setting('careslink.assertion_entry_role'),
+  false
+);
 -- Drain the intentionally deferred job/payload identity cycle before the
 -- assertion-only ALTER TABLE used to age the payload fixture.
 set constraints all immediate;
@@ -2097,7 +2131,11 @@ set expires_at = current_setting(
 )::timestamptz
 where id = 'c5000000-0000-4000-8000-000000000001'::uuid;
 alter table careslink_v1_generation.payloads force row level security;
-reset role;
+select pg_catalog.set_config(
+  'role',
+  pg_catalog.current_setting('careslink.assertion_entry_role'),
+  false
+);
 select pg_catalog.pg_sleep(0.02);
 set local role careslink_v1_generation_owner_api_executor;
 do $$
@@ -2186,7 +2224,11 @@ $$;
 -- Status and cancel must remain available while new admission is hard-off.
 -- Disable the capability before both the corrupt-outbox rejection and queued
 -- cancellation; the worker path is re-enabled only after those checks.
-reset role;
+select pg_catalog.set_config(
+  'role',
+  pg_catalog.current_setting('careslink.assertion_entry_role'),
+  false
+);
 set local role careslink_v1_generation_owner;
 alter table careslink_v1_generation.settings no force row level security;
 update careslink_v1_generation.settings
@@ -2194,7 +2236,11 @@ set enabled = false,
     updated_at = date_trunc('milliseconds', transaction_timestamp())
 where capability = 'note_generation_v1';
 alter table careslink_v1_generation.settings force row level security;
-reset role;
+select pg_catalog.set_config(
+  'role',
+  pg_catalog.current_setting('careslink.assertion_entry_role'),
+  false
+);
 set local role careslink_v1_generation_owner_api_executor;
 
 -- A pre-existing purge event on a nonterminal job is corruption, never an
@@ -2290,7 +2336,11 @@ begin
 end
 $$;
 
-reset role;
+select pg_catalog.set_config(
+  'role',
+  pg_catalog.current_setting('careslink.assertion_entry_role'),
+  false
+);
 set local role careslink_v1_generation_owner;
 alter table careslink_v1_generation.payload_purge_outbox
   no force row level security;
@@ -2298,7 +2348,11 @@ delete from careslink_v1_generation.payload_purge_outbox
 where id = 'c7000000-0000-4000-8000-000000000001'::uuid;
 alter table careslink_v1_generation.payload_purge_outbox
   force row level security;
-reset role;
+select pg_catalog.set_config(
+  'role',
+  pg_catalog.current_setting('careslink.assertion_entry_role'),
+  false
+);
 
 -- The table constraints allow a pre-existing QUEUED job to have one RUNNING
 -- attempt. Cancellation must lock and reject that split before touching the
@@ -2339,7 +2393,11 @@ from (
   ) as fixture_now
 ) as fixture;
 alter table careslink_v1_generation.attempts force row level security;
-reset role;
+select pg_catalog.set_config(
+  'role',
+  pg_catalog.current_setting('careslink.assertion_entry_role'),
+  false
+);
 set local role careslink_v1_generation_owner_api_executor;
 
 do $$
@@ -2410,13 +2468,21 @@ begin
 end
 $$;
 
-reset role;
+select pg_catalog.set_config(
+  'role',
+  pg_catalog.current_setting('careslink.assertion_entry_role'),
+  false
+);
 set local role careslink_v1_generation_owner;
 alter table careslink_v1_generation.attempts no force row level security;
 delete from careslink_v1_generation.attempts
 where id = 'c6000000-0000-4000-8000-000000000099'::uuid;
 alter table careslink_v1_generation.attempts force row level security;
-reset role;
+select pg_catalog.set_config(
+  'role',
+  pg_catalog.current_setting('careslink.assertion_entry_role'),
+  false
+);
 set local role careslink_v1_generation_owner_api_executor;
 
 -- Queued cancellation is atomic and replayable while admission is disabled:
@@ -2514,7 +2580,11 @@ begin
 end
 $$;
 
-reset role;
+select pg_catalog.set_config(
+  'role',
+  pg_catalog.current_setting('careslink.assertion_entry_role'),
+  false
+);
 
 -- Re-enable only long enough for the worker to claim and authorize owner B.
 set local role careslink_v1_generation_owner;
@@ -2547,7 +2617,11 @@ where id = 'c5000000-0000-4000-8000-000000000002'::uuid
   and state = 'AVAILABLE';
 alter table careslink_v1_generation.jobs force row level security;
 alter table careslink_v1_generation.payloads force row level security;
-reset role;
+select pg_catalog.set_config(
+  'role',
+  pg_catalog.current_setting('careslink.assertion_entry_role'),
+  false
+);
 
 -- The worker takes the sole remaining queued job and issues one metadata-only
 -- payload grant. The owner then cancels this RUNNING attempt in the next block.
@@ -2628,7 +2702,11 @@ begin
 end
 $$;
 
-reset role;
+select pg_catalog.set_config(
+  'role',
+  pg_catalog.current_setting('careslink.assertion_entry_role'),
+  false
+);
 
 -- Move the RUNNING attempt/grant timestamps beyond transaction start without
 -- claiming a concurrent race. A cancel that still uses transaction_timestamp
@@ -2675,7 +2753,11 @@ end
 $$;
 alter table careslink_v1_generation.attempts force row level security;
 alter table careslink_v1_generation.payload_grants force row level security;
-reset role;
+select pg_catalog.set_config(
+  'role',
+  pg_catalog.current_setting('careslink.assertion_entry_role'),
+  false
+);
 
 -- Hard-off again before the RUNNING status/cancel path. From this point to the
 -- final ROLLBACK, admission stays disabled under its original CHECK.
@@ -2688,7 +2770,11 @@ where capability = 'note_generation_v1';
 alter table careslink_v1_generation.settings
   add constraint settings_enabled_check check (enabled = false);
 alter table careslink_v1_generation.settings force row level security;
-reset role;
+select pg_catalog.set_config(
+  'role',
+  pg_catalog.current_setting('careslink.assertion_entry_role'),
+  false
+);
 
 -- Status reflects RUNNING while admission is disabled and exposes no
 -- lease/grant. Cancellation then
@@ -2868,7 +2954,11 @@ begin
 end
 $$;
 
-reset role;
+select pg_catalog.set_config(
+  'role',
+  pg_catalog.current_setting('careslink.assertion_entry_role'),
+  false
+);
 
 -- Remove the assertion-only active binding before the rollback. The capability
 -- is already hard-off again with its original CHECK restored above.
@@ -2879,7 +2969,11 @@ delete from careslink_v1_generation.admission_policy_bindings
 where binding_version = 'binding.owner.test.v1';
 alter table careslink_v1_generation.admission_policy_bindings
   force row level security;
-reset role;
+select pg_catalog.set_config(
+  'role',
+  pg_catalog.current_setting('careslink.assertion_entry_role'),
+  false
+);
 
 set local role careslink_v1_generation_owner_api_executor;
 do $$
@@ -2943,7 +3037,11 @@ begin
   end if;
 end
 $$;
-reset role;
+select pg_catalog.set_config(
+  'role',
+  pg_catalog.current_setting('careslink.assertion_entry_role'),
+  false
+);
 
 revoke careslink_v1_generation_owner_api_executor from current_user
   granted by current_user;
@@ -2956,24 +3054,24 @@ do $$
 declare
   v_edge_count integer;
   v_expected_edges integer;
-  v_session_super boolean;
+  v_entry_actor_super boolean;
 begin
   select role.rolsuper
-  into v_session_super
+  into v_entry_actor_super
   from pg_roles as role
-  where role.oid = session_user::regrole;
+  where role.oid = current_user::regrole;
 
   select count(*)
   into v_edge_count
   from pg_auth_members as membership
   join pg_roles as granted_role on granted_role.oid = membership.roleid
-  where membership.member = session_user::regrole
+  where membership.member = current_user::regrole
     and granted_role.rolname in (
       'careslink_v1_generation_owner',
       'careslink_v1_generation_executor',
       'careslink_v1_generation_owner_api_executor'
     );
-  v_expected_edges := case when v_session_super then 0 else 3 end;
+  v_expected_edges := case when v_entry_actor_super then 0 else 3 end;
 
   if v_edge_count <> v_expected_edges
     or exists (
@@ -2982,14 +3080,14 @@ begin
     join pg_roles as granted_role on granted_role.oid = membership.roleid
     join pg_roles as member_role on member_role.oid = membership.member
     join pg_roles as grantor_role on grantor_role.oid = membership.grantor
-    where membership.member = session_user::regrole
+    where membership.member = current_user::regrole
       and granted_role.rolname in (
         'careslink_v1_generation_owner',
         'careslink_v1_generation_executor',
         'careslink_v1_generation_owner_api_executor'
       )
       and not (
-        member_role.oid = session_user::regrole
+        member_role.oid = current_user::regrole
         and grantor_role.rolsuper
         and grantor_role.oid <> member_role.oid
         and membership.admin_option

@@ -3,10 +3,23 @@
 -- whole file as one request: BEGIN through ROLLBACK share transaction-only
 -- TEST_ONLY fixtures. Production must never be the SQL target. This file does
 -- not claim to exercise the separate two-connection claim/retirement race.
+-- On 2026-08-25, official Supabase CLI 2.115.0 executed this exact assertion
+-- body in the final disposable no-data r5 gate: 30/30 migrations, 11/11
+-- rollback suites and the independent posture postcheck passed. r5 was
+-- hosted-role-restore-r5-20260825, id
+-- d68d531a-55e6-4374-be68-494da7542c75 and ref eqqlvqqhvsogusqhzuaq;
+-- deletion and exact id/ref absence were confirmed. Production was never a
+-- SQL target.
 
 \set ON_ERROR_STOP on
 
 begin;
+
+select pg_catalog.set_config(
+  'careslink.assertion_entry_role',
+  current_user,
+  true
+);
 
 -- Prove the durable posture before adding rollback-only SET-role edges.
 do $$
@@ -18,7 +31,7 @@ declare
   v_table oid := to_regclass(
     'careslink_v1_generation.worker_registration_retirements'
   );
-  v_session_super boolean;
+  v_entry_actor_super boolean;
   v_edge_count integer;
   v_expected_edges integer;
   v_denied_role text;
@@ -48,16 +61,16 @@ begin
   end if;
 
   select role.rolsuper
-  into v_session_super
+  into v_entry_actor_super
   from pg_roles as role
-  where role.oid = session_user::regrole;
+  where role.oid = current_user::regrole;
 
   select count(*)
   into v_edge_count
   from pg_auth_members as membership
   where membership.roleid = v_control
     or membership.member = v_control;
-  v_expected_edges := case when v_session_super then 0 else 1 end;
+  v_expected_edges := case when v_entry_actor_super then 0 else 1 end;
 
   if v_edge_count <> v_expected_edges
     or exists (
@@ -71,7 +84,7 @@ begin
       )
         and not (
           membership.roleid = v_control
-          and member_role.oid = session_user::regrole
+          and member_role.oid = current_user::regrole
           and grantor_role.rolsuper
           and grantor_role.oid <> member_role.oid
           and membership.admin_option
@@ -713,7 +726,11 @@ begin
 end
 $$;
 
-reset role;
+select pg_catalog.set_config(
+  'role',
+  pg_catalog.current_setting('careslink.assertion_entry_role'),
+  false
+);
 
 -- Minimal catalog, one cancelled job/payload pair and no QUEUED work. The
 -- terminal job exists only to exercise the attempt trigger's RUNNING boundary.
@@ -1094,7 +1111,11 @@ alter table careslink_v1_generation.jobs force row level security;
 alter table careslink_v1_generation.payloads force row level security;
 alter table careslink_v1_generation.attempts force row level security;
 
-reset role;
+select pg_catalog.set_config(
+  'role',
+  pg_catalog.current_setting('careslink.assertion_entry_role'),
+  false
+);
 
 -- The fixed reason vocabulary rejects all unreviewed values even through the
 -- only INSERT-capable control role.
@@ -1137,7 +1158,11 @@ begin
 end
 $$;
 
-reset role;
+select pg_catalog.set_config(
+  'role',
+  pg_catalog.current_setting('careslink.assertion_entry_role'),
+  false
+);
 
 set local role careslink_v1_generation_executor;
 
@@ -1152,7 +1177,11 @@ begin
 end
 $$;
 
-reset role;
+select pg_catalog.set_config(
+  'role',
+  pg_catalog.current_setting('careslink.assertion_entry_role'),
+  false
+);
 
 -- Reject malformed or stale expected sets before accepting the exact sorted,
 -- de-duplicated ACTIVE binding vector. Then prove durable idempotent replay.
@@ -1346,7 +1375,11 @@ begin
 end
 $$;
 
-reset role;
+select pg_catalog.set_config(
+  'role',
+  pg_catalog.current_setting('careslink.assertion_entry_role'),
+  false
+);
 
 -- The helper and claim both fail closed after retirement. The queue is
 -- deliberately empty, proving the gate precedes the queue scan.
@@ -1405,7 +1438,11 @@ begin
 end
 $$;
 
-reset role;
+select pg_catalog.set_config(
+  'role',
+  pg_catalog.current_setting('careslink.assertion_entry_role'),
+  false
+);
 
 -- The ledger is immutable even to the table owner inside a rollback-only
 -- FORCE-RLS relaxation. Both UPDATE and DELETE must reach the guard trigger.
@@ -1633,7 +1670,11 @@ end
 $$;
 
 alter table careslink_v1_generation.attempts force row level security;
-reset role;
+select pg_catalog.set_config(
+  'role',
+  pg_catalog.current_setting('careslink.assertion_entry_role'),
+  false
+);
 
 -- Remove the assertion-only role edges explicitly; ROLLBACK also removes all
 -- fixtures, FORCE-RLS relaxations and the temporary capability enablement.

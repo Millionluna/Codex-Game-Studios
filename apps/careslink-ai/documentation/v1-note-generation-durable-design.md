@@ -1096,18 +1096,39 @@ grant and revoke. A separate commit boundary retained the migration actor as
 topology: all three tables and the schema were owned by the dedicated owner;
 both transport and entry roles had zero schema `CREATE`; the temporary
 `SET=true` membership was gone; and only the PostgreSQL 16 admin-only bootstrap
-edge (`ADMIN=true`, `INHERIT=false`, `SET=false`) remained. Six focused Vitest
-files passed 75/75 contracts. The full source gate passed 134 files / 1,645
-tests, TypeScript, full lint, the 63/63-page production build, the 73-file
-Codex-adapter sync check and `git diff --check`. The server was stopped and the
-exact temporary cluster directory was permanently deleted.
+edge (`ADMIN=true`, `INHERIT=false`, `SET=false`) remained. The server was
+stopped and the exact temporary cluster directory was permanently deleted.
 
-This is source and local PostgreSQL evidence only. It is not proof that the
-exact 30-migration manifest deploys through the official Hosted CLI, and it
-does not refresh the historical deleted-Preview evidence for older migration
-bytes. No Hosted branch, Production change, deployment, activation, business
-data or paid resource was created. The next gate is a fresh no-data disposable
-Preview: official CLI clean-apply 30/30, run the now 11 rollback/assertion
-suites, verify the two #26 auth readers and five #30 Portal definer functions
-retain the migration-entry owner, run the independent role/ACL/zero-fixture
-postcheck, then delete the branch.
+Four diagnostic no-data Hosted iterations then exposed and closed assertion-
+harness defects without changing Production. Hosted enters assertion files as
+`current_user=postgres` while retaining a distinct transport `session_user`.
+The four generation suites and five ordinary/Portal suites now capture that
+entry actor once and use 82 explicit restores instead of bare `RESET ROLE`.
+The dedicated restoration suite inspects the temporary ACL directly with
+`aclexplode`; an effective-privilege check was invalid because a SET-only role
+membership can preserve indirect privilege after the direct ACL is revoked.
+
+The final non-default, `persistent=false`, `with_data=false` Preview was
+`hosted-role-restore-r5-20260825` (id
+`d68d531a-55e6-4374-be68-494da7542c75`, ref
+`eqqlvqqhvsogusqhzuaq`) under Production parent
+`adocsnwnslxhxcjgbyee`. In one official Supabase CLI 2.115.0 remote reset, the
+exact 30 migrations and all 11 rollback suites passed. The special suite proved
+the real `session_user != current_user` topology, entry-actor `CREATEROLE`,
+temporary grant, explicit restore, revoke and direct-ACL cleanup.
+
+A separate rollback-only postcheck proved the exact 30-row migration manifest;
+14 owner-correct forced-RLS generation tables; four locked `NOLOGIN NOINHERIT`
+roles and exact bootstrap edges; both #26 auth/privacy readers and all five #30
+Portal `SECURITY DEFINER` functions owned by the entry actor; hard-off settings;
+zero checked Auth, Portal and generation fixtures; and no API or schema-
+`CREATE` leak. Security advisors reported zero generation findings. Generation
+performance scope retained 14 unindexed-FK INFO, four unused-index INFO and 13
+`auth_rls_initplan` WARN advisories; these are tracked separately from the role
+boundary. The Preview was deleted and exact id/ref absence was verified, leaving
+only the healthy default Production branch. Production was never a SQL target;
+no deployment, activation, business data or ongoing Preview charge resulted.
+The final source gate passed the 11 direct contract files (162 tests), the full
+134-file / 1,657-test Vitest suite, TypeScript, lint, the Next.js 16.2.9 webpack
+production build with 63/63 static pages, the 73-file adapter check and
+`git diff --check`.

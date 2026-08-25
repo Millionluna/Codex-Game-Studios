@@ -26,6 +26,13 @@ const entryRoleRestore = normalizeSql(`
     false
   );
 `);
+const assertionEntryRoleRestore = normalizeSql(`
+  select pg_catalog.set_config(
+    'role',
+    pg_catalog.current_setting('careslink.assertion_entry_role'),
+    false
+  );
+`);
 
 describe("V1 Note durable generation foundation migration contract", () => {
   it("is a CLI-named additive schema-only foundation that cannot activate itself", () => {
@@ -476,17 +483,23 @@ describe("V1 Note durable generation foundation migration contract", () => {
       "37547 bytes",
       "Historical deleted-r22 BEGIN-through-ROLLBACK source SHA-256",
       "Current #29 additive-aware BEGIN-through-ROLLBACK source SHA-256",
-      "9b0d0bca7cb91466ffa7d0bf626b6915947c4fb5021b0a1e9e513bb54dfc967b",
-      "39962 bytes",
-      "has not replaced the historical Preview evidence",
+      "e65b163bae59503d80a20d1ac1ff9457e0996bae5d2c10f537c33c4bbd8b28ea",
+      "40182 bytes",
+      "official Supabase CLI 2.115.0",
+      "30/30 migrations",
+      "11/11 rollback suites",
+      "hosted-role-restore-r5-20260825",
+      "d68d531a-55e6-4374-be68-494da7542c75",
+      "eqqlvqqhvsogusqhzuaq",
+      "deletion and exact id/ref absence were confirmed",
     ]) {
       expect(assertionHeader).toContain(marker);
     }
     expect(assertionBodyStart).toBeGreaterThanOrEqual(0);
-    expect(Buffer.byteLength(assertionBody, "utf8")).toBe(39_962);
+    expect(Buffer.byteLength(assertionBody, "utf8")).toBe(40_182);
     expect(
       createHash("sha256").update(assertionBody, "utf8").digest("hex"),
-    ).toBe("9b0d0bca7cb91466ffa7d0bf626b6915947c4fb5021b0a1e9e513bb54dfc967b");
+    ).toBe("e65b163bae59503d80a20d1ac1ff9457e0996bae5d2c10f537c33c4bbd8b28ea");
     expect(assertionHeader).toContain(
       "serial rollback proof does not itself prove true two-connection SKIP LOCKED",
     );
@@ -697,7 +710,7 @@ describe("V1 Note durable generation foundation migration contract", () => {
     expect(assertions).toContain(
       "remove\n-- their pending constraint-trigger events before restoring FORCE RLS",
     );
-    expect(assertions).toContain("reset role;");
+    expect(normalizeSql(assertions)).toContain(assertionEntryRoleRestore);
     expect(normalizeSql(assertions)).toContain(
       "revoke careslink_v1_generation_owner from current_user granted by current_user;",
     );

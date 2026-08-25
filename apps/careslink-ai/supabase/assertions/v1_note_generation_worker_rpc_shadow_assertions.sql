@@ -53,12 +53,24 @@
 -- 1c9f65bdc7f1de86e1c7398399ecf029207ba1b2bdf9fa3634dadb482424fdbb;
 -- 153956 bytes.
 -- The current #29 additive-aware BEGIN-through-ROLLBACK source SHA-256 is:
--- b9b55ab15118761c8a75a5ded3a3360bcebffac666ac9d7bb86882cd111189ba;
--- 160372 bytes. This source has not replaced the historical Preview evidence.
+-- 50b2b9cf03c7e23279cfed94f38958b949fefd722a3def9ff787d24c40b9a72f;
+-- 161598 bytes. On 2026-08-25, official Supabase CLI 2.115.0 executed this
+-- exact body in the final disposable no-data r5 gate: 30/30 migrations,
+-- 11/11 rollback suites and the independent posture postcheck passed. r5 was
+-- hosted-role-restore-r5-20260825, id
+-- d68d531a-55e6-4374-be68-494da7542c75 and ref eqqlvqqhvsogusqhzuaq;
+-- deletion and exact id/ref absence were confirmed. Production was never a
+-- SQL target.
 
 \set ON_ERROR_STOP on
 
 begin;
+
+select pg_catalog.set_config(
+  'careslink.assertion_entry_role',
+  current_user,
+  true
+);
 
 -- Assertion-only role access. These two temporary SET edges are rolled back
 -- and are never migration/runtime or API memberships.
@@ -567,7 +579,11 @@ $$;
 -- No migration, route, runtime grant, model, vault, Points or Production
 -- capability is enabled by this file.
 
-reset role;
+select pg_catalog.set_config(
+  'role',
+  pg_catalog.current_setting('careslink.assertion_entry_role'),
+  false
+);
 
 create temporary table rpc_assertion_policy_values (
   note_type text primary key,
@@ -1535,7 +1551,11 @@ alter table careslink_v1_generation.provider_evidence force row level security;
 alter table careslink_v1_generation.payload_purge_outbox
   force row level security;
 
-reset role;
+select pg_catalog.set_config(
+  'role',
+  pg_catalog.current_setting('careslink.assertion_entry_role'),
+  false
+);
 set local role careslink_v1_generation_executor;
 
 -- Serial arbitration proves that repeated claims in one transaction select
@@ -2971,7 +2991,11 @@ begin
 end
 $$;
 
-reset role;
+select pg_catalog.set_config(
+  'role',
+  pg_catalog.current_setting('careslink.assertion_entry_role'),
+  false
+);
 
 -- The executor deliberately has no SELECT privilege on raw revision content.
 -- After leaving that role, the migration actor proves the one successful raw
@@ -3144,7 +3168,11 @@ begin
 end
 $$;
 
-reset role;
+select pg_catalog.set_config(
+  'role',
+  pg_catalog.current_setting('careslink.assertion_entry_role'),
+  false
+);
 drop trigger test_only_fail_v1_worker_rpc_late
   on public.ai_document_mutation_receipts;
 drop function pg_temp.fail_v1_worker_rpc_late();
@@ -3933,7 +3961,11 @@ $$;
 
 -- Advance the successful payload and its outbox through the rollback-only
 -- purge-worker lifecycle without widening the executor's production ACL.
-reset role;
+select pg_catalog.set_config(
+  'role',
+  pg_catalog.current_setting('careslink.assertion_entry_role'),
+  false
+);
 set local role careslink_v1_generation_owner;
 alter table careslink_v1_generation.payloads no force row level security;
 alter table careslink_v1_generation.payload_purge_outbox
@@ -4079,7 +4111,11 @@ $$;
 alter table careslink_v1_generation.payload_purge_outbox
   force row level security;
 alter table careslink_v1_generation.payloads force row level security;
-reset role;
+select pg_catalog.set_config(
+  'role',
+  pg_catalog.current_setting('careslink.assertion_entry_role'),
+  false
+);
 set local role careslink_v1_generation_executor;
 
 -- Both attempts now replay across a later live purge state. The old worker
@@ -4442,7 +4478,11 @@ begin
 end
 $$;
 
-reset role;
+select pg_catalog.set_config(
+  'role',
+  pg_catalog.current_setting('careslink.assertion_entry_role'),
+  false
+);
 
 -- A terminal attempt must keep its immutable worker-registration row for
 -- historical resolve/settle/success replay. Prove both the exact catalog
@@ -4643,7 +4683,11 @@ alter table careslink_v1_generation.worker_registrations
   force row level security;
 alter table careslink_v1_generation.payload_grants force row level security;
 alter table careslink_v1_generation.attempts force row level security;
-reset role;
+select pg_catalog.set_config(
+  'role',
+  pg_catalog.current_setting('careslink.assertion_entry_role'),
+  false
+);
 
 -- Revoke the shared TEST_ONLY proof only after every fresh-authority scenario
 -- has completed. Authorize must re-read it and atomically settle the still-
@@ -4789,7 +4833,11 @@ begin
 end
 $$;
 
-reset role;
+select pg_catalog.set_config(
+  'role',
+  pg_catalog.current_setting('careslink.assertion_entry_role'),
+  false
+);
 
 -- Note generation must not touch any wallet, lot, reservation, allocation or
 -- ledger row. Compare the complete table counts captured before all RPCs.
@@ -4838,7 +4886,11 @@ where capability = 'note_generation_v1';
 alter table careslink_v1_generation.settings
   add constraint settings_enabled_check check (enabled = false);
 alter table careslink_v1_generation.settings force row level security;
-reset role;
+select pg_catalog.set_config(
+  'role',
+  pg_catalog.current_setting('careslink.assertion_entry_role'),
+  false
+);
 
 -- The hosted migration actor is not assumed to be superuser and owns neither
 -- the private tables nor their SELECT grants. Re-enter the narrowly privileged
@@ -4876,7 +4928,11 @@ begin
   end if;
 end
 $$;
-reset role;
+select pg_catalog.set_config(
+  'role',
+  pg_catalog.current_setting('careslink.assertion_entry_role'),
+  false
+);
 
 revoke careslink_v1_generation_executor from current_user
   granted by current_user;

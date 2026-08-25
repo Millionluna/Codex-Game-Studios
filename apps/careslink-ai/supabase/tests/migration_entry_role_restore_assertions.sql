@@ -120,10 +120,16 @@ begin
     pg_catalog.current_setting('careslink.migration_entry_role')
   );
 
-  if pg_catalog.has_table_privilege(
-    pg_catalog.current_setting('careslink.migration_entry_role'),
-    'pg_temp.careslink_migration_restore_acl_probe',
-    'SELECT'
+  if exists (
+    select 1
+    from pg_catalog.pg_class as relation
+    cross join lateral pg_catalog.aclexplode(relation.relacl) as privilege
+    where relation.oid =
+      'pg_temp.careslink_migration_restore_acl_probe'::regclass
+      and privilege.grantee = pg_catalog.to_regrole(
+        pg_catalog.current_setting('careslink.migration_entry_role')
+      )
+      and privilege.privilege_type = 'SELECT'
   ) then
     raise exception 'captured entry actor retained the temporary ACL';
   end if;

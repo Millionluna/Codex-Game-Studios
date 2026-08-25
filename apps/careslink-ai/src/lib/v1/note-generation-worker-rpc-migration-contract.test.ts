@@ -32,6 +32,11 @@ const entryRoleRestore = `select pg_catalog.set_config(
   pg_catalog.current_setting('careslink.migration_entry_role'),
   false
 );`;
+const assertionEntryRoleRestore = `select pg_catalog.set_config(
+  'role',
+  pg_catalog.current_setting('careslink.assertion_entry_role'),
+  false
+);`;
 
 const newTableNames = [
   "worker_policies",
@@ -968,7 +973,10 @@ describe("V1 Note registered-worker RPC shadow migration contract", () => {
     const proofStart = assertions.indexOf(
       "-- The executor deliberately has no SELECT privilege on raw revision content.",
     );
-    const actorReset = assertions.lastIndexOf("reset role;", proofStart);
+    const actorRestore = assertions.lastIndexOf(
+      assertionEntryRoleRestore,
+      proofStart,
+    );
     const proofFailure = assertions.indexOf(
       "canonical success raw revision binding drifted",
       proofStart,
@@ -991,8 +999,8 @@ describe("V1 Note registered-worker RPC shadow migration contract", () => {
     const initialExecutor = assertions.indexOf(
       `set local role ${executorRole};`,
     );
-    expect(actorReset).toBeGreaterThan(initialExecutor);
-    expect(proofStart).toBeGreaterThan(actorReset);
+    expect(actorRestore).toBeGreaterThan(initialExecutor);
+    expect(proofStart).toBeGreaterThan(actorRestore);
     expect(proofFailure).toBeGreaterThan(proofStart);
     expect(proofEndStart).toBeGreaterThan(proofFailure);
     expect(faultComment).toBeGreaterThan(proofEnd);
@@ -1017,7 +1025,7 @@ describe("V1 Note registered-worker RPC shadow migration contract", () => {
     );
     expect(rawProof).not.toContain(`set local role ${executorRole}`);
 
-    const executorBeforeActor = assertions.slice(initialExecutor, actorReset);
+    const executorBeforeActor = assertions.slice(initialExecutor, actorRestore);
     expect(executorBeforeActor).not.toContain("and content = v_content");
     expect(executorBeforeActor).toContain("and content_hash = v_content_hash");
     expect(executorBeforeActor).toContain(
@@ -1163,26 +1171,26 @@ describe("V1 Note registered-worker RPC shadow migration contract", () => {
   });
 
   it("precomputes the owner fixture lease digest before entering the restricted owner role", () => {
-    const bootstrapReset = assertions.indexOf("reset role;");
+    const bootstrapRestore = assertions.indexOf(assertionEntryRoleRestore);
     const digestSetting = assertions.indexOf(
       "'careslink.assert.expired_lease_hash'",
-      bootstrapReset,
+      bootstrapRestore,
     );
     const fixtureOwnerSet = assertions.indexOf(
       `set local role ${ownerRole};`,
-      bootstrapReset,
+      bootstrapRestore,
     );
-    const fixtureOwnerReset = assertions.indexOf(
-      "reset role;",
+    const fixtureOwnerRestore = assertions.indexOf(
+      assertionEntryRoleRestore,
       fixtureOwnerSet,
     );
 
-    expect(bootstrapReset).toBeGreaterThanOrEqual(0);
-    expect(digestSetting).toBeGreaterThan(bootstrapReset);
+    expect(bootstrapRestore).toBeGreaterThanOrEqual(0);
+    expect(digestSetting).toBeGreaterThan(bootstrapRestore);
     expect(fixtureOwnerSet).toBeGreaterThan(digestSetting);
-    expect(fixtureOwnerReset).toBeGreaterThan(fixtureOwnerSet);
+    expect(fixtureOwnerRestore).toBeGreaterThan(fixtureOwnerSet);
 
-    const bootstrapDigest = assertions.slice(bootstrapReset, fixtureOwnerSet);
+    const bootstrapDigest = assertions.slice(bootstrapRestore, fixtureOwnerSet);
     expect(bootstrapDigest).toContain(
       "extensions.digest(convert_to('test-only-expired-lease', 'UTF8'), 'sha256')",
     );
@@ -1190,7 +1198,7 @@ describe("V1 Note registered-worker RPC shadow migration contract", () => {
       "select set_config(\n  'careslink.assert.expired_lease_hash'",
     );
 
-    const ownerFixtures = assertions.slice(fixtureOwnerSet, fixtureOwnerReset);
+    const ownerFixtures = assertions.slice(fixtureOwnerSet, fixtureOwnerRestore);
     expect(ownerFixtures).toContain(
       "current_setting('careslink.assert.expired_lease_hash')",
     );
@@ -1253,10 +1261,13 @@ describe("V1 Note registered-worker RPC shadow migration contract", () => {
     const settingsForce = assertions.lastIndexOf(
       `alter table ${schemaName}.settings force row level security;`,
     );
-    const ownerReset = assertions.indexOf("reset role;", settingsForce);
+    const ownerRestore = assertions.indexOf(
+      assertionEntryRoleRestore,
+      settingsForce,
+    );
     const executorSet = assertions.indexOf(
       `set local role ${executorRole};`,
-      ownerReset,
+      ownerRestore,
     );
     const verificationStart = assertions.indexOf("do $$", executorSet);
     const verificationFailure = assertions.indexOf(
@@ -1268,21 +1279,24 @@ describe("V1 Note registered-worker RPC shadow migration contract", () => {
       verificationFailure,
     );
     const verificationEnd = verificationEndStart + "\nend\n$$;".length;
-    const executorReset = assertions.indexOf("reset role;", verificationEnd);
+    const executorRestore = assertions.indexOf(
+      assertionEntryRoleRestore,
+      verificationEnd,
+    );
     const executorRevoke = assertions.indexOf(
       `revoke ${executorRole} from current_user`,
-      executorReset,
+      executorRestore,
     );
 
     expect(settingsForce).toBeGreaterThanOrEqual(0);
-    expect(ownerReset).toBeGreaterThan(settingsForce);
-    expect(executorSet).toBeGreaterThan(ownerReset);
+    expect(ownerRestore).toBeGreaterThan(settingsForce);
+    expect(executorSet).toBeGreaterThan(ownerRestore);
     expect(verificationStart).toBeGreaterThan(executorSet);
     expect(verificationFailure).toBeGreaterThan(verificationStart);
     expect(verificationEndStart).toBeGreaterThan(verificationFailure);
-    expect(executorReset).toBeGreaterThan(verificationEnd);
-    expect(assertions.slice(verificationEnd, executorReset).trim()).toBe("");
-    expect(executorRevoke).toBeGreaterThan(executorReset);
+    expect(executorRestore).toBeGreaterThan(verificationEnd);
+    expect(assertions.slice(verificationEnd, executorRestore).trim()).toBe("");
+    expect(executorRevoke).toBeGreaterThan(executorRestore);
 
     const verification = assertions.slice(verificationStart, verificationEnd);
     expect(verification).toContain(`from ${schemaName}.settings`);
@@ -1361,17 +1375,23 @@ describe("V1 Note registered-worker RPC shadow migration contract", () => {
       "1c9f65bdc7f1de86e1c7398399ecf029207ba1b2bdf9fa3634dadb482424fdbb",
       "153956 bytes",
       "current #29 additive-aware BEGIN-through-ROLLBACK source SHA-256",
-      "b9b55ab15118761c8a75a5ded3a3360bcebffac666ac9d7bb86882cd111189ba",
-      "160372 bytes",
-      "has not replaced the historical Preview evidence",
+      "50b2b9cf03c7e23279cfed94f38958b949fefd722a3def9ff787d24c40b9a72f",
+      "161598 bytes",
+      "official Supabase CLI 2.115.0",
+      "30/30 migrations",
+      "11/11 rollback suites",
+      "hosted-role-restore-r5-20260825",
+      "d68d531a-55e6-4374-be68-494da7542c75",
+      "eqqlvqqhvsogusqhzuaq",
+      "deletion and exact id/ref absence were confirmed",
     ]) {
       expect(assertionHeader).toContain(marker);
     }
     expect(assertionBodyStart).toBeGreaterThanOrEqual(0);
-    expect(Buffer.byteLength(assertionBody, "utf8")).toBe(160_372);
+    expect(Buffer.byteLength(assertionBody, "utf8")).toBe(161_598);
     expect(
       createHash("sha256").update(assertionBody, "utf8").digest("hex"),
-    ).toBe("b9b55ab15118761c8a75a5ded3a3360bcebffac666ac9d7bb86882cd111189ba");
+    ).toBe("50b2b9cf03c7e23279cfed94f38958b949fefd722a3def9ff787d24c40b9a72f");
     expect(assertions).toContain("transaction-only TEST_ONLY fixtures");
     expect(assertions).toContain("pg_get_function_identity_arguments");
     expect(assertions).toContain("aclexplode(");

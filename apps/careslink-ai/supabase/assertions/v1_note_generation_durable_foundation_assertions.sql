@@ -33,8 +33,14 @@
 -- 2a2af2e8c7c745b769a731a4892b27f65fcf311321e813c3cc190e54167772a6;
 -- 37547 bytes.
 -- Current #29 additive-aware BEGIN-through-ROLLBACK source SHA-256:
--- 9b0d0bca7cb91466ffa7d0bf626b6915947c4fb5021b0a1e9e513bb54dfc967b;
--- 39962 bytes. This source has not replaced the historical Preview evidence.
+-- e65b163bae59503d80a20d1ac1ff9457e0996bae5d2c10f537c33c4bbd8b28ea;
+-- 40182 bytes. On 2026-08-25, official Supabase CLI 2.115.0 executed this
+-- exact body in the final disposable no-data r5 gate: 30/30 migrations,
+-- 11/11 rollback suites and the independent posture postcheck passed. r5 was
+-- hosted-role-restore-r5-20260825, id
+-- d68d531a-55e6-4374-be68-494da7542c75 and ref eqqlvqqhvsogusqhzuaq;
+-- deletion and exact id/ref absence were confirmed. Production was never a
+-- SQL target.
 -- This remains metadata-schema evidence only; it does not prove or enable a
 -- live worker, payload vault or canonical persistence RPC.
 -- Run it after the foundation migration, with or without later separately
@@ -62,6 +68,12 @@
 
 begin;
 
+select pg_catalog.set_config(
+  'careslink.assertion_entry_role',
+  current_user,
+  true
+);
+
 do $$
 begin
   if current_setting('server_version_num')::integer < 160000 then
@@ -76,7 +88,7 @@ declare
   v_edge_count integer;
   v_distinct_roles integer;
   v_expected_edges integer;
-  v_session_super boolean;
+  v_entry_actor_super boolean;
 begin
   if v_schema is null
     or exists (
@@ -104,9 +116,9 @@ begin
   end if;
 
   select role.rolsuper
-  into v_session_super
+  into v_entry_actor_super
   from pg_roles as role
-  where role.oid = session_user::regrole;
+  where role.oid = current_user::regrole;
 
   select
     count(*),
@@ -126,7 +138,7 @@ begin
 
   v_expected_edges := case
     when current_setting('server_version_num')::integer >= 160000
-      and not v_session_super then 2
+      and not v_entry_actor_super then 2
     else 0
   end;
 
@@ -153,7 +165,7 @@ begin
           'careslink_v1_generation_owner',
           'careslink_v1_generation_executor'
         )
-        and member_role.oid = session_user::regrole
+        and member_role.oid = current_user::regrole
         and grantor_role.rolsuper
         and grantor_role.oid <> member_role.oid
         and membership.admin_option
@@ -1123,7 +1135,11 @@ $$;
 alter table careslink_v1_generation.settings force row level security;
 alter table careslink_v1_generation.jobs force row level security;
 alter table careslink_v1_generation.attempts force row level security;
-reset role;
+select pg_catalog.set_config(
+  'role',
+  pg_catalog.current_setting('careslink.assertion_entry_role'),
+  false
+);
 revoke careslink_v1_generation_owner from current_user
   granted by current_user;
 
@@ -1133,7 +1149,7 @@ declare
   v_edge_count integer;
   v_distinct_roles integer;
   v_expected_edges integer;
-  v_session_super boolean;
+  v_entry_actor_super boolean;
 begin
   if (
     select count(*)
@@ -1147,9 +1163,9 @@ begin
   end if;
 
   select role.rolsuper
-  into v_session_super
+  into v_entry_actor_super
   from pg_roles as role
-  where role.oid = session_user::regrole;
+  where role.oid = current_user::regrole;
 
   select
     count(*),
@@ -1169,7 +1185,7 @@ begin
 
   v_expected_edges := case
     when current_setting('server_version_num')::integer >= 160000
-      and not v_session_super then 2
+      and not v_entry_actor_super then 2
     else 0
   end;
 
@@ -1196,7 +1212,7 @@ begin
           'careslink_v1_generation_owner',
           'careslink_v1_generation_executor'
         )
-        and member_role.oid = session_user::regrole
+        and member_role.oid = current_user::regrole
         and grantor_role.rolsuper
         and grantor_role.oid <> member_role.oid
         and membership.admin_option

@@ -958,7 +958,7 @@ describe("V1 Note owner runtime RPC shadow migration contract", () => {
     );
   });
 
-  it("ships the frozen rollback-only PostgreSQL 16 owner runtime gate", () => {
+  it("ships the current rollback-only PostgreSQL owner runtime gate", () => {
     const normalizedHeader = assertionHeader
       .replace(/^-- ?/gm, "")
       .replace(/\s+/g, " ")
@@ -967,17 +967,21 @@ describe("V1 Note owner runtime RPC shadow migration contract", () => {
     expect(assertionsPath).toBe(
       "supabase/assertions/v1_note_generation_owner_runtime_rpc_shadow_assertions.sql",
     );
-    expect(Buffer.byteLength(assertions, "utf8")).toBe(102_605);
+    expect(Buffer.byteLength(assertions, "utf8")).toBe(105_236);
     expect(
       createHash("sha256").update(assertions, "utf8").digest("hex"),
-    ).toBe("daad15afec6de4f0ecc9c866d66157c56e34ba49fcbcbf189c77ddbf375da16c");
+    ).toBe("065550a45b1b68a38c536d27a2a54a87cb73bae03567b05eda095a92b1448ef3");
     for (const marker of [
       "Manual rollback-only assertions for a fresh disposable PostgreSQL 16+ database",
-      "after all 29 repository migrations have been applied",
+      "after every repository migration has been applied",
       "BEGIN through ROLLBACK",
       "TEST_ONLY fixtures",
       "Production must never be the SQL target",
-      "No hosted execution evidence is claimed",
+      "official Supabase CLI 2.115.0",
+      "30/30 migrations",
+      "11/11 rollback suites",
+      "hosted-role-restore-r5-20260825",
+      "deletion and exact id/ref absence were confirmed",
     ]) {
       expect(normalizedHeader).toContain(marker);
     }
@@ -986,10 +990,10 @@ describe("V1 Note owner runtime RPC shadow migration contract", () => {
     expect(assertionBody.startsWith("begin;\n")).toBe(true);
     expect(assertionBody.endsWith("rollback;\n")).toBe(true);
     expect(assertionBody).not.toMatch(/^commit\s*;/im);
-    expect(Buffer.byteLength(assertionBody, "utf8")).toBe(101_810);
+    expect(Buffer.byteLength(assertionBody, "utf8")).toBe(104_193);
     expect(
       createHash("sha256").update(assertionBody, "utf8").digest("hex"),
-    ).toBe("a611de18f8ab7269414d8a4f3c2579f0524e00fd3dc224316235e70625bf02ba");
+    ).toBe("9377611059f0f816a45edeb2c391a2905896e1534d37384047b06c5ca5b2946a");
 
     for (const marker of [
       "owner runtime RPC shadow requires PostgreSQL 16 or newer",
