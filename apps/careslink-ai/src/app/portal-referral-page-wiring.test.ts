@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import ProviderPortalPage from "./provider-portal/page";
 import ReferralSourcePortalPage from "./referral-source-portal/page";
 import ReferralDetailPage from "./referrals/[id]/page";
@@ -13,6 +13,9 @@ const navigationMocks = vi.hoisted(() => ({
   notFound: vi.fn(() => {
     throw new Error("NEXT_NOT_FOUND");
   }),
+}));
+const runtimeMocks = vi.hoisted(() => ({
+  isPortalReferralRuntimeEnabled: vi.fn(() => false),
 }));
 
 vi.mock("next/navigation", () => ({
@@ -97,13 +100,19 @@ vi.mock("@/lib/provider-assessment", async () =>
   import("../lib/provider-assessment"),
 );
 vi.mock("@/lib/provider-portal", async () => import("../lib/provider-portal"));
+vi.mock("@/lib/portal-referral-runtime.server", () => runtimeMocks);
 vi.mock("@/lib/referral-matching", async () =>
   import("../lib/referral-matching"),
 );
 vi.mock("@/lib/role-portals", async () => import("../lib/role-portals"));
 
 describe("Portal referral page wiring", () => {
-  it("uses disabled shared intake controls on both source entry pages", () => {
+  beforeEach(() => {
+    runtimeMocks.isPortalReferralRuntimeEnabled.mockClear();
+    runtimeMocks.isPortalReferralRuntimeEnabled.mockReturnValue(false);
+  });
+
+  it("uses the closed runtime gate on both source entry pages", () => {
     const intakeMarkup = renderToStaticMarkup(ReferralIntakePage());
     const sourceMarkup = renderToStaticMarkup(ReferralSourcePortalPage());
 
@@ -113,10 +122,28 @@ describe("Portal referral page wiring", () => {
       expect(markup).toContain('name="contactName"');
       expect(markup).toContain('name="summary"');
       expect(markup).toContain("No data will be submitted");
+      expect(markup).toContain("No list request is sent");
       expect(markup).toContain("disabled");
     }
     expect(sourceMarkup).toContain("Legacy demo data / 旧版演示数据");
     expect(sourceMarkup).toContain("不是 Preview 数据库记录");
+    expect(sourceMarkup).toContain("Preview runtime disabled");
+    expect(runtimeMocks.isPortalReferralRuntimeEnabled).toHaveBeenCalledTimes(2);
+  });
+
+  it("passes the server runtime result as a plain enabled boolean", () => {
+    runtimeMocks.isPortalReferralRuntimeEnabled.mockReturnValue(true);
+
+    const intakeMarkup = renderToStaticMarkup(ReferralIntakePage());
+    const sourceMarkup = renderToStaticMarkup(ReferralSourcePortalPage());
+
+    for (const markup of [intakeMarkup, sourceMarkup]) {
+      expect(markup).toContain("Loading durable Preview referral metadata");
+      expect(markup).not.toContain("No list request is sent");
+    }
+    expect(intakeMarkup).toContain("不会显示摘要或联系人");
+    expect(sourceMarkup).toContain("Preview runtime enabled");
+    expect(sourceMarkup).toContain("Preview durable intake");
   });
 
   it("withholds follow-up controls until a database-scoped identity is available", async () => {

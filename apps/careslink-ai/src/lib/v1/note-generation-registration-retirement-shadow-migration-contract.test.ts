@@ -49,15 +49,15 @@ const unchangedWorkerRpcs = [
 ] as const;
 
 describe("V1 Note worker-registration retirement shadow migration contract", () => {
-  it("is the 29th CLI-named additive default-off migration", () => {
+  it("remains the historical 29th CLI-named additive default-off migration", () => {
     const topLevel = withoutDollarQuotedBodies(migration);
     const normalizedSource = migration.replace(/\s+/g, " ");
 
     expect(migrationPath).toMatch(
       /^supabase\/migrations\/\d{14}_add_v1_note_generation_worker_registration_retirement_shadow\.sql$/,
     );
-    expect(migrations).toHaveLength(29);
-    expect(migrations.at(-1)).toBe(migrationPath.split("/").at(-1));
+    expect(migrations.length).toBeGreaterThanOrEqual(29);
+    expect(migrations.at(28)).toBe(migrationPath.split("/").at(-1));
     for (const marker of [
       "Source-only and default-off",
       "status = 'APPROVED' because that value is covered by registration_digest",

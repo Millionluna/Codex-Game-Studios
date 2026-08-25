@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 
 export const PORTAL_REFERRAL_UI_REGION_CODES = [
   "VIC_MELBOURNE",
@@ -75,18 +75,55 @@ export type PortalReferralMutationAck = Readonly<{
   updatedAt: string;
 }>;
 
+export type PortalReferralListItem = Readonly<{
+  referralId: string;
+  region: PortalReferralRegionCode;
+  serviceType: PortalReferralServiceTypeCode;
+  currentStatus: string;
+  rowVersion: number;
+  updatedAt: string;
+}>;
+
+type PortalReferralRequestFailureCode =
+  | "CAPABILITY_DISABLED"
+  | "AUTH_REQUIRED"
+  | "FORBIDDEN"
+  | "NOT_FOUND"
+  | "CONFLICT"
+  | "REQUEST_FAILED";
+
 export type PortalReferralMutationResult =
   | Readonly<{ ok: true; ack: PortalReferralMutationAck }>
-  | Readonly<{
-      ok: false;
-      code:
-        | "CAPABILITY_DISABLED"
-        | "AUTH_REQUIRED"
-        | "FORBIDDEN"
-        | "NOT_FOUND"
-        | "CONFLICT"
-        | "REQUEST_FAILED";
-    }>;
+  | Readonly<{ ok: false; code: PortalReferralRequestFailureCode }>;
+
+export type PortalReferralListResult =
+  | Readonly<{ ok: true; items: readonly PortalReferralListItem[] }>
+  | Readonly<{ ok: false; code: PortalReferralRequestFailureCode }>;
+
+export type PortalReferralIntakeSubmissionResult = Readonly<{
+  mutation: PortalReferralMutationResult;
+  readback?: PortalReferralListResult;
+}>;
+
+export function canSubmitPortalReferralIntake({
+  enabled,
+  pending,
+  readback,
+}: Readonly<{
+  enabled: boolean;
+  pending: boolean;
+  readback: PortalReferralListResult | undefined;
+}>) {
+  return enabled && !pending && readback?.ok === true;
+}
+
+export function portalReferralMutationInvalidatesPreauthorization(
+  result: PortalReferralMutationResult,
+) {
+  return (
+    !result.ok && result.code !== "CONFLICT" && result.code !== "REQUEST_FAILED"
+  );
+}
 
 type PortalReferralFetch = (
   input: RequestInfo | URL,
@@ -195,22 +232,114 @@ export async function submitPortalReferralMutation({
   }
 }
 
+export async function loadPortalReferralReadback({
+  enabled = false,
+  fetcher = globalThis.fetch,
+}: Readonly<{
+  enabled?: boolean;
+  fetcher?: PortalReferralFetch;
+}> = {}): Promise<PortalReferralListResult> {
+  if (!enabled) {
+    return { ok: false, code: "CAPABILITY_DISABLED" };
+  }
+
+  try {
+    const response = await fetcher("/api/portal/referrals", {
+      method: "GET",
+      credentials: "same-origin",
+      cache: "no-store",
+      headers: { accept: "application/json" },
+    });
+    if (!response.ok) {
+      // Do not parse error bodies: they can contain echoed private input or
+      // implementation detail that must never become client-visible copy.
+      return { ok: false, code: failureCodeForStatus(response.status) };
+    }
+
+    const items = parseMetadataOnlyList(await response.json());
+    return items
+      ? { ok: true, items }
+      : { ok: false, code: "REQUEST_FAILED" };
+  } catch {
+    return { ok: false, code: "REQUEST_FAILED" };
+  }
+}
+
+export async function submitPortalReferralIntakeAndReadback({
+  enabled = false,
+  mutation,
+  idempotencyKey,
+  fetcher = globalThis.fetch,
+  onMutationAccepted,
+}: Readonly<{
+  enabled?: boolean;
+  mutation: Extract<PortalReferralMutation, { kind: "CREATE_REFERRAL" }>;
+  idempotencyKey: string;
+  fetcher?: PortalReferralFetch;
+  onMutationAccepted?: () => void;
+}>): Promise<PortalReferralIntakeSubmissionResult> {
+  const mutationResult = await submitPortalReferralMutation({
+    enabled,
+    mutation,
+    idempotencyKey,
+    fetcher,
+  });
+  if (!mutationResult.ok) {
+    return Object.freeze({ mutation: mutationResult });
+  }
+
+  onMutationAccepted?.();
+  return Object.freeze({
+    mutation: mutationResult,
+    readback: await loadPortalReferralReadback({ enabled, fetcher }),
+  });
+}
+
 export function PortalReferralIntakeControls({
   enabled = false,
 }: Readonly<{ enabled?: boolean }>) {
   const [result, setResult] = useState<PortalReferralMutationResult>();
+  const [readback, setReadback] = useState<PortalReferralListResult>();
   const [pending, setPending] = useState(false);
   const mutationId = usePortalMutationId("create");
+  const readbackGeneration = useRef(0);
+  const canCreate = canSubmitPortalReferralIntake({
+    enabled,
+    pending,
+    readback,
+  });
+
+  useEffect(() => {
+    if (!enabled) return;
+    const generation = ++readbackGeneration.current;
+    let active = true;
+    void loadPortalReferralReadback({ enabled }).then((loaded) => {
+      if (active && generation === readbackGeneration.current) {
+        setReadback(loaded);
+      }
+    });
+    return () => {
+      active = false;
+    };
+  }, [enabled]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!enabled || pending) return;
+    if (!canCreate) return;
 
-    const formData = new FormData(event.currentTarget);
+    const submittedForm = event.currentTarget;
+    const formData = new FormData(submittedForm);
     setPending(true);
-    const submission = await submitPortalReferralMutation({
+    const submission = await submitPortalReferralIntakeAndReadback({
       enabled,
       idempotencyKey: mutationId.get(),
+      onMutationAccepted: () => {
+        // Once the POST is accepted, invalidate any older mount-time GET so it
+        // cannot overwrite the post-create readback with a stale snapshot.
+        ++readbackGeneration.current;
+        submittedForm.reset();
+        mutationId.reset();
+      },
       mutation: {
         kind: "CREATE_REFERRAL",
         region: formData.get("region") as PortalReferralRegionCode,
@@ -225,95 +354,120 @@ export function PortalReferralIntakeControls({
         },
       },
     });
-    setResult(submission);
-    if (submission.ok) mutationId.reset();
+    setResult(submission.mutation);
+    if (submission.mutation.ok) {
+      setReadback(
+        submission.readback ?? { ok: false, code: "REQUEST_FAILED" },
+      );
+    } else if (
+      portalReferralMutationInvalidatesPreauthorization(submission.mutation)
+    ) {
+      setReadback({ ok: false, code: submission.mutation.code });
+    }
     setPending(false);
   }
 
   return (
-    <form
-      className="grid gap-5"
-      onInput={mutationId.reset}
-      onSubmit={handleSubmit}
-    >
-      <fieldset className="grid gap-5" disabled={!enabled || pending}>
-        <div className="grid gap-4 md:grid-cols-2">
+    <div className="grid gap-5">
+      <form
+        autoComplete="off"
+        className="grid gap-5"
+        onInput={mutationId.reset}
+        onSubmit={handleSubmit}
+      >
+        <fieldset className="grid gap-5" disabled={!canCreate}>
+          <div className="grid gap-4 md:grid-cols-2">
+            <label className="grid gap-1.5 text-sm font-medium text-[#263834]">
+              Region / 区域
+              <select
+                name="region"
+                defaultValue={PORTAL_REFERRAL_UI_REGION_CODES[0]}
+                className="h-10 rounded-lg border border-[#cfded8] bg-white px-3 text-sm"
+              >
+                {PORTAL_REFERRAL_UI_REGION_CODES.map((code) => (
+                  <option key={code} value={code}>
+                    {REGION_LABELS[code]}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="grid gap-1.5 text-sm font-medium text-[#263834]">
+              Service type / 服务类型
+              <select
+                name="serviceType"
+                defaultValue={PORTAL_REFERRAL_UI_SERVICE_TYPE_CODES[0]}
+                className="h-10 rounded-lg border border-[#cfded8] bg-white px-3 text-sm"
+              >
+                {PORTAL_REFERRAL_UI_SERVICE_TYPE_CODES.map((code) => (
+                  <option key={code} value={code}>
+                    {SERVICE_LABELS[code]}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="grid gap-1.5 text-sm font-medium text-[#263834]">
+              Contact name / 联系人
+              <input
+                name="contactName"
+                autoComplete="off"
+                autoCorrect="off"
+                spellCheck={false}
+                required
+                className="h-10 rounded-lg border border-[#cfded8] bg-white px-3 text-sm"
+              />
+            </label>
+            <label className="grid gap-1.5 text-sm font-medium text-[#263834]">
+              Contact phone / 联系电话
+              <input
+                name="contactPhone"
+                type="tel"
+                autoComplete="off"
+                required
+                className="h-10 rounded-lg border border-[#cfded8] bg-white px-3 text-sm"
+              />
+            </label>
+            <label className="grid gap-1.5 text-sm font-medium text-[#263834] md:col-span-2">
+              Contact email / 联系邮箱（可选）
+              <input
+                name="contactEmail"
+                type="email"
+                autoComplete="off"
+                className="h-10 rounded-lg border border-[#cfded8] bg-white px-3 text-sm"
+              />
+            </label>
+          </div>
           <label className="grid gap-1.5 text-sm font-medium text-[#263834]">
-            Region / 区域
-            <select
-              name="region"
-              defaultValue={PORTAL_REFERRAL_UI_REGION_CODES[0]}
-              className="h-10 rounded-lg border border-[#cfded8] bg-white px-3 text-sm"
-            >
-              {PORTAL_REFERRAL_UI_REGION_CODES.map((code) => (
-                <option key={code} value={code}>
-                  {REGION_LABELS[code]}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="grid gap-1.5 text-sm font-medium text-[#263834]">
-            Service type / 服务类型
-            <select
-              name="serviceType"
-              defaultValue={PORTAL_REFERRAL_UI_SERVICE_TYPE_CODES[0]}
-              className="h-10 rounded-lg border border-[#cfded8] bg-white px-3 text-sm"
-            >
-              {PORTAL_REFERRAL_UI_SERVICE_TYPE_CODES.map((code) => (
-                <option key={code} value={code}>
-                  {SERVICE_LABELS[code]}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="grid gap-1.5 text-sm font-medium text-[#263834]">
-            Contact name / 联系人
-            <input
-              name="contactName"
-              autoComplete="name"
+            Private referral summary / 私密需求摘要
+            <textarea
+              name="summary"
+              autoComplete="off"
+              autoCorrect="off"
+              spellCheck={false}
               required
-              className="h-10 rounded-lg border border-[#cfded8] bg-white px-3 text-sm"
+              rows={5}
+              className="rounded-lg border border-[#cfded8] bg-white px-3 py-2 text-sm"
             />
           </label>
-          <label className="grid gap-1.5 text-sm font-medium text-[#263834]">
-            Contact phone / 联系电话
-            <input
-              name="contactPhone"
-              type="tel"
-              autoComplete="tel"
-              required
-              className="h-10 rounded-lg border border-[#cfded8] bg-white px-3 text-sm"
-            />
-          </label>
-          <label className="grid gap-1.5 text-sm font-medium text-[#263834] md:col-span-2">
-            Contact email / 联系邮箱（可选）
-            <input
-              name="contactEmail"
-              type="email"
-              autoComplete="email"
-              className="h-10 rounded-lg border border-[#cfded8] bg-white px-3 text-sm"
-            />
-          </label>
-        </div>
-        <label className="grid gap-1.5 text-sm font-medium text-[#263834]">
-          Private referral summary / 私密需求摘要
-          <textarea
-            name="summary"
-            required
-            rows={5}
-            className="rounded-lg border border-[#cfded8] bg-white px-3 py-2 text-sm"
-          />
-        </label>
-        <button
-          type="submit"
-          disabled={!enabled || pending}
-          className="inline-flex h-10 w-fit items-center rounded-lg bg-[#0f766e] px-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          Create referral / 创建 referral
-        </button>
-      </fieldset>
-      <PortalReferralCapabilityNotice enabled={enabled} result={result} />
-    </form>
+          <button
+            type="submit"
+            disabled={!canCreate}
+            className="inline-flex h-10 w-fit items-center rounded-lg bg-[#0f766e] px-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Create referral / 创建 referral
+          </button>
+        </fieldset>
+        <PortalReferralCapabilityNotice
+          enabled={enabled}
+          result={result}
+          successMessage={
+            readback?.ok
+              ? "Saved. Durable Preview metadata was refreshed below."
+              : "Saved. Metadata readback is unavailable; private intake data is not displayed."
+          }
+        />
+      </form>
+      <PortalReferralReadback enabled={enabled} result={readback} />
+    </div>
   );
 }
 
@@ -625,15 +779,18 @@ function PortalReferralCapabilityNotice({
   enabled,
   result,
   compact = false,
+  successMessage,
 }: Readonly<{
   enabled: boolean;
   result: PortalReferralMutationResult | undefined;
   compact?: boolean;
+  successMessage?: string;
 }>) {
   const message = !enabled
     ? "Preview workflow is disabled. No data will be submitted."
     : result?.ok
-      ? "Saved. Refresh the authorized view to see the current status."
+      ? (successMessage ??
+        "Saved. Refresh the authorized view to see the current status.")
       : result
         ? genericFailureMessage(result.code)
         : "";
@@ -650,6 +807,83 @@ function PortalReferralCapabilityNotice({
       {message}
     </p>
   ) : null;
+}
+
+function PortalReferralReadback({
+  enabled,
+  result,
+}: Readonly<{
+  enabled: boolean;
+  result: PortalReferralListResult | undefined;
+}>) {
+  return (
+    <section
+      aria-label="Referral metadata readback"
+      className="rounded-lg border border-[#cfe4dc] bg-[#f7faf8] p-4"
+    >
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#0f766e]">
+            Preview durable data
+          </p>
+          <h2 className="mt-1 text-base font-semibold text-[#263834]">
+            Referral metadata / Referral 元数据
+          </h2>
+        </div>
+        <span className="rounded-md border border-[#cfe4dc] bg-white px-2 py-1 text-xs font-semibold text-[#40504b]">
+          metadata only
+        </span>
+      </div>
+
+      {!enabled ? (
+        <p className="mt-3 text-sm leading-6 text-[#5d6d68]">
+          Preview runtime is disabled. No list request is sent, and no durable
+          Preview data is shown.
+        </p>
+      ) : !result ? (
+        <p aria-live="polite" className="mt-3 text-sm text-[#5d6d68]">
+          Loading durable Preview referral metadata…
+        </p>
+      ) : !result.ok ? (
+        <p aria-live="polite" className="mt-3 text-sm leading-6 text-[#7a4b00]">
+          Durable referral metadata could not be loaded. No private intake data
+          is displayed.
+        </p>
+      ) : result.items.length === 0 ? (
+        <p aria-live="polite" className="mt-3 text-sm text-[#5d6d68]">
+          No durable Preview referrals are available to this account.
+        </p>
+      ) : (
+        <ul aria-live="polite" className="mt-3 grid gap-2">
+          {result.items.map((item) => (
+            <li
+              key={item.referralId}
+              className="rounded-lg border border-[#dce8e2] bg-white p-3"
+            >
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="font-mono text-xs font-semibold text-[#40504b]">
+                  {abbreviateReferralId(item.referralId)}
+                </span>
+                <span className="rounded-md bg-[#e6f7f2] px-2 py-1 text-xs font-semibold text-[#0f766e]">
+                  {item.currentStatus}
+                </span>
+              </div>
+              <p className="mt-2 text-sm font-medium text-[#263834]">
+                {displayRegionCode(item.region)} ·{" "}
+                {displayServiceCode(item.serviceType)}
+              </p>
+              <p className="mt-1 text-xs text-[#66736f]">
+                Version {item.rowVersion} · Updated{" "}
+                <time dateTime={item.updatedAt}>
+                  {displayUtcInstant(item.updatedAt)}
+                </time>
+              </p>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
 }
 
 function getMutationTarget(mutation: PortalReferralMutation) {
@@ -725,6 +959,59 @@ function parseMetadataOnlyAck(value: unknown): PortalReferralMutationAck | undef
   });
 }
 
+function parseMetadataOnlyList(
+  value: unknown,
+): readonly PortalReferralListItem[] | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return undefined;
+  }
+  const items = (value as { items?: unknown }).items;
+  if (!Array.isArray(items)) return undefined;
+
+  const parsed: PortalReferralListItem[] = [];
+  for (const valueItem of items) {
+    if (!valueItem || typeof valueItem !== "object" || Array.isArray(valueItem)) {
+      return undefined;
+    }
+    const item = valueItem as Partial<PortalReferralListItem>;
+    if (
+      typeof item.referralId !== "string" ||
+      !UUID_PATTERN.test(item.referralId) ||
+      typeof item.region !== "string" ||
+      !PORTAL_REFERRAL_UI_REGION_CODES.includes(
+        item.region as PortalReferralRegionCode,
+      ) ||
+      typeof item.serviceType !== "string" ||
+      !PORTAL_REFERRAL_UI_SERVICE_TYPE_CODES.includes(
+        item.serviceType as PortalReferralServiceTypeCode,
+      ) ||
+      typeof item.currentStatus !== "string" ||
+      !(PORTAL_REFERRAL_UI_STATUSES as readonly string[]).includes(
+        item.currentStatus,
+      ) ||
+      !Number.isSafeInteger(item.rowVersion) ||
+      (item.rowVersion ?? 0) < 1 ||
+      typeof item.updatedAt !== "string" ||
+      !ISO_INSTANT_PATTERN.test(item.updatedAt)
+    ) {
+      return undefined;
+    }
+
+    parsed.push(
+      Object.freeze({
+        referralId: item.referralId.toLowerCase(),
+        region: item.region as PortalReferralRegionCode,
+        serviceType: item.serviceType as PortalReferralServiceTypeCode,
+        currentStatus: item.currentStatus,
+        rowVersion: item.rowVersion as number,
+        updatedAt: item.updatedAt,
+      }),
+    );
+  }
+
+  return Object.freeze(parsed);
+}
+
 function requiredUuid(value: string) {
   if (!UUID_PATTERN.test(value)) {
     throw new TypeError("resource id is invalid");
@@ -734,7 +1021,7 @@ function requiredUuid(value: string) {
 
 function failureCodeForStatus(
   status: number,
-): Exclude<PortalReferralMutationResult, { ok: true }>["code"] {
+): PortalReferralRequestFailureCode {
   if (status === 401) return "AUTH_REQUIRED";
   if (status === 403) return "FORBIDDEN";
   if (status === 404) return "NOT_FOUND";
@@ -744,7 +1031,7 @@ function failureCodeForStatus(
 }
 
 function genericFailureMessage(
-  code: Exclude<PortalReferralMutationResult, { ok: true }>["code"],
+  code: PortalReferralRequestFailureCode,
 ) {
   switch (code) {
     case "CAPABILITY_DISABLED":
@@ -804,4 +1091,12 @@ function displayServiceCode(code: string) {
   )
     ? SERVICE_LABELS[code as PortalReferralServiceTypeCode]
     : code;
+}
+
+function abbreviateReferralId(referralId: string) {
+  return `${referralId.slice(0, 8)}…${referralId.slice(-4)}`;
+}
+
+function displayUtcInstant(instant: string) {
+  return `${instant.slice(0, 10)} ${instant.slice(11, 19)} UTC`;
 }

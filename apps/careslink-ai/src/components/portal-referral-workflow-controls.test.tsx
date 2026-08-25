@@ -15,8 +15,13 @@ import {
   PortalReferralProviderOfferCard,
   PortalReferralResponseControls,
   PortalReferralTriageControls,
+  canSubmitPortalReferralIntake,
   createPortalReferralMutationRequest,
+  loadPortalReferralReadback,
+  portalReferralMutationInvalidatesPreauthorization,
+  submitPortalReferralIntakeAndReadback,
   submitPortalReferralMutation,
+  type PortalReferralListResult,
   type PortalReferralMutation,
 } from "./portal-referral-workflow-controls";
 
@@ -24,6 +29,14 @@ const MUTATION_ID = "portal.ui:test-mutation-0001";
 const REFERRAL_ID = "11111111-1111-4111-8111-111111111111";
 const PROVIDER_ID = "22222222-2222-4222-8222-222222222222";
 const MATCH_ID = "33333333-3333-4333-8333-333333333333";
+const UPDATED_AT = "2026-08-24T02:15:30.000Z";
+const CREATE_MUTATION = {
+  kind: "CREATE_REFERRAL",
+  region: "VIC_MELBOURNE",
+  serviceType: "SUPPORT_COORDINATION",
+  summary: "Needs support coordination.",
+  contact: { name: "Person A", phone: "0400000000", email: null },
+} as const satisfies PortalReferralMutation;
 
 describe("Portal referral workflow controls", () => {
   it("keeps the client catalogs identical to the reviewed workflow catalogs", () => {
@@ -73,6 +86,99 @@ describe("Portal referral workflow controls", () => {
     expect(markup).toContain("<fieldset");
     expect(markup).toContain("disabled");
     expect(markup).toContain("No data will be submitted");
+    expect(markup).toContain("No list request is sent");
+    expect(markup).not.toContain("Loading durable Preview referral metadata");
+  });
+
+  it("renders an enabled intake in metadata-loading state", () => {
+    const markup = renderToStaticMarkup(
+      <PortalReferralIntakeControls enabled />,
+    );
+
+    expect(markup).toContain("Preview durable data");
+    expect(markup).toContain("metadata only");
+    expect(markup).toContain("Loading durable Preview referral metadata");
+    expect(markup).toContain("<fieldset");
+    expect(markup).toContain("disabled");
+    expect(markup).toContain('autoComplete="off"');
+    expect(markup).toContain('autoCorrect="off"');
+    expect(markup).toContain('spellCheck="false"');
+    expect(markup).not.toContain('autoComplete="name"');
+    expect(markup).not.toContain('autoComplete="tel"');
+    expect(markup).not.toContain('autoComplete="email"');
+    expect(markup).not.toContain("No list request is sent");
+  });
+
+  it("permits private intake only after a successful database preauthorization", () => {
+    const authorized: PortalReferralListResult = { ok: true, items: [] };
+
+    expect(
+      canSubmitPortalReferralIntake({
+        enabled: true,
+        pending: false,
+        readback: undefined,
+      }),
+    ).toBe(false);
+    for (const code of ["AUTH_REQUIRED", "FORBIDDEN"] as const) {
+      expect(
+        canSubmitPortalReferralIntake({
+          enabled: true,
+          pending: false,
+          readback: { ok: false, code },
+        }),
+      ).toBe(false);
+    }
+    expect(
+      canSubmitPortalReferralIntake({
+        enabled: false,
+        pending: false,
+        readback: authorized,
+      }),
+    ).toBe(false);
+    expect(
+      canSubmitPortalReferralIntake({
+        enabled: true,
+        pending: true,
+        readback: authorized,
+      }),
+    ).toBe(false);
+    expect(
+      canSubmitPortalReferralIntake({
+        enabled: true,
+        pending: false,
+        readback: authorized,
+      }),
+    ).toBe(true);
+  });
+
+  it("invalidates stale preauthorization after authorization-boundary failures", () => {
+    for (const code of [
+      "AUTH_REQUIRED",
+      "FORBIDDEN",
+      "CAPABILITY_DISABLED",
+      "NOT_FOUND",
+    ] as const) {
+      expect(
+        portalReferralMutationInvalidatesPreauthorization({ ok: false, code }),
+      ).toBe(true);
+    }
+    for (const code of ["CONFLICT", "REQUEST_FAILED"] as const) {
+      expect(
+        portalReferralMutationInvalidatesPreauthorization({ ok: false, code }),
+      ).toBe(false);
+    }
+    expect(
+      portalReferralMutationInvalidatesPreauthorization({
+        ok: true,
+        ack: {
+          referralId: REFERRAL_ID,
+          matchId: null,
+          currentStatus: "SUBMITTED",
+          rowVersion: 1,
+          updatedAt: UPDATED_AT,
+        },
+      }),
+    ).toBe(false);
   });
 
   it("renders every mutation control disabled unless capability and row version are explicit", () => {
@@ -233,6 +339,137 @@ describe("Portal referral workflow controls", () => {
 
     expect(result).toEqual({ ok: false, code: "CAPABILITY_DISABLED" });
     expect(fetcher).not.toHaveBeenCalled();
+  });
+
+  it("makes zero list requests while the runtime is disabled", async () => {
+    const fetcher = vi.fn();
+
+    const result = await loadPortalReferralReadback({ fetcher });
+
+    expect(result).toEqual({ ok: false, code: "CAPABILITY_DISABLED" });
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+
+  it("performs a safe GET readback after a successful intake creation", async () => {
+    const privateServerValue = "private-summary-must-not-escape";
+    const fetcher = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 201,
+        json: async () => ({
+          referralId: REFERRAL_ID,
+          matchId: null,
+          currentStatus: "SUBMITTED",
+          rowVersion: 1,
+          updatedAt: UPDATED_AT,
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          items: [
+            {
+              referralId: REFERRAL_ID,
+              region: "VIC_MELBOURNE",
+              serviceType: "SUPPORT_COORDINATION",
+              currentStatus: "SUBMITTED",
+              rowVersion: 1,
+              updatedAt: UPDATED_AT,
+              summary: privateServerValue,
+              contact: { phone: "0400999999" },
+            },
+          ],
+        }),
+      });
+
+    const result = await submitPortalReferralIntakeAndReadback({
+      enabled: true,
+      mutation: CREATE_MUTATION,
+      idempotencyKey: MUTATION_ID,
+      fetcher,
+    });
+
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    expect(fetcher.mock.calls[0]?.[0]).toBe("/api/portal/referrals");
+    expect(fetcher.mock.calls[0]?.[1]).toMatchObject({
+      method: "POST",
+      credentials: "same-origin",
+      cache: "no-store",
+    });
+    expect(fetcher.mock.calls[1]?.[0]).toBe("/api/portal/referrals");
+    expect(fetcher.mock.calls[1]?.[1]).toMatchObject({
+      method: "GET",
+      credentials: "same-origin",
+      cache: "no-store",
+      headers: { accept: "application/json" },
+    });
+    expect(result).toEqual({
+      mutation: {
+        ok: true,
+        ack: {
+          referralId: REFERRAL_ID,
+          matchId: null,
+          currentStatus: "SUBMITTED",
+          rowVersion: 1,
+          updatedAt: UPDATED_AT,
+        },
+      },
+      readback: {
+        ok: true,
+        items: [
+          {
+            referralId: REFERRAL_ID,
+            region: "VIC_MELBOURNE",
+            serviceType: "SUPPORT_COORDINATION",
+            currentStatus: "SUBMITTED",
+            rowVersion: 1,
+            updatedAt: UPDATED_AT,
+          },
+        ],
+      },
+    });
+    expect(JSON.stringify(result)).not.toContain(privateServerValue);
+    expect(JSON.stringify(result)).not.toContain("0400999999");
+  });
+
+  it("fails closed when any list item is malformed", async () => {
+    const privateServerValue = "do-not-render-this-server-value";
+    const result = await loadPortalReferralReadback({
+      enabled: true,
+      fetcher: vi.fn(async () => ({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          items: [
+            {
+              referralId: REFERRAL_ID,
+              region: "VIC_MELBOURNE",
+              serviceType: "SUPPORT_COORDINATION",
+              currentStatus: "SUBMITTED",
+              rowVersion: "1",
+              updatedAt: UPDATED_AT,
+              summary: privateServerValue,
+            },
+          ],
+        }),
+      })),
+    });
+
+    expect(result).toEqual({ ok: false, code: "REQUEST_FAILED" });
+    expect(JSON.stringify(result)).not.toContain(privateServerValue);
+  });
+
+  it("does not parse list error response bodies", async () => {
+    const json = vi.fn(async () => ({ summary: "private-server-message" }));
+    const result = await loadPortalReferralReadback({
+      enabled: true,
+      fetcher: vi.fn(async () => ({ ok: false, status: 403, json })),
+    });
+
+    expect(result).toEqual({ ok: false, code: "FORBIDDEN" });
+    expect(json).not.toHaveBeenCalled();
   });
 
   it("does not parse or reflect server error messages", async () => {

@@ -29,9 +29,11 @@ import {
   getAssessmentPipeline,
   getSourceReadinessMap,
 } from "@/lib/provider-assessment";
+import { isPortalReferralRuntimeEnabled } from "@/lib/portal-referral-runtime.server";
 import { getRolePortal } from "@/lib/role-portals";
 
 export default function ReferralSourcePortalPage() {
+  const portalReferralRuntimeEnabled = isPortalReferralRuntimeEnabled();
   const portal = getRolePortal("referral_source");
   const source = referralSources[0];
   const sourcedReferrals = referrals.filter(
@@ -71,7 +73,7 @@ export default function ReferralSourcePortalPage() {
         </p>
         <p className="mt-1 text-sm leading-6 text-[#6c5a38]">
           本页现有数量、列表和手机卡片来自本地 mock，不是 Preview
-          数据库记录。新的 intake 控件保持关闭，不会提交或保存资料。
+          数据库记录。下方 Preview durable intake 与这些旧版演示统计相互独立。
         </p>
       </Card>
 
@@ -107,7 +109,7 @@ export default function ReferralSourcePortalPage() {
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#0f766e]">
-                  Web 端
+                  Preview durable intake
                 </p>
                 <h2 className="mt-2 text-lg font-semibold">Referral 快速录入</h2>
                 <p className="mt-1 text-sm leading-6 text-[#5d6d68]">
@@ -115,12 +117,16 @@ export default function ReferralSourcePortalPage() {
                 </p>
               </div>
               <span className="rounded-md border border-[#9ed8c9] bg-[#e6f7f2] px-2 py-1 text-xs font-semibold text-[#0f766e]">
-                {portal?.label}
+                {portalReferralRuntimeEnabled
+                  ? "Preview runtime enabled"
+                  : "Preview runtime disabled"}
               </span>
             </div>
 
             <div className="mt-5">
-              <PortalReferralIntakeControls />
+              <PortalReferralIntakeControls
+                enabled={portalReferralRuntimeEnabled}
+              />
             </div>
           </Card>
 
