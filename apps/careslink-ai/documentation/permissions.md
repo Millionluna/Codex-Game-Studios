@@ -75,7 +75,7 @@ Current admin pages may display access-request metadata, feature counts, statuse
 
 ## V1 shadow permission contract and isolated evidence
 
-### Portal Referral foundation, intake, source-detail and Assignment M1a runtime (source/local and unapplied)
+### Portal Referral foundation, intake, source-detail and Assignment M1a runtime (default-off and Production-unapplied)
 
 The Portal Referral foundation introduces organization membership, provider,
 referral, separately protected contact, match, follow-up, receipt, audit,
@@ -156,8 +156,10 @@ are never accepted from the body. Source list is metadata-only and create
 atomically writes referral, private contact, audit and receipt rows with hashed
 mutation/correlation identifiers. Source detail is read-only. Assignment reads
 or performs only triage/offer as described above. All application and database
-flags remain off. This is source/local disposable-SQL evidence only: no hosted
-Preview or Production migration, activation or deployment is claimed.
+flags remain off. Exact commit `526aa1e` subsequently passed
+deleted-disposable Hosted 32/32 migration, 13/13 rollback and real GoTrue
+SSR-cookie route E2E with zero-residue teardown. No retained Preview, Vercel
+deployment, Production migration or activation is claimed.
 
 `supabase/migrations/20260809120000_create_v1_shadow_foundation.sql` defines the following controls. It was applied only to a disposable `with_data=false` branch and has not been applied to Production Supabase:
 
