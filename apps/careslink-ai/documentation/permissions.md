@@ -156,13 +156,39 @@ are never accepted from the body. Source list is metadata-only and create
 atomically writes referral, private contact, audit and receipt rows with hashed
 mutation/correlation identifiers. Source detail is read-only. Assignment reads
 or performs only triage/offer as described above. All application and database
-flags remain off. Exact pre-review commit `526aa1e` subsequently passed a
-deleted-disposable Hosted 32/32 migration, the then-current 13/13 rollback
-suites and real GoTrue SSR-cookie route E2E with zero-residue teardown. The
-2026-08-26 queue-bound, page-latch and route-adapter hardening has local
-PostgreSQL/source evidence only and requires a new exact-current Preview before
-Hosted attribution. No retained Preview, Vercel deployment, Production
-migration or activation is claimed.
+flags remain off. Exact pre-review commit `526aa1e` remains the historical
+deleted-disposable Hosted 32/32 migration, then-current 13/13 rollback and real
+GoTrue SSR-cookie route-E2E baseline. Exact-current hardening HEAD
+`43659ab16e9af6d9c73d0a55f8fe8b30b3ce9ee2` separately passed 32/32 migrations
+and all 13 current rollback suites on deleted no-data branch
+`portal-assignment-m1a-r2-20260826` (id
+`3b111420-9f47-4e9f-b3a5-acd418f9423f`; ref
+`uzlnwjurzbtwtstabogm`). Its exact-source local HTTPS Next runtime used a real
+Hosted SSR cookie to pass Bearer rejection, Source-A-only queue, uniform
+Source-B/random-ID detail denial, triage/replay, one eligible candidate,
+offer/replay, the expected OFFERED-v3/hash-only terminal database state and
+global-session-revocation `401`. This extends Hosted attribution to the
+queue-bound, page-latch and null-adapter revision without changing the default-
+off permission model.
+
+The fixed teardown left Auth users, identities, sessions and refresh tokens and
+every Portal fixture table at zero; all four Portal flags were
+`enabled=false, preview_only=true`, and the checked append-only triggers were
+normally enabled. Three consecutive branch-list probes found the exact `r2` id
+and ref absent after deletion. Production retained 19 migrations and remained
+the default `ACTIVE_HEALTHY` project before and after; it was never a SQL, Auth,
+route or other write target. No Vercel deployment, merge, retained Preview,
+Production migration or activation is claimed.
+
+The exact-current branch's security advisors returned 21 INFO / 14 WARN and
+performance advisors returned 105 INFO / 24 WARN, with no ERROR. The
+authenticated-executable `SECURITY DEFINER` warnings include intentionally
+narrow Portal RPCs: each remains covered by the master plus operation-specific
+database gates, the exact non-Production application target, fresh Auth
+user/session checks and exact membership/tenant authorization; all use
+`search_path=''`, and authenticated callers receive no direct Portal table
+write grant. The WARN findings therefore remain visible review items rather
+than an unrestricted definer or all-project security-green claim.
 
 `supabase/migrations/20260809120000_create_v1_shadow_foundation.sql` defines the following controls. It was applied only to a disposable `with_data=false` branch and has not been applied to Production Supabase:
 

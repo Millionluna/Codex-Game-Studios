@@ -29,6 +29,9 @@ Current registration-retention hosted gate HEAD:
 Historical Portal Assignment M1a Hosted Cookie gate source:
 `526aa1efba281ee1e6e671ffb2a20d40cce1999b`
 
+Current Portal Assignment M1a exact-current Hosted Cookie gate source:
+`43659ab16e9af6d9c73d0a55f8fe8b30b3ce9ee2`
+
 This checkpoint covers the AI Web Portal reality audit, release sequencing,
 local Referral foundation and default-off intake/source-detail/Assignment M1a runtimes, plus source-only
 five-Note generation contracts. It
@@ -62,7 +65,7 @@ availability.
 | `/providers/onboarding`, `/providers/review` | static/mock | No | Forms/buttons imply a save/review that does not occur | Add canonical provider profile and admin review command after identity proof |
 | Provider profile generator | mixed: real `provider_drafts`, mock editing seed | Partial | Draft handoff can use an in-memory fallback and is not a canonical provider | Treat claimed draft only as intake seed |
 | `/provider-portal` | mock referrals | No | Accept/decline/request-info controls do nothing; provider identity is not DB-bound | Owner-scoped offered referrals plus atomic response command |
-| `/referrals`, `/referrals/intake`, `/referrals/[id]`, match page | legacy mock remains default; default-off durable intake, exact-tenant source detail and operator Assignment M1a exist | List/create/source-detail plus operator queue/detail/triage/candidates/offer behind independent gates; not deployed | Gate-on assignment pages have no mock fallback and offer does not assign/accept; provider response, follow-up and audit remain disabled | Pre-review M1a commit `526aa1e` passed a deleted exact-revision Hosted gate; the current queue-bound hardening is local-only and needs a new exact-current Preview before any M1b/activation step |
+| `/referrals`, `/referrals/intake`, `/referrals/[id]`, match page | legacy mock remains default; default-off durable intake, exact-tenant source detail and operator Assignment M1a exist | List/create/source-detail plus operator queue/detail/triage/candidates/offer behind independent gates; not deployed | Gate-on assignment pages have no mock fallback and offer does not assign/accept; provider response, follow-up and audit remain disabled | Exact-current M1a commit `43659ab` passed a deleted no-data Hosted Cookie gate; keep every gate off and take provider response M1b only under separate approval, with no deployment or activation implied |
 | `/referral-source-portal` | legacy mock remains default; source-only intake controls are wired and the UUID detail page has a separate gate | List/create/detail only behind independent gates; not deployed | No hosted runtime or activation; the operator slice is independently gated and provider/later workflow actions remain unavailable | Reuse the database-authorized source slice after exact-revision Preview approval |
 | `/referral-workspace/*` | mixed real access/material/outreach stores | Yes, for those tools | These are AI access and outreach tools, not the referral pipeline; some stores have memory fallback | Preserve and later link by canonical referral ID |
 | `/admin`, `/dashboard` | mock global metrics | No | Core pages have no real referral permission gate; must not receive real data yet | Add membership gate, then replace only the assignment queue |
@@ -1219,8 +1222,9 @@ Deleted `r5`'s postcheck remains the historical Hosted proof of those owners,
 but `r5` did not execute these enhanced exact bodies. The later exact-commit
 `526aa1e` disposable gate applied 32/32 and passed all 13 then-current rollback
 suites, superseding that exact-body gap without touching Production. The
-Assignment assertion changed again in the 2026-08-26 local-only queue-bound
-hardening recorded in Sections 26–27.
+Assignment assertion changed again in the 2026-08-26 queue-bound hardening
+recorded in Sections 26–27; the later exact-current Hosted gate in Section 28
+supersedes that remaining Hosted-body gap.
 
 ## 25. Portal Referral source-detail source/local runtime — 2026-08-25
 
@@ -1339,12 +1343,13 @@ current full gate passes 139 files / 1,830 tests; PostgreSQL
 fixtures. Exact current hashes and the evidence boundary are recorded in
 `documentation/tests.md`.
 
-This is source/local evidence, not by itself a full repository migration apply,
+By itself this was source/local evidence, not a full repository migration apply,
 hosted GoTrue/PostgREST/Auth E2E, retained Preview, deployment or activation.
-Production and cloud data were not touched. The separately approved disposable
-Hosted validation recorded below covers exact pre-review commit `526aa1e`; it
-does not cover the 2026-08-26 queue-bound hardening and does not authorize
-deployment or provider response M1b.
+Production and cloud data were not touched. Section 27 records the pre-review
+Hosted validation at `526aa1e`; Section 28 records the later exact-current
+Hosted validation at `43659ab`. That closes the queue-bound hardening's Hosted
+evidence gap without authorizing deployment, activation or provider response
+M1b.
 
 ## 27. Portal Referral Assignment M1a disposable Hosted Cookie gate — 2026-08-25
 
@@ -1384,8 +1389,49 @@ and only the default `ACTIVE_HEALTHY` Production branch remained.
 
 This is Hosted Auth/Data API plus exact application-route Cookie evidence, not
 a Vercel Preview deployment, retained flag activation, Production approval or
-provider response M1b. It proves exact pre-review commit `526aa1e`; the
-2026-08-26 queue-bound hardening has local PostgreSQL/source evidence only and
-needs a new exact-current protected Preview before activation. Accept/decline,
-assignment finalization, follow-up and audit listing remain the next functional
-work.
+provider response M1b. It proves exact pre-review commit `526aa1e`; Section 28
+records the separate exact-current `43659ab` gate. Accept/decline, assignment
+finalization, follow-up and audit listing remain later functional work.
+
+## 28. Portal Referral Assignment M1a exact-current Hosted Cookie gate — 2026-08-26
+
+The exact current source commit
+`43659ab16e9af6d9c73d0a55f8fe8b30b3ce9ee2` was validated on disposable
+Supabase Preview `portal-assignment-m1a-r2-20260826` (id
+`3b111420-9f47-4e9f-b3a5-acd418f9423f`, ref
+`uzlnwjurzbtwtstabogm`). It was non-default, `persistent=false`,
+`with_data=false` and PostgreSQL 17.6 at the confirmed US$0.01344/hour Preview
+rate. No data-bearing or persistent branch was used.
+
+The exact 32-file repository migration chain applied 32/32 and all 13 rollback
+suites passed. The patched Assignment suite proved that direct queue limit `51`
+returns `PORTAL_VALIDATION_ERROR` while limit `50` succeeds, in addition to the
+maintained owner, role-restoration, ACL, RLS, gate, tenant, replay and rollback
+checks.
+
+The first local application pass used a `127.0.0.1` origin and reached the
+designed `403` exact-origin rejection; that run was fully cleaned before retry.
+The same exact-source runtime was then rerun with `localhost` as the HTTPS
+same-origin host. Its real SSR Cookie matrix passed all eight boundaries: Bearer
+rejection; Source-A-only queue; Source A detail plus uniform Source B/random
+not-found; triage v1→v2 with stable replay; one exact eligible provider; offer
+v2→v3 with stable replay; final active offer with
+`assigned_provider_id=null` and hash-only audit/receipt side effects; and `401`
+from the same cookie after global GoTrue sign-out.
+
+Final teardown and postcheck found zero run-scoped Auth rows, zero rows across
+the 11 checked Portal tables and zero temporary roles. All four Portal flags
+were off, and all three append-only triggers were restored and operating in
+their expected mode. Security advisors reported 21 INFO and 14 WARN; performance
+advisors reported 105 INFO and 24 WARN; neither advisor class reported an ERROR.
+
+The Preview branch was deleted, and three consecutive observations found both
+its id and ref absent. Production remained healthy with its existing 19
+migrations unchanged; it was never a SQL, Auth or route target. No application
+deployment, merge, retained Preview, Production write, runtime activation or
+provider response capability resulted.
+
+This closes the exact-current Assignment M1a Hosted Cookie evidence gap only.
+The next functional slice remains provider response M1b under a separate plan
+and explicit approval; assignment finalization, follow-up and audit listing also
+remain unimplemented.
