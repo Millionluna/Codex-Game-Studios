@@ -16,8 +16,12 @@ const navigationMocks = vi.hoisted(() => ({
 }));
 const runtimeMocks = vi.hoisted(() => ({
   isPortalReferralAssignmentRuntimeEnabled: vi.fn(() => false),
+  isPortalReferralProviderResponseRuntimeEnabled: vi.fn(() => false),
   isPortalReferralRuntimeEnabled: vi.fn(() => false),
   isPortalReferralSourceDetailRuntimeEnabled: vi.fn(() => false),
+}));
+const providerPortalMocks = vi.hoisted(() => ({
+  getProviderPortalData: vi.fn(),
 }));
 
 vi.mock("next/navigation", () => ({
@@ -65,6 +69,9 @@ vi.mock("@/components/portal-referral-workflow-controls", async () =>
 vi.mock("@/components/portal-referral-assignment-controls", async () =>
   import("../components/portal-referral-assignment-controls"),
 );
+vi.mock("@/components/portal-referral-provider-response-controls", async () =>
+  import("../components/portal-referral-provider-response-controls"),
+);
 vi.mock("@/components/referral-card", async () => {
   const React = await import("react");
   return {
@@ -107,7 +114,16 @@ vi.mock("@/lib/portal-referral-id", async () =>
 vi.mock("@/lib/provider-assessment", async () =>
   import("../lib/provider-assessment"),
 );
-vi.mock("@/lib/provider-portal", async () => import("../lib/provider-portal"));
+vi.mock("@/lib/provider-portal", async () => {
+  const actual = await import("../lib/provider-portal");
+  providerPortalMocks.getProviderPortalData.mockImplementation(
+    actual.getProviderPortalData,
+  );
+  return {
+    ...actual,
+    getProviderPortalData: providerPortalMocks.getProviderPortalData,
+  };
+});
 vi.mock("@/lib/portal-referral-runtime.server", () => runtimeMocks);
 vi.mock("@/lib/referral-matching", async () =>
   import("../lib/referral-matching"),
@@ -120,12 +136,17 @@ describe("Portal referral page wiring", () => {
     runtimeMocks.isPortalReferralAssignmentRuntimeEnabled.mockReturnValue(
       false,
     );
+    runtimeMocks.isPortalReferralProviderResponseRuntimeEnabled.mockClear();
+    runtimeMocks.isPortalReferralProviderResponseRuntimeEnabled.mockReturnValue(
+      false,
+    );
     runtimeMocks.isPortalReferralRuntimeEnabled.mockClear();
     runtimeMocks.isPortalReferralRuntimeEnabled.mockReturnValue(false);
     runtimeMocks.isPortalReferralSourceDetailRuntimeEnabled.mockClear();
     runtimeMocks.isPortalReferralSourceDetailRuntimeEnabled.mockReturnValue(
       false,
     );
+    providerPortalMocks.getProviderPortalData.mockClear();
   });
 
   it("uses the closed runtime gate on both source entry pages", () => {
@@ -280,6 +301,28 @@ describe("Portal referral page wiring", () => {
     expect(markup).not.toContain("04 0000 0000");
     expect(markup).toContain("Legacy mock referrals are intentionally not shown");
     expect(markup).toContain("authorized database-scoped ID");
+    expect(
+      runtimeMocks.isPortalReferralProviderResponseRuntimeEnabled,
+    ).toHaveBeenCalledOnce();
+    expect(providerPortalMocks.getProviderPortalData).toHaveBeenCalledOnce();
+  });
+
+  it("renders only the authorized provider-response workbench while its gate is open", () => {
+    runtimeMocks.isPortalReferralProviderResponseRuntimeEnabled.mockReturnValue(
+      true,
+    );
+
+    const markup = renderToStaticMarkup(ProviderPortalPage());
+
+    expect(markup).toContain("我的 referral 邀约");
+    expect(markup).toContain("Authorized provider offers");
+    expect(markup).toContain("Loading authorized provider offers");
+    expect(markup).not.toContain("Legacy mock referrals");
+    expect(markup).not.toContain("Readiness");
+    expect(markup).not.toContain("本周容量");
+    expect(markup).not.toContain("AI 推荐文案");
+    expect(markup).not.toContain("Share card");
+    expect(providerPortalMocks.getProviderPortalData).not.toHaveBeenCalled();
   });
 
   it("marks the core referral board as mock and keeps the real list adapter disabled", () => {

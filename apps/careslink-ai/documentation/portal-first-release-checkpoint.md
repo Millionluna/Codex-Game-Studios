@@ -2,8 +2,8 @@
 
 Date: 2026-08-26
 
-Branch: `codex/careslink-portal-assignment-m1a`
-Base HEAD inspected: `4e582ffb7f9a61fde3364916dc517379dcdcc1d4`
+Branch: `codex/careslink-portal-provider-response-m1b`
+Base HEAD inspected: `1b5f42c9ef84bbcc51b4d2fc284a2f0a87d9431c`
 
 Current five-Note local batch base: `63c10ea2e94ee4efdba7ffdbeb5aabbee6fcfa3b`
 
@@ -64,8 +64,8 @@ availability.
 | `/providers`, `/providers/[id]` | `mock-data` | No | Unknown IDs fall back to the first mock provider; no provider table, membership or RLS | Real provider detail after M0 membership; unknown IDs return 404 |
 | `/providers/onboarding`, `/providers/review` | static/mock | No | Forms/buttons imply a save/review that does not occur | Add canonical provider profile and admin review command after identity proof |
 | Provider profile generator | mixed: real `provider_drafts`, mock editing seed | Partial | Draft handoff can use an in-memory fallback and is not a canonical provider | Treat claimed draft only as intake seed |
-| `/provider-portal` | mock referrals | No | Accept/decline/request-info controls do nothing; provider identity is not DB-bound | Owner-scoped offered referrals plus atomic response command |
-| `/referrals`, `/referrals/intake`, `/referrals/[id]`, match page | legacy mock remains default; default-off durable intake, exact-tenant source detail and operator Assignment M1a exist | List/create/source-detail plus operator queue/detail/triage/candidates/offer behind independent gates; not deployed | Gate-on assignment pages have no mock fallback and offer does not assign/accept; provider response, follow-up and audit remain disabled | Exact-current M1a commit `43659ab` passed a deleted no-data Hosted Cookie gate; keep every gate off and take provider response M1b only under separate approval, with no deployment or activation implied |
+| `/provider-portal` | legacy mock remains the gate-off default; a default-off Provider Response M1b workbench exists | Metadata-only own-offer list plus atomic accept/decline behind independent gates; not deployed | Source/local PostgreSQL evidence only; no M1b Hosted Cookie/Data API proof, accepted private detail, follow-up, notification, audit list or document/export | Keep every gate off; take the exact M1b revision through a separately approved disposable Hosted Cookie gate before any deployment or activation |
+| `/referrals`, `/referrals/intake`, `/referrals/[id]`, match page | legacy mock remains default; default-off durable intake, exact-tenant source detail and operator Assignment M1a exist | List/create/source-detail plus operator queue/detail/triage/candidates/offer behind independent gates; not deployed | Gate-on assignment pages have no mock fallback and offer does not assign; Provider Response M1b now completes accept/decline only on `/provider-portal`, while follow-up and audit remain disabled | Exact-current M1a commit `43659ab` passed a deleted no-data Hosted Cookie gate; M1b has exact-current source/application and local PostgreSQL evidence only, with no deployment or activation implied |
 | `/referral-source-portal` | legacy mock remains default; source-only intake controls are wired and the UUID detail page has a separate gate | List/create/detail only behind independent gates; not deployed | No hosted runtime or activation; the operator slice is independently gated and provider/later workflow actions remain unavailable | Reuse the database-authorized source slice after exact-revision Preview approval |
 | `/referral-workspace/*` | mixed real access/material/outreach stores | Yes, for those tools | These are AI access and outreach tools, not the referral pipeline; some stores have memory fallback | Preserve and later link by canonical referral ID |
 | `/admin`, `/dashboard` | mock global metrics | No | Core pages have no real referral permission gate; must not receive real data yet | Add membership gate, then replace only the assignment queue |
@@ -1431,7 +1431,74 @@ migrations unchanged; it was never a SQL, Auth or route target. No application
 deployment, merge, retained Preview, Production write, runtime activation or
 provider response capability resulted.
 
-This closes the exact-current Assignment M1a Hosted Cookie evidence gap only.
-The next functional slice remains provider response M1b under a separate plan
-and explicit approval; assignment finalization, follow-up and audit listing also
-remain unimplemented.
+This closed the exact-current Assignment M1a Hosted Cookie evidence gap only.
+At that M1a gate closure, provider response M1b remained the next separately
+approved slice; Section 29 records its later source/local implementation.
+Follow-up and audit listing remain unimplemented.
+
+## 29. Portal Referral Provider Response M1b source/local checkpoint — 2026-08-26
+
+M1b is an independently gated, default-off Provider surface based on merged
+integration commit `1b5f42c9ef84bbcc51b4d2fc284a2f0a87d9431c`. Its only served operations
+are the current approved provider's metadata-only offer inbox and an atomic
+`ACCEPT` or `DECLINE` response. It does not inherit Intake, Source Detail or
+Assignment authorization and does not add provider private detail, follow-up,
+notification, audit listing, document/export, Note/Points, deployment or
+Production activation.
+
+CLI-generated migration
+`20260825153340_add_portal_referral_provider_response_runtime.sql` adds the
+independent `referral_provider_response_v1` row, an inbox index, private
+enabled/session/exact-provider helpers and three authenticated-only definer
+RPCs: `portal_referral_provider_response_authorize()`,
+`portal_referral_provider_response_offers(integer,uuid)` and
+`portal_referral_provider_response_respond(uuid,bigint,text,text,text,text)`.
+Every RPC requires master then provider-response database gates. Provider
+context is derived only from the live Cookie principal, Auth session, one active
+`provider_member`, its active PROVIDER organization and one APPROVED provider;
+capacity remains an offer-time M1a condition. Helpers receive no API execution,
+the public RPCs use `search_path=''`, and no Portal table grant or wider provider
+match policy is introduced.
+
+The inbox is capped at 50 and strictly returns only `matchId`, `referralId`,
+frozen region/service, match/referral status and referral row version. Response
+rebuilds the canonical payload using the database-derived organization, role and
+provider, serializes actor+mutation, and locks referral before all of its matches
+to preserve M1a ordering. `ACCEPT` changes both rows to `ACCEPTED` and sets
+`assigned_provider_id`; `DECLINE` marks the match `DECLINED`, returns the referral
+to `TRIAGED` and leaves it unassigned. Each success writes one metadata-only
+audit event and one hash-only receipt. Exact replay returns the historical ACK;
+changed payload, stale version and losing concurrent decisions fail closed.
+
+The application adds an exact `CARESLINK_PORTAL_REFERRAL_PROVIDER_RESPONSE_ENABLED`
+gate, a `PROVIDER_RESPONSE` authorization scope, strict Supabase and route DTO
+projection, server-created correlation hashing and a gate-on Provider Portal
+workbench that never promotes legacy mock identity or private text. The only new
+HTTP operations are `GET /api/portal/referral-offers` and
+`POST /api/portal/referral-offers/{matchId}/response`. Pending mutations block
+manual refresh; a network-uncertain response keeps the original command and
+idempotency key for an exact reconciliation replay instead of enabling a second
+decision with a new key.
+
+Local PostgreSQL 16.15 applied the exact-current minimum seven-migration
+foundation→mobile-sync→Portal-foundation→intake→source-detail→assignment→M1b
+chain after a clean database rebuild. The M1b rollback-only assertion passed
+after proving default-off gates, exact Provider A/B authorization, bounded
+no-PII `OFFERED`/`ACCEPTED` (including downstream `CLOSED`) inbox behavior,
+NULL-safe corrupt accepted-state denial, offer-time-only capacity,
+stale/forged/cross-provider denial, ACCEPT/DECLINE atomicity, exact replay,
+changed-payload conflict, ACLs and zero fixture residue. The existing Intake,
+Source Detail and Assignment rollback suites then all passed against the same
+migrated database. Final postcheck found all five Portal flags
+`enabled=false, preview_only=true`, zero Auth/Portal fixtures, zero client table
+grants, authenticated-only execution on the three M1b RPCs and enabled
+append-only audit/receipt triggers. The cluster and bootstrap file were stopped
+and permanently removed.
+
+Repository verification passed 7 focused files / 244 tests, the full 142 files /
+1,908 tests, TypeScript, full lint, the 64/64-page Next production build, the
+73-file Codex-adapter sync check and `git diff --check`. This is local
+source/database evidence only. No paid or Hosted Supabase Preview, GoTrue or
+PostgREST E2E, Vercel deployment, merge, runtime activation, Production SQL/write
+or retained test resource is claimed. Those actions remain outside this batch
+and require separate approval.

@@ -69,6 +69,21 @@ the workspace can resolve the draft and auto-claim it for that user's Supabase
 UUID owner id. Demo account ids are not auto-claimed, so they cannot be written
 into the `owner_user_id uuid` column in persistent Supabase storage.
 
+## Portal Referral Preview runtime
+
+The Portal Referral slices are separate, default-off, Preview-only cookie
+workflows. They require the master and durable-adapter gates, one exact
+operation gate, `VERCEL_ENV=preview`, and a reviewed non-Production Supabase ref.
+The request routes reject caller Bearer authorization, use no `service_role`,
+and never fall back to memory or demo data after a durable page gate opens.
+
+Provider Response M1b exposes only the signed-in approved provider's frozen
+region/service offer metadata and accepts only `ACCEPT` or `DECLINE`. It is
+independently gated from Intake, Source Detail and Assignment. `ACCEPT` binds the
+database-derived provider atomically; `DECLINE` returns the referral to triage.
+The slice does not expose summary/contact, enable follow-up or audit listing, or
+authorize a deployment or Production activation.
+
 ## Supabase Access Control Store
 
 Access requests, access codes, and future AI usage audit events use an

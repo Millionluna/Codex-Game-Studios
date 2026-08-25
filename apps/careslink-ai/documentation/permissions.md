@@ -75,7 +75,7 @@ Current admin pages may display access-request metadata, feature counts, statuse
 
 ## V1 shadow permission contract and isolated evidence
 
-### Portal Referral foundation, intake, source-detail and Assignment M1a runtime (default-off and Production-unapplied)
+### Portal Referral foundation, intake, source-detail, Assignment M1a and Provider Response M1b runtimes (default-off and Production-unapplied)
 
 The Portal Referral foundation introduces organization membership, provider,
 referral, separately protected contact, match, follow-up, receipt, audit,
@@ -124,7 +124,8 @@ eligibility query: active PROVIDER organization, APPROVED review,
 AVAILABLE/LIMITED capacity, exact region/service and at least one active
 provider member. Offer checks the authorized referral before provider
 eligibility, promotes or creates one match and keeps
-`assigned_provider_id=null`; provider response remains unavailable. Triage and
+`assigned_provider_id=null`; under Assignment M1a alone, provider response is
+still unavailable. Triage and
 offer use actor+mutation advisory serialization, expected row versions, fresh
 post-lock session checks, SHA-256 payload/idempotency/correlation values and one
 audit plus one receipt. Session time is sampled only after Auth row locks; the
@@ -145,6 +146,32 @@ copy contact, summary, client correlation or raw idempotency values. Raw match
 and audit rows are limited to platform admin or the tenant partner operator in
 the draft RLS contract.
 
+Provider Response M1b adds an independent `referral_provider_response_v1`
+database gate and three authenticated-only definer RPCs:
+`portal_referral_provider_response_authorize()`,
+`portal_referral_provider_response_offers(integer,uuid)` and
+`portal_referral_provider_response_respond(uuid,bigint,text,text,text,text)`.
+The context must resolve exactly one active
+`provider_member` in an active PROVIDER organization with one APPROVED provider;
+zero, multiple, suspended or non-approved contexts fail closed. Capacity is an
+offer-time M1a eligibility condition and is not reinterpreted as provider
+authority while an already-issued offer is answered. Provider identity is
+always database-derived and is never accepted from the route, body or JWT user
+metadata.
+
+The inbox is limited to the caller's own `OFFERED` or `ACCEPTED` match rows and
+returns only match/referral IDs, frozen region/service codes, match/referral
+status and referral row version. No table grant or provider match RLS policy is
+added. Response holds master then provider-response gates, serializes the
+actor+mutation lane, locks referral before its matches, refreshes session and
+provider authority after waits, and verifies the supplied payload hash against a
+database-rebuilt canonical command. `ACCEPT` completes the previously absent
+assignment binding; `DECLINE` returns the referral to triage. Exact completed
+replay may return only its historical metadata ACK even after a decline removes
+the offer from the inbox. The durable M1b route does not yet serve the
+post-accept private referral detail that the broader foundation permission model
+reserves for a later independently reviewed read slice.
+
 The default runtime now supplies a request-scoped cookie client only after the
 base API and durable-adapter gates, the selected independent operation gate and
 the exact non-Production Preview ref pass. It
@@ -155,8 +182,11 @@ membership required by the selected operation; actor, organization and role
 are never accepted from the body. Source list is metadata-only and create
 atomically writes referral, private contact, audit and receipt rows with hashed
 mutation/correlation identifiers. Source detail is read-only. Assignment reads
-or performs only triage/offer as described above. All application and database
-flags remain off. Exact pre-review commit `526aa1e` remains the historical
+or performs only triage/offer, while Provider Response reads the caller's
+metadata-only inbox or performs only accept/decline as described above. All
+application flags are off, and every database flag row defaults off in migration
+source. Exact pre-review commit `526aa1e`
+remains the historical
 deleted-disposable Hosted 32/32 migration, then-current 13/13 rollback and real
 GoTrue SSR-cookie route-E2E baseline. Exact-current hardening HEAD
 `43659ab16e9af6d9c73d0a55f8fe8b30b3ce9ee2` separately passed 32/32 migrations

@@ -143,7 +143,7 @@ There is no app-owned notification preference, push token, in-app inbox, email f
 
 Security, reminders, content/digest, Points and marketing are separate preferences. Payloads contain only opaque IDs and safe type. Daily/Weekdays/Weekly/Off is explicit; content push is normally capped at one proactive item per day. Open requires reauthentication and resolves to a safe resource/recovery state.
 
-## 11. Portal Referral intake and Assignment M1a (inactive runtimes)
+## 11. Portal Referral intake, Assignment M1a and Provider Response M1b (inactive runtimes)
 
 When every default-off application gate and the exact non-Production Preview ref pass, the browser first requests a metadata-only source list. The server creates a request-scoped cookie Supabase client, rejects Bearer authorization and calls the database authorize RPC before enabling private inputs. The database revalidates its separate flag, Auth session/user and one active referral-source membership. Only then may create atomically write the referral, separately protected contact, metadata-only audit and idempotency receipt; the UI renders only the metadata ACK/list. An authorization-boundary failure disables further submission. This path uses no OpenAI call, Points, service role, worker or background retry. It remains source/local only, with all gates and the database flag off and no hosted deployment.
 
@@ -195,6 +195,36 @@ and one hashed idempotency receipt; exact replay is stable, changed payload is a
 conflict and stale version refreshes the authoritative detail. Provider
 accept/decline, follow-up, audit listing, document/export and completion remain
 outside M1a.
+
+Provider Response M1b adds a fourth independent operation gate without opening
+the operator or source surfaces. After the base, durable, exact Preview-ref and
+provider-response gates pass, `/provider-portal` requests at most 50 offers for
+the exact database-derived approved provider through
+`GET /api/portal/referral-offers` and
+`portal_referral_provider_response_offers(integer,uuid)`. Each item contains only match and
+referral IDs, frozen region/service codes, match/referral status and referral
+row version. It never includes source identity, summary or contact and never
+falls back to a legacy provider fixture.
+
+An `OFFERED` item can be answered at
+`POST /api/portal/referral-offers/{matchId}/response` with only `ACCEPT` or
+`DECLINE`, the expected referral version and a transport idempotency key; the
+database mutation is
+`portal_referral_provider_response_respond(uuid,bigint,text,text,text,text)`.
+The request-scoped Cookie
+adapter rejects Bearer before client creation; the database independently
+revalidates the Auth session, one active `provider_member`, its active PROVIDER
+organization and its APPROVED provider binding. `ACCEPT` atomically advances
+both match and referral to `ACCEPTED` and sets `assigned_provider_id` from that
+database context. `DECLINE` marks the match `DECLINED`, returns the referral to
+`TRIAGED` and leaves it unassigned. Each success writes one hash-only receipt
+and metadata-only audit event; stable replay returns the original ACK. Private
+provider detail, follow-up, notifications, audit listing, document/export and
+Note/Points remain outside M1b. While a response is pending, manual refresh and
+other offer decisions are locked. If transport outcome is uncertain, the UI
+retains the exact original command and idempotency key; other decisions stay
+blocked until an authoritative refresh resolves it or the same response is
+replayed for receipt-safe reconciliation.
 
 ## 12. Legacy Profile / Readiness / Referrals
 

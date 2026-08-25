@@ -11,6 +11,7 @@ vi.mock("./supabase-server", () => supabaseServerMock);
 
 import {
   CARESLINK_PORTAL_REFERRAL_ASSIGNMENT_FLAG,
+  CARESLINK_PORTAL_REFERRAL_PROVIDER_RESPONSE_FLAG,
   CARESLINK_PORTAL_REFERRAL_SOURCE_DETAIL_FLAG,
   CARESLINK_PORTAL_REFERRAL_RUNTIME_IMPLEMENTATION_READY,
   createPortalReferralApiResolver,
@@ -18,6 +19,7 @@ import {
   isPortalReferralBaseRuntimeEnabled,
   isPortalReferralOperationEnabled,
   isPortalReferralPreviewTargetAllowed,
+  isPortalReferralProviderResponseRuntimeEnabled,
   isPortalReferralRuntimeEnabled,
   isPortalReferralSourceDetailRuntimeEnabled,
   resolveDefaultPortalReferralApi,
@@ -45,6 +47,7 @@ function enabledPreviewEnv(
     CARESLINK_PORTAL_REFERRAL_INTAKE_ENABLED: "true",
     CARESLINK_PORTAL_REFERRAL_SOURCE_DETAIL_ENABLED: "true",
     CARESLINK_PORTAL_REFERRAL_ASSIGNMENT_ENABLED: "true",
+    CARESLINK_PORTAL_REFERRAL_PROVIDER_RESPONSE_ENABLED: "true",
     SUPABASE_PUBLISHABLE_KEY: "preview-publishable-key",
     ...overrides,
   };
@@ -59,6 +62,9 @@ describe("Portal referral runtime latch", () => {
     expect(CARESLINK_PORTAL_REFERRAL_ASSIGNMENT_FLAG).toBe(
       "CARESLINK_PORTAL_REFERRAL_ASSIGNMENT_ENABLED",
     );
+    expect(CARESLINK_PORTAL_REFERRAL_PROVIDER_RESPONSE_FLAG).toBe(
+      "CARESLINK_PORTAL_REFERRAL_PROVIDER_RESPONSE_ENABLED",
+    );
     expect(isPortalReferralBaseRuntimeEnabled(enabledPreviewEnv())).toBe(true);
     expect(isPortalReferralRuntimeEnabled(enabledPreviewEnv())).toBe(true);
     expect(isPortalReferralSourceDetailRuntimeEnabled(enabledPreviewEnv())).toBe(
@@ -67,6 +73,9 @@ describe("Portal referral runtime latch", () => {
     expect(isPortalReferralAssignmentRuntimeEnabled(enabledPreviewEnv())).toBe(
       false,
     );
+    expect(
+      isPortalReferralProviderResponseRuntimeEnabled(enabledPreviewEnv()),
+    ).toBe(true);
     expect(
       isPortalReferralOperationEnabled(
         "LIST_ASSIGNMENT_REFERRALS",
@@ -114,10 +123,11 @@ describe("Portal referral runtime latch", () => {
     ]) {
       expect(isPortalReferralBaseRuntimeEnabled(env)).toBe(false);
       expect(isPortalReferralAssignmentRuntimeEnabled(env)).toBe(false);
+      expect(isPortalReferralProviderResponseRuntimeEnabled(env)).toBe(false);
     }
   });
 
-  it("separates exact-true intake, source-detail and assignment operation gates", () => {
+  it("separates exact-true intake, source-detail, assignment and provider-response gates", () => {
     const detailOnly = enabledPreviewEnv({
       CARESLINK_PORTAL_REFERRAL_INTAKE_ENABLED: "false",
     });
@@ -210,6 +220,35 @@ describe("Portal referral runtime latch", () => {
     for (const operation of [
       "LIST_MY_OFFERS",
       "RESPOND_TO_OFFER",
+    ] satisfies PortalReferralOperation[]) {
+      expect(isPortalReferralOperationEnabled(operation, enabledPreviewEnv())).toBe(
+        true,
+      );
+    }
+    expect(
+      isPortalReferralProviderResponseRuntimeEnabled(enabledPreviewEnv()),
+    ).toBe(true);
+
+    for (const providerResponseFlag of [undefined, "false", "TRUE", " true"]) {
+      const providerResponseOff = enabledPreviewEnv({
+        CARESLINK_PORTAL_REFERRAL_PROVIDER_RESPONSE_ENABLED:
+          providerResponseFlag,
+      });
+      expect(
+        isPortalReferralProviderResponseRuntimeEnabled(providerResponseOff),
+      ).toBe(false);
+      expect(
+        isPortalReferralOperationEnabled("LIST_MY_OFFERS", providerResponseOff),
+      ).toBe(false);
+      expect(
+        isPortalReferralOperationEnabled(
+          "RESPOND_TO_OFFER",
+          providerResponseOff,
+        ),
+      ).toBe(false);
+    }
+
+    for (const operation of [
       "RECORD_FOLLOW_UP",
       "LIST_AUDIT",
     ] satisfies PortalReferralOperation[]) {
@@ -303,6 +342,45 @@ describe("Portal referral runtime latch", () => {
         ),
       ).resolves.toEqual({ ok: true, api });
       expect(authorize).toHaveBeenCalledWith(client, "ASSIGNMENT");
+      expect(createApi).toHaveBeenCalledWith(client, authorization);
+    },
+  );
+
+  it.each(["LIST_MY_OFFERS", "RESPOND_TO_OFFER"] as const)(
+    "maps %s only to the PROVIDER_RESPONSE authorization scope",
+    async (operation) => {
+      const client = { rpc: vi.fn() };
+      const api = {};
+      const authorization = {
+        userId: "10000000-0000-4000-8000-000000000001",
+        organizationId: "20000000-0000-4000-8000-000000000001",
+        organizationType: "PROVIDER",
+        organizationStatus: "ACTIVE",
+        membershipRole: "provider_member",
+        membershipStatus: "ACTIVE",
+        providerId: "30000000-0000-4000-8000-000000000001",
+        providerReviewStatus: "APPROVED",
+      } as const;
+      const authorize = vi
+        .spyOn(portalReferralSupabase, "authorizePortalReferralSupabaseClient")
+        .mockResolvedValue({ ok: true, authorization });
+      const createApi = vi
+        .spyOn(portalReferralSupabase, "createSupabasePortalReferralApi")
+        .mockReturnValue(api as never);
+      const resolver = createPortalReferralApiResolver({
+        env: enabledPreviewEnv(),
+        createCookieRpcClient: vi.fn(async () => client),
+      });
+
+      await expect(
+        resolver(
+          new Request(
+            "https://preview.careslink.test/api/portal/referral-offers",
+          ),
+          operation,
+        ),
+      ).resolves.toEqual({ ok: true, api });
+      expect(authorize).toHaveBeenCalledWith(client, "PROVIDER_RESPONSE");
       expect(createApi).toHaveBeenCalledWith(client, authorization);
     },
   );
@@ -449,6 +527,7 @@ describe("Portal referral runtime latch", () => {
     "LIST_REFERRALS",
     "GET_REFERRAL",
     "LIST_ASSIGNMENT_REFERRALS",
+    "LIST_MY_OFFERS",
   ] as const)(
     "does not accept a caller bearer for %s or construct any client for it",
     async (operation) => {
@@ -519,6 +598,10 @@ describe("Portal referral runtime latch", () => {
     ["LIST_REFERRALS", "portal_referral_intake_authorize"],
     ["GET_REFERRAL", "portal_referral_source_detail_authorize"],
     ["TRIAGE_REFERRAL", "portal_referral_assignment_authorize"],
+    [
+      "LIST_MY_OFFERS",
+      "portal_referral_provider_response_authorize",
+    ],
   ] as const)(
     "maps identical authorize results for %s before returning an API",
     async (operation, expectedRpcName) => {

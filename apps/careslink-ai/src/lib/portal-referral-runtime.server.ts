@@ -23,6 +23,8 @@ export const CARESLINK_PORTAL_REFERRAL_SOURCE_DETAIL_FLAG =
   "CARESLINK_PORTAL_REFERRAL_SOURCE_DETAIL_ENABLED" as const;
 export const CARESLINK_PORTAL_REFERRAL_ASSIGNMENT_FLAG =
   "CARESLINK_PORTAL_REFERRAL_ASSIGNMENT_ENABLED" as const;
+export const CARESLINK_PORTAL_REFERRAL_PROVIDER_RESPONSE_FLAG =
+  "CARESLINK_PORTAL_REFERRAL_PROVIDER_RESPONSE_ENABLED" as const;
 export const CARESLINK_PORTAL_REFERRAL_EXPECTED_SUPABASE_REF_FLAG =
   "CARESLINK_PORTAL_REFERRAL_EXPECTED_SUPABASE_REF" as const;
 
@@ -35,6 +37,7 @@ export type PortalReferralRuntimeEnv = Readonly<{
   CARESLINK_PORTAL_REFERRAL_INTAKE_ENABLED?: string;
   CARESLINK_PORTAL_REFERRAL_SOURCE_DETAIL_ENABLED?: string;
   CARESLINK_PORTAL_REFERRAL_ASSIGNMENT_ENABLED?: string;
+  CARESLINK_PORTAL_REFERRAL_PROVIDER_RESPONSE_ENABLED?: string;
   CARESLINK_PORTAL_REFERRAL_EXPECTED_SUPABASE_REF?: string;
   NEXT_PUBLIC_SUPABASE_ANON_KEY?: string;
   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY?: string;
@@ -145,6 +148,16 @@ export function isPortalReferralAssignmentRuntimeEnabled(
   );
 }
 
+export function isPortalReferralProviderResponseRuntimeEnabled(
+  env: PortalReferralRuntimeEnv = process.env as PortalReferralRuntimeEnv,
+) {
+  return (
+    isPortalReferralBaseRuntimeEnabled(env) &&
+    isPortalReferralOperationEnabled("LIST_MY_OFFERS", env) &&
+    isPortalReferralOperationEnabled("RESPOND_TO_OFFER", env)
+  );
+}
+
 /**
  * Assignment M1a and the source-role pages still share `/referrals`. Keep the
  * page-level assignment latch closed if either source-role surface is active.
@@ -173,6 +186,9 @@ export function isPortalReferralOperationEnabled(
     case "LIST_PROVIDER_CANDIDATES":
     case "OFFER_REFERRAL":
       return env.CARESLINK_PORTAL_REFERRAL_ASSIGNMENT_ENABLED === "true";
+    case "LIST_MY_OFFERS":
+    case "RESPOND_TO_OFFER":
+      return env.CARESLINK_PORTAL_REFERRAL_PROVIDER_RESPONSE_ENABLED === "true";
     default:
       return false;
   }
@@ -256,6 +272,9 @@ function authorizationScopeForOperation(
     case "LIST_PROVIDER_CANDIDATES":
     case "OFFER_REFERRAL":
       return "ASSIGNMENT";
+    case "LIST_MY_OFFERS":
+    case "RESPOND_TO_OFFER":
+      return "PROVIDER_RESPONSE";
     default:
       return undefined;
   }
