@@ -2,11 +2,22 @@ import "server-only";
 
 import type {
   PortalReferralActor,
+  PortalReferralAssignmentActiveOffer as WorkflowPortalReferralAssignmentActiveOffer,
+  PortalReferralAssignmentDetail as WorkflowPortalReferralAssignmentDetail,
+  PortalReferralAssignmentQueueItem as WorkflowPortalReferralAssignmentQueueItem,
   PortalReferralContact,
   PortalReferralFollowUpOutcomeCode,
   PortalReferralMutationMetadata,
+  PortalReferralStatus,
   PortalReferralWorkflowPort,
 } from "./portal-referral-workflow";
+
+export type PortalReferralAssignmentQueueItem =
+  WorkflowPortalReferralAssignmentQueueItem;
+export type PortalReferralAssignmentDetail =
+  WorkflowPortalReferralAssignmentDetail;
+export type PortalReferralAssignmentActiveOffer =
+  WorkflowPortalReferralAssignmentActiveOffer;
 
 export type MaybePromise<T> = T | Promise<T>;
 
@@ -39,6 +50,23 @@ export type PortalReferralFollowUpCommand = Readonly<{
   outcomeCode: PortalReferralFollowUpOutcomeCode;
 }>;
 
+/**
+ * Exact referral-source detail projection. It deliberately excludes tenant,
+ * assignment, document, export and audit fields that the source detail RPC does
+ * not authorize.
+ */
+export type PortalReferralSourceDetail = Readonly<{
+  referralId: string;
+  summary: string;
+  region: string;
+  serviceType: string;
+  currentStatus: PortalReferralStatus;
+  rowVersion: number;
+  contact: PortalReferralContact;
+  createdAt: string;
+  updatedAt: string;
+}>;
+
 export type PortalReferralApi = Readonly<{
   listReferrals(): MaybePromise<
     ReturnType<PortalReferralWorkflowPort["listReferrals"]>
@@ -49,11 +77,20 @@ export type PortalReferralApi = Readonly<{
   ): MaybePromise<ReturnType<PortalReferralWorkflowPort["createReferral"]>>;
   getReferral(
     referralId: string,
-  ): MaybePromise<ReturnType<PortalReferralWorkflowPort["getReferral"]>>;
+  ): MaybePromise<
+    PortalReferralSourceDetail |
+      ReturnType<PortalReferralWorkflowPort["getReferral"]>
+  >;
+  listAssignmentReferrals(): MaybePromise<
+    readonly PortalReferralAssignmentQueueItem[]
+  >;
+  getAssignmentReferral(
+    referralId: string,
+  ): MaybePromise<PortalReferralAssignmentDetail>;
   triageReferral(
     referralId: string,
     expectedVersion: number,
-    mutation: PortalReferralMutationMetadata,
+    mutation: PortalReferralApiMutationMetadata,
   ): MaybePromise<ReturnType<PortalReferralWorkflowPort["triageReferral"]>>;
   listProviderCandidates(
     referralId: string,
@@ -63,7 +100,7 @@ export type PortalReferralApi = Readonly<{
   offerReferral(
     referralId: string,
     command: PortalReferralOfferCommand,
-    mutation: PortalReferralMutationMetadata,
+    mutation: PortalReferralApiMutationMetadata,
   ): MaybePromise<ReturnType<PortalReferralWorkflowPort["offerReferral"]>>;
   listMyOffers(): MaybePromise<
     ReturnType<PortalReferralWorkflowPort["listMyOffers"]>
@@ -96,6 +133,9 @@ export function createActorBoundPortalReferralApi(
     createReferral: (command, mutation) =>
       workflow.createReferral(actor, command, mutation),
     getReferral: (referralId) => workflow.getReferral(actor, referralId),
+    listAssignmentReferrals: () => workflow.listAssignmentReferrals(actor),
+    getAssignmentReferral: (referralId) =>
+      workflow.getAssignmentReferral(actor, referralId),
     triageReferral: (referralId, expectedVersion, mutation) =>
       workflow.triageReferral(actor, referralId, expectedVersion, mutation),
     listProviderCandidates: (referralId) =>

@@ -75,7 +75,7 @@ Current admin pages may display access-request metadata, feature counts, statuse
 
 ## V1 shadow permission contract and isolated evidence
 
-### Portal Referral foundation and intake runtime (source/local and unapplied)
+### Portal Referral foundation, intake, source-detail and Assignment M1a runtime (default-off and Production-unapplied)
 
 The Portal Referral foundation introduces organization membership, provider,
 referral, separately protected contact, match, follow-up, receipt, audit,
@@ -85,6 +85,55 @@ migration adds exactly three public `SECURITY DEFINER` RPCs—authorize, source
 metadata list and atomic create—with `search_path=''` and `EXECUTE` only for
 `authenticated`; `PUBLIC`, `anon` and `service_role` remain revoked. Its two
 private helpers grant no caller execution.
+
+The later source-detail migration adds two read-only public `SECURITY DEFINER`
+RPCs—`portal_referral_source_detail_authorize()` and
+`portal_referral_source_detail(uuid)`—under the migration-entry owner with
+`search_path=''`. It revokes `PUBLIC`, `anon`, `authenticated` and
+`service_role` before granting `EXECUTE` back only to `authenticated`; no table
+grant is added. Both RPCs hold master + source-detail database gates, then reuse
+the fresh intake session/membership context. The detail tenant predicate
+requires the exact source organization, and
+cross-tenant and absent identifiers both raise `PORTAL_NOT_FOUND`. The DTO is
+limited to referral ID, summary, region, service, status, version, contact and
+timestamps; source/actor/assignment/document/export/audit identities are not
+returned.
+
+That migration also creates the independently default-off `referral_intake_v1`
+row and replaces the private intake gate helper. The already granted intake
+authorize/list/create RPCs now hold master + intake before validation or write,
+so master + detail cannot open intake through a direct Data API call. Conversely,
+master + intake cannot open either detail RPC.
+
+Assignment M1a adds exactly six public `SECURITY DEFINER` RPCs—assignment
+authorize, queue, detail, triage, candidates and offer—with `search_path=''`,
+the migration-entry owner and `EXECUTE` only for `authenticated`. Four private
+assignment helpers have no API-role execution, and no Portal table grant is
+added. Every RPC holds master then `referral_assignment_v1`; the new row remains
+`enabled=false, preview_only=true`. Assignment context must resolve from the
+live database to exactly one active `platform_admin` membership in an active
+PLATFORM organization or one active `partner_operator` membership in an active
+REFERRAL_SOURCE organization. Mixed, multiple and zero contexts fail closed.
+Partner operators are source-tenant-scoped; platform admins are global.
+
+Queue is metadata-only and keyset-bounded. Assignment detail adds the source
+organization, private summary/contact and at most one active-offer projection,
+but excludes source user, membership, provider-member, audit, receipt,
+document and export identities. Candidate and offer share one private
+eligibility query: active PROVIDER organization, APPROVED review,
+AVAILABLE/LIMITED capacity, exact region/service and at least one active
+provider member. Offer checks the authorized referral before provider
+eligibility, promotes or creates one match and keeps
+`assigned_provider_id=null`; provider response remains unavailable. Triage and
+offer use actor+mutation advisory serialization, expected row versions, fresh
+post-lock session checks, SHA-256 payload/idempotency/correlation values and one
+audit plus one receipt. Session time is sampled only after Auth row locks; the
+context rechecks it after organization/membership table locks and before
+exact-one derivation, and candidates/offer recheck after their referral,
+match/provider lock stages. Currently ineligible providers retain uniform
+not-found even when a historical match exists. Exact completed offer replay
+remains stable if the provider later becomes ineligible; changed payload or kind
+conflicts.
 
 The local actor-bound test adapter enforces Source A/B, Provider A/B and
 partner-operator tenant isolation. Providers receive only frozen region/service
@@ -96,18 +145,50 @@ copy contact, summary, client correlation or raw idempotency values. Raw match
 and audit rows are limited to platform admin or the tenant partner operator in
 the draft RLS contract.
 
-The default runtime now supplies a request-scoped cookie client only after all
-three application gates and the exact non-Production Preview ref pass. It
+The default runtime now supplies a request-scoped cookie client only after the
+base API and durable-adapter gates, the selected independent operation gate and
+the exact non-Production Preview ref pass. It
 rejects caller Bearer authorization, never creates a service-role client and
 executes database authorization before a private mutation body is parsed. The
-database revalidates the current Auth user/session and exactly one active
-referral-source membership in an active referral-source organization; actor,
-organization and role are never accepted from the body. List is source-scoped
-and metadata-only. Create atomically writes referral, private contact, audit and
-receipt rows with hashed mutation/correlation identifiers. The database flag
-and all application gates remain off, and this is source/local disposable-SQL
-evidence only: no hosted Preview or Production migration, activation or
-deployment is claimed.
+database revalidates the current Auth user/session and the exact active
+membership required by the selected operation; actor, organization and role
+are never accepted from the body. Source list is metadata-only and create
+atomically writes referral, private contact, audit and receipt rows with hashed
+mutation/correlation identifiers. Source detail is read-only. Assignment reads
+or performs only triage/offer as described above. All application and database
+flags remain off. Exact pre-review commit `526aa1e` remains the historical
+deleted-disposable Hosted 32/32 migration, then-current 13/13 rollback and real
+GoTrue SSR-cookie route-E2E baseline. Exact-current hardening HEAD
+`43659ab16e9af6d9c73d0a55f8fe8b30b3ce9ee2` separately passed 32/32 migrations
+and all 13 current rollback suites on deleted no-data branch
+`portal-assignment-m1a-r2-20260826` (id
+`3b111420-9f47-4e9f-b3a5-acd418f9423f`; ref
+`uzlnwjurzbtwtstabogm`). Its exact-source local HTTPS Next runtime used a real
+Hosted SSR cookie to pass Bearer rejection, Source-A-only queue, uniform
+Source-B/random-ID detail denial, triage/replay, one eligible candidate,
+offer/replay, the expected OFFERED-v3/hash-only terminal database state and
+global-session-revocation `401`. This extends Hosted attribution to the
+queue-bound, page-latch and null-adapter revision without changing the default-
+off permission model.
+
+The fixed teardown left Auth users, identities, sessions and refresh tokens and
+every Portal fixture table at zero; all four Portal flags were
+`enabled=false, preview_only=true`, and the checked append-only triggers were
+normally enabled. Three consecutive branch-list probes found the exact `r2` id
+and ref absent after deletion. Production retained 19 migrations and remained
+the default `ACTIVE_HEALTHY` project before and after; it was never a SQL, Auth,
+route or other write target. No Vercel deployment, merge, retained Preview,
+Production migration or activation is claimed.
+
+The exact-current branch's security advisors returned 21 INFO / 14 WARN and
+performance advisors returned 105 INFO / 24 WARN, with no ERROR. The
+authenticated-executable `SECURITY DEFINER` warnings include intentionally
+narrow Portal RPCs: each remains covered by the master plus operation-specific
+database gates, the exact non-Production application target, fresh Auth
+user/session checks and exact membership/tenant authorization; all use
+`search_path=''`, and authenticated callers receive no direct Portal table
+write grant. The WARN findings therefore remain visible review items rather
+than an unrestricted definer or all-project security-green claim.
 
 `supabase/migrations/20260809120000_create_v1_shadow_foundation.sql` defines the following controls. It was applied only to a disposable `with_data=false` branch and has not been applied to Production Supabase:
 

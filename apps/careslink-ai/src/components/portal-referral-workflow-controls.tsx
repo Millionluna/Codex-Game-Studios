@@ -1,6 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useRef, useState, type FormEvent } from "react";
+import { canonicalPortalReferralUuid } from "../lib/portal-referral-id";
 
 export const PORTAL_REFERRAL_UI_REGION_CODES = [
   "VIC_MELBOURNE",
@@ -84,6 +86,18 @@ export type PortalReferralListItem = Readonly<{
   updatedAt: string;
 }>;
 
+export type PortalReferralSourceDetail = Readonly<{
+  referralId: string;
+  summary: string;
+  region: PortalReferralRegionCode;
+  serviceType: PortalReferralServiceTypeCode;
+  currentStatus: string;
+  rowVersion: number;
+  contact: PortalReferralContact;
+  createdAt: string;
+  updatedAt: string;
+}>;
+
 type PortalReferralRequestFailureCode =
   | "CAPABILITY_DISABLED"
   | "AUTH_REQUIRED"
@@ -98,6 +112,10 @@ export type PortalReferralMutationResult =
 
 export type PortalReferralListResult =
   | Readonly<{ ok: true; items: readonly PortalReferralListItem[] }>
+  | Readonly<{ ok: false; code: PortalReferralRequestFailureCode }>;
+
+export type PortalReferralSourceDetailResult =
+  | Readonly<{ ok: true; detail: PortalReferralSourceDetail }>
   | Readonly<{ ok: false; code: PortalReferralRequestFailureCode }>;
 
 export type PortalReferralIntakeSubmissionResult = Readonly<{
@@ -132,8 +150,6 @@ type PortalReferralFetch = (
 
 const IDEMPOTENCY_KEY_PATTERN =
   /^[A-Za-z0-9][A-Za-z0-9._:-]{15,127}$/;
-const UUID_PATTERN =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const ISO_INSTANT_PATTERN =
   /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/;
 const PORTAL_REFERRAL_UI_STATUSES = [
@@ -223,7 +239,7 @@ export async function submitPortalReferralMutation({
       return { ok: false, code: failureCodeForStatus(response.status) };
     }
 
-    const ack = parseMetadataOnlyAck(await response.json());
+    const ack = parseMetadataOnlyAck(await response.json(), mutation);
     return ack
       ? { ok: true, ack }
       : { ok: false, code: "REQUEST_FAILED" };
@@ -265,6 +281,51 @@ export async function loadPortalReferralReadback({
   }
 }
 
+export async function loadPortalReferralSourceDetail({
+  enabled = false,
+  referralId,
+  fetcher = globalThis.fetch,
+}: Readonly<{
+  enabled?: boolean;
+  referralId: string;
+  fetcher?: PortalReferralFetch;
+}>): Promise<PortalReferralSourceDetailResult> {
+  if (!enabled) {
+    return { ok: false, code: "CAPABILITY_DISABLED" };
+  }
+
+  let canonicalReferralId: string;
+  try {
+    canonicalReferralId = requiredUuid(referralId);
+  } catch {
+    return { ok: false, code: "REQUEST_FAILED" };
+  }
+
+  try {
+    const response = await fetcher(
+      `/api/portal/referrals/${canonicalReferralId}`,
+      {
+        method: "GET",
+        credentials: "same-origin",
+        cache: "no-store",
+        headers: { accept: "application/json" },
+      },
+    );
+    if (!response.ok) {
+      // Error bodies can contain database or request details. Never parse them
+      // into the client-visible detail state.
+      return { ok: false, code: failureCodeForStatus(response.status) };
+    }
+
+    const detail = parseSourceDetailEnvelope(await response.json());
+    return detail?.referralId === canonicalReferralId
+      ? { ok: true, detail }
+      : { ok: false, code: "REQUEST_FAILED" };
+  } catch {
+    return { ok: false, code: "REQUEST_FAILED" };
+  }
+}
+
 export async function submitPortalReferralIntakeAndReadback({
   enabled = false,
   mutation,
@@ -297,7 +358,8 @@ export async function submitPortalReferralIntakeAndReadback({
 
 export function PortalReferralIntakeControls({
   enabled = false,
-}: Readonly<{ enabled?: boolean }>) {
+  detailEnabled = false,
+}: Readonly<{ enabled?: boolean; detailEnabled?: boolean }>) {
   const [result, setResult] = useState<PortalReferralMutationResult>();
   const [readback, setReadback] = useState<PortalReferralListResult>();
   const [pending, setPending] = useState(false);
@@ -466,8 +528,126 @@ export function PortalReferralIntakeControls({
           }
         />
       </form>
-      <PortalReferralReadback enabled={enabled} result={readback} />
+      <PortalReferralReadback
+        detailEnabled={detailEnabled}
+        enabled={enabled}
+        result={readback}
+      />
     </div>
+  );
+}
+
+export function PortalReferralSourceDetailPanel({
+  enabled = false,
+  referralId,
+}: Readonly<{
+  enabled?: boolean;
+  referralId: string;
+}>) {
+  const requestReferralId =
+    canonicalPortalReferralUuid(referralId) ?? referralId;
+  const [loaded, setLoaded] = useState<
+    Readonly<{
+      referralId: string;
+      result: PortalReferralSourceDetailResult;
+    }>
+  >();
+  const result =
+    loaded?.referralId === requestReferralId ? loaded.result : undefined;
+
+  useEffect(() => {
+    if (!enabled) return;
+    let active = true;
+    void loadPortalReferralSourceDetail({
+      enabled,
+      referralId: requestReferralId,
+    }).then(
+      (loadedResult) => {
+        if (active) {
+          setLoaded({ referralId: requestReferralId, result: loadedResult });
+        }
+      },
+    );
+    return () => {
+      active = false;
+    };
+  }, [enabled, requestReferralId]);
+
+  return (
+    <section
+      aria-label="Authorized referral detail"
+      className="rounded-lg border border-[#cfe4dc] bg-white p-5"
+    >
+      {!enabled ? (
+        <p className="text-sm leading-6 text-[#5d6d68]">
+          Preview source-detail runtime is disabled. No detail request is sent.
+        </p>
+      ) : !result ? (
+        <p aria-live="polite" className="text-sm text-[#5d6d68]">
+          Loading authorized referral detail…
+        </p>
+      ) : !result.ok ? (
+        <p aria-live="polite" className="text-sm leading-6 text-[#7a4b00]">
+          {result.code === "NOT_FOUND" || result.code === "FORBIDDEN"
+            ? "This referral is not available to the current account."
+            : "Authorized referral detail could not be loaded."}
+        </p>
+      ) : (
+        <div aria-live="polite" className="grid gap-5">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="font-semibold text-[#263834]">
+              {displayRegionCode(result.detail.region)} ·{" "}
+              {displayServiceCode(result.detail.serviceType)}
+            </p>
+            <span className="rounded-md bg-[#e6f7f2] px-2 py-1 text-xs font-semibold text-[#0f766e]">
+              {result.detail.currentStatus}
+            </span>
+          </div>
+
+          <div className="grid gap-2">
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#66736f]">
+              Private summary / 私密摘要
+            </p>
+            <p className="whitespace-pre-wrap rounded-lg bg-[#f7faf8] p-3 text-sm leading-6 text-[#40504b]">
+              {result.detail.summary}
+            </p>
+          </div>
+
+          <div className="grid gap-2">
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#66736f]">
+              Contact / 联系人
+            </p>
+            <dl className="grid gap-2 rounded-lg bg-[#f7faf8] p-3 text-sm text-[#40504b] sm:grid-cols-3">
+              <div>
+                <dt className="text-xs text-[#66736f]">Name / 姓名</dt>
+                <dd className="mt-1 font-medium">{result.detail.contact.name}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-[#66736f]">Phone / 电话</dt>
+                <dd className="mt-1 font-medium">{result.detail.contact.phone}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-[#66736f]">Email / 邮箱</dt>
+                <dd className="mt-1 font-medium">
+                  {result.detail.contact.email ?? "Not provided / 未提供"}
+                </dd>
+              </div>
+            </dl>
+          </div>
+
+          <p className="text-xs leading-5 text-[#66736f]">
+            Version {result.detail.rowVersion} · Created{" "}
+            <time dateTime={result.detail.createdAt}>
+              {displayUtcInstant(result.detail.createdAt)}
+            </time>{" "}
+            · Updated{" "}
+            <time dateTime={result.detail.updatedAt}>
+              {displayUtcInstant(result.detail.updatedAt)}
+            </time>
+          </p>
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -809,10 +989,12 @@ function PortalReferralCapabilityNotice({
   ) : null;
 }
 
-function PortalReferralReadback({
+export function PortalReferralReadback({
+  detailEnabled,
   enabled,
   result,
 }: Readonly<{
+  detailEnabled: boolean;
   enabled: boolean;
   result: PortalReferralListResult | undefined;
 }>) {
@@ -878,6 +1060,14 @@ function PortalReferralReadback({
                   {displayUtcInstant(item.updatedAt)}
                 </time>
               </p>
+              {detailEnabled ? (
+                <Link
+                  className="mt-3 inline-flex text-sm font-semibold text-[#0f766e] underline-offset-4 hover:underline"
+                  href={`/referrals/${item.referralId}`}
+                >
+                  Open authorized detail / 打开已授权详情
+                </Link>
+              ) : null}
             </li>
           ))}
         </ul>
@@ -930,33 +1120,125 @@ function getMutationTarget(mutation: PortalReferralMutation) {
   }
 }
 
-function parseMetadataOnlyAck(value: unknown): PortalReferralMutationAck | undefined {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
-  const candidate = value as Partial<PortalReferralMutationAck>;
+function parseMetadataOnlyAck(
+  value: unknown,
+  mutation: PortalReferralMutation,
+): PortalReferralMutationAck | undefined {
   if (
-    typeof candidate.referralId !== "string" ||
-    !UUID_PATTERN.test(candidate.referralId) ||
-    (candidate.matchId !== null &&
-      (typeof candidate.matchId !== "string" ||
-        !UUID_PATTERN.test(candidate.matchId))) ||
+    !hasExactKeys(value, [
+      "referralId",
+      "matchId",
+      "currentStatus",
+      "rowVersion",
+      "updatedAt",
+    ])
+  ) {
+    return undefined;
+  }
+  const candidate = value;
+  const referralId = canonicalPortalReferralUuid(candidate.referralId);
+  const matchId =
+    candidate.matchId === null
+      ? null
+      : canonicalPortalReferralUuid(candidate.matchId);
+  if (
+    !referralId ||
+    referralId !== candidate.referralId ||
+    (candidate.matchId !== null && !matchId) ||
+    (candidate.matchId !== null && matchId !== candidate.matchId) ||
     typeof candidate.currentStatus !== "string" ||
     !(PORTAL_REFERRAL_UI_STATUSES as readonly string[]).includes(
       candidate.currentStatus,
     ) ||
     !Number.isSafeInteger(candidate.rowVersion) ||
-    typeof candidate.updatedAt !== "string" ||
-    !ISO_INSTANT_PATTERN.test(candidate.updatedAt)
+    (candidate.rowVersion as number) < 1 ||
+    !strictUtcInstant(candidate.updatedAt) ||
+    !ackMatchesMutation(
+      {
+        referralId,
+        matchId: matchId ?? null,
+        currentStatus: candidate.currentStatus,
+        rowVersion: candidate.rowVersion as number,
+      },
+      mutation,
+    )
   ) {
     return undefined;
   }
 
   return Object.freeze({
-    referralId: candidate.referralId,
-    matchId: candidate.matchId ?? null,
+    referralId,
+    matchId: matchId ?? null,
     currentStatus: candidate.currentStatus,
     rowVersion: candidate.rowVersion as number,
-    updatedAt: candidate.updatedAt,
+    updatedAt: candidate.updatedAt as string,
   });
+}
+
+function ackMatchesMutation(
+  ack: Pick<
+    PortalReferralMutationAck,
+    "referralId" | "matchId" | "currentStatus" | "rowVersion"
+  >,
+  mutation: PortalReferralMutation,
+) {
+  switch (mutation.kind) {
+    case "CREATE_REFERRAL":
+      return (
+        ack.matchId === null &&
+        ack.currentStatus === "SUBMITTED" &&
+        ack.rowVersion === 1
+      );
+    case "TRIAGE_REFERRAL": {
+      const referralId = canonicalPortalReferralUuid(mutation.referralId);
+      return (
+        Boolean(referralId) &&
+        ack.referralId === referralId &&
+        ack.matchId === null &&
+        ack.currentStatus === "TRIAGED" &&
+        isNextVersion(ack.rowVersion, mutation.expectedVersion)
+      );
+    }
+    case "OFFER_REFERRAL": {
+      const referralId = canonicalPortalReferralUuid(mutation.referralId);
+      return (
+        Boolean(referralId) &&
+        ack.referralId === referralId &&
+        ack.matchId !== null &&
+        ack.currentStatus === "OFFERED" &&
+        isNextVersion(ack.rowVersion, mutation.expectedVersion)
+      );
+    }
+    case "RESPOND_TO_OFFER": {
+      const matchId = canonicalPortalReferralUuid(mutation.matchId);
+      return (
+        Boolean(matchId) &&
+        ack.matchId === matchId &&
+        ack.currentStatus ===
+          (mutation.decision === "ACCEPT" ? "ACCEPTED" : "TRIAGED") &&
+        isNextVersion(ack.rowVersion, mutation.expectedVersion)
+      );
+    }
+    case "RECORD_FOLLOW_UP": {
+      const referralId = canonicalPortalReferralUuid(mutation.referralId);
+      return (
+        Boolean(referralId) &&
+        ack.referralId === referralId &&
+        ack.matchId === null &&
+        ack.currentStatus === "IN_PROGRESS" &&
+        isNextVersion(ack.rowVersion, mutation.expectedVersion)
+      );
+    }
+  }
+}
+
+function isNextVersion(actual: number, expected: number) {
+  return (
+    Number.isSafeInteger(expected) &&
+    expected >= 1 &&
+    expected < Number.MAX_SAFE_INTEGER &&
+    actual === expected + 1
+  );
 }
 
 function parseMetadataOnlyList(
@@ -974,9 +1256,9 @@ function parseMetadataOnlyList(
       return undefined;
     }
     const item = valueItem as Partial<PortalReferralListItem>;
+    const referralId = canonicalPortalReferralUuid(item.referralId);
     if (
-      typeof item.referralId !== "string" ||
-      !UUID_PATTERN.test(item.referralId) ||
+      !referralId ||
       typeof item.region !== "string" ||
       !PORTAL_REFERRAL_UI_REGION_CODES.includes(
         item.region as PortalReferralRegionCode,
@@ -999,7 +1281,7 @@ function parseMetadataOnlyList(
 
     parsed.push(
       Object.freeze({
-        referralId: item.referralId.toLowerCase(),
+        referralId,
         region: item.region as PortalReferralRegionCode,
         serviceType: item.serviceType as PortalReferralServiceTypeCode,
         currentStatus: item.currentStatus,
@@ -1012,11 +1294,119 @@ function parseMetadataOnlyList(
   return Object.freeze(parsed);
 }
 
+function parseSourceDetailEnvelope(
+  value: unknown,
+): PortalReferralSourceDetail | undefined {
+  if (!hasExactKeys(value, ["referral"])) return undefined;
+  const detail = value.referral;
+  if (
+    !hasExactKeys(detail, [
+      "referralId",
+      "summary",
+      "region",
+      "serviceType",
+      "currentStatus",
+      "rowVersion",
+      "contact",
+      "createdAt",
+      "updatedAt",
+    ]) ||
+    !hasExactKeys(detail.contact, ["name", "phone", "email"])
+  ) {
+    return undefined;
+  }
+
+  const summary = strictBoundedText(detail.summary, 4_000);
+  const contactName = strictBoundedText(detail.contact.name, 200);
+  const contactPhone = strictBoundedText(detail.contact.phone, 100);
+  const contactEmail =
+    detail.contact.email === null
+      ? null
+      : strictBoundedText(detail.contact.email, 320);
+  const createdAt = strictUtcInstant(detail.createdAt);
+  const updatedAt = strictUtcInstant(detail.updatedAt);
+  const referralId = canonicalPortalReferralUuid(detail.referralId);
+  if (!summary || !contactName || !contactPhone || contactEmail === undefined) {
+    return undefined;
+  }
+  if (
+    !referralId ||
+    referralId !== detail.referralId ||
+    typeof detail.region !== "string" ||
+    !PORTAL_REFERRAL_UI_REGION_CODES.includes(
+      detail.region as PortalReferralRegionCode,
+    ) ||
+    typeof detail.serviceType !== "string" ||
+    !PORTAL_REFERRAL_UI_SERVICE_TYPE_CODES.includes(
+      detail.serviceType as PortalReferralServiceTypeCode,
+    ) ||
+    typeof detail.currentStatus !== "string" ||
+    !(PORTAL_REFERRAL_UI_STATUSES as readonly string[]).includes(
+      detail.currentStatus,
+    ) ||
+    !Number.isSafeInteger(detail.rowVersion) ||
+    (detail.rowVersion as number) < 1 ||
+    !createdAt ||
+    !updatedAt ||
+    Date.parse(createdAt) > Date.parse(updatedAt)
+  ) {
+    return undefined;
+  }
+
+  return Object.freeze({
+    referralId,
+    summary,
+    region: detail.region as PortalReferralRegionCode,
+    serviceType: detail.serviceType as PortalReferralServiceTypeCode,
+    currentStatus: detail.currentStatus,
+    rowVersion: detail.rowVersion as number,
+    contact: Object.freeze({
+      name: contactName,
+      phone: contactPhone,
+      email: contactEmail,
+    }),
+    createdAt,
+    updatedAt,
+  });
+}
+
+function hasExactKeys(
+  value: unknown,
+  expectedKeys: readonly string[],
+): value is Record<string, unknown> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const actual = Object.keys(value).sort();
+  const expected = [...expectedKeys].sort();
+  return (
+    actual.length === expected.length &&
+    actual.every((key, index) => key === expected[index])
+  );
+}
+
+function strictBoundedText(value: unknown, maxLength: number) {
+  if (typeof value !== "string") return undefined;
+  const normalized = value.trim();
+  return normalized && normalized === value && normalized.length <= maxLength
+    ? normalized
+    : undefined;
+}
+
+function strictUtcInstant(value: unknown) {
+  if (typeof value !== "string" || !ISO_INSTANT_PATTERN.test(value)) {
+    return undefined;
+  }
+  const instant = new Date(value);
+  if (!Number.isFinite(instant.getTime())) return undefined;
+  const canonical = instant.toISOString();
+  return value === canonical ? canonical : undefined;
+}
+
 function requiredUuid(value: string) {
-  if (!UUID_PATTERN.test(value)) {
+  const canonical = canonicalPortalReferralUuid(value);
+  if (!canonical) {
     throw new TypeError("resource id is invalid");
   }
-  return value.toLowerCase();
+  return canonical;
 }
 
 function failureCodeForStatus(

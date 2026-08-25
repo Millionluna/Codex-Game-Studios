@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   PORTAL_REFERRAL_WORKFLOW_IMPLEMENTATION_STATUS,
   PortalReferralWorkflowError,
@@ -395,6 +395,150 @@ describe("Portal referral workflow contract", () => {
         ),
       "FORBIDDEN",
     );
+  });
+
+  it("checks tenant, version and state before provider eligibility", () => {
+    const isProviderEligible = vi.fn(() => false);
+    const workflow = createMemoryPortalReferralWorkflow({ isProviderEligible });
+    const crossTenant = workflow.createReferral(
+      SOURCE_B,
+      referralInput(),
+      mutation("offer-order-create-b"),
+    );
+
+    expectError(
+      () =>
+        workflow.offerReferral(
+          OPERATOR_A,
+          {
+            referralId: crossTenant.referralId,
+            providerId: "provider-enumeration-probe",
+            expectedVersion: 1,
+          },
+          mutation("offer-order-cross-tenant"),
+        ),
+      "NOT_FOUND",
+    );
+    expect(isProviderEligible).not.toHaveBeenCalled();
+
+    const sameTenant = workflow.createReferral(
+      SOURCE_A,
+      referralInput(),
+      mutation("offer-order-create-a"),
+    );
+    expectError(
+      () =>
+        workflow.offerReferral(
+          OPERATOR_A,
+          {
+            referralId: sameTenant.referralId,
+            providerId: "provider-enumeration-probe",
+            expectedVersion: 1,
+          },
+          mutation("offer-order-state-first"),
+        ),
+      "INVALID_STATE_TRANSITION",
+    );
+    expect(isProviderEligible).not.toHaveBeenCalled();
+  });
+
+  it("projects an operator-only assignment queue and coherent active offer detail", () => {
+    let id = 0;
+    let instant = 0;
+    const workflow = createMemoryPortalReferralWorkflow({
+      createId: () => `assignment-resource-${++id}`,
+      now: () => `2026-08-16T00:00:0${instant++}.000Z`,
+      providerCandidates: [
+        { providerId: "provider-a", displayName: "Provider A" },
+      ],
+      sourceOrganizationNames: {
+        "source-org-a": "Source A",
+        "source-org-b": "Source B",
+      },
+    });
+    const sourceA = workflow.createReferral(
+      SOURCE_A,
+      referralInput(),
+      mutation("assignment-create-a1"),
+    );
+    const sourceB = workflow.createReferral(
+      SOURCE_B,
+      referralInput(),
+      mutation("assignment-create-b1"),
+    );
+
+    expect(workflow.listAssignmentReferrals(ADMIN)).toHaveLength(2);
+    expect(workflow.listAssignmentReferrals(OPERATOR_A)).toEqual([
+      expect.objectContaining({
+        referralId: sourceA.referralId,
+        sourceOrganizationId: SOURCE_A.organizationId,
+        sourceOrganizationName: "Source A",
+        currentStatus: "SUBMITTED",
+        rowVersion: 1,
+      }),
+    ]);
+    expectError(
+      () => workflow.listAssignmentReferrals(SOURCE_A),
+      "FORBIDDEN",
+    );
+    expectError(
+      () => workflow.getAssignmentReferral(OPERATOR_A, sourceB.referralId),
+      "NOT_FOUND",
+    );
+    expect(workflow.getAssignmentReferral(OPERATOR_A, sourceA.referralId)).toEqual(
+      expect.objectContaining({
+        summary: referralInput().summary,
+        contact: referralInput().contact,
+        activeOffer: null,
+      }),
+    );
+
+    workflow.triageReferral(
+      OPERATOR_A,
+      sourceA.referralId,
+      1,
+      mutation("assignment-triage-a"),
+    );
+    const offered = workflow.offerReferral(
+      OPERATOR_A,
+      {
+        referralId: sourceA.referralId,
+        providerId: "provider-a",
+        expectedVersion: 2,
+      },
+      mutation("assignment-offer-a1"),
+    );
+    const offeredDetail = workflow.getAssignmentReferral(
+      OPERATOR_A,
+      sourceA.referralId,
+    );
+    expect(offeredDetail).toMatchObject({
+      currentStatus: "OFFERED",
+      rowVersion: 3,
+      activeOffer: {
+        matchId: offered.matchId,
+        providerId: "provider-a",
+        displayName: "Provider A",
+        offeredAt: offered.updatedAt,
+      },
+    });
+
+    workflow.respondToOffer(
+      PROVIDER_A,
+      {
+        matchId: offered.matchId!,
+        expectedVersion: 3,
+        decision: "ACCEPT",
+      },
+      mutation("assignment-accept-a"),
+    );
+    expectError(
+      () => workflow.getAssignmentReferral(ADMIN, sourceA.referralId),
+      "NOT_FOUND",
+    );
+    expect(workflow.listAssignmentReferrals(ADMIN)).toEqual([
+      expect.objectContaining({ referralId: sourceB.referralId }),
+    ]);
   });
 
   it("replays the same mutation once and rejects a changed payload", () => {

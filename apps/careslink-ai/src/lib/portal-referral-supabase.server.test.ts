@@ -8,9 +8,11 @@ import {
   authorizePortalReferralSupabaseClient,
   createSupabasePortalReferralApi,
   type PortalReferralAuthorization,
+  type PortalReferralAuthorizationScope,
   type PortalReferralSessionScopedSupabaseRpcClient,
   type PortalReferralSupabaseRpcResult,
 } from "./portal-referral-supabase.server";
+import type { PortalReferralSourceDetail } from "./portal-referral-adapter.server";
 import {
   PortalReferralWorkflowError,
   createPortalReferralMutationPayloadHash,
@@ -19,7 +21,10 @@ import {
 const IDS = {
   user: "a0000000-0000-4000-8000-000000000001",
   organization: "20000000-0000-4000-8000-000000000001",
+  sourceOrganization: "20000000-0000-4000-8000-000000000002",
   referral: "b0000000-0000-4000-8000-000000000001",
+  provider: "c0000000-0000-4000-8000-000000000001",
+  match: "d0000000-0000-4000-8000-000000000001",
 } as const;
 const MUTATION_ID = "portal-create-private-0001";
 const CORRELATION_ID = "server-correlation-0001";
@@ -30,38 +35,57 @@ const CONTACT = {
 } as const;
 
 describe("Portal referral Supabase adapter", () => {
-  it("strictly authorizes one active referral-source membership", async () => {
-    const client = rpcClient(rpcSuccess(authorizationEnvelope()));
-
-    await expect(authorizePortalReferralSupabaseClient(client)).resolves.toEqual({
-      ok: true,
-      authorization: authorization(),
-    });
-    expect(client.rpc).toHaveBeenCalledWith(
-      PORTAL_REFERRAL_SUPABASE_RPC_NAMES.authorize,
-    );
-  });
-
   it.each([
-    ["PORTAL_CAPABILITY_DISABLED", "capability_disabled"],
-    ["PORTAL_AUTH_REQUIRED", "auth_required"],
-    ["PORTAL_SESSION_REVOKED", "session_revoked"],
-    ["PORTAL_FORBIDDEN", "forbidden"],
-  ] as const)("maps authorize error %s without echoing details", async (message, reason) => {
-    const client = rpcClient({
-      data: { private_contact: CONTACT },
-      error: {
-        code: "P0001",
-        message,
-        details: CONTACT.phone,
-      },
-      status: 400,
-    });
+    ["INTAKE", PORTAL_REFERRAL_SUPABASE_RPC_NAMES.authorize],
+    [
+      "SOURCE_DETAIL",
+      PORTAL_REFERRAL_SUPABASE_RPC_NAMES.sourceDetailAuthorize,
+    ],
+  ] as const)(
+    "strictly authorizes one active referral-source membership for %s",
+    async (scope, rpcName) => {
+      const client = rpcClient(rpcSuccess(authorizationEnvelope()));
 
-    const result = await authorizePortalReferralSupabaseClient(client);
-    expect(result).toEqual({ ok: false, reason });
-    expect(JSON.stringify(result)).not.toContain(CONTACT.phone);
-  });
+      await expect(
+        authorizePortalReferralSupabaseClient(client, scope),
+      ).resolves.toEqual({
+        ok: true,
+        authorization: authorization(),
+      });
+      expect(client.rpc).toHaveBeenCalledWith(rpcName);
+    },
+  );
+
+  it.each(
+    ["INTAKE", "SOURCE_DETAIL"] satisfies PortalReferralAuthorizationScope[],
+  )(
+    "maps identical authorize errors for %s without echoing details",
+    async (scope) => {
+      for (const [message, reason] of [
+        ["PORTAL_CAPABILITY_DISABLED", "capability_disabled"],
+        ["PORTAL_AUTH_REQUIRED", "auth_required"],
+        ["PORTAL_SESSION_REVOKED", "session_revoked"],
+        ["PORTAL_FORBIDDEN", "forbidden"],
+      ] as const) {
+        const client = rpcClient({
+          data: { private_contact: CONTACT },
+          error: {
+            code: "P0001",
+            message,
+            details: CONTACT.phone,
+          },
+          status: 400,
+        });
+
+        const result = await authorizePortalReferralSupabaseClient(
+          client,
+          scope,
+        );
+        expect(result).toEqual({ ok: false, reason });
+        expect(JSON.stringify(result)).not.toContain(CONTACT.phone);
+      }
+    },
+  );
 
   it.each([
     [{ code: "PGRST302" }, "auth_required"],
@@ -75,6 +99,7 @@ describe("Portal referral Supabase adapter", () => {
         error: { ...error, message: CONTACT.email },
         status: 400,
       }),
+      "INTAKE",
     );
     expect(result).toEqual({ ok: false, reason });
     expect(JSON.stringify(result)).not.toContain(CONTACT.email);
@@ -92,6 +117,7 @@ describe("Portal referral Supabase adapter", () => {
           error: { code: "42501", message: CONTACT.email },
           status,
         }),
+        "INTAKE",
       );
       expect(result).toEqual({ ok: false, reason });
       expect(JSON.stringify(result)).not.toContain(CONTACT.email);
@@ -109,8 +135,366 @@ describe("Portal referral Supabase adapter", () => {
     { ...authorizationEnvelope(), membership_status: "REVOKED" },
   ])("fails closed on unsafe authorize envelope %#", async (data) => {
     await expect(
-      authorizePortalReferralSupabaseClient(rpcClient(rpcSuccess(data))),
+      authorizePortalReferralSupabaseClient(
+        rpcClient(rpcSuccess(data)),
+        "INTAKE",
+      ),
     ).resolves.toEqual({ ok: false, reason: "adapter_unavailable" });
+  });
+
+  it.each([
+    ["PLATFORM", "platform_admin"],
+    ["REFERRAL_SOURCE", "partner_operator"],
+  ] as const)(
+    "authorizes an active %s %s assignment membership",
+    async (organizationType, membershipRole) => {
+      const envelope = assignmentAuthorizationEnvelope(
+        organizationType,
+        membershipRole,
+      );
+      const client = rpcClient(rpcSuccess(envelope));
+
+      await expect(
+        authorizePortalReferralSupabaseClient(client, "ASSIGNMENT"),
+      ).resolves.toEqual({
+        ok: true,
+        authorization: assignmentAuthorization(
+          organizationType,
+          membershipRole,
+        ),
+      });
+      expect(client.rpc).toHaveBeenCalledWith(
+        PORTAL_REFERRAL_SUPABASE_RPC_NAMES.assignmentAuthorize,
+      );
+    },
+  );
+
+  it.each([
+    assignmentAuthorizationEnvelope("PLATFORM", "partner_operator"),
+    assignmentAuthorizationEnvelope("REFERRAL_SOURCE", "platform_admin"),
+    authorizationEnvelope(),
+  ])("fails closed on a mismatched assignment authorization %#", async (data) => {
+    await expect(
+      authorizePortalReferralSupabaseClient(
+        rpcClient(rpcSuccess(data)),
+        "ASSIGNMENT",
+      ),
+    ).resolves.toEqual({ ok: false, reason: "adapter_unavailable" });
+  });
+
+  it("does not widen source and assignment authorization scopes", async () => {
+    await expect(
+      authorizePortalReferralSupabaseClient(
+        rpcClient(
+          rpcSuccess(
+            assignmentAuthorizationEnvelope("PLATFORM", "platform_admin"),
+          ),
+        ),
+        "INTAKE",
+      ),
+    ).resolves.toEqual({ ok: false, reason: "adapter_unavailable" });
+
+    const sourceApi = createSupabasePortalReferralApi(
+      rpcClient(rpcSuccess(assignmentQueueEnvelope())),
+      authorization(),
+    );
+    await expect(sourceApi.listAssignmentReferrals()).rejects.toMatchObject({
+      code: "FORBIDDEN",
+    });
+    const assignmentApi = createSupabasePortalReferralApi(
+      rpcClient(rpcSuccess(listEnvelope())),
+      assignmentAuthorization("PLATFORM", "platform_admin"),
+    );
+    await expect(assignmentApi.listReferrals()).rejects.toMatchObject({
+      code: "FORBIDDEN",
+    });
+  });
+
+  it("lists a fixed bounded assignment queue with an exact projection", async () => {
+    const client = rpcClient(rpcSuccess(assignmentQueueEnvelope()));
+    const api = createSupabasePortalReferralApi(
+      client,
+      assignmentAuthorization("PLATFORM", "platform_admin"),
+    );
+
+    await expect(api.listAssignmentReferrals()).resolves.toEqual([
+      {
+        referralId: IDS.referral,
+        sourceOrganizationId: IDS.sourceOrganization,
+        sourceOrganizationName: "Source Organisation",
+        region: "VIC_MELBOURNE",
+        serviceType: "SUPPORT_COORDINATION",
+        currentStatus: "SUBMITTED",
+        rowVersion: 1,
+        updatedAt: "2026-08-24T01:02:03.456Z",
+      },
+    ]);
+    expect(client.rpc).toHaveBeenCalledWith(
+      PORTAL_REFERRAL_SUPABASE_RPC_NAMES.assignmentQueue,
+      { p_limit: 50, p_before_updated_at: null, p_before_id: null },
+    );
+  });
+
+  it.each([
+    { ...assignmentQueueEnvelope(), contact: CONTACT },
+    {
+      items: [
+        { ...assignmentQueueItem(), source_organization_name: " Source " },
+      ],
+    },
+    { items: [{ ...assignmentQueueItem(), current_status: "ACCEPTED" }] },
+    { items: [assignmentQueueItem(), assignmentQueueItem()] },
+    { items: Array.from({ length: 51 }, assignmentQueueItem) },
+  ])("rejects an unsafe assignment queue envelope %#", async (data) => {
+    const api = createSupabasePortalReferralApi(
+      rpcClient(rpcSuccess(data)),
+      assignmentAuthorization("PLATFORM", "platform_admin"),
+    );
+    await expect(api.listAssignmentReferrals()).rejects.toMatchObject({
+      code: "ADAPTER_UNAVAILABLE",
+    });
+  });
+
+  it("returns exact assignment detail and binds the requested referral id", async () => {
+    const client = rpcClient(rpcSuccess(assignmentDetailEnvelope()));
+    const api = createSupabasePortalReferralApi(
+      client,
+      assignmentAuthorization(
+        "REFERRAL_SOURCE",
+        "partner_operator",
+        IDS.sourceOrganization,
+      ),
+    );
+
+    await expect(api.getAssignmentReferral(IDS.referral)).resolves.toEqual({
+      referralId: IDS.referral,
+      sourceOrganizationId: IDS.sourceOrganization,
+      sourceOrganizationName: "Source Organisation",
+      summary: "Adult participant needs community participation support",
+      region: "VIC_MELBOURNE",
+      serviceType: "SUPPORT_COORDINATION",
+      currentStatus: "SUBMITTED",
+      rowVersion: 1,
+      contact: CONTACT,
+      activeOffer: null,
+      createdAt: "2026-08-24T00:00:00.000Z",
+      updatedAt: "2026-08-24T01:02:03.456Z",
+    });
+    expect(client.rpc).toHaveBeenCalledWith(
+      PORTAL_REFERRAL_SUPABASE_RPC_NAMES.assignmentDetail,
+      { p_referral_id: IDS.referral },
+    );
+  });
+
+  it("maps the one active OFFERED match without exposing its DB status field", async () => {
+    const api = createSupabasePortalReferralApi(
+      rpcClient(
+        rpcSuccess({
+          ...assignmentDetailEnvelope(),
+          current_status: "OFFERED",
+          row_version: 3,
+          active_offer: assignmentActiveOfferEnvelope(),
+        }),
+      ),
+      assignmentAuthorization("PLATFORM", "platform_admin"),
+    );
+
+    const detail = await api.getAssignmentReferral(IDS.referral);
+    expect(detail.activeOffer).toEqual({
+      matchId: IDS.match,
+      providerId: IDS.provider,
+      displayName: "Provider One",
+      offeredAt: "2026-08-24T00:30:00.000Z",
+    });
+    expect(detail.activeOffer).not.toHaveProperty("matchStatus");
+  });
+
+  it("rejects cross-tenant queue and detail projections for a partner operator", async () => {
+    const authorization = assignmentAuthorization(
+      "REFERRAL_SOURCE",
+      "partner_operator",
+    );
+    const queueApi = createSupabasePortalReferralApi(
+      rpcClient(rpcSuccess(assignmentQueueEnvelope())),
+      authorization,
+    );
+    const detailApi = createSupabasePortalReferralApi(
+      rpcClient(rpcSuccess(assignmentDetailEnvelope())),
+      authorization,
+    );
+
+    await expect(queueApi.listAssignmentReferrals()).rejects.toMatchObject({
+      code: "ADAPTER_UNAVAILABLE",
+    });
+    await expect(
+      detailApi.getAssignmentReferral(IDS.referral),
+    ).rejects.toMatchObject({ code: "ADAPTER_UNAVAILABLE" });
+  });
+
+  it.each([
+    { ...assignmentDetailEnvelope(), referral_id: IDS.match },
+    { ...assignmentDetailEnvelope(), current_status: "ACCEPTED" },
+    {
+      ...assignmentDetailEnvelope(),
+      current_status: "OFFERED",
+      active_offer: null,
+    },
+    {
+      ...assignmentDetailEnvelope(),
+      active_offer: assignmentActiveOfferEnvelope(),
+    },
+    {
+      ...assignmentDetailEnvelope(),
+      current_status: "OFFERED",
+      active_offer: {
+        ...assignmentActiveOfferEnvelope(),
+        match_status: "ACCEPTED",
+      },
+    },
+  ])("rejects an unsafe assignment detail envelope %#", async (data) => {
+    const api = createSupabasePortalReferralApi(
+      rpcClient(rpcSuccess(data)),
+      assignmentAuthorization("PLATFORM", "platform_admin"),
+    );
+    await expect(api.getAssignmentReferral(IDS.referral)).rejects.toMatchObject({
+      code: "ADAPTER_UNAVAILABLE",
+    });
+  });
+
+  it("strictly projects at most 50 unique provider candidates", async () => {
+    const client = rpcClient(rpcSuccess(providerCandidatesEnvelope()));
+    const api = createSupabasePortalReferralApi(
+      client,
+      assignmentAuthorization("PLATFORM", "platform_admin"),
+    );
+
+    await expect(api.listProviderCandidates(IDS.referral)).resolves.toEqual([
+      { providerId: IDS.provider, displayName: "Provider One" },
+    ]);
+    expect(client.rpc).toHaveBeenCalledWith(
+      PORTAL_REFERRAL_SUPABASE_RPC_NAMES.assignmentCandidates,
+      { p_referral_id: IDS.referral, p_limit: 50 },
+    );
+
+    for (const data of [
+      { items: [{ ...providerCandidateEnvelope(), score: 99 }] },
+      { items: [providerCandidateEnvelope(), providerCandidateEnvelope()] },
+      { items: Array.from({ length: 51 }, providerCandidateEnvelope) },
+    ]) {
+      const unsafeApi = createSupabasePortalReferralApi(
+        rpcClient(rpcSuccess(data)),
+        assignmentAuthorization("PLATFORM", "platform_admin"),
+      );
+      await expect(
+        unsafeApi.listProviderCandidates(IDS.referral),
+      ).rejects.toMatchObject({ code: "ADAPTER_UNAVAILABLE" });
+    }
+  });
+
+  it("hashes the canonical triage payload and strictly binds its ACK", async () => {
+    const client = rpcClient(
+      rpcSuccess(assignmentMutationEnvelope("TRIAGED", null, 2)),
+    );
+    const authorization = assignmentAuthorization("PLATFORM", "platform_admin");
+    const api = createSupabasePortalReferralApi(client, authorization);
+
+    await expect(
+      api.triageReferral(IDS.referral, 1, {
+        mutationId: MUTATION_ID,
+        correlationId: CORRELATION_ID,
+      }),
+    ).resolves.toMatchObject({
+      referralId: IDS.referral,
+      matchId: null,
+      currentStatus: "TRIAGED",
+      rowVersion: 2,
+    });
+    expect(client.rpc).toHaveBeenCalledWith(
+      PORTAL_REFERRAL_SUPABASE_RPC_NAMES.assignmentTriage,
+      {
+        p_referral_id: IDS.referral,
+        p_expected_version: 1,
+        p_mutation_id_hash: sha256(MUTATION_ID),
+        p_payload_hash: createPortalReferralMutationPayloadHash({
+          actor: {
+            organizationId: IDS.organization,
+            role: "platform_admin",
+            providerId: null,
+          },
+          kind: "TRIAGE_REFERRAL",
+          command: { referralId: IDS.referral, expectedVersion: 1 },
+        }),
+        p_correlation_id_hash: sha256(CORRELATION_ID),
+      },
+    );
+  });
+
+  it("hashes the canonical offer payload and strictly binds its ACK", async () => {
+    const client = rpcClient(
+      rpcSuccess(assignmentMutationEnvelope("OFFERED", IDS.match, 3)),
+    );
+    const api = createSupabasePortalReferralApi(
+      client,
+      assignmentAuthorization("REFERRAL_SOURCE", "partner_operator"),
+    );
+
+    await expect(
+      api.offerReferral(
+        IDS.referral,
+        { providerId: IDS.provider, expectedVersion: 2 },
+        { mutationId: MUTATION_ID, correlationId: CORRELATION_ID },
+      ),
+    ).resolves.toMatchObject({
+      referralId: IDS.referral,
+      matchId: IDS.match,
+      currentStatus: "OFFERED",
+      rowVersion: 3,
+    });
+    expect(client.rpc).toHaveBeenCalledWith(
+      PORTAL_REFERRAL_SUPABASE_RPC_NAMES.assignmentOffer,
+      {
+        p_referral_id: IDS.referral,
+        p_provider_id: IDS.provider,
+        p_expected_version: 2,
+        p_mutation_id_hash: sha256(MUTATION_ID),
+        p_payload_hash: createPortalReferralMutationPayloadHash({
+          actor: {
+            organizationId: IDS.organization,
+            role: "partner_operator",
+            providerId: null,
+          },
+          kind: "OFFER_REFERRAL",
+          command: {
+            referralId: IDS.referral,
+            providerId: IDS.provider,
+            expectedVersion: 2,
+          },
+        }),
+        p_correlation_id_hash: sha256(CORRELATION_ID),
+      },
+    );
+  });
+
+  it.each([
+    assignmentMutationEnvelope("TRIAGED", IDS.match, 2),
+    assignmentMutationEnvelope("OFFERED", null, 2),
+    assignmentMutationEnvelope("TRIAGED", null, 3),
+    {
+      ...assignmentMutationEnvelope("TRIAGED", null, 2),
+      referral_id: IDS.match,
+    },
+    { ...assignmentMutationEnvelope("TRIAGED", null, 2), private: CONTACT },
+  ])("rejects an unbound assignment mutation ACK %#", async (data) => {
+    const api = createSupabasePortalReferralApi(
+      rpcClient(rpcSuccess(data)),
+      assignmentAuthorization("PLATFORM", "platform_admin"),
+    );
+    await expect(
+      api.triageReferral(IDS.referral, 1, {
+        mutationId: MUTATION_ID,
+        correlationId: CORRELATION_ID,
+      }),
+    ).rejects.toMatchObject({ code: "ADAPTER_UNAVAILABLE" });
   });
 
   it("lists only exact metadata fields using a fixed bounded cursor", async () => {
@@ -157,6 +541,123 @@ describe("Portal referral Supabase adapter", () => {
     );
     await expect(api.listReferrals()).rejects.toThrow(
       "Portal referral adapter is unavailable",
+    );
+  });
+
+  it("returns only the exact referral-source detail projection", async () => {
+    const client = rpcClient(rpcSuccess(sourceDetailEnvelope()));
+    const api = createSupabasePortalReferralApi(client, authorization());
+    const expected = {
+      referralId: IDS.referral,
+      summary: "Adult participant needs community participation support",
+      region: "VIC_MELBOURNE",
+      serviceType: "SUPPORT_COORDINATION",
+      currentStatus: "SUBMITTED",
+      rowVersion: 1,
+      contact: CONTACT,
+      createdAt: "2026-08-24T00:00:00.000Z",
+      updatedAt: "2026-08-24T01:02:03.456Z",
+    } satisfies PortalReferralSourceDetail;
+
+    await expect(api.getReferral(IDS.referral)).resolves.toEqual(expected);
+    expect(client.rpc).toHaveBeenCalledWith(
+      PORTAL_REFERRAL_SUPABASE_RPC_NAMES.sourceDetail,
+      { p_referral_id: IDS.referral },
+    );
+  });
+
+  it("accepts an explicit null contact email without relaxing the contact shape", async () => {
+    const data = sourceDetailEnvelope();
+    const client = rpcClient(
+      rpcSuccess({ ...data, contact: { ...data.contact, email: null } }),
+    );
+    const api = createSupabasePortalReferralApi(client, authorization());
+
+    await expect(api.getReferral(IDS.referral)).resolves.toMatchObject({
+      contact: { name: CONTACT.name, phone: CONTACT.phone, email: null },
+    });
+  });
+
+  it("fails closed when source detail returns a different referral id", async () => {
+    const otherReferralId = "b0000000-0000-4000-8000-000000000002";
+    const client = rpcClient(
+      rpcSuccess({ ...sourceDetailEnvelope(), referral_id: otherReferralId }),
+    );
+    const api = createSupabasePortalReferralApi(client, authorization());
+
+    await expect(api.getReferral(IDS.referral)).rejects.toMatchObject({
+      code: "ADAPTER_UNAVAILABLE",
+    });
+    expect(client.rpc).toHaveBeenCalledWith(
+      PORTAL_REFERRAL_SUPABASE_RPC_NAMES.sourceDetail,
+      { p_referral_id: IDS.referral },
+    );
+  });
+
+  it.each([
+    { ...sourceDetailEnvelope(), extra: "private" },
+    omit(sourceDetailEnvelope(), "updated_at"),
+    { ...sourceDetailEnvelope(), referral_id: IDS.referral.toUpperCase() },
+    { ...sourceDetailEnvelope(), summary: "" },
+    { ...sourceDetailEnvelope(), summary: " private summary " },
+    { ...sourceDetailEnvelope(), region: "VIC_UNKNOWN" },
+    { ...sourceDetailEnvelope(), service_type: "FREE_TEXT" },
+    { ...sourceDetailEnvelope(), current_status: "UNKNOWN" },
+    { ...sourceDetailEnvelope(), row_version: 0 },
+    { ...sourceDetailEnvelope(), created_at: "2026-02-31T00:00:00Z" },
+    {
+      ...sourceDetailEnvelope(),
+      created_at: "2026-08-25T00:00:00Z",
+      updated_at: "2026-08-24T00:00:00Z",
+    },
+    { ...sourceDetailEnvelope(), contact: null },
+    {
+      ...sourceDetailEnvelope(),
+      contact: { ...CONTACT, private_note: "private" },
+    },
+    { ...sourceDetailEnvelope(), contact: omit(CONTACT, "email") },
+    { ...sourceDetailEnvelope(), contact: { ...CONTACT, name: null } },
+    { ...sourceDetailEnvelope(), contact: { ...CONTACT, phone: "" } },
+    { ...sourceDetailEnvelope(), contact: { ...CONTACT, email: 123 } },
+  ])("rejects unsafe source-detail envelope %#", async (data) => {
+    const api = createSupabasePortalReferralApi(
+      rpcClient(rpcSuccess(data)),
+      authorization(),
+    );
+    await expect(api.getReferral(IDS.referral)).rejects.toMatchObject({
+      code: "ADAPTER_UNAVAILABLE",
+    });
+  });
+
+  it("rejects a non-canonical referral id before the detail RPC", async () => {
+    const client = rpcClient(rpcSuccess(sourceDetailEnvelope()));
+    const api = createSupabasePortalReferralApi(client, authorization());
+
+    await expect(api.getReferral("not-a-referral-id")).rejects.toMatchObject({
+      code: "VALIDATION_ERROR",
+    });
+    expect(client.rpc).not.toHaveBeenCalled();
+  });
+
+  it("maps PORTAL_NOT_FOUND from source detail to the public workflow code", async () => {
+    const client = rpcClient({
+      data: null,
+      error: {
+        code: "P0001",
+        message: "PORTAL_NOT_FOUND",
+        details: CONTACT.phone,
+      },
+      status: 400,
+    });
+    const api = createSupabasePortalReferralApi(client, authorization());
+
+    const error = await captureError(() => api.getReferral(IDS.referral));
+    expect(error).toBeInstanceOf(PortalReferralWorkflowError);
+    expect((error as PortalReferralWorkflowError).code).toBe("NOT_FOUND");
+    expect(String(error)).not.toContain(CONTACT.phone);
+    expect(client.rpc).toHaveBeenCalledWith(
+      PORTAL_REFERRAL_SUPABASE_RPC_NAMES.sourceDetail,
+      { p_referral_id: IDS.referral },
     );
   });
 
@@ -354,7 +855,7 @@ describe("Portal referral Supabase adapter", () => {
       });
 
       await expect(
-        authorizePortalReferralSupabaseClient(client),
+        authorizePortalReferralSupabaseClient(client, "INTAKE"),
       ).resolves.toEqual({ ok: false, reason: "adapter_unavailable" });
     },
   );
@@ -394,6 +895,45 @@ function authorizationEnvelope() {
   } as const;
 }
 
+function assignmentAuthorizationEnvelope(
+  organizationType: "PLATFORM" | "REFERRAL_SOURCE",
+  membershipRole: "platform_admin" | "partner_operator",
+) {
+  return {
+    authorized: true,
+    user_id: IDS.user,
+    organization_id: IDS.organization,
+    organization_type: organizationType,
+    organization_status: "ACTIVE",
+    membership_role: membershipRole,
+    membership_status: "ACTIVE",
+  } as const;
+}
+
+function assignmentAuthorization(
+  organizationType: "PLATFORM" | "REFERRAL_SOURCE",
+  membershipRole: "platform_admin" | "partner_operator",
+  organizationId: string = IDS.organization,
+): PortalReferralAuthorization {
+  if (
+    !(
+      (organizationType === "PLATFORM" && membershipRole === "platform_admin") ||
+      (organizationType === "REFERRAL_SOURCE" &&
+        membershipRole === "partner_operator")
+    )
+  ) {
+    throw new Error("invalid assignment authorization fixture");
+  }
+  return {
+    userId: IDS.user,
+    organizationId,
+    organizationType,
+    organizationStatus: "ACTIVE",
+    membershipRole,
+    membershipStatus: "ACTIVE",
+  } as PortalReferralAuthorization;
+}
+
 function authorization(): PortalReferralAuthorization {
   return {
     userId: IDS.user,
@@ -420,12 +960,92 @@ function listEnvelope() {
   return { items: [listItem()] };
 }
 
+function assignmentQueueItem() {
+  return {
+    referral_id: IDS.referral,
+    source_organization_id: IDS.sourceOrganization,
+    source_organization_name: "Source Organisation",
+    region: "VIC_MELBOURNE",
+    service_type: "SUPPORT_COORDINATION",
+    current_status: "SUBMITTED",
+    row_version: 1,
+    updated_at: "2026-08-24T11:02:03.456+10:00",
+  } as const;
+}
+
+function assignmentQueueEnvelope() {
+  return { items: [assignmentQueueItem()] };
+}
+
+function assignmentActiveOfferEnvelope() {
+  return {
+    match_id: IDS.match,
+    provider_id: IDS.provider,
+    provider_display_name: "Provider One",
+    match_status: "OFFERED",
+    offered_at: "2026-08-24T00:30:00.000Z",
+  } as const;
+}
+
+function assignmentDetailEnvelope() {
+  return {
+    referral_id: IDS.referral,
+    source_organization_id: IDS.sourceOrganization,
+    source_organization_name: "Source Organisation",
+    summary: "Adult participant needs community participation support",
+    region: "VIC_MELBOURNE",
+    service_type: "SUPPORT_COORDINATION",
+    current_status: "SUBMITTED",
+    row_version: 1,
+    contact: CONTACT,
+    active_offer: null,
+    created_at: "2026-08-24T10:00:00.000+10:00",
+    updated_at: "2026-08-24T11:02:03.456+10:00",
+  } as const;
+}
+
+function providerCandidateEnvelope() {
+  return { provider_id: IDS.provider, display_name: "Provider One" } as const;
+}
+
+function providerCandidatesEnvelope() {
+  return { items: [providerCandidateEnvelope()] };
+}
+
+function assignmentMutationEnvelope(
+  currentStatus: "TRIAGED" | "OFFERED",
+  matchId: string | null,
+  rowVersion: number,
+) {
+  return {
+    referral_id: IDS.referral,
+    match_id: matchId,
+    current_status: currentStatus,
+    row_version: rowVersion,
+    updated_at: "2026-08-24T11:02:03.456+10:00",
+  } as const;
+}
+
 function createEnvelope() {
   return {
     referral_id: IDS.referral,
     match_id: null,
     current_status: "SUBMITTED",
     row_version: 1,
+    updated_at: "2026-08-24T11:02:03.456+10:00",
+  } as const;
+}
+
+function sourceDetailEnvelope() {
+  return {
+    referral_id: IDS.referral,
+    summary: "Adult participant needs community participation support",
+    region: "VIC_MELBOURNE",
+    service_type: "SUPPORT_COORDINATION",
+    current_status: "SUBMITTED",
+    row_version: 1,
+    contact: CONTACT,
+    created_at: "2026-08-24T10:00:00.000+10:00",
     updated_at: "2026-08-24T11:02:03.456+10:00",
   } as const;
 }

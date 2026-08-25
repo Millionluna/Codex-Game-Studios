@@ -5,6 +5,7 @@ import type { PortalReferralApi } from "./portal-referral-adapter.server";
 import {
   authorizePortalReferralSupabaseClient,
   createSupabasePortalReferralApi,
+  type PortalReferralAuthorizationScope,
   type PortalReferralSessionScopedSupabaseRpcClient,
 } from "./portal-referral-supabase.server";
 import {
@@ -18,6 +19,10 @@ export const CARESLINK_PORTAL_REFERRAL_DURABLE_ADAPTER_FLAG =
   "CARESLINK_PORTAL_REFERRAL_DURABLE_ADAPTER_ENABLED" as const;
 export const CARESLINK_PORTAL_REFERRAL_INTAKE_FLAG =
   "CARESLINK_PORTAL_REFERRAL_INTAKE_ENABLED" as const;
+export const CARESLINK_PORTAL_REFERRAL_SOURCE_DETAIL_FLAG =
+  "CARESLINK_PORTAL_REFERRAL_SOURCE_DETAIL_ENABLED" as const;
+export const CARESLINK_PORTAL_REFERRAL_ASSIGNMENT_FLAG =
+  "CARESLINK_PORTAL_REFERRAL_ASSIGNMENT_ENABLED" as const;
 export const CARESLINK_PORTAL_REFERRAL_EXPECTED_SUPABASE_REF_FLAG =
   "CARESLINK_PORTAL_REFERRAL_EXPECTED_SUPABASE_REF" as const;
 
@@ -28,6 +33,8 @@ export type PortalReferralRuntimeEnv = Readonly<{
   CARESLINK_PORTAL_REFERRAL_API_ENABLED?: string;
   CARESLINK_PORTAL_REFERRAL_DURABLE_ADAPTER_ENABLED?: string;
   CARESLINK_PORTAL_REFERRAL_INTAKE_ENABLED?: string;
+  CARESLINK_PORTAL_REFERRAL_SOURCE_DETAIL_ENABLED?: string;
+  CARESLINK_PORTAL_REFERRAL_ASSIGNMENT_ENABLED?: string;
   CARESLINK_PORTAL_REFERRAL_EXPECTED_SUPABASE_REF?: string;
   NEXT_PUBLIC_SUPABASE_ANON_KEY?: string;
   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY?: string;
@@ -42,6 +49,8 @@ export type PortalReferralOperation =
   | "LIST_REFERRALS"
   | "CREATE_REFERRAL"
   | "GET_REFERRAL"
+  | "LIST_ASSIGNMENT_REFERRALS"
+  | "GET_ASSIGNMENT_REFERRAL"
   | "TRIAGE_REFERRAL"
   | "LIST_PROVIDER_CANDIDATES"
   | "OFFER_REFERRAL"
@@ -93,16 +102,80 @@ export function isPortalReferralPreviewTargetAllowed(
   );
 }
 
-export function isPortalReferralRuntimeEnabled(
+export function isPortalReferralBaseRuntimeEnabled(
   env: PortalReferralRuntimeEnv = process.env as PortalReferralRuntimeEnv,
 ) {
   return Boolean(
     CARESLINK_PORTAL_REFERRAL_RUNTIME_IMPLEMENTATION_READY &&
       env.CARESLINK_PORTAL_REFERRAL_API_ENABLED === "true" &&
       env.CARESLINK_PORTAL_REFERRAL_DURABLE_ADAPTER_ENABLED === "true" &&
-      env.CARESLINK_PORTAL_REFERRAL_INTAKE_ENABLED === "true" &&
       isPortalReferralPreviewTargetAllowed(env),
   );
+}
+
+/**
+ * Existing intake-page convenience gate. Resolver authorization uses the base
+ * and per-operation gates independently below.
+ */
+export function isPortalReferralRuntimeEnabled(
+  env: PortalReferralRuntimeEnv = process.env as PortalReferralRuntimeEnv,
+) {
+  return (
+    isPortalReferralBaseRuntimeEnabled(env) &&
+    isPortalReferralOperationEnabled("LIST_REFERRALS", env)
+  );
+}
+
+export function isPortalReferralSourceDetailRuntimeEnabled(
+  env: PortalReferralRuntimeEnv = process.env as PortalReferralRuntimeEnv,
+) {
+  return (
+    isPortalReferralBaseRuntimeEnabled(env) &&
+    isPortalReferralOperationEnabled("GET_REFERRAL", env)
+  );
+}
+
+export function isPortalReferralAssignmentRuntimeEnabled(
+  env: PortalReferralRuntimeEnv = process.env as PortalReferralRuntimeEnv,
+) {
+  return (
+    isPortalReferralBaseRuntimeEnabled(env) &&
+    isPortalReferralOperationEnabled("LIST_ASSIGNMENT_REFERRALS", env) &&
+    !isPortalReferralSourceRoleSurfaceEnabled(env)
+  );
+}
+
+/**
+ * Assignment M1a and the source-role pages still share `/referrals`. Keep the
+ * page-level assignment latch closed if either source-role surface is active.
+ * The operation gates remain independent for request-scoped API authorization.
+ */
+function isPortalReferralSourceRoleSurfaceEnabled(env: PortalReferralRuntimeEnv) {
+  return (
+    env.CARESLINK_PORTAL_REFERRAL_INTAKE_ENABLED === "true" ||
+    env.CARESLINK_PORTAL_REFERRAL_SOURCE_DETAIL_ENABLED === "true"
+  );
+}
+
+export function isPortalReferralOperationEnabled(
+  operation: PortalReferralOperation,
+  env: PortalReferralRuntimeEnv = process.env as PortalReferralRuntimeEnv,
+) {
+  switch (operation) {
+    case "LIST_REFERRALS":
+    case "CREATE_REFERRAL":
+      return env.CARESLINK_PORTAL_REFERRAL_INTAKE_ENABLED === "true";
+    case "GET_REFERRAL":
+      return env.CARESLINK_PORTAL_REFERRAL_SOURCE_DETAIL_ENABLED === "true";
+    case "LIST_ASSIGNMENT_REFERRALS":
+    case "GET_ASSIGNMENT_REFERRAL":
+    case "TRIAGE_REFERRAL":
+    case "LIST_PROVIDER_CANDIDATES":
+    case "OFFER_REFERRAL":
+      return env.CARESLINK_PORTAL_REFERRAL_ASSIGNMENT_ENABLED === "true";
+    default:
+      return false;
+  }
 }
 
 /**
@@ -115,9 +188,11 @@ export function createPortalReferralApiResolver(
 ): PortalReferralApiResolver {
   const env = options.env ?? (process.env as PortalReferralRuntimeEnv);
   return async (request, operation) => {
+    const authorizationScope = authorizationScopeForOperation(operation);
     if (
-      !isPortalReferralRuntimeEnabled(env) ||
-      !isPortalReferralIntakeOperation(operation)
+      !isPortalReferralBaseRuntimeEnabled(env) ||
+      !isPortalReferralOperationEnabled(operation, env) ||
+      !authorizationScope
     ) {
       return disabled();
     }
@@ -140,7 +215,10 @@ export function createPortalReferralApiResolver(
     }
     if (!client) return unavailable();
 
-    const authorization = await authorizePortalReferralSupabaseClient(client);
+    const authorization = await authorizePortalReferralSupabaseClient(
+      client,
+      authorizationScope,
+    );
     if (!authorization.ok) {
       switch (authorization.reason) {
         case "auth_required":
@@ -163,12 +241,28 @@ export function createPortalReferralApiResolver(
   };
 }
 
+function authorizationScopeForOperation(
+  operation: PortalReferralOperation,
+): PortalReferralAuthorizationScope | undefined {
+  switch (operation) {
+    case "LIST_REFERRALS":
+    case "CREATE_REFERRAL":
+      return "INTAKE";
+    case "GET_REFERRAL":
+      return "SOURCE_DETAIL";
+    case "LIST_ASSIGNMENT_REFERRALS":
+    case "GET_ASSIGNMENT_REFERRAL":
+    case "TRIAGE_REFERRAL":
+    case "LIST_PROVIDER_CANDIDATES":
+    case "OFFER_REFERRAL":
+      return "ASSIGNMENT";
+    default:
+      return undefined;
+  }
+}
+
 export const resolveDefaultPortalReferralApi: PortalReferralApiResolver =
   createPortalReferralApiResolver();
-
-function isPortalReferralIntakeOperation(operation: PortalReferralOperation) {
-  return operation === "LIST_REFERRALS" || operation === "CREATE_REFERRAL";
-}
 
 function disabled(): PortalReferralApiResolution {
   return { ok: false, reason: "capability_disabled", status: 503 };

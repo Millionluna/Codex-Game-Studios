@@ -2,7 +2,10 @@ import { ArrowRight, CalendarClock } from "lucide-react";
 import { notFound } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { PageHeader } from "@/components/page-header";
-import { PortalReferralWorkflowBoundary } from "@/components/portal-referral-workflow-controls";
+import {
+  PortalReferralSourceDetailPanel,
+  PortalReferralWorkflowBoundary,
+} from "@/components/portal-referral-workflow-controls";
 import { ButtonLink, Card, ReferralStatusBadge } from "@/components/ui";
 import {
   displayArea,
@@ -13,6 +16,8 @@ import {
   displayService,
 } from "@/lib/display";
 import { providers, referrals } from "@/lib/mock-data";
+import { canonicalPortalReferralUuid } from "../../../lib/portal-referral-id";
+import { isPortalReferralSourceDetailRuntimeEnabled } from "@/lib/portal-referral-runtime.server";
 
 export default async function ReferralDetailPage({
   params,
@@ -20,6 +25,27 @@ export default async function ReferralDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
+  const sourceDetailEnabled = isPortalReferralSourceDetailRuntimeEnabled();
+
+  if (sourceDetailEnabled) {
+    const referralId = canonicalPortalReferralUuid(id);
+    if (!referralId) notFound();
+    return (
+      <AppShell>
+        <PageHeader
+          eyebrow="Referral 详情"
+          title="Authorized referral detail / 已授权 Referral 详情"
+          description="本页只在独立 Preview source-detail gate 通过后读取当前来源组织的记录。跨租户与不存在记录使用相同不可用结果，不会回退到 mock。"
+        />
+        <PortalReferralSourceDetailPanel
+          enabled={sourceDetailEnabled}
+          key={referralId}
+          referralId={referralId}
+        />
+      </AppShell>
+    );
+  }
+
   const referral = referrals.find((item) => item.id === id);
   if (!referral) notFound();
   const assignedProvider = providers.find(

@@ -143,9 +143,58 @@ There is no app-owned notification preference, push token, in-app inbox, email f
 
 Security, reminders, content/digest, Points and marketing are separate preferences. Payloads contain only opaque IDs and safe type. Daily/Weekdays/Weekly/Off is explicit; content push is normally capped at one proactive item per day. Open requires reauthentication and resolves to a safe resource/recovery state.
 
-## 11. Portal Referral intake (inactive source runtime)
+## 11. Portal Referral intake and Assignment M1a (inactive runtimes)
 
 When every default-off application gate and the exact non-Production Preview ref pass, the browser first requests a metadata-only source list. The server creates a request-scoped cookie Supabase client, rejects Bearer authorization and calls the database authorize RPC before enabling private inputs. The database revalidates its separate flag, Auth session/user and one active referral-source membership. Only then may create atomically write the referral, separately protected contact, metadata-only audit and idempotency receipt; the UI renders only the metadata ACK/list. An authorization-boundary failure disables further submission. This path uses no OpenAI call, Points, service role, worker or background retry. It remains source/local only, with all gates and the database flag off and no hosted deployment.
+
+The independently gated source-detail read closes that intake loop without
+opening assignment. When both operation gates are enabled, the durable metadata
+list links to the exact UUID detail page. A canonical referral UUID is sent to
+the existing GET route; a detail-specific preauthorization RPC and the read RPC
+each refresh the same database session and membership context, check master +
+detail, and the latter returns the
+private summary/contact only when the referral belongs to that exact source
+organization. A missing UUID and another tenant's UUID both become the same
+not-found result. Error bodies are never parsed into browser detail state, and
+the durable page never falls back to a mock record. This is also source/local
+only and does not enable triage, offer, provider response, follow-up or audit.
+
+The same migration adds `referral_intake_v1` and replaces the old private
+intake gate helper, so authenticated callers cannot bypass the application by
+calling Data API list/create directly while only master + detail is enabled.
+Intake authorize/list/create now require master + intake; neither operation gate
+opens the other.
+
+Assignment M1a adds a third independent operation gate. With every Preview and
+assignment gate open, `/referrals` reads a maximum of 50 `SUBMITTED`, `TRIAGED`
+or `OFFERED` referrals from the caller's database-derived operator scope. A
+platform admin in one active PLATFORM organization receives the global queue;
+a partner operator in one active REFERRAL_SOURCE organization receives only
+that source tenant. Zero, multiple or mixed operator contexts fail closed. The
+queue contains only referral/source metadata. Opening
+`/referrals/{id}/matches` performs a separate authorized detail read before
+rendering summary/contact, and missing/cross-tenant identifiers share the same
+not-found result. Gate-on pages do not fall back to legacy mock data.
+
+Because `/referrals` is still shared with the source-role surface, the
+page-level Assignment latch additionally requires both source-role UI gates to
+be off. A simultaneous UI configuration therefore fails closed instead of
+sending a source user into the operator queue. The request-scoped Assignment
+API operation gates remain independent and still enforce database-derived
+operator authorization.
+
+From `SUBMITTED`, triage atomically advances the expected row version to
+`TRIAGED`. The next authorized candidate read returns only IDs and trimmed
+display names for active approved providers with AVAILABLE/LIMITED capacity,
+the exact region/service and at least one active provider member. Offer reuses
+that same eligibility authority, serializes the referral and its matches, and
+either promotes one existing `CANDIDATE` or creates one `OFFERED` match. It
+advances the referral to `OFFERED` but deliberately leaves
+`assigned_provider_id` null. Each mutation writes one metadata-only audit row
+and one hashed idempotency receipt; exact replay is stable, changed payload is a
+conflict and stale version refreshes the authoritative detail. Provider
+accept/decline, follow-up, audit listing, document/export and completion remain
+outside M1a.
 
 ## 12. Legacy Profile / Readiness / Referrals
 

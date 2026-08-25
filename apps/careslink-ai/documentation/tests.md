@@ -143,6 +143,276 @@ These are source and disposable-local-database claims only. No hosted
 GoTrue/PostgREST cookie E2E, hosted Preview or Production migration, deployment,
 flag activation, retained business row or paid runtime resource is claimed.
 
+### Portal Referral source-detail runtime source/local checkpoint — 2026-08-25
+
+This slice adds one independently gated `GET_REFERRAL` path for a referral
+source to reopen a referral owned by its exact organization. The application
+base gate, source-detail application gate, master database flag and detail
+database flag all fail closed and remain off by default. A separate new intake
+database flag closes direct Data API list/create when only detail is enabled.
+The cookie-only resolver rejects Bearer before client construction, authorizes
+from fresh database session/membership state through
+`portal_referral_source_detail_authorize()`, and then invokes
+`portal_referral_source_detail(p_referral_id)`.
+
+The authenticated-only `SECURITY DEFINER` RPC holds the master and operation
+flag rows, reuses the intake context's post-lock session revalidation, joins the
+separately protected contact row and requires the exact source organization.
+Cross-tenant, absent and null IDs share `PORTAL_NOT_FOUND`. Its exact 9-field
+referral / 3-field contact DTO excludes tenant, actor, assignment, document,
+export and audit identities and performs no write. The server and browser both
+reject extra/missing fields, invalid catalog/status/version/time values and
+non-canonical response UUIDs; error bodies are never parsed into detail state.
+The adapter, route and browser bind the returned referral ID to the requested
+UUID; the route projects the exact DTO even if a future adapter returns a wider
+legacy view. When the durable detail gate is on, list items provide a same-origin
+detail link, the UUID page never falls back to a legacy mock record, and keyed
+component state cannot show the prior referral while navigating to another ID.
+
+| Command | Result |
+|---|---|
+| focused intake/source-detail gate | 9 files / 214 tests passed |
+| `pnpm test` | 136 files / 1,717 tests passed |
+| `pnpm exec tsc --noEmit --incremental false` | passed |
+| `pnpm lint` | passed |
+| `pnpm exec next build --webpack` | passed; Next static generation completed 63/63 |
+| `python3 tools/sync_codex_adapters.py --check` | passed; 73 files checked |
+| `git diff --check` | passed |
+
+A temporary Homebrew PostgreSQL 16.15 cluster
+(`server_version_num=160015`) loaded only the minimum compatible
+foundation → intake → source-detail migration chain and then ran
+the updated intake and new source-detail rollback suites with `ON_ERROR_STOP=1`.
+Both transactions passed. The source-detail suite proved master+detail cannot
+open intake authorize/list/create and master+intake cannot open either detail
+RPC, as well as default-off/master-only denial, exact Source A/B reads,
+bidirectional tenant denial, absent/null IDs, expired/deleted sessions, revoked
+membership, authenticated-only RPC ACL, entry-owner/search-path posture,
+direct-table denial, zero writes and cleanup. The updated intake suite reproved
+authorization, atomic create/list, replay/conflict and its existing session/
+tenant boundaries behind master + intake. The final postcheck retained all
+three flags off/Preview-only and zero referral/audit/receipt rows. The server
+was stopped and the temporary cluster deleted. This is deliberately not a
+31/31 repository clean-apply or hosted Supabase parity claim.
+
+The migration is 5,780 bytes / SHA-256
+`8e58ad2d7fcf68400925604b459dc972be7f7ef8608b1b496d5217a99ec0dc4e`;
+the source-detail rollback file is 29,059 bytes / SHA-256
+`2dc91eb69814a778d82a392d41c2d4aadc84a102b8df870a24db4bb41842dd98`.
+The updated intake BEGIN-through-ROLLBACK body is 40,774 bytes / SHA-256
+`f9934a85728d3d42f1109ac05675f8c25c7ac06b0e1c40231747828f30bc1195`.
+No cloud database, Preview deployment, Production migration, flag activation,
+retained user/business row or paid resource was used.
+
+### Portal Referral Assignment M1a source/local checkpoint — 2026-08-25
+
+This slice adds an independently gated operator queue/detail, triage,
+eligible-provider candidates and offer. The application and database gates are
+default-off. Runtime authorization remains cookie-only and exact-Preview-ref
+bound; database authorization resolves exactly one active platform admin or
+source-tenant partner operator and rechecks the live Auth session after lock
+waits. Queue and candidates are bounded; Supabase and browser envelopes plus
+route requests are exact-key parsed, while route responses are strictly
+validated and allowlist-projected. Gate-on pages never fall back to mock. Offer
+promotes or creates one `OFFERED` match while leaving `assigned_provider_id`
+null.
+Provider response, follow-up and audit list remain unsupported.
+
+| Command | Result |
+|---|---|
+| focused Assignment gate | 9 files / 292 tests passed |
+| `pnpm test` | 138 files / 1,821 tests passed |
+| `pnpm exec tsc --noEmit --incremental false` | passed |
+| `pnpm lint` | passed |
+| `pnpm exec next build --webpack` | passed; Next static generation completed 64/64 |
+| `python3 tools/sync_codex_adapters.py --check` | passed; 73 files checked |
+| `git diff --check` | passed |
+
+A temporary PostgreSQL 16.15 (`server_version_num=160015`) loaded the minimum
+compatible bootstrap and foundation → intake → source-detail → assignment
+migration chain with `ON_ERROR_STOP=1`, then passed the rollback-only Assignment
+suite. The suite proves default-off/master-before-operation and cross-gate
+denial; exact owner/definer/volatile/search-path/ACL posture; zero direct table
+grants; exact-one role/organization/session authority; tenant/not-found
+isolation; strict DTO, trimmed names, keyset/state boundaries; provider
+eligibility and uniform not-found for absent/currently ineligible targets even
+when a historical `DECLINED` or `EXPIRED` match exists; triage/offer hashes,
+replay, conflict, stale and corrupt-receipt handling; bigint increment
+protection; candidate promotion; metadata-only audit; stable replay after
+provider suspension; role restoration, cleanup and zero-write failure
+snapshots.
+
+Eleven real two-backend PostgreSQL scenarios also passed. Concurrent same-actor
+same-mutation triage returned one ACK and one audit/receipt side effect;
+triage/offer queued behind the same referral lock produced exactly one winner;
+and the provider helper locked only its bounded result. Eight wall-clock expiry
+scenarios crossed `not_after` while waiting at the triage referral, Auth row,
+organization/membership table, candidate referral/provider and offer
+referral/match/provider lock stages. Every expired call returned
+`PORTAL_SESSION_REVOKED` before a data-derived error or write, with zero
+referral/match/audit/receipt side effect. The temporary cluster and race scripts
+were removed.
+
+The pre-review migration at exact source commit `526aa1e` is 36,128 bytes /
+SHA-256
+`e9ecd8ce68a70a69d0a611f5803aeaae195025cfc6a65235025d6e6544fdcb40`;
+the rollback assertion file is 62,944 bytes / SHA-256
+`eb77a92cf18ad602a9cdb6c6fb05ab58e63618ec4b97ade2e38b0d81775eedff`;
+the TypeScript migration contract is 20,783 bytes / SHA-256
+`65c13cae85e4f1e4e3d9b387965c0aae9e785a0f9162466f8a9869598be752e1`.
+This is a minimum local chain, not a full repository migration apply or hosted
+GoTrue/PostgREST/Auth E2E. No cloud database, deployment, flag activation,
+retained fixture, Production action or paid resource was used.
+
+### Portal Referral Assignment M1a PR review hardening — 2026-08-26
+
+Independent PR review found that the browser/route contracts and release text
+bounded the Assignment queue to 50, but the authenticated public database RPC
+still accepted `p_limit=100`. A hostile direct PostgREST caller could therefore
+request twice the intended tenant/global-admin metadata page. The migration now
+rejects every limit above 50, the rollback suite proves `51` returns
+`PORTAL_VALIDATION_ERROR`, and all valid queue/keyset fixtures use 50 or less.
+
+The same review made the documented shared-URL role-surface exclusion
+executable: the Assignment page latch stays closed whenever intake or
+source-detail UI is active, while request-scoped API operation gates remain
+independent. A null/undefined source-detail adapter envelope now maps to the
+redacted `503 ADAPTER_UNAVAILABLE` boundary instead of falling through to a
+generic 500. One dev-only `jsdom@26.1.0` dependency supports seven real
+React-mounted Coordinator tests covering SUBMITTED → TRIAGED → OFFERED,
+pending duplicate-submit blocking, 409 and malformed-ACK authoritative refresh,
+candidate 403 private-detail invalidation and A→B→A late-response isolation for
+the independent detail, candidate and mutation trackers.
+
+| Command | Result |
+|---|---|
+| focused changed-surface Vitest runs | passed, including 7/7 mounted DOM state-flow tests |
+| `pnpm test` | 139 files / 1,830 tests passed |
+| `pnpm exec tsc --noEmit --incremental false` | passed |
+| `pnpm lint` | passed |
+| `pnpm build` | passed; Next.js 16.2.9 generated 64/64 static pages |
+| `python3 tools/sync_codex_adapters.py --check` | passed; 73 files checked |
+| `git diff --check` | passed |
+| PostgreSQL 16.15 patched minimum chain + Assignment rollback suite | passed with `ON_ERROR_STOP=1`; 51 rejected, 50 queue/keyset passed, final `ROLLBACK` reached |
+| PostgreSQL postcheck | 4/4 Portal flags default-off/Preview-only; checked Auth and Portal fixture counts zero; temporary cluster removed |
+
+Current source identities are:
+
+- migration: 36,127 bytes / SHA-256 `1478122a147dddaffcdfb07aa6dfc29b0162ba27342480984bb6fb96152e3416`;
+- rollback assertion: 63,195 bytes / SHA-256 `569c6f50899df1754be1cc4971328b3dfae4a766871941b83b4603bc867bcd9c`;
+- TypeScript migration contract: 20,782 bytes / SHA-256 `b41346f82942338ca78cbc6bac4a70dc17c2e57da4ff13df51062463fe88b171`.
+
+The hardening batch itself did not touch a cloud database, deployment, flag or
+Production. The exact-current disposable Hosted gate immediately below later
+closed Hosted attribution for this commit and these hashes without retaining
+activation or touching Production.
+
+### Portal Referral Assignment M1a exact-current Hosted Cookie gate — 2026-08-26
+
+The exact source was HEAD
+`43659ab16e9af6d9c73d0a55f8fe8b30b3ce9ee2`. The approved disposable Supabase
+Preview was `portal-assignment-m1a-r2-20260826` (id
+`3b111420-9f47-4e9f-b3a5-acd418f9423f`, ref
+`uzlnwjurzbtwtstabogm`). It was non-default, `persistent=false`,
+`with_data=false`, healthy PostgreSQL 17.6
+(`server_version_num=170006`) and charged at the confirmed US$0.01344/hour
+branch rate.
+
+The exact repository inventory applied 32/32 migrations and all 13
+rollback-only suites passed. The Hosted identities matched the current
+Assignment migration at 36,127 bytes / SHA-256
+`1478122a147dddaffcdfb07aa6dfc29b0162ba27342480984bb6fb96152e3416`
+and its rollback assertion at 63,195 bytes / SHA-256
+`569c6f50899df1754be1cc4971328b3dfae4a766871941b83b4603bc867bcd9c`.
+
+The first local-HTTPS attempt used a `127.0.0.1` origin and reached the
+designed same-origin `403` boundary. Its one-time Auth and Portal fixtures were
+fully torn down. The authoritative rerun used the `localhost` same origin and
+all eight real SSR-cookie assertions passed:
+
+| Exact-current Hosted Cookie assertion | Result |
+|---|---|
+| Bearer on the cookie-only Assignment route | `401 AUTH_REQUIRED` before the cookie RPC client |
+| operator queue | only Source A; no summary/contact projection and no Source B identifier |
+| detail isolation | Source A `200`; Source B and a random valid UUID both uniform `404 NOT_FOUND` |
+| triage | `SUBMITTED` v1 → `TRIAGED` v2; exact same-key/body replay returned the identical ACK |
+| provider candidates | exactly one active, approved, available Melbourne support-coordination provider |
+| offer | `TRIAGED` v2 → `OFFERED` v3; exact replay returned the identical match/ACK |
+| final database state | A `OFFERED` v3 with `assigned_provider_id=null`; B unchanged; one offered match, two audit rows and two hash-only mutation receipts |
+| revocation | global GoTrue sign-out made the same cookie return `401` |
+
+The terminal independent postcheck proved all four Portal flags disabled and
+still Preview-only; all four checked Auth tables and all 11 Portal business
+tables empty; both temporary migration roles absent; and all three append-only
+triggers enabled. Supabase security advisors returned 21 INFO and 14 WARN;
+performance advisors returned 105 INFO and 24 WARN. The Portal security WARN
+items were the intentional authenticated `SECURITY DEFINER` RPC surface,
+bounded by the application/database gates, internal authorization and explicit
+execute grants; the remaining advisor output stays recorded as non-blocking
+hardening backlog rather than being silently discarded.
+
+The branch was deleted and three consecutive absence probes found both its id
+and ref absent. Only the Production `main` branch remained healthy, and its 19
+migration versions were identical before and after the gate. There was no
+deployment, merge, retained Preview activation or Production write.
+
+### Portal Referral Assignment M1a disposable Hosted Cookie gate — 2026-08-25
+
+The exact source commit was
+`526aa1efba281ee1e6e671ffb2a20d40cce1999b`. The approved disposable Supabase
+Preview was `portal-assignment-m1a-r1-20260825` (id
+`5b509a27-925b-4cd4-9924-603d8a0d8470`, ref
+`scyathyvzyopukbdutps`) under Production parent
+`adocsnwnslxhxcjgbyee`. It was non-default, `persistent=false`,
+`with_data=false`, healthy and charged at the confirmed US$0.01344/hour branch
+rate. Production was never a SQL, Auth or application target.
+
+Official Supabase CLI 2.115.0 reset the linked no-data branch and applied the
+exact 32-file repository migration chain. `migration list --linked` then
+matched all 32 local/remote versions, and the Hosted database reported
+`server_version_num=170006`. All 13 rollback-only SQL suites passed. Twelve ran
+directly with the branch non-pooling URL; the migration-entry-role suite also
+passed under a short-lived LOGIN runner after `SET ROLE` to a short-lived
+`CREATEROLE` entry actor. Both roles were removed. The independent baseline and
+postchecks retained four default-off/Preview-only Portal flags, the exact 32
+migration rows, no temporary roles and zero Auth/Portal fixtures before the
+runtime setup.
+
+One auto-confirmed, one-time GoTrue password user exercised the exact Next
+source over local HTTPS with `VERCEL_ENV=preview`, the exact branch-ref pin,
+base/durable/Assignment application gates on and Intake/Source Detail gates
+off. The app received only the branch URL and publishable key; the branch
+service-role key was confined to one-time Auth administration and never entered
+the application environment. The SSR client produced the real Supabase Auth
+cookie consumed by the Next routes and Hosted GoTrue/PostgREST RPCs.
+
+| Hosted Cookie assertion | Result |
+|---|---|
+| Bearer on the cookie-only Assignment route | `401 AUTH_REQUIRED` before the cookie RPC client |
+| operator queue | only Source A; no summary/contact projection and no Source B identifier |
+| detail isolation | Source A `200`; Source B and a random valid UUID both uniform `404 NOT_FOUND` |
+| triage | `SUBMITTED` v1 → `TRIAGED` v2; exact same-key/body replay returned the identical ACK |
+| provider candidates | exactly the one active, approved, available Melbourne support-coordination provider |
+| offer | `TRIAGED` v2 → `OFFERED` v3; exact replay returned the identical match/ACK |
+| final database state | A `OFFERED` v3 with `assigned_provider_id=null`; B unchanged; one offered match, two audit rows and two receipts with hash-only command fields |
+| revocation | global GoTrue sign-out made the same cookie return `401` |
+
+The fixed teardown closed master then Assignment, transactionally removed the
+two audit/receipt rows, match, private contacts, referrals, provider,
+memberships and organizations, restored both append-only triggers, hard-deleted
+the Auth user and proved its old password grant failed. Auth users, identities,
+sessions and refresh tokens plus every Portal fixture table and enabled flag
+were zero. The local HTTPS process, certificate, test harness and Supabase link
+were removed. The branch was deleted, and three consecutive branch-list probes
+found its id/ref absent while the sole default Production branch remained
+`ACTIVE_HEALTHY`.
+
+This closes exact-revision Hosted GoTrue/PostgREST cookie and database evidence
+for pre-review commit `526aa1e`. The exact-current 2026-08-26 gate above now
+covers the later queue-bound hardening; this historical run remains separate
+and is not a Vercel Preview deployment, retained activation, Production
+approval or evidence for provider response M1b.
+
 ### Five-Note generation source/offline checkpoint — 2026-08-20
 
 Communication, Handover, Progress, NDIS and Incident Factual now share one
@@ -1052,8 +1322,11 @@ worker body is 162,857 bytes with SHA-256
 the current enhanced Portal-intake body is 39,728 bytes with SHA-256
 `2255331b99ff6c4ca05b3a79578c6daa601e26662633063aa004f43423e3729f`.
 These are current source identities, not replacements for the two historical
-`r5` rows above. No fresh Hosted Preview has executed either enhanced exact
-body, and Production has not been touched.
+`r5` rows above. The later exact-commit `526aa1e` disposable gate applied 32/32
+and passed all 13 then-current rollback suites, superseding that historical
+exact-body gap without touching Production. The Assignment suite changed again
+in the 2026-08-26 queue-bound hardening and the later exact-current Hosted gate
+recorded above exercised that final body.
 
 The special suite proved the real Hosted topology with distinct
 `session_user` and entry `current_user`, entry-actor `CREATEROLE`, temporary
@@ -1068,9 +1341,10 @@ The source-maintenance follow-up is complete: the long-lived worker and Portal-
 intake rollback suites now check the exact signatures and entry ownership of
 the two #26 readers and five #30 Portal functions. Deleted `r5`'s independent
 postcheck remains the historical Hosted proof of the underlying owner posture,
-but `r5` did not execute the enhanced bodies identified above. A fresh
-disposable Preview would be required to create new exact-body Hosted evidence;
-that evidence refresh has not occurred and is not being attributed to `r5`.
+but `r5` did not execute the enhanced bodies identified above. That evidence is
+still not attributed to `r5`; the separately recorded exact-commit `526aa1e`
+disposable 32/32 and 13/13 gate is the later pre-review body refresh. The current
+Assignment assertion hash is separately identified in the PR-review section.
 
 Security advisors returned 21 INFO and six WARN globally, zero findings in the
 generation scope, and one INFO plus three intended authenticated-
@@ -1259,7 +1533,7 @@ This does not prove a live, data-bearing cross-migration upgrade. The `202608100
 | Production-unapplied SQL boundary | `src/lib/v1/v1-shadow-migration-contract.test.ts`, `mobile-sync-migration-contract.test.ts`, isolated guarded-live and local engine evidence | additive/no legacy DML, owner isolation and explicit grants are source-checked; historical deleted `r4` passed the 13-file foundation manifest 13/13 and six rollback suites. At HEAD `c7b70e9f84b9b804779039711b85cc7eda55bd57`, deleted `r9` passed the exact 14-file worker manifest 14/14, seven rollback suites and independent hard-off/zero-row/role/RLS/ACL/9-RPC postchecks. Deleted `r20` additionally passed the PostgreSQL 17.6 true two-session claim/session/privacy race gate; deleted `r21` passed the Attempt 1/Attempt 2 historical-replay and post-purge matrix; deleted `r22` passed 15/15 and 7/7. The isolated PostgreSQL 16.15 gates added engine and strict two-backend evidence. Deleted Hosted r5 then passed the exact 30-file manifest, all 11 rollback suites and the independent owner/role/RLS/ACL/hard-off/zero-fixture postcheck. All diagnostic Previews and local test resources were removed. This is schema/transaction evidence only; runtime writes remain withheld |
 | Owner generation repository boundary | `note-generation-owner-repository.server.test.ts`, `note-generation-owner-runtime-migration-contract.test.ts` and `v1_note_generation_owner_runtime_rpc_shadow_assertions.sql` | exact private direct-query calls, owner-safe envelopes, default-empty admission, fresh session/privacy/catalog selection, idempotent atomic enqueue, status/cancel while hard-off and atomic cancellation are source/local-SQL tested. The local PG16.15 owner/posture/session-lock gate and deleted r5 Hosted 30/30 migration, 11/11 assertion and independent posture gate passed. No retained Preview, hosted Auth/Data API, route, caller grant, vault/model/Points or Production capability |
 | Worker-registration graceful retirement | `note-generation-registration-retirement-shadow-migration-contract.test.ts` and `v1_note_generation_registration_retirement_shadow_assertions.sql` | migration #29 preserves immutable digest-bound `APPROVED` registrations, adds the fourteenth forced-RLS table and validates append-only retirement, fixed reasons, exact sorted active-binding compare-and-retire, idempotent replay, new-admission/new-claim denial and existing-attempt drain/recovery. The local 29/29, 9/9, posture and two-ordering race gate plus deleted r5 Hosted 30/30, 11/11 and independent posture gate passed. No caller grant, route, credential, seed, activation, emergency revoke or Production capability |
-| Portal Referral intake runtime | `portal-referral-intake-runtime-migration-contract.test.ts`, route/runtime/Supabase/UI tests and `portal_referral_intake_runtime_assertions.sql` | default-off cookie-only list/create, auth-before-body, exact authenticated RPC grants, database-derived source tenant, post-lock wall-clock/session revalidation, metadata-only readback, atomic PII-separated create and replay/conflict boundaries passed source tests, the local clean 30/30, 10/10, independent-posture and 8/8 two-session gate, and the deleted r5 Hosted 30/30, 11/11 and Portal-owner/posture gate. Hosted GoTrue/PostgREST and activation remain unproved |
+| Portal Referral intake, source-detail and Assignment M1a runtime | intake/source-detail/assignment migration contracts, route/runtime/Supabase/UI tests and rollback suites | default-off cookie-only source list/create/detail plus operator queue/detail/triage/candidates/offer; independent application/database operation gates; exact authenticated RPC grants; database-derived exact-one operator context; Source A/B isolation; post-lock session revalidation; shared provider eligibility; strict DTO/ACK parsing; PII-separated create; assignment offer keeps `assigned_provider_id` null. Historical intake evidence includes local 30/30, 10/10, 8/8 two-session and deleted r5 Hosted 30/30/11/11 gates. Exact pre-review commit `526aa1e` passed deleted-r1 Hosted 32/32 migrations, its then-current 13/13 rollback suites and real GoTrue SSR-cookie E2E. Exact-current commit `43659ab16e9af6d9c73d0a55f8fe8b30b3ce9ee2` then passed a fresh deleted-r2 Hosted 32/32 migration, 13/13 rollback-suite and eight-assertion SSR-cookie matrix, including the queue bound, replay, tenant isolation, revocation and full zero-residue teardown. No Vercel Preview deployment, retained activation or Production capability resulted |
 | Runtime isolation | `src/lib/v1/runtime-boundary.test.ts` | audited NDIS routes and the new `/v1` adapter are the only allowed server boundaries; `/v1` remains disabled without explicit adapters |
 
 ### Current live/read-only evidence
@@ -1338,4 +1612,4 @@ The following suites are required before the corresponding V1 slice can be calle
 8. No signed PIA/data-map/subprocessor/NDB evidence is represented in automated tests.
 9. Current production refresh-token errors need a reproducible stale-cookie/session recovery test before V1 release.
 10. Build/test success is not a production V1 greenlight; migration, Preview/live safety and explicit owner approval remain mandatory.
-11. Portal Intake still lacks hosted GoTrue/PostgREST cookie E2E, actual Preview activation and every later triage/offer/response/follow-up/detail/audit operation.
+11. Portal Assignment M1a exact-current commit `43659ab16e9af6d9c73d0a55f8fe8b30b3ce9ee2` has 32/32 migrations, 13/13 rollback suites and the complete real Hosted GoTrue/PostgREST SSR-cookie route matrix on a deleted disposable branch, with independent zero-residue and unchanged-Production proof. There is still no Vercel Preview deployment, retained activation or Production approval. Provider offer acceptance/decline, assignment finalization, follow-up and audit listing remain unimplemented; intake/source-detail still need their own current-revision live route matrix before activation.

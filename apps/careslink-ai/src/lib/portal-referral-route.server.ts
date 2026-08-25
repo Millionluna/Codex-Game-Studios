@@ -3,12 +3,22 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 
 import { readBoundedRequestText } from "./bounded-request-text.server";
-import type { PortalReferralApi } from "./portal-referral-adapter.server";
+import type {
+  PortalReferralApi,
+  PortalReferralSourceDetail,
+} from "./portal-referral-adapter.server";
+import { canonicalPortalReferralUuid } from "./portal-referral-id";
 import {
   PORTAL_REFERRAL_FOLLOW_UP_OUTCOME_CODES,
+  PORTAL_REFERRAL_PREVIEW_REGION_CODES,
+  PORTAL_REFERRAL_PREVIEW_SERVICE_TYPE_CODES,
   PORTAL_REFERRAL_STATUSES,
   PortalReferralWorkflowError,
+  type PortalReferralAssignmentDetail,
+  type PortalReferralAssignmentQueueItem,
   type PortalReferralFollowUpOutcomeCode,
+  type PortalReferralMutationAck,
+  type PortalReferralProviderCandidate,
 } from "./portal-referral-workflow";
 import {
   resolveDefaultPortalReferralApi,
@@ -19,9 +29,6 @@ import {
 import { assertCaresLinkV1IdempotencyKey } from "./v1/shared-contracts";
 
 const MAX_REQUEST_BYTES = 16_384;
-const UUID_PATTERN =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-
 export type PortalReferralRouteDependencies = Readonly<{
   resolveApi?: PortalReferralApiResolver;
   createCorrelationId?: () => string;
@@ -86,9 +93,61 @@ export async function handlePortalReferralGet(
     request,
     "GET_REFERRAL",
     dependencies,
+    async (api) => {
+      const expectedReferralId = assertUuid(referralId);
+      const referral = await api.getReferral(expectedReferralId);
+      return {
+        body: {
+          referral: projectPortalReferralSourceDetail(
+            expectedReferralId,
+            referral,
+          ),
+        },
+      };
+    },
+  );
+}
+
+export async function handlePortalReferralAssignmentCollection(
+  request: Request,
+  dependencies?: PortalReferralRouteDependencies,
+) {
+  if (request.method !== "GET") return methodNotAllowed("GET");
+  return withPortalReferralApi(
+    request,
+    "LIST_ASSIGNMENT_REFERRALS",
+    dependencies,
     async (api) => ({
-      body: { referral: await api.getReferral(assertUuid(referralId)) },
+      body: {
+        items: projectPortalReferralAssignmentQueue(
+          await api.listAssignmentReferrals(),
+        ),
+      },
     }),
+  );
+}
+
+export async function handlePortalReferralAssignmentGet(
+  request: Request,
+  referralId: string,
+  dependencies?: PortalReferralRouteDependencies,
+) {
+  if (request.method !== "GET") return methodNotAllowed("GET");
+  return withPortalReferralApi(
+    request,
+    "GET_ASSIGNMENT_REFERRAL",
+    dependencies,
+    async (api) => {
+      const expectedReferralId = assertUuid(referralId);
+      return {
+        body: {
+          referral: projectPortalReferralAssignmentDetail(
+            expectedReferralId,
+            await api.getAssignmentReferral(expectedReferralId),
+          ),
+        },
+      };
+    },
   );
 }
 
@@ -102,16 +161,26 @@ export async function handlePortalReferralTriage(
     request,
     "TRIAGE_REFERRAL",
     dependencies,
-    async (api) => {
+    async (api, correlationId) => {
       assertMutationTransport(request);
-      const mutation = getMutationMetadata(request);
+      const mutation = { ...getMutationMetadata(request), correlationId };
       const body = await readJsonObject(request);
       assertExactKeys(body, ["expectedVersion"]);
+      const expectedReferralId = assertUuid(referralId);
+      const expectedVersion = requiredVersion(body.expectedVersion);
       return {
-        body: await api.triageReferral(
-          assertUuid(referralId),
-          requiredVersion(body.expectedVersion),
-          mutation,
+        body: projectPortalReferralAssignmentMutation(
+          await api.triageReferral(
+            expectedReferralId,
+            expectedVersion,
+            mutation,
+          ),
+          {
+            referralId: expectedReferralId,
+            expectedVersion,
+            currentStatus: "TRIAGED",
+            match: "NULL",
+          },
         ),
       };
     },
@@ -128,11 +197,16 @@ export async function handlePortalReferralCandidates(
     request,
     "LIST_PROVIDER_CANDIDATES",
     dependencies,
-    async (api) => ({
-      body: {
-        items: await api.listProviderCandidates(assertUuid(referralId)),
-      },
-    }),
+    async (api) => {
+      const expectedReferralId = assertUuid(referralId);
+      return {
+        body: {
+          items: projectPortalReferralProviderCandidates(
+            await api.listProviderCandidates(expectedReferralId),
+          ),
+        },
+      };
+    },
   );
 }
 
@@ -146,19 +220,29 @@ export async function handlePortalReferralOffer(
     request,
     "OFFER_REFERRAL",
     dependencies,
-    async (api) => {
+    async (api, correlationId) => {
       assertMutationTransport(request);
-      const mutation = getMutationMetadata(request);
+      const mutation = { ...getMutationMetadata(request), correlationId };
       const body = await readJsonObject(request);
       assertExactKeys(body, ["providerId", "expectedVersion"]);
+      const expectedReferralId = assertUuid(referralId);
+      const expectedVersion = requiredVersion(body.expectedVersion);
       return {
-        body: await api.offerReferral(
-          assertUuid(referralId),
+        body: projectPortalReferralAssignmentMutation(
+          await api.offerReferral(
+            expectedReferralId,
+            {
+              providerId: assertUuid(body.providerId),
+              expectedVersion,
+            },
+            mutation,
+          ),
           {
-            providerId: assertUuid(body.providerId),
-            expectedVersion: requiredVersion(body.expectedVersion),
+            referralId: expectedReferralId,
+            expectedVersion,
+            currentStatus: "OFFERED",
+            match: "NON_NULL",
           },
-          mutation,
         ),
       };
     },
@@ -408,13 +492,21 @@ function requiredObject(value: unknown): Record<string, unknown> {
 }
 
 function assertExactKeys(value: Record<string, unknown>, allowed: readonly string[]) {
-  if (Object.keys(value).some((key) => !allowed.includes(key))) {
+  const actual = Object.keys(value);
+  if (
+    actual.length !== allowed.length ||
+    actual.some((key) => !allowed.includes(key))
+  ) {
     throw validationError();
   }
 }
 
 function requiredVersion(value: unknown) {
-  if (!Number.isSafeInteger(value) || (value as number) < 1) {
+  if (
+    !Number.isSafeInteger(value) ||
+    (value as number) < 1 ||
+    (value as number) >= Number.MAX_SAFE_INTEGER
+  ) {
     throw validationError();
   }
   return value as number;
@@ -431,10 +523,238 @@ function requiredOutcomeCode(value: unknown): PortalReferralFollowUpOutcomeCode 
 }
 
 function assertUuid(value: unknown) {
-  if (typeof value !== "string" || !UUID_PATTERN.test(value)) {
+  const canonical = canonicalPortalReferralUuid(value);
+  if (!canonical) {
     throw validationError();
   }
-  return value.toLowerCase();
+  return canonical;
+}
+
+function projectPortalReferralSourceDetail(
+  expectedReferralId: string,
+  value: Awaited<ReturnType<PortalReferralApi["getReferral"]>>,
+): PortalReferralSourceDetail {
+  if (!value || typeof value !== "object") {
+    throw invalidAdapterResponse();
+  }
+  const referralId = canonicalPortalReferralUuid(value.referralId);
+  const contact = value.contact;
+  const createdAt = responseInstant(value.createdAt);
+  const updatedAt = responseInstant(value.updatedAt);
+  if (
+    referralId !== expectedReferralId ||
+    !contact ||
+    !(PORTAL_REFERRAL_PREVIEW_REGION_CODES as readonly string[]).includes(
+      value.region,
+    ) ||
+    !(PORTAL_REFERRAL_PREVIEW_SERVICE_TYPE_CODES as readonly string[]).includes(
+      value.serviceType,
+    ) ||
+    !(PORTAL_REFERRAL_STATUSES as readonly string[]).includes(
+      value.currentStatus,
+    ) ||
+    !Number.isSafeInteger(value.rowVersion) ||
+    value.rowVersion < 1 ||
+    Date.parse(createdAt) > Date.parse(updatedAt)
+  ) {
+    throw invalidAdapterResponse();
+  }
+  return Object.freeze({
+    referralId,
+    summary: responseText(value.summary, 4_000),
+    region: value.region,
+    serviceType: value.serviceType,
+    currentStatus: value.currentStatus,
+    rowVersion: value.rowVersion,
+    contact: Object.freeze({
+      name: responseText(contact.name, 200),
+      phone: responseText(contact.phone, 100),
+      email: contact.email === null ? null : responseText(contact.email, 320),
+    }),
+    createdAt,
+    updatedAt,
+  });
+}
+
+const ASSIGNMENT_STATUSES = ["SUBMITTED", "TRIAGED", "OFFERED"] as const;
+
+function projectPortalReferralAssignmentQueue(
+  value: readonly PortalReferralAssignmentQueueItem[],
+): PortalReferralAssignmentQueueItem[] {
+  if (!Array.isArray(value) || value.length > 50) {
+    throw invalidAdapterResponse();
+  }
+  const seen = new Set<string>();
+  return value.map((item) => {
+    const referralId = responseUuid(item?.referralId);
+    if (seen.has(referralId)) throw invalidAdapterResponse();
+    seen.add(referralId);
+    if (
+      !(PORTAL_REFERRAL_PREVIEW_REGION_CODES as readonly string[]).includes(
+        item.region,
+      ) ||
+      !(
+        PORTAL_REFERRAL_PREVIEW_SERVICE_TYPE_CODES as readonly string[]
+      ).includes(item.serviceType) ||
+      !(ASSIGNMENT_STATUSES as readonly string[]).includes(item.currentStatus) ||
+      !Number.isSafeInteger(item.rowVersion) ||
+      item.rowVersion < 1
+    ) {
+      throw invalidAdapterResponse();
+    }
+    return Object.freeze({
+      referralId,
+      sourceOrganizationId: responseUuid(item.sourceOrganizationId),
+      sourceOrganizationName: responseText(item.sourceOrganizationName, 200),
+      region: item.region,
+      serviceType: item.serviceType,
+      currentStatus: item.currentStatus,
+      rowVersion: item.rowVersion,
+      updatedAt: responseInstant(item.updatedAt),
+    });
+  });
+}
+
+function projectPortalReferralAssignmentDetail(
+  expectedReferralId: string,
+  value: PortalReferralAssignmentDetail,
+): PortalReferralAssignmentDetail {
+  const referralId = responseUuid(value?.referralId);
+  const contact = value?.contact;
+  const createdAt = responseInstant(value?.createdAt);
+  const updatedAt = responseInstant(value?.updatedAt);
+  if (
+    referralId !== expectedReferralId ||
+    !contact ||
+    !(PORTAL_REFERRAL_PREVIEW_REGION_CODES as readonly string[]).includes(
+      value.region,
+    ) ||
+    !(
+      PORTAL_REFERRAL_PREVIEW_SERVICE_TYPE_CODES as readonly string[]
+    ).includes(value.serviceType) ||
+    !(ASSIGNMENT_STATUSES as readonly string[]).includes(value.currentStatus) ||
+    !Number.isSafeInteger(value.rowVersion) ||
+    value.rowVersion < 1 ||
+    Date.parse(createdAt) > Date.parse(updatedAt)
+  ) {
+    throw invalidAdapterResponse();
+  }
+  let activeOffer: PortalReferralAssignmentDetail["activeOffer"] = null;
+  if (value.activeOffer !== null) {
+    const offer = value.activeOffer;
+    const offeredAt = responseInstant(offer?.offeredAt);
+    if (
+      Date.parse(offeredAt) < Date.parse(createdAt) ||
+      Date.parse(offeredAt) > Date.parse(updatedAt)
+    ) {
+      throw invalidAdapterResponse();
+    }
+    activeOffer = Object.freeze({
+      matchId: responseUuid(offer.matchId),
+      providerId: responseUuid(offer.providerId),
+      displayName: responseText(offer.displayName, 200),
+      offeredAt,
+    });
+  }
+  if ((value.currentStatus === "OFFERED") !== Boolean(activeOffer)) {
+    throw invalidAdapterResponse();
+  }
+  return Object.freeze({
+    referralId,
+    sourceOrganizationId: responseUuid(value.sourceOrganizationId),
+    sourceOrganizationName: responseText(value.sourceOrganizationName, 200),
+    summary: responseText(value.summary, 4_000),
+    region: value.region,
+    serviceType: value.serviceType,
+    currentStatus: value.currentStatus,
+    rowVersion: value.rowVersion,
+    contact: Object.freeze({
+      name: responseText(contact.name, 200),
+      phone: responseText(contact.phone, 100),
+      email:
+        contact.email === null ? null : responseText(contact.email, 320),
+    }),
+    activeOffer,
+    createdAt,
+    updatedAt,
+  });
+}
+
+function projectPortalReferralProviderCandidates(
+  value: readonly PortalReferralProviderCandidate[],
+): PortalReferralProviderCandidate[] {
+  if (!Array.isArray(value) || value.length > 50) {
+    throw invalidAdapterResponse();
+  }
+  const seen = new Set<string>();
+  return value.map((item) => {
+    const providerId = responseUuid(item?.providerId);
+    if (seen.has(providerId)) throw invalidAdapterResponse();
+    seen.add(providerId);
+    return Object.freeze({
+      providerId,
+      displayName: responseText(item.displayName, 200),
+    });
+  });
+}
+
+function projectPortalReferralAssignmentMutation(
+  value: PortalReferralMutationAck,
+  expected: Readonly<{
+    referralId: string;
+    expectedVersion: number;
+    currentStatus: "TRIAGED" | "OFFERED";
+    match: "NULL" | "NON_NULL";
+  }>,
+): PortalReferralMutationAck {
+  const referralId = responseUuid(value?.referralId);
+  const matchId = value?.matchId === null ? null : responseUuid(value?.matchId);
+  if (
+    referralId !== expected.referralId ||
+    value.currentStatus !== expected.currentStatus ||
+    value.rowVersion !== expected.expectedVersion + 1 ||
+    (expected.match === "NULL" ? matchId !== null : matchId === null)
+  ) {
+    throw invalidAdapterResponse();
+  }
+  return Object.freeze({
+    referralId,
+    matchId,
+    currentStatus: expected.currentStatus,
+    rowVersion: value.rowVersion,
+    updatedAt: responseInstant(value.updatedAt),
+  });
+}
+
+function responseText(value: unknown, maxLength: number) {
+  if (typeof value !== "string") throw invalidAdapterResponse();
+  const normalized = value.trim();
+  if (!normalized || normalized !== value || value.length > maxLength) {
+    throw invalidAdapterResponse();
+  }
+  return value;
+}
+
+function responseUuid(value: unknown) {
+  const canonical = canonicalPortalReferralUuid(value);
+  if (!canonical || canonical !== value) throw invalidAdapterResponse();
+  return canonical;
+}
+
+function responseInstant(value: unknown) {
+  if (typeof value !== "string") throw invalidAdapterResponse();
+  const instant = new Date(value);
+  if (!Number.isFinite(instant.getTime()) || instant.toISOString() !== value) {
+    throw invalidAdapterResponse();
+  }
+  return value;
+}
+
+function invalidAdapterResponse() {
+  return new PortalReferralWorkflowError(
+    "ADAPTER_UNAVAILABLE",
+    "Portal referral adapter is unavailable",
+  );
 }
 
 function validationError() {
