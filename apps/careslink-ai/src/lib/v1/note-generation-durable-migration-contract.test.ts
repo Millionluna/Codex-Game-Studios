@@ -19,6 +19,13 @@ const assertionBody = assertions.slice(assertionBodyStart);
 
 const schemaName = "careslink_v1_generation";
 const tableNames = ["settings", "jobs", "attempts"] as const;
+const entryRoleRestore = normalizeSql(`
+  select pg_catalog.set_config(
+    'role',
+    pg_catalog.current_setting('careslink.migration_entry_role'),
+    false
+  );
+`);
 
 describe("V1 Note durable generation foundation migration contract", () => {
   it("is a CLI-named additive schema-only foundation that cannot activate itself", () => {
@@ -66,8 +73,8 @@ describe("V1 Note durable generation foundation migration contract", () => {
     }
   });
 
-  it("allows only a temporary non-inheriting SET edge and leaves no object grant", () => {
-    expect(migration.match(/^\s*grant\b/gim)).toHaveLength(1);
+  it("allows only bounded migration grants and leaves no object grant", () => {
+    expect(migration.match(/^\s*grant\b/gim)).toHaveLength(2);
     expect(normalizeSql(migration)).toContain(
       "grant careslink_v1_generation_owner to current_user with admin false, inherit false, set true granted by current_user;",
     );
@@ -76,8 +83,11 @@ describe("V1 Note durable generation foundation migration contract", () => {
     );
     expect(migration).toContain("bootstrap-superuser grant on each new role");
     expect(migration).toContain("must be asserted as such rather than misreported as zero memberships");
-    expect(migration).not.toMatch(
-      /\bgrant\s+(?:all|usage|create|select|insert|update|delete|truncate|references|trigger|execute)\b/i,
+    expect(normalizeSql(migration)).toContain(
+      "grant create on schema careslink_v1_generation to careslink_v1_generation_owner;",
+    );
+    expect(normalizeSql(migration)).toContain(
+      "revoke create on schema careslink_v1_generation from careslink_v1_generation_owner;",
     );
     expect(migration).not.toMatch(/\bgrant\s+.+\bto\s+(?:public|anon|authenticated|service_role|careslink_v1_generation_executor)\b/i);
     expect(normalizeSql(migration)).toContain(
@@ -133,14 +143,19 @@ describe("V1 Note durable generation foundation migration contract", () => {
       "public, anon, authenticated, service_role,\\s+careslink_v1_generation_executor";
     const normalizedMigration = normalizeSql(migration);
     const ownerSet = `set role careslink_v1_generation_owner;`;
-    const ownerReset = `reset role;`;
     const ownerSetStart = normalizedMigration.indexOf(ownerSet);
-    const ownerSetEnd = normalizedMigration.indexOf(ownerReset, ownerSetStart);
+    const ownerSetEnd = normalizedMigration.indexOf(
+      entryRoleRestore,
+      ownerSetStart,
+    );
     const firstTable = normalizedMigration.indexOf(
       `create table ${schemaName}.settings`,
     );
     const schemaTransfer = normalizedMigration.indexOf(
       `alter schema ${schemaName} owner to careslink_v1_generation_owner;`,
+    );
+    const firstOwnershipTransfer = normalizedMigration.indexOf(
+      `alter table ${schemaName}.settings owner to careslink_v1_generation_owner;`,
     );
     const lastOwnershipTransfer = normalizedMigration.indexOf(
       `alter table ${schemaName}.attempts owner to careslink_v1_generation_owner;`,
@@ -148,11 +163,17 @@ describe("V1 Note durable generation foundation migration contract", () => {
     const finalMembershipRevoke = normalizedMigration.indexOf(
       `revoke careslink_v1_generation_owner from current_user granted by current_user;`,
     );
+    const temporaryOwnerCreateGrant = normalizedMigration.indexOf(
+      `grant create on schema ${schemaName} to careslink_v1_generation_owner;`,
+    );
+    const temporaryOwnerCreateRevoke = normalizedMigration.indexOf(
+      `revoke create on schema ${schemaName} from careslink_v1_generation_owner;`,
+    );
 
     expect(
       migration.match(/^set role careslink_v1_generation_owner;$/gm),
     ).toHaveLength(1);
-    expect(migration.match(/^reset role;$/gm)).toHaveLength(1);
+    expect(normalizedMigration.split(entryRoleRestore)).toHaveLength(2);
     expect(migration).not.toMatch(
       /alter default privileges\s+for role\s+careslink_v1_generation_owner/i,
     );
@@ -163,12 +184,15 @@ describe("V1 Note durable generation foundation migration contract", () => {
     );
     expect(ownerSetEnd).toBeGreaterThan(ownerSetStart);
     expect(firstTable).toBeGreaterThan(ownerSetEnd);
-    expect(schemaTransfer).toBeGreaterThan(firstTable);
-    expect(lastOwnershipTransfer).toBeGreaterThan(schemaTransfer);
-    expect(finalMembershipRevoke).toBeGreaterThan(lastOwnershipTransfer);
+    expect(temporaryOwnerCreateGrant).toBeGreaterThan(firstTable);
+    expect(firstOwnershipTransfer).toBeGreaterThan(temporaryOwnerCreateGrant);
+    expect(lastOwnershipTransfer).toBeGreaterThan(firstOwnershipTransfer);
+    expect(temporaryOwnerCreateRevoke).toBeGreaterThan(lastOwnershipTransfer);
+    expect(schemaTransfer).toBeGreaterThan(temporaryOwnerCreateRevoke);
+    expect(finalMembershipRevoke).toBeGreaterThan(schemaTransfer);
     expect(migration.match(/^alter default privileges\b/gm)).toHaveLength(8);
     expect(
-      normalizedMigration.slice(schemaTransfer, finalMembershipRevoke),
+      normalizedMigration.slice(firstOwnershipTransfer, finalMembershipRevoke),
     ).not.toMatch(/\b(?:alter default privileges|revoke all on)\b/);
 
     expect(

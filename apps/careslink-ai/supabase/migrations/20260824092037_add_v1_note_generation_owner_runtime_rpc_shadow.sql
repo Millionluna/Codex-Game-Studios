@@ -6,6 +6,15 @@
 -- plus metadata-only vault staging evidence; every API role remains denied.
 -- The migration runner owns the transaction boundary.
 
+-- Supabase Hosted may authenticate the CLI with a login role and then enter
+-- the migration as its database actor. Preserve that actor transactionally
+-- before any temporary owner/executor switch.
+select pg_catalog.set_config(
+  'careslink.migration_entry_role',
+  current_user,
+  true
+);
+
 create role careslink_v1_generation_owner_api_executor
   with nologin nosuperuser nocreatedb nocreaterole noinherit noreplication nobypassrls;
 
@@ -66,7 +75,11 @@ alter default privileges in schema careslink_v1_generation
     careslink_v1_generation_owner,
     careslink_v1_generation_executor;
 
-reset role;
+select pg_catalog.set_config(
+  'role',
+  pg_catalog.current_setting('careslink.migration_entry_role'),
+  false
+);
 
 set role careslink_v1_generation_owner;
 
@@ -449,7 +462,11 @@ grant update (id)
 grant create on schema careslink_v1_generation
   to careslink_v1_generation_owner_api_executor;
 
-reset role;
+select pg_catalog.set_config(
+  'role',
+  pg_catalog.current_setting('careslink.migration_entry_role'),
+  false
+);
 
 -- Close the SECURITY INVOKER dependency chain without relying on mutable
 -- PUBLIC schema defaults. No CREATE privilege is granted on either schema.
@@ -480,7 +497,11 @@ grant execute on function careslink_v1_generation._payload_snapshot_is_valid(
 grant execute on function careslink_v1_generation._enqueue_payload_purge(
   uuid, uuid, uuid, uuid, text, timestamptz
 ) to careslink_v1_generation_owner_api_executor;
-reset role;
+select pg_catalog.set_config(
+  'role',
+  pg_catalog.current_setting('careslink.migration_entry_role'),
+  false
+);
 
 -- These two metadata-only readers are migration-actor owned because Supabase
 -- owns auth. The owner executor receives only exact EXECUTE, never auth table
@@ -1492,7 +1513,11 @@ revoke all on function
     careslink_v1_generation_owner,
     careslink_v1_generation_executor;
 
-reset role;
+select pg_catalog.set_config(
+  'role',
+  pg_catalog.current_setting('careslink.migration_entry_role'),
+  false
+);
 
 set role careslink_v1_generation_owner;
 
@@ -1528,7 +1553,11 @@ revoke all on all tables in schema careslink_v1_generation
 revoke all on all sequences in schema careslink_v1_generation
   from public, anon, authenticated, service_role;
 
-reset role;
+select pg_catalog.set_config(
+  'role',
+  pg_catalog.current_setting('careslink.migration_entry_role'),
+  false
+);
 
 -- Remove only this migration's temporary PostgreSQL-16 SET edges. The roles
 -- remain NOLOGIN and no runtime caller membership is introduced.

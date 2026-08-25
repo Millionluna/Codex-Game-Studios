@@ -33,6 +33,11 @@ const ownerExecutorRole = "careslink_v1_generation_owner_api_executor";
 const registrationControlRole =
   "careslink_v1_generation_registration_control_executor";
 const ownerGuc = "careslink.v1_generation_owner_user_id";
+const entryRoleRestore = `select pg_catalog.set_config(
+  'role',
+  pg_catalog.current_setting('careslink.migration_entry_role'),
+  false
+);`;
 
 const rpcIdentities = {
   admit_and_enqueue_v1_shadow_note_generation_job:
@@ -106,10 +111,10 @@ describe("V1 Note owner runtime RPC shadow migration contract", () => {
     expect(migrations.at(28)).toBe(
       retirementMigrationPath.split("/").at(-1),
     );
-    expect(Buffer.byteLength(migration, "utf8")).toBe(52_387);
+    expect(Buffer.byteLength(migration, "utf8")).toBe(53_195);
     expect(
       createHash("sha256").update(migration, "utf8").digest("hex"),
-    ).toBe("a51052e3e28fad221c5774bb0508867ba21c48b185931fc06d1df1ae5cadeaaa");
+    ).toBe("64626d770fc4f0effb3c8f14ef6d0afdf71250ef2491373ac15cdce52cbf0661");
     expect(migration).toContain("Source-only and default-off");
     expect(migration).toContain("adds no active admission binding");
     expect(migration).toContain("every API role remains denied");
@@ -163,7 +168,7 @@ describe("V1 Note owner runtime RPC shadow migration contract", () => {
       `set role ${ownerRole};`,
       tableStart,
     );
-    const tableOwnerEnd = migration.indexOf("\nreset role;", tableStart);
+    const tableOwnerEnd = migration.indexOf(entryRoleRestore, tableStart);
     expect(tableOwnerStart).toBeGreaterThanOrEqual(0);
     expect(tableStart).toBeGreaterThan(tableOwnerStart);
     expect(tableOwnerEnd).toBeGreaterThan(tableStart);
@@ -232,7 +237,10 @@ describe("V1 Note owner runtime RPC shadow migration contract", () => {
     }
 
     const defaultsStart = normalized.indexOf(`set role ${ownerExecutorRole};`);
-    const defaultsEnd = normalized.indexOf("reset role;", defaultsStart);
+    const defaultsEnd = normalized.indexOf(
+      normalizeSql(entryRoleRestore),
+      defaultsStart,
+    );
     expect(defaultsStart).toBeGreaterThanOrEqual(0);
     expect(defaultsEnd).toBeGreaterThan(defaultsStart);
     const defaults = normalized.slice(defaultsStart, defaultsEnd);
@@ -540,7 +548,10 @@ describe("V1 Note owner runtime RPC shadow migration contract", () => {
       `set role ${ownerExecutorRole};`,
       functionStart("_owner_api_assert_contract"),
     );
-    const functionRoleEnd = migration.indexOf("\nreset role;", functionRoleStart);
+    const functionRoleEnd = migration.indexOf(
+      entryRoleRestore,
+      functionRoleStart,
+    );
     expect(functionRoleStart).toBeGreaterThanOrEqual(0);
     expect(functionRoleEnd).toBeGreaterThan(functionRoleStart);
     for (const name of unqualifiedFunctions) {

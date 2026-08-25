@@ -260,6 +260,30 @@ independent 14-table/four-role/hard-off/zero-fixture postcheck and both real
 retirement/claim lock orderings. Production was not targeted, and no retained
 Preview, deployment or paid runtime resource was created.
 
+### Hosted migration-entry role restoration — 2026-08-25
+
+The five Production-unapplied generation migrations now preserve their
+file-entry migration actor across all 25 temporary owner/executor windows. The
+capture is transaction-local; restoration is session-scope so it remains in
+effect after the migration transaction commits. This removes the unsafe
+assumption that PostgreSQL `RESET ROLE` returns from a Hosted transport login
+to the preceding migration actor. #26 also grants and revokes the temporary
+auth-reader schema `CREATE` privilege against the identifier-safe captured
+actor rather than `session_user`.
+
+A fresh local PostgreSQL 16.15 Hosted-like topology proved the rollback path,
+dynamic ACL path, post-commit role state and a full #25 apply. That apply kept
+the schema and three tables under the dedicated owner, removed the temporary
+SET edge and left neither entry nor transport role with schema `CREATE`.
+Focused source contracts passed 75/75, and the exact local cluster was stopped
+and deleted. The full gate also passed 134 files / 1,645 tests, TypeScript,
+lint, the 63/63-page production build, the 73-file adapter check and diff
+checks. No Hosted/Production database, deployment, activation or paid resource
+was used. This is not yet official CLI 30/30 evidence; the next disposable
+no-data Preview must clean-apply all 30 migrations, pass the 11 current
+assertion suites plus the independent owner/ACL/zero-fixture postcheck, and then
+be deleted.
+
 ## Inactive shadow automation contracts
 
 - The contract and migrations define generation/export job states. Source-only memory contracts model leases, recovery, retry policy, provider evidence and single-use payload grants, and the registered-worker v2 facade composes those boundaries without a payload locator. All five generation migrations remain Production-unapplied; deleted `r9` supplied isolated PostgreSQL 17.6 execution evidence for database-clock claim/heartbeat/fence/commit/settle/resolve/recover/authorize/consume logic and payload/grant/evidence/purge-outbox metadata, deleted `r20` supplied the three true two-session race results, and deleted `r21` supplied exact historical transient-retry/success replay through payload/outbox purge. The later local owner-repository gate covers the three private owner RPCs, and migration #29 adds only the non-login control-executor-owned graceful-retirement identity described above. There is still no caller grant. Normal consume deliberately settles `DENIED_SETTLED` / `PAYLOAD_UNAVAILABLE` and returns no vault grant, locator or facts; the historical rollback-only `TEST_ONLY` `CONSUMED` fixture proves only scripted canonical transaction atomicity. There is still no payload vault, queue service, deployed worker, live retry loop or served cancellation endpoint.

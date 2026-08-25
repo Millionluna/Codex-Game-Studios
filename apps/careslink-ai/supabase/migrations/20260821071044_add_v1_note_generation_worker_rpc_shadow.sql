@@ -9,6 +9,15 @@
 --
 -- The migration runner owns the transaction boundary.
 
+-- Supabase Hosted may authenticate the CLI with a login role and then enter
+-- the migration as its database actor. Preserve that actor transactionally
+-- before any temporary owner/executor switch.
+select pg_catalog.set_config(
+  'careslink.migration_entry_role',
+  current_user,
+  true
+);
+
 -- PostgreSQL 16+ role membership options are independent. These temporary SET
 -- edges let the migration actor perform owner-only DDL and create functions as
 -- the actual executor. They are revoked at the end; the bootstrap administrative
@@ -58,7 +67,11 @@ alter default privileges in schema careslink_v1_generation
   from public, anon, authenticated, service_role,
     careslink_v1_generation_owner;
 
-reset role;
+select pg_catalog.set_config(
+  'role',
+  pg_catalog.current_setting('careslink.migration_entry_role'),
+  false
+);
 
 set role careslink_v1_generation_owner;
 
@@ -675,7 +688,11 @@ alter table careslink_v1_generation.attempts
     )
   );
 
-reset role;
+select pg_catalog.set_config(
+  'role',
+  pg_catalog.current_setting('careslink.migration_entry_role'),
+  false
+);
 
 -- ---------------------------------------------------------------------------
 -- Private-schema RLS and least-privilege executor ACL
@@ -827,7 +844,11 @@ grant select, insert on careslink_v1_generation.payload_purge_outbox
 grant create on schema careslink_v1_generation
   to careslink_v1_generation_executor;
 
-reset role;
+select pg_catalog.set_config(
+  'role',
+  pg_catalog.current_setting('careslink.migration_entry_role'),
+  false
+);
 
 -- ---------------------------------------------------------------------------
 -- Narrow public/auth dependencies for the executor-owned definer functions
@@ -1069,8 +1090,19 @@ create policy ai_document_mutation_receipts_generation_executor_insert
 -- by the private executor. Disposable Preview must prove its hosted ownership
 -- and lock behavior before any later runtime activation.
 set role careslink_v1_generation_owner;
-grant create on schema careslink_v1_generation to session_user;
-reset role;
+do $grant_migration_entry_role$
+begin
+  execute pg_catalog.format(
+    'grant create on schema careslink_v1_generation to %I',
+    pg_catalog.current_setting('careslink.migration_entry_role')
+  );
+end;
+$grant_migration_entry_role$;
+select pg_catalog.set_config(
+  'role',
+  pg_catalog.current_setting('careslink.migration_entry_role'),
+  false
+);
 
 create function careslink_v1_generation.fresh_session_is_active(
   p_owner_user_id uuid,
@@ -1212,8 +1244,19 @@ grant execute on function careslink_v1_generation.fresh_privacy_proof_expires_at
 ) to careslink_v1_generation_executor;
 
 set role careslink_v1_generation_owner;
-revoke create on schema careslink_v1_generation from session_user;
-reset role;
+do $revoke_migration_entry_role$
+begin
+  execute pg_catalog.format(
+    'revoke create on schema careslink_v1_generation from %I',
+    pg_catalog.current_setting('careslink.migration_entry_role')
+  );
+end;
+$revoke_migration_entry_role$;
+select pg_catalog.set_config(
+  'role',
+  pg_catalog.current_setting('careslink.migration_entry_role'),
+  false
+);
 
 -- ---------------------------------------------------------------------------
 -- Executor-owned validation and envelope helpers
@@ -5009,7 +5052,11 @@ revoke all on function
   from public, anon, authenticated, service_role,
     careslink_v1_generation_owner;
 
-reset role;
+select pg_catalog.set_config(
+  'role',
+  pg_catalog.current_setting('careslink.migration_entry_role'),
+  false
+);
 
 set role careslink_v1_generation_owner;
 revoke create on schema careslink_v1_generation
@@ -5020,7 +5067,11 @@ revoke all on all tables in schema careslink_v1_generation
   from public, anon, authenticated, service_role;
 revoke all on all sequences in schema careslink_v1_generation
   from public, anon, authenticated, service_role;
-reset role;
+select pg_catalog.set_config(
+  'role',
+  pg_catalog.current_setting('careslink.migration_entry_role'),
+  false
+);
 
 -- Remove only this migration's temporary SET edges. The PostgreSQL-16
 -- bootstrap administrative memberships from role creation remain untouched.

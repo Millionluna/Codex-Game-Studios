@@ -8,6 +8,15 @@
 --
 -- The migration runner owns the transaction boundary.
 
+-- Supabase Hosted may authenticate the CLI with a login role and then enter
+-- the migration as its database actor. Preserve that actor transactionally
+-- before any temporary owner/executor switch.
+select pg_catalog.set_config(
+  'careslink.migration_entry_role',
+  current_user,
+  true
+);
+
 create role careslink_v1_generation_owner
   with nologin nosuperuser nocreatedb nocreaterole noinherit noreplication nobypassrls;
 
@@ -73,7 +82,11 @@ alter default privileges
   from public, anon, authenticated, service_role,
     careslink_v1_generation_executor;
 
-reset role;
+select pg_catalog.set_config(
+  'role',
+  pg_catalog.current_setting('careslink.migration_entry_role'),
+  false
+);
 
 create table careslink_v1_generation.settings (
   capability text primary key,
@@ -486,13 +499,21 @@ revoke all on type
   from public, anon, authenticated, service_role,
     careslink_v1_generation_executor;
 
-alter schema careslink_v1_generation
-  owner to careslink_v1_generation_owner;
+-- PostgreSQL requires the prospective table owner to have CREATE on the
+-- containing schema. Grant that dedicated NOLOGIN role only for the three
+-- ownership transfers, revoke it while the migration actor still owns the
+-- schema, and transfer the schema last so no explicit owner ACL remains.
+grant create on schema careslink_v1_generation
+  to careslink_v1_generation_owner;
 alter table careslink_v1_generation.settings
   owner to careslink_v1_generation_owner;
 alter table careslink_v1_generation.jobs
   owner to careslink_v1_generation_owner;
 alter table careslink_v1_generation.attempts
+  owner to careslink_v1_generation_owner;
+revoke create on schema careslink_v1_generation
+  from careslink_v1_generation_owner;
+alter schema careslink_v1_generation
   owner to careslink_v1_generation_owner;
 
 -- The schema and object ACLs were closed above while the migration actor still

@@ -27,6 +27,11 @@ const assertionBody = assertions.slice(assertionBodyStart);
 const schemaName = "careslink_v1_generation";
 const ownerRole = "careslink_v1_generation_owner";
 const executorRole = "careslink_v1_generation_executor";
+const entryRoleRestore = `select pg_catalog.set_config(
+  'role',
+  pg_catalog.current_setting('careslink.migration_entry_role'),
+  false
+);`;
 
 const newTableNames = [
   "worker_policies",
@@ -136,7 +141,7 @@ describe("V1 Note registered-worker RPC shadow migration contract", () => {
     ).toEqual(newTableNames);
 
     const ownerDdlStart = migration.indexOf(`set role ${ownerRole};`);
-    const ownerDdlEnd = migration.indexOf("reset role;", ownerDdlStart);
+    const ownerDdlEnd = migration.indexOf(entryRoleRestore, ownerDdlStart);
     expect(ownerDdlStart).toBeGreaterThanOrEqual(0);
     expect(ownerDdlEnd).toBeGreaterThan(ownerDdlStart);
     for (const table of newTableNames) {
@@ -358,7 +363,10 @@ describe("V1 Note registered-worker RPC shadow migration contract", () => {
     expect(migration.match(/^alter default privileges\b/gm)).toHaveLength(8);
 
     const functionWindowStart = migration.lastIndexOf(`set role ${executorRole};`);
-    const functionWindowEnd = migration.indexOf("reset role;", functionWindowStart);
+    const functionWindowEnd = migration.indexOf(
+      entryRoleRestore,
+      functionWindowStart,
+    );
     expect(functionWindowStart).toBeGreaterThanOrEqual(0);
     expect(functionWindowEnd).toBeGreaterThan(functionWindowStart);
     const functionWindow = migration.slice(functionWindowStart, functionWindowEnd);
