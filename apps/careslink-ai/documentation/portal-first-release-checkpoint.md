@@ -628,10 +628,13 @@ and its absence verified. Production was not used as the SQL target, and no
 Production migration, deployment, capability or grant was changed. This is
 failure/cleanup evidence, not successful Preview evidence.
 
-The hosted-safe source repair changes the dedicated owner's global defaults
-inside a temporary `SET ROLE` / `RESET ROLE` window and performs the only schema
-revoke before ownership transfer. On a second fresh branch, all 13 exact source
-migrations applied successfully and the earlier `42501` did not recur. The
+The then-current source repair changed the dedicated owner's global defaults
+inside a temporary `SET ROLE` window, used `RESET ROLE` before object creation,
+and performed the only schema revoke before ownership transfer. The later
+2026-08-25 Hosted role-restoration gate superseded that unsafe exit with an
+explicit restore to the captured file-entry actor. On the second historical
+branch, all 13 exact source migrations applied successfully and the earlier
+`42501` did not recur. The
 rollback assertion then failed safely because PostgreSQL 17's
 `information_schema.table_constraints` included generated NOT NULL constraint
 names in addition to the declared constraints. Its transaction rolled back;
@@ -1170,3 +1173,33 @@ generation and the 73-file Codex-adapter sync check. This remains source/local
 evidence and does not claim promotion readiness. All earlier `r22` manifests,
 assertion identities and hashes remain historical evidence for their recorded
 revision and are not rewritten.
+
+## 24. Hosted CLI role-restoration and Portal posture gate — 2026-08-25
+
+The final non-default, `persistent=false`, `with_data=false` Preview was
+`hosted-role-restore-r5-20260825` (id
+`d68d531a-55e6-4374-be68-494da7542c75`, ref
+`eqqlvqqhvsogusqhzuaq`) under Production parent
+`adocsnwnslxhxcjgbyee`. Official Supabase CLI 2.115.0 applied the exact 30-file
+manifest and passed all 11 rollback suites in one remote reset. This included
+the Portal workflow and intake suites after all 31 of their completed role
+windows were changed from bare `RESET ROLE` to explicit restoration of the
+captured assertion-entry actor.
+
+The separate postcheck retained all five #30 Portal `SECURITY DEFINER`
+functions under the migration-entry owner, exact authenticated execution
+boundaries, hard-off Portal settings and zero referral, contact, audit and
+receipt fixtures. No API or generation-schema `CREATE` privilege leaked to the
+transport login or API roles. Portal security advisors reported one INFO and
+three WARN findings for the intended authenticated `SECURITY DEFINER` public
+functions. Portal performance scope retained 16 unused-index INFO and two
+`auth_rls_initplan` WARN advisories; they are recorded optimization work rather
+than a role/owner/ACL/RLS failure.
+
+The Preview was deleted and exact id/ref absence was verified. Production was
+never a SQL target, and no hosted Auth/Data API E2E, deployment, flag activation,
+caller route, retained fixture or ongoing Preview charge resulted.
+The final source gate passed the 11 direct contract files (162 tests), the full
+134-file / 1,657-test Vitest suite, TypeScript, lint, the Next.js 16.2.9 webpack
+production build with 63/63 static pages, the 73-file adapter check and diff
+checks.

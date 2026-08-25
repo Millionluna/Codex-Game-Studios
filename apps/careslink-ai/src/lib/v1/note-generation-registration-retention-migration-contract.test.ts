@@ -12,6 +12,11 @@ const assertions = readFileSync(join(process.cwd(), assertionsPath), "utf8");
 
 const schemaName = "careslink_v1_generation";
 const ownerRole = "careslink_v1_generation_owner";
+const entryRoleRestore = `select pg_catalog.set_config(
+  'role',
+  pg_catalog.current_setting('careslink.migration_entry_role'),
+  false
+);`;
 
 describe("V1 Note worker-registration retention migration contract", () => {
   it("is an additive CLI-named source-only hardening migration", () => {
@@ -54,7 +59,7 @@ describe("V1 Note worker-registration retention migration contract", () => {
     );
 
     const ownerStart = migration.indexOf(`set role ${ownerRole};`);
-    const ownerEnd = migration.indexOf("reset role;", ownerStart);
+    const ownerEnd = migration.indexOf(entryRoleRestore, ownerStart);
     expect(ownerStart).toBeGreaterThanOrEqual(0);
     expect(ownerEnd).toBeGreaterThan(ownerStart);
     expect(migration.indexOf("create index attempts_registration_digest_idx")).toBeGreaterThan(

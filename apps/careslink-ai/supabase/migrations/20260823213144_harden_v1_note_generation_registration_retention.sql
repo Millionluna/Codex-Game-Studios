@@ -8,6 +8,15 @@
 --
 -- The migration runner owns the transaction boundary.
 
+-- Supabase Hosted may authenticate the CLI with a login role and then enter
+-- the migration as its database actor. Preserve that actor transactionally
+-- before any temporary owner/executor switch.
+select pg_catalog.set_config(
+  'careslink.migration_entry_role',
+  current_user,
+  true
+);
+
 -- PostgreSQL 16+ keeps membership options per grantor. Add only a temporary
 -- SET edge for owner-only DDL; the bootstrap admin-only creator edge remains
 -- untouched when this exact grantor edge is revoked below.
@@ -41,7 +50,11 @@ alter table careslink_v1_generation.attempts
 alter table careslink_v1_generation.attempts
   validate constraint attempts_registration_catalog_fk;
 
-reset role;
+select pg_catalog.set_config(
+  'role',
+  pg_catalog.current_setting('careslink.migration_entry_role'),
+  false
+);
 
 -- Remove only this migration's temporary SET edge.
 revoke careslink_v1_generation_owner from current_user

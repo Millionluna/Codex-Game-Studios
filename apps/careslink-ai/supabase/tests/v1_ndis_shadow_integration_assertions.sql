@@ -4,6 +4,12 @@
 
 begin;
 
+select pg_catalog.set_config(
+  'careslink.assertion_entry_role',
+  current_user,
+  true
+);
+
 select set_config('request.jwt.claim.role', 'service_role', true);
 
 do $$
@@ -968,7 +974,11 @@ begin
 end;
 $$;
 
-reset role;
+select pg_catalog.set_config(
+  'role',
+  pg_catalog.current_setting('careslink.assertion_entry_role'),
+  false
+);
 select set_config('request.jwt.claim.role', 'service_role', true);
 select set_config('request.jwt.claim.sub', '', true);
 
@@ -1023,7 +1033,11 @@ begin
 end;
 $$;
 
-reset role;
+select pg_catalog.set_config(
+  'role',
+  pg_catalog.current_setting('careslink.assertion_entry_role'),
+  false
+);
 select set_config('request.jwt.claim.role', 'service_role', true);
 select set_config('request.jwt.claim.sub', '', true);
 

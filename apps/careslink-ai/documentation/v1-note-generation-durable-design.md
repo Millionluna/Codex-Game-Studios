@@ -355,8 +355,10 @@ authority: the migration and assertions require `INHERIT=false` and
 transfer and owner-default-ACL hardening is scoped to the migration grantor and
 revoked before completion. A hosted non-superuser migration actor enters a
 bounded `SET ROLE` window so the dedicated owner alters its own global defaults,
-then `RESET ROLE`s before table creation. API roles and the executor are
-forbidden as members.
+then restores the transaction-captured migration entry actor explicitly. It
+must not use `RESET ROLE`, because a Hosted CLI connection may have a transport
+`session_user` that differs from the entry actor. API roles and the executor
+are forbidden as members.
 
 Every privileged function must be narrowly typed, owned by the reviewed
 non-login executor role, declared `SECURITY DEFINER`, and use
@@ -551,12 +553,14 @@ as the SQL target, and no deployment, runtime capability or execute grant was
 added or enabled. This is failure/cleanup evidence, not successful Preview
 evidence.
 
-The repaired source now has the dedicated owner alter its global defaults
-inside a temporary `SET ROLE` / `RESET ROLE` window and does not repeat the
-schema revoke after the migration actor transfers ownership. A second fresh
-branch clean-applied all 13 exact source migrations; the earlier `42501` did not
-recur, so that hosted repair is now execution evidence rather than source-only
-inference.
+The repaired revision used for that historical gate had the dedicated owner
+alter its global defaults inside a temporary `SET ROLE` / `RESET ROLE` window
+and did not repeat the schema revoke after the migration actor transferred
+ownership. A second fresh branch clean-applied all 13 exact source migrations;
+the earlier `42501` did not recur, so that recorded revision gained execution
+evidence rather than source-only inference. Section 16 records the later
+Hosted-CLI role-topology correction; this paragraph is not evidence for that
+newer source.
 
 The rollback-only assertion then failed inside its transaction because
 PostgreSQL 17's `information_schema.table_constraints` includes generated NOT
@@ -1056,3 +1060,75 @@ roles, hard-off settings and zero generation fixtures, and passed both real
 retirement-first and claim-first lock orderings. Historical `r22` manifests and
 assertion hashes continue to describe only their recorded revision and are not
 rewritten by this handoff.
+
+## 16. Hosted CLI migration-entry role restoration — 2026-08-25
+
+Supabase Hosted may authenticate its migration connection as a transport login
+role and enter the database migration actor with `SET ROLE`. In that topology,
+`session_user` and the file-entry `current_user` differ. PostgreSQL
+`RESET ROLE` returns to the connection default or `session_user`; it is not a
+stack pop to the preceding `current_user`. The five Production-unapplied Note
+generation migrations #25 through #29 previously contained 25 such exits
+(`1 / 7 / 1 / 5 / 11`). A normal Hosted CLI apply could therefore lose the
+migration actor after the first dedicated owner/executor window.
+
+Each of those migrations now transaction-locally captures its entry actor in
+`careslink.migration_entry_role` before any role switch. Every owner/executor
+exit restores the `role` GUC to that captured actor with session scope so the
+actor remains correct after the runner commits. Capture is transaction-local
+and rolls back with a failed migration. The two #26 auth-reader schema grants
+also target that captured actor through identifier-safe `%I` formatting;
+neither grant, function ownership nor cleanup relies on the transport
+`session_user`.
+
+The same non-superuser PostgreSQL 16.15 run exposed and closed a second #25
+ownership precondition. The prospective table owner needs `CREATE` on the
+containing schema. #25 now grants that dedicated `NOLOGIN` owner only for the
+three table-owner transfers, revokes the grant while the migration actor still
+owns the schema, and transfers the schema last. No explicit migration-entry or
+transport-login schema privilege remains.
+
+The local gate used a fresh loopback-only cluster with a `LOGIN NOINHERIT`
+transport role and a distinct `NOLOGIN CREATEROLE` migration actor. The
+rollback-only role/ACL assertion passed, including identifier-safe dynamic
+grant and revoke. A separate commit boundary retained the migration actor as
+`current_user` after `COMMIT`. The full #25 migration then committed in that
+topology: all three tables and the schema were owned by the dedicated owner;
+both transport and entry roles had zero schema `CREATE`; the temporary
+`SET=true` membership was gone; and only the PostgreSQL 16 admin-only bootstrap
+edge (`ADMIN=true`, `INHERIT=false`, `SET=false`) remained. The server was
+stopped and the exact temporary cluster directory was permanently deleted.
+
+Four diagnostic no-data Hosted iterations then exposed and closed assertion-
+harness defects without changing Production. Hosted enters assertion files as
+`current_user=postgres` while retaining a distinct transport `session_user`.
+The four generation suites and five ordinary/Portal suites now capture that
+entry actor once and use 82 explicit restores instead of bare `RESET ROLE`.
+The dedicated restoration suite inspects the temporary ACL directly with
+`aclexplode`; an effective-privilege check was invalid because a SET-only role
+membership can preserve indirect privilege after the direct ACL is revoked.
+
+The final non-default, `persistent=false`, `with_data=false` Preview was
+`hosted-role-restore-r5-20260825` (id
+`d68d531a-55e6-4374-be68-494da7542c75`, ref
+`eqqlvqqhvsogusqhzuaq`) under Production parent
+`adocsnwnslxhxcjgbyee`. In one official Supabase CLI 2.115.0 remote reset, the
+exact 30 migrations and all 11 rollback suites passed. The special suite proved
+the real `session_user != current_user` topology, entry-actor `CREATEROLE`,
+temporary grant, explicit restore, revoke and direct-ACL cleanup.
+
+A separate rollback-only postcheck proved the exact 30-row migration manifest;
+14 owner-correct forced-RLS generation tables; four locked `NOLOGIN NOINHERIT`
+roles and exact bootstrap edges; both #26 auth/privacy readers and all five #30
+Portal `SECURITY DEFINER` functions owned by the entry actor; hard-off settings;
+zero checked Auth, Portal and generation fixtures; and no API or schema-
+`CREATE` leak. Security advisors reported zero generation findings. Generation
+performance scope retained 14 unindexed-FK INFO, four unused-index INFO and 13
+`auth_rls_initplan` WARN advisories; these are tracked separately from the role
+boundary. The Preview was deleted and exact id/ref absence was verified, leaving
+only the healthy default Production branch. Production was never a SQL target;
+no deployment, activation, business data or ongoing Preview charge resulted.
+The final source gate passed the 11 direct contract files (162 tests), the full
+134-file / 1,657-test Vitest suite, TypeScript, lint, the Next.js 16.2.9 webpack
+production build with 63/63 static pages, the 73-file adapter check and
+`git diff --check`.

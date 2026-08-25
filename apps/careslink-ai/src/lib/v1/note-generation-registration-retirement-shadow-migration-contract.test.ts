@@ -389,7 +389,7 @@ describe("V1 Note worker-registration retirement shadow migration contract", () 
     expect(terminalAttemptInsert).toContain("'FAILED'");
   });
 
-  it("ships the frozen rollback-only PostgreSQL 16 retirement gate", () => {
+  it("ships the current rollback-only PostgreSQL retirement gate", () => {
     const assertionHeader = assertions.slice(0, assertionBodyStart);
     const normalizedHeader = assertionHeader
       .replace(/^-- ?/gm, "")
@@ -399,10 +399,10 @@ describe("V1 Note worker-registration retirement shadow migration contract", () 
     expect(assertionsPath).toBe(
       "supabase/assertions/v1_note_generation_registration_retirement_shadow_assertions.sql",
     );
-    expect(Buffer.byteLength(assertions, "utf8")).toBe(50_987);
+    expect(Buffer.byteLength(assertions, "utf8")).toBe(52_236);
     expect(
       createHash("sha256").update(assertions, "utf8").digest("hex"),
-    ).toBe("0a58b4b6731e48525af4b9eaf395cb4d20bebc4e77baea5c0207b9e2c92f7cbc");
+    ).toBe("301da01ebbca2f4165579113c559c7a2e624919d703cb4c9b43b8bf2232ceb13");
     for (const marker of [
       "Manual rollback-only assertions for a fresh disposable PostgreSQL 16+",
       "after every repository migration has been applied",
@@ -410,6 +410,11 @@ describe("V1 Note worker-registration retirement shadow migration contract", () 
       "TEST_ONLY fixtures",
       "Production must never be the SQL target",
       "does not claim to exercise the separate two-connection claim/retirement race",
+      "official Supabase CLI 2.115.0",
+      "30/30 migrations",
+      "11/11 rollback suites",
+      "hosted-role-restore-r5-20260825",
+      "deletion and exact id/ref absence were confirmed",
     ]) {
       expect(normalizedHeader).toContain(marker);
     }
@@ -418,10 +423,10 @@ describe("V1 Note worker-registration retirement shadow migration contract", () 
     expect(assertionBody.startsWith("begin;\n")).toBe(true);
     expect(assertionBody.endsWith("rollback;\n")).toBe(true);
     expect(assertionBody).not.toMatch(/^commit\s*;/im);
-    expect(Buffer.byteLength(assertionBody, "utf8")).toBe(50_584);
+    expect(Buffer.byteLength(assertionBody, "utf8")).toBe(51_410);
     expect(
       createHash("sha256").update(assertionBody, "utf8").digest("hex"),
-    ).toBe("3c9b1d9cfd0919bdf1213d3272923261cc9399cc88fcdd85e46469c8e026440f");
+    ).toBe("7701051c4bd11159833ccd5c9a3604becc5b38d79d25e1e280aff80d4e9513a4");
 
     for (const marker of [
       "registration-retirement shadow requires PostgreSQL 16 or newer",

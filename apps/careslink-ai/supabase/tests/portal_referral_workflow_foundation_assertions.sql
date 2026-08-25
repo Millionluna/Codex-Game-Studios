@@ -8,6 +8,12 @@
 
 begin;
 
+select pg_catalog.set_config(
+  'careslink.assertion_entry_role',
+  current_user,
+  true
+);
+
 do $$
 declare
   v_table text;
@@ -755,7 +761,11 @@ begin
 end
 $$;
 
-reset role;
+select pg_catalog.set_config(
+  'role',
+  pg_catalog.current_setting('careslink.assertion_entry_role'),
+  false
+);
 select set_config(
   'request.jwt.claims',
   '{"role":"authenticated","sub":"90000000-0000-4000-8000-000000000006","session_id":"90000000-0000-4000-8000-000000000606"}',
@@ -785,7 +795,11 @@ begin
 end
 $$;
 
-reset role;
+select pg_catalog.set_config(
+  'role',
+  pg_catalog.current_setting('careslink.assertion_entry_role'),
+  false
+);
 select set_config(
   'request.jwt.claims',
   '{"role":"authenticated","sub":"92000000-0000-4000-8000-000000000002","session_id":"92200000-0000-4000-8000-000000000002"}',
@@ -812,7 +826,11 @@ begin
 end
 $$;
 
-reset role;
+select pg_catalog.set_config(
+  'role',
+  pg_catalog.current_setting('careslink.assertion_entry_role'),
+  false
+);
 select set_config(
   'request.jwt.claims',
   '{"role":"authenticated","sub":"93000000-0000-4000-8000-000000000003","session_id":"93300000-0000-4000-8000-000000000003"}',
@@ -837,7 +855,11 @@ begin
 end
 $$;
 
-reset role;
+select pg_catalog.set_config(
+  'role',
+  pg_catalog.current_setting('careslink.assertion_entry_role'),
+  false
+);
 select set_config(
   'request.jwt.claims',
   '{"role":"authenticated","sub":"94000000-0000-4000-8000-000000000004","session_id":"94400000-0000-4000-8000-000000000004"}',
@@ -861,7 +883,11 @@ begin
 end
 $$;
 
-reset role;
+select pg_catalog.set_config(
+  'role',
+  pg_catalog.current_setting('careslink.assertion_entry_role'),
+  false
+);
 insert into public.portal_organization_memberships (
   organization_id, user_id, role, status
 ) values (
@@ -882,7 +908,11 @@ begin
 end
 $$;
 
-reset role;
+select pg_catalog.set_config(
+  'role',
+  pg_catalog.current_setting('careslink.assertion_entry_role'),
+  false
+);
 update public.portal_referral_matches
 set status = 'DECLINED', row_version = row_version + 1, updated_at = now()
 where id = '98000000-0000-4000-8000-000000000001';
@@ -912,7 +942,11 @@ begin
 end
 $$;
 
-reset role;
+select pg_catalog.set_config(
+  'role',
+  pg_catalog.current_setting('careslink.assertion_entry_role'),
+  false
+);
 update public.portal_referrals
 set current_status = 'ACCEPTED',
     assigned_provider_id = '96000000-0000-4000-8000-000000000003',
@@ -932,7 +966,11 @@ begin
 end
 $$;
 
-reset role;
+select pg_catalog.set_config(
+  'role',
+  pg_catalog.current_setting('careslink.assertion_entry_role'),
+  false
+);
 update public.portal_referral_matches
 set status = 'ACCEPTED', row_version = row_version + 1, updated_at = now()
 where id = '98000000-0000-4000-8000-000000000001';
@@ -953,7 +991,11 @@ begin
 end
 $$;
 
-reset role;
+select pg_catalog.set_config(
+  'role',
+  pg_catalog.current_setting('careslink.assertion_entry_role'),
+  false
+);
 update public.portal_organizations
 set status = 'SUSPENDED', updated_at = now()
 where id = '95000000-0000-4000-8000-000000000003';
@@ -972,7 +1014,11 @@ begin
 end
 $$;
 
-reset role;
+select pg_catalog.set_config(
+  'role',
+  pg_catalog.current_setting('careslink.assertion_entry_role'),
+  false
+);
 update public.portal_organizations
 set status = 'ACTIVE', updated_at = now()
 where id = '95000000-0000-4000-8000-000000000003';
@@ -990,7 +1036,11 @@ begin
 end
 $$;
 
-reset role;
+select pg_catalog.set_config(
+  'role',
+  pg_catalog.current_setting('careslink.assertion_entry_role'),
+  false
+);
 update public.portal_providers
 set review_status = 'APPROVED', updated_at = now()
 where id = '96000000-0000-4000-8000-000000000003';
@@ -1010,7 +1060,11 @@ begin
 end
 $$;
 
-reset role;
+select pg_catalog.set_config(
+  'role',
+  pg_catalog.current_setting('careslink.assertion_entry_role'),
+  false
+);
 update public.portal_organization_memberships
 set status = 'ACTIVE', updated_at = now()
 where organization_id = '95000000-0000-4000-8000-000000000003'
@@ -1043,7 +1097,11 @@ begin
 end
 $$;
 
-reset role;
+select pg_catalog.set_config(
+  'role',
+  pg_catalog.current_setting('careslink.assertion_entry_role'),
+  false
+);
 update public.portal_organizations
 set status = 'ACTIVE', updated_at = now()
 where id = '95000000-0000-4000-8000-000000000001';
@@ -1070,7 +1128,11 @@ begin
 end
 $$;
 
-reset role;
+select pg_catalog.set_config(
+  'role',
+  pg_catalog.current_setting('careslink.assertion_entry_role'),
+  false
+);
 update public.portal_organizations
 set status = 'SUSPENDED', updated_at = now()
 where id = '95000000-0000-4000-8000-000000000005';
@@ -1088,7 +1150,11 @@ begin
 end
 $$;
 
-reset role;
+select pg_catalog.set_config(
+  'role',
+  pg_catalog.current_setting('careslink.assertion_entry_role'),
+  false
+);
 update public.portal_organizations
 set status = 'ACTIVE', updated_at = now()
 where id = '95000000-0000-4000-8000-000000000005';
@@ -1120,5 +1186,9 @@ begin
 end
 $$;
 
-reset role;
+select pg_catalog.set_config(
+  'role',
+  pg_catalog.current_setting('careslink.assertion_entry_role'),
+  false
+);
 rollback;

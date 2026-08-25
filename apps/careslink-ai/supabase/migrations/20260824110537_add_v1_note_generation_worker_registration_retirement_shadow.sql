@@ -10,6 +10,15 @@
 -- and its in-flight/grant/purge recovery semantics remain a separate blocker.
 -- The migration runner owns the transaction boundary.
 
+-- Supabase Hosted may authenticate the CLI with a login role and then enter
+-- the migration as its database actor. Preserve that actor transactionally
+-- before any temporary owner/executor switch.
+select pg_catalog.set_config(
+  'careslink.migration_entry_role',
+  current_user,
+  true
+);
+
 create role careslink_v1_generation_registration_control_executor
   with nologin nosuperuser nocreatedb nocreaterole noinherit
     noreplication nobypassrls;
@@ -82,7 +91,11 @@ alter default privileges in schema careslink_v1_generation
     careslink_v1_generation_executor,
     careslink_v1_generation_owner_api_executor;
 
-reset role;
+select pg_catalog.set_config(
+  'role',
+  pg_catalog.current_setting('careslink.migration_entry_role'),
+  false
+);
 
 -- ---------------------------------------------------------------------------
 -- Append-only retirement ledger and lock-supporting catalog index
@@ -230,7 +243,11 @@ grant create on schema careslink_v1_generation
     careslink_v1_generation_executor,
     careslink_v1_generation_owner_api_executor;
 
-reset role;
+select pg_catalog.set_config(
+  'role',
+  pg_catalog.current_setting('careslink.migration_entry_role'),
+  false
+);
 
 -- ---------------------------------------------------------------------------
 -- Registration-retirement helper, guards and private control RPC
@@ -515,7 +532,11 @@ grant execute on function
   careslink_v1_generation._enforce_running_attempt_registration_accepts_new_work()
   to careslink_v1_generation_owner;
 
-reset role;
+select pg_catalog.set_config(
+  'role',
+  pg_catalog.current_setting('careslink.migration_entry_role'),
+  false
+);
 
 -- Attach guards as the catalog owner. Trigger functions remain owned by the
 -- low-privilege control executor and expose no callable API surface.
@@ -543,7 +564,11 @@ when (new.status = 'RUNNING')
 execute function
   careslink_v1_generation._enforce_running_attempt_registration_accepts_new_work();
 
-reset role;
+select pg_catalog.set_config(
+  'role',
+  pg_catalog.current_setting('careslink.migration_entry_role'),
+  false
+);
 
 -- Remove the table owner's trigger-attachment grants, then expose only the
 -- content-free boolean helper to the two existing definer executors.
@@ -567,7 +592,11 @@ grant execute on function
   to careslink_v1_generation_executor,
     careslink_v1_generation_owner_api_executor;
 
-reset role;
+select pg_catalog.set_config(
+  'role',
+  pg_catalog.current_setting('careslink.migration_entry_role'),
+  false
+);
 
 -- ---------------------------------------------------------------------------
 -- Worker claim replacement: reject a retired registration before queue scan
@@ -811,7 +840,11 @@ begin
 end;
 $$;
 
-reset role;
+select pg_catalog.set_config(
+  'role',
+  pg_catalog.current_setting('careslink.migration_entry_role'),
+  false
+);
 
 -- ---------------------------------------------------------------------------
 -- Owner admission replacement: replay first, then binding -> registration
@@ -1409,7 +1442,11 @@ end;
 $$;
 
 
-reset role;
+select pg_catalog.set_config(
+  'role',
+  pg_catalog.current_setting('careslink.migration_entry_role'),
+  false
+);
 
 
 -- ---------------------------------------------------------------------------
@@ -1452,7 +1489,11 @@ revoke all on function
     careslink_v1_generation_executor,
     careslink_v1_generation_owner_api_executor;
 
-reset role;
+select pg_catalog.set_config(
+  'role',
+  pg_catalog.current_setting('careslink.migration_entry_role'),
+  false
+);
 
 set role careslink_v1_generation_executor;
 
@@ -1465,7 +1506,11 @@ revoke all on function
     careslink_v1_generation_owner_api_executor,
     careslink_v1_generation_registration_control_executor;
 
-reset role;
+select pg_catalog.set_config(
+  'role',
+  pg_catalog.current_setting('careslink.migration_entry_role'),
+  false
+);
 
 set role careslink_v1_generation_owner_api_executor;
 
@@ -1479,7 +1524,11 @@ revoke all on function
     careslink_v1_generation_executor,
     careslink_v1_generation_registration_control_executor;
 
-reset role;
+select pg_catalog.set_config(
+  'role',
+  pg_catalog.current_setting('careslink.migration_entry_role'),
+  false
+);
 
 set role careslink_v1_generation_owner;
 
@@ -1501,7 +1550,11 @@ revoke all on all tables in schema careslink_v1_generation
 revoke all on all sequences in schema careslink_v1_generation
   from public, anon, authenticated, service_role;
 
-reset role;
+select pg_catalog.set_config(
+  'role',
+  pg_catalog.current_setting('careslink.migration_entry_role'),
+  false
+);
 
 -- Remove only this migration's temporary PostgreSQL-16 SET edges. Every
 -- executor remains NOLOGIN and no runtime caller membership is introduced.

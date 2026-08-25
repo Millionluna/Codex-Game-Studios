@@ -5,6 +5,12 @@
 
 begin;
 
+select pg_catalog.set_config(
+  'careslink.assertion_entry_role',
+  current_user,
+  true
+);
+
 do $$
 declare
   v_count integer;
@@ -595,7 +601,11 @@ begin
   end if;
 end
 $$;
-reset role;
+select pg_catalog.set_config(
+  'role',
+  pg_catalog.current_setting('careslink.assertion_entry_role'),
+  false
+);
 
 -- Eligibility is bound to trusted Auth user state as well as the exact
 -- session row. User-editable metadata can never supply the provider role.
@@ -1189,7 +1199,11 @@ begin
 end
 $$;
 
-reset role;
+select pg_catalog.set_config(
+  'role',
+  pg_catalog.current_setting('careslink.assertion_entry_role'),
+  false
+);
 
 -- Frozen Product V1 must not mix legacy NDIS projections into its DTOs. This
 -- is stricter than the legacy owner policy: even a healthy matching source is
@@ -1383,7 +1397,11 @@ begin
 end
 $$;
 
-reset role;
+select pg_catalog.set_config(
+  'role',
+  pg_catalog.current_setting('careslink.assertion_entry_role'),
+  false
+);
 select set_config('request.jwt.claim.role', 'authenticated', true);
 select set_config(
   'request.jwt.claim.sub',
@@ -1486,7 +1504,11 @@ begin
 end
 $$;
 
-reset role;
+select pg_catalog.set_config(
+  'role',
+  pg_catalog.current_setting('careslink.assertion_entry_role'),
+  false
+);
 
 -- An expired session row is not active merely because it still exists.
 select set_config('request.jwt.claim.role', 'authenticated', true);
@@ -1636,7 +1658,11 @@ begin
 end
 $$;
 
-reset role;
+select pg_catalog.set_config(
+  'role',
+  pg_catalog.current_setting('careslink.assertion_entry_role'),
+  false
+);
 select set_config(
   'request.jwt.claims',
   '{"role":"service_role"}',
@@ -1653,7 +1679,11 @@ begin
   end if;
 end
 $$;
-reset role;
+select pg_catalog.set_config(
+  'role',
+  pg_catalog.current_setting('careslink.assertion_entry_role'),
+  false
+);
 
 update public.v1_mobile_sync_shadow_flags
 set enabled = false, updated_at = now()
