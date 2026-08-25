@@ -29,11 +29,16 @@ import {
   getAssessmentPipeline,
   getSourceReadinessMap,
 } from "@/lib/provider-assessment";
-import { isPortalReferralRuntimeEnabled } from "@/lib/portal-referral-runtime.server";
+import {
+  isPortalReferralRuntimeEnabled,
+  isPortalReferralSourceDetailRuntimeEnabled,
+} from "@/lib/portal-referral-runtime.server";
 import { getRolePortal } from "@/lib/role-portals";
 
 export default function ReferralSourcePortalPage() {
   const portalReferralRuntimeEnabled = isPortalReferralRuntimeEnabled();
+  const portalReferralSourceDetailEnabled =
+    isPortalReferralSourceDetailRuntimeEnabled();
   const portal = getRolePortal("referral_source");
   const source = referralSources[0];
   const sourcedReferrals = referrals.filter(
@@ -125,6 +130,7 @@ export default function ReferralSourcePortalPage() {
 
             <div className="mt-5">
               <PortalReferralIntakeControls
+                detailEnabled={portalReferralSourceDetailEnabled}
                 enabled={portalReferralRuntimeEnabled}
               />
             </div>

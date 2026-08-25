@@ -147,6 +147,24 @@ Security, reminders, content/digest, Points and marketing are separate preferenc
 
 When every default-off application gate and the exact non-Production Preview ref pass, the browser first requests a metadata-only source list. The server creates a request-scoped cookie Supabase client, rejects Bearer authorization and calls the database authorize RPC before enabling private inputs. The database revalidates its separate flag, Auth session/user and one active referral-source membership. Only then may create atomically write the referral, separately protected contact, metadata-only audit and idempotency receipt; the UI renders only the metadata ACK/list. An authorization-boundary failure disables further submission. This path uses no OpenAI call, Points, service role, worker or background retry. It remains source/local only, with all gates and the database flag off and no hosted deployment.
 
+The independently gated source-detail read closes that intake loop without
+opening assignment. When both operation gates are enabled, the durable metadata
+list links to the exact UUID detail page. A canonical referral UUID is sent to
+the existing GET route; a detail-specific preauthorization RPC and the read RPC
+each refresh the same database session and membership context, check master +
+detail, and the latter returns the
+private summary/contact only when the referral belongs to that exact source
+organization. A missing UUID and another tenant's UUID both become the same
+not-found result. Error bodies are never parsed into browser detail state, and
+the durable page never falls back to a mock record. This is also source/local
+only and does not enable triage, offer, provider response, follow-up or audit.
+
+The same migration adds `referral_intake_v1` and replaces the old private
+intake gate helper, so authenticated callers cannot bypass the application by
+calling Data API list/create directly while only master + detail is enabled.
+Intake authorize/list/create now require master + intake; neither operation gate
+opens the other.
+
 ## 12. Legacy Profile / Readiness / Referrals
 
 These Web routes keep their current profile, access-code, guided material and outreach flow for regression compatibility. They are not part of App parity, do not create canonical AI Note documents and must not grant or debit the personal V1 Points wallet unless a future approved contract explicitly adds that service.

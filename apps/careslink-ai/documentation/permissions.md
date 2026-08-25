@@ -75,7 +75,7 @@ Current admin pages may display access-request metadata, feature counts, statuse
 
 ## V1 shadow permission contract and isolated evidence
 
-### Portal Referral foundation and intake runtime (source/local and unapplied)
+### Portal Referral foundation, intake and source-detail runtime (source/local and unapplied)
 
 The Portal Referral foundation introduces organization membership, provider,
 referral, separately protected contact, match, follow-up, receipt, audit,
@@ -85,6 +85,25 @@ migration adds exactly three public `SECURITY DEFINER` RPCs—authorize, source
 metadata list and atomic create—with `search_path=''` and `EXECUTE` only for
 `authenticated`; `PUBLIC`, `anon` and `service_role` remain revoked. Its two
 private helpers grant no caller execution.
+
+The later source-detail migration adds two read-only public `SECURITY DEFINER`
+RPCs—`portal_referral_source_detail_authorize()` and
+`portal_referral_source_detail(uuid)`—under the migration-entry owner with
+`search_path=''`. It revokes `PUBLIC`, `anon`, `authenticated` and
+`service_role` before granting `EXECUTE` back only to `authenticated`; no table
+grant is added. Both RPCs hold master + source-detail database gates, then reuse
+the fresh intake session/membership context. The detail tenant predicate
+requires the exact source organization, and
+cross-tenant and absent identifiers both raise `PORTAL_NOT_FOUND`. The DTO is
+limited to referral ID, summary, region, service, status, version, contact and
+timestamps; source/actor/assignment/document/export/audit identities are not
+returned.
+
+That migration also creates the independently default-off `referral_intake_v1`
+row and replaces the private intake gate helper. The already granted intake
+authorize/list/create RPCs now hold master + intake before validation or write,
+so master + detail cannot open intake through a direct Data API call. Conversely,
+master + intake cannot open either detail RPC.
 
 The local actor-bound test adapter enforces Source A/B, Provider A/B and
 partner-operator tenant isolation. Providers receive only frozen region/service
@@ -96,8 +115,9 @@ copy contact, summary, client correlation or raw idempotency values. Raw match
 and audit rows are limited to platform admin or the tenant partner operator in
 the draft RLS contract.
 
-The default runtime now supplies a request-scoped cookie client only after all
-three application gates and the exact non-Production Preview ref pass. It
+The default runtime now supplies a request-scoped cookie client only after the
+base API and durable-adapter gates, the selected independent operation gate and
+the exact non-Production Preview ref pass. It
 rejects caller Bearer authorization, never creates a service-role client and
 executes database authorization before a private mutation body is parsed. The
 database revalidates the current Auth user/session and exactly one active
@@ -105,7 +125,8 @@ referral-source membership in an active referral-source organization; actor,
 organization and role are never accepted from the body. List is source-scoped
 and metadata-only. Create atomically writes referral, private contact, audit and
 receipt rows with hashed mutation/correlation identifiers. The database flag
-and all application gates remain off, and this is source/local disposable-SQL
+and all application gates remain off. Source detail is read-only and cannot
+write referral, contact, audit or receipt rows. This is source/local disposable-SQL
 evidence only: no hosted Preview or Production migration, activation or
 deployment is claimed.
 

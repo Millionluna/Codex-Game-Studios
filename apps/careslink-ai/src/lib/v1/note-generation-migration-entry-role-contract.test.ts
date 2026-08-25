@@ -157,6 +157,15 @@ const assertionCases = [
     checksBootstrapMembership: false,
     adjacentSwitches: [],
   },
+  {
+    name: "Portal source detail runtime assertion",
+    path: "supabase/tests/portal_referral_source_detail_runtime_assertions.sql",
+    roleSwitches: 8,
+    restores: 8,
+    rollbackClosesLastRole: false,
+    checksBootstrapMembership: false,
+    adjacentSwitches: [],
+  },
 ] as const;
 const assertionsWithRoleWindows = assertionCases.map((assertionCase) => ({
   ...assertionCase,

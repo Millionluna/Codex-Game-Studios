@@ -5,6 +5,7 @@ import type {
   PortalReferralContact,
   PortalReferralFollowUpOutcomeCode,
   PortalReferralMutationMetadata,
+  PortalReferralStatus,
   PortalReferralWorkflowPort,
 } from "./portal-referral-workflow";
 
@@ -39,6 +40,23 @@ export type PortalReferralFollowUpCommand = Readonly<{
   outcomeCode: PortalReferralFollowUpOutcomeCode;
 }>;
 
+/**
+ * Exact referral-source detail projection. It deliberately excludes tenant,
+ * assignment, document, export and audit fields that the source detail RPC does
+ * not authorize.
+ */
+export type PortalReferralSourceDetail = Readonly<{
+  referralId: string;
+  summary: string;
+  region: string;
+  serviceType: string;
+  currentStatus: PortalReferralStatus;
+  rowVersion: number;
+  contact: PortalReferralContact;
+  createdAt: string;
+  updatedAt: string;
+}>;
+
 export type PortalReferralApi = Readonly<{
   listReferrals(): MaybePromise<
     ReturnType<PortalReferralWorkflowPort["listReferrals"]>
@@ -49,7 +67,10 @@ export type PortalReferralApi = Readonly<{
   ): MaybePromise<ReturnType<PortalReferralWorkflowPort["createReferral"]>>;
   getReferral(
     referralId: string,
-  ): MaybePromise<ReturnType<PortalReferralWorkflowPort["getReferral"]>>;
+  ): MaybePromise<
+    PortalReferralSourceDetail |
+      ReturnType<PortalReferralWorkflowPort["getReferral"]>
+  >;
   triageReferral(
     referralId: string,
     expectedVersion: number,

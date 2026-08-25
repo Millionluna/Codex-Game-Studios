@@ -13,16 +13,20 @@ import {
   PortalReferralIntakeControls,
   PortalReferralOfferControls,
   PortalReferralProviderOfferCard,
+  PortalReferralReadback,
   PortalReferralResponseControls,
+  PortalReferralSourceDetailPanel,
   PortalReferralTriageControls,
   canSubmitPortalReferralIntake,
   createPortalReferralMutationRequest,
   loadPortalReferralReadback,
+  loadPortalReferralSourceDetail,
   portalReferralMutationInvalidatesPreauthorization,
   submitPortalReferralIntakeAndReadback,
   submitPortalReferralMutation,
   type PortalReferralListResult,
   type PortalReferralMutation,
+  type PortalReferralSourceDetail,
 } from "./portal-referral-workflow-controls";
 
 const MUTATION_ID = "portal.ui:test-mutation-0001";
@@ -30,6 +34,12 @@ const REFERRAL_ID = "11111111-1111-4111-8111-111111111111";
 const PROVIDER_ID = "22222222-2222-4222-8222-222222222222";
 const MATCH_ID = "33333333-3333-4333-8333-333333333333";
 const UPDATED_AT = "2026-08-24T02:15:30.000Z";
+const CREATED_AT = "2026-08-24T01:15:30.000Z";
+const CONTACT = {
+  name: "Person A",
+  phone: "0400000000",
+  email: "person-a@example.invalid",
+} as const;
 const CREATE_MUTATION = {
   kind: "CREATE_REFERRAL",
   region: "VIC_MELBOURNE",
@@ -107,6 +117,52 @@ describe("Portal referral workflow controls", () => {
     expect(markup).not.toContain('autoComplete="tel"');
     expect(markup).not.toContain('autoComplete="email"');
     expect(markup).not.toContain("No list request is sent");
+  });
+
+  it("keeps source detail request-free while disabled and renders only a loading shell when enabled", () => {
+    const disabled = renderToStaticMarkup(
+      <PortalReferralSourceDetailPanel referralId={REFERRAL_ID} />,
+    );
+    const enabled = renderToStaticMarkup(
+      <PortalReferralSourceDetailPanel enabled referralId={REFERRAL_ID} />,
+    );
+
+    expect(disabled).toContain("No detail request is sent");
+    expect(disabled).not.toContain("Loading authorized referral detail");
+    expect(enabled).toContain("Loading authorized referral detail");
+    expect(enabled).not.toContain(CONTACT.name);
+    expect(enabled).not.toContain(CONTACT.phone);
+  });
+
+  it("links durable list items to source detail only when the detail gate is enabled", () => {
+    const result: PortalReferralListResult = {
+      ok: true,
+      items: [
+        {
+          referralId: REFERRAL_ID,
+          region: "VIC_MELBOURNE",
+          serviceType: "SUPPORT_COORDINATION",
+          currentStatus: "SUBMITTED",
+          rowVersion: 1,
+          updatedAt: UPDATED_AT,
+        },
+      ],
+    };
+    const disabled = renderToStaticMarkup(
+      <PortalReferralReadback
+        detailEnabled={false}
+        enabled
+        result={result}
+      />,
+    );
+    const enabled = renderToStaticMarkup(
+      <PortalReferralReadback detailEnabled enabled result={result} />,
+    );
+
+    expect(disabled).not.toContain(`/referrals/${REFERRAL_ID}`);
+    expect(disabled).not.toContain("Open authorized detail");
+    expect(enabled).toContain(`href="/referrals/${REFERRAL_ID}"`);
+    expect(enabled).toContain("Open authorized detail");
   });
 
   it("permits private intake only after a successful database preauthorization", () => {
@@ -350,6 +406,121 @@ describe("Portal referral workflow controls", () => {
     expect(fetcher).not.toHaveBeenCalled();
   });
 
+  it("makes zero source-detail requests while disabled or given an invalid id", async () => {
+    const fetcher = vi.fn();
+
+    await expect(
+      loadPortalReferralSourceDetail({ referralId: REFERRAL_ID, fetcher }),
+    ).resolves.toEqual({ ok: false, code: "CAPABILITY_DISABLED" });
+    await expect(
+      loadPortalReferralSourceDetail({
+        enabled: true,
+        referralId: "mock-referral-id",
+        fetcher,
+      }),
+    ).resolves.toEqual({ ok: false, code: "REQUEST_FAILED" });
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+
+  it("loads one exact authorized source detail without putting private data in the request", async () => {
+    const detail = sourceDetail();
+    const fetcher = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({ referral: detail }),
+    }));
+
+    await expect(
+      loadPortalReferralSourceDetail({
+        enabled: true,
+        referralId: REFERRAL_ID,
+        fetcher,
+      }),
+    ).resolves.toEqual({ ok: true, detail });
+    expect(fetcher).toHaveBeenCalledWith(
+      `/api/portal/referrals/${REFERRAL_ID}`,
+      {
+        method: "GET",
+        credentials: "same-origin",
+        cache: "no-store",
+        headers: { accept: "application/json" },
+      },
+    );
+    expect(JSON.stringify(fetcher.mock.calls)).not.toContain(CONTACT.name);
+    expect(JSON.stringify(fetcher.mock.calls)).not.toContain(CONTACT.phone);
+  });
+
+  it.each([
+    { referral: { ...sourceDetail(), extra: "private" } },
+    { referral: { ...sourceDetail(), contact: { ...CONTACT, extra: "private" } } },
+    {
+      referral: {
+        ...sourceDetail(),
+        referralId: "A1111111-1111-4111-8111-111111111111",
+      },
+    },
+    { referral: { ...sourceDetail(), summary: ` ${sourceDetail().summary}` } },
+    { referral: { ...sourceDetail(), region: "VIC_UNKNOWN" } },
+    { referral: { ...sourceDetail(), serviceType: "FREE_TEXT" } },
+    { referral: { ...sourceDetail(), currentStatus: "UNKNOWN" } },
+    { referral: { ...sourceDetail(), rowVersion: 0 } },
+    { referral: { ...sourceDetail(), createdAt: "2026-02-31T00:00:00Z" } },
+    { referral: { ...sourceDetail(), updatedAt: "not-a-time" } },
+    {
+      referral: {
+        ...sourceDetail(),
+        createdAt: "2026-08-25T00:00:00.000Z",
+        updatedAt: "2026-08-24T00:00:00.000Z",
+      },
+    },
+  ])("fails closed on unsafe source-detail envelope %#", async (body) => {
+    const result = await loadPortalReferralSourceDetail({
+      enabled: true,
+      referralId: REFERRAL_ID,
+      fetcher: vi.fn(async () => ({
+        ok: true,
+        status: 200,
+        json: async () => body,
+      })),
+    });
+
+    expect(result).toEqual({ ok: false, code: "REQUEST_FAILED" });
+    expect(JSON.stringify(result)).not.toContain(CONTACT.phone);
+  });
+
+  it("does not parse private source-detail error bodies", async () => {
+    const json = vi.fn(async () => ({ privateContact: CONTACT }));
+    const result = await loadPortalReferralSourceDetail({
+      enabled: true,
+      referralId: REFERRAL_ID,
+      fetcher: vi.fn(async () => ({ ok: false, status: 404, json })),
+    });
+
+    expect(result).toEqual({ ok: false, code: "NOT_FOUND" });
+    expect(json).not.toHaveBeenCalled();
+    expect(JSON.stringify(result)).not.toContain(CONTACT.phone);
+  });
+
+  it("rejects a valid detail envelope bound to a different referral id", async () => {
+    const result = await loadPortalReferralSourceDetail({
+      enabled: true,
+      referralId: REFERRAL_ID,
+      fetcher: vi.fn(async () => ({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          referral: {
+            ...sourceDetail(),
+            referralId: "71111111-1111-7111-8111-111111111111",
+          },
+        }),
+      })),
+    });
+
+    expect(result).toEqual({ ok: false, code: "REQUEST_FAILED" });
+    expect(JSON.stringify(result)).not.toContain(CONTACT.phone);
+  });
+
   it("performs a safe GET readback after a successful intake creation", async () => {
     const privateServerValue = "private-summary-must-not-escape";
     const fetcher = vi
@@ -530,3 +701,17 @@ describe("Portal referral workflow controls", () => {
     expect(JSON.stringify(result)).not.toContain(serverSecret);
   });
 });
+
+function sourceDetail(): PortalReferralSourceDetail {
+  return {
+    referralId: REFERRAL_ID,
+    summary: "Needs support coordination.",
+    region: "VIC_MELBOURNE",
+    serviceType: "SUPPORT_COORDINATION",
+    currentStatus: "SUBMITTED",
+    rowVersion: 1,
+    contact: CONTACT,
+    createdAt: CREATED_AT,
+    updatedAt: UPDATED_AT,
+  };
+}

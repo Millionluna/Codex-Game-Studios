@@ -58,16 +58,16 @@ describe("Portal referral intake runtime migration contract", () => {
     for (const marker of [
       "Deleted r5 executed the prior 38843-byte body",
       "d434f916ff0aece191b0754e35393c0ab03ada7ec9849c75add8c04c16536182",
-      "current post-r5 proowner-hardened body is 39728 bytes",
-      "2255331b99ff6c4ca05b3a79578c6daa601e26662633063aa004f43423e3729f",
-      "source and static-contract evidence only",
-      "deleted-r5 postcheck separately proved the same invariant",
+      "current P1 operation-gated body is 40774 bytes",
+      "f9934a85728d3d42f1109ac05675f8c25c7ac06b0e1c40231747828f30bc1195",
+      "retains all five migration-entry ownership checks",
+      "independently default-off master+Intake gates",
     ]) {
       expect(header).toContain(marker);
     }
-    expect(Buffer.byteLength(body, "utf8")).toBe(39_728);
+    expect(Buffer.byteLength(body, "utf8")).toBe(40_774);
     expect(createHash("sha256").update(body, "utf8").digest("hex")).toBe(
-      "2255331b99ff6c4ca05b3a79578c6daa601e26662633063aa004f43423e3729f",
+      "f9934a85728d3d42f1109ac05675f8c25c7ac06b0e1c40231747828f30bc1195",
     );
     expect(postureStart).toBeGreaterThanOrEqual(0);
     expect(postureEnd).toBeGreaterThanOrEqual(0);
@@ -97,6 +97,32 @@ describe("Portal referral intake runtime migration contract", () => {
     );
     expect(postureProof).not.toContain("session_user");
     expect(postureProof).not.toContain("current_user");
+  });
+
+  it("nests the rollback suite inside master and Intake operation gates", () => {
+    const masterEnable = assertions.indexOf(
+      flagUpdate("referral_workflow_v1", true),
+    );
+    const intakeEnable = assertions.indexOf(
+      flagUpdate("referral_intake_v1", true),
+    );
+    const intakeDisable = assertions.indexOf(
+      flagUpdate("referral_intake_v1", false),
+    );
+    const masterDisable = assertions.indexOf(
+      flagUpdate("referral_workflow_v1", false),
+    );
+
+    expect(masterEnable).toBeGreaterThanOrEqual(0);
+    expect(intakeEnable).toBeGreaterThan(masterEnable);
+    expect(intakeDisable).toBeGreaterThan(intakeEnable);
+    expect(masterDisable).toBeGreaterThan(intakeDisable);
+    expect(assertions).toContain(
+      "where capability = 'referral_intake_v1') is distinct from false",
+    );
+    expect(assertions).toContain(
+      "where capability = 'referral_intake_v1') is distinct from true",
+    );
   });
 
   it("derives and stabilizes authorization from current database state", () => {
@@ -288,4 +314,10 @@ function lastSqlToken(sql: string) {
 
 function countOccurrences(value: string, needle: string) {
   return value.split(needle).length - 1;
+}
+
+function flagUpdate(capability: string, enabled: boolean) {
+  return `update public.portal_workflow_flags
+set enabled = ${enabled}, updated_at = now()
+where capability = '${capability}';`;
 }

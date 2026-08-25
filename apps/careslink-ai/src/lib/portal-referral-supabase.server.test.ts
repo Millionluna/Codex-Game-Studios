@@ -8,9 +8,11 @@ import {
   authorizePortalReferralSupabaseClient,
   createSupabasePortalReferralApi,
   type PortalReferralAuthorization,
+  type PortalReferralAuthorizationScope,
   type PortalReferralSessionScopedSupabaseRpcClient,
   type PortalReferralSupabaseRpcResult,
 } from "./portal-referral-supabase.server";
+import type { PortalReferralSourceDetail } from "./portal-referral-adapter.server";
 import {
   PortalReferralWorkflowError,
   createPortalReferralMutationPayloadHash,
@@ -30,38 +32,57 @@ const CONTACT = {
 } as const;
 
 describe("Portal referral Supabase adapter", () => {
-  it("strictly authorizes one active referral-source membership", async () => {
-    const client = rpcClient(rpcSuccess(authorizationEnvelope()));
-
-    await expect(authorizePortalReferralSupabaseClient(client)).resolves.toEqual({
-      ok: true,
-      authorization: authorization(),
-    });
-    expect(client.rpc).toHaveBeenCalledWith(
-      PORTAL_REFERRAL_SUPABASE_RPC_NAMES.authorize,
-    );
-  });
-
   it.each([
-    ["PORTAL_CAPABILITY_DISABLED", "capability_disabled"],
-    ["PORTAL_AUTH_REQUIRED", "auth_required"],
-    ["PORTAL_SESSION_REVOKED", "session_revoked"],
-    ["PORTAL_FORBIDDEN", "forbidden"],
-  ] as const)("maps authorize error %s without echoing details", async (message, reason) => {
-    const client = rpcClient({
-      data: { private_contact: CONTACT },
-      error: {
-        code: "P0001",
-        message,
-        details: CONTACT.phone,
-      },
-      status: 400,
-    });
+    ["INTAKE", PORTAL_REFERRAL_SUPABASE_RPC_NAMES.authorize],
+    [
+      "SOURCE_DETAIL",
+      PORTAL_REFERRAL_SUPABASE_RPC_NAMES.sourceDetailAuthorize,
+    ],
+  ] as const)(
+    "strictly authorizes one active referral-source membership for %s",
+    async (scope, rpcName) => {
+      const client = rpcClient(rpcSuccess(authorizationEnvelope()));
 
-    const result = await authorizePortalReferralSupabaseClient(client);
-    expect(result).toEqual({ ok: false, reason });
-    expect(JSON.stringify(result)).not.toContain(CONTACT.phone);
-  });
+      await expect(
+        authorizePortalReferralSupabaseClient(client, scope),
+      ).resolves.toEqual({
+        ok: true,
+        authorization: authorization(),
+      });
+      expect(client.rpc).toHaveBeenCalledWith(rpcName);
+    },
+  );
+
+  it.each(
+    ["INTAKE", "SOURCE_DETAIL"] satisfies PortalReferralAuthorizationScope[],
+  )(
+    "maps identical authorize errors for %s without echoing details",
+    async (scope) => {
+      for (const [message, reason] of [
+        ["PORTAL_CAPABILITY_DISABLED", "capability_disabled"],
+        ["PORTAL_AUTH_REQUIRED", "auth_required"],
+        ["PORTAL_SESSION_REVOKED", "session_revoked"],
+        ["PORTAL_FORBIDDEN", "forbidden"],
+      ] as const) {
+        const client = rpcClient({
+          data: { private_contact: CONTACT },
+          error: {
+            code: "P0001",
+            message,
+            details: CONTACT.phone,
+          },
+          status: 400,
+        });
+
+        const result = await authorizePortalReferralSupabaseClient(
+          client,
+          scope,
+        );
+        expect(result).toEqual({ ok: false, reason });
+        expect(JSON.stringify(result)).not.toContain(CONTACT.phone);
+      }
+    },
+  );
 
   it.each([
     [{ code: "PGRST302" }, "auth_required"],
@@ -75,6 +96,7 @@ describe("Portal referral Supabase adapter", () => {
         error: { ...error, message: CONTACT.email },
         status: 400,
       }),
+      "INTAKE",
     );
     expect(result).toEqual({ ok: false, reason });
     expect(JSON.stringify(result)).not.toContain(CONTACT.email);
@@ -92,6 +114,7 @@ describe("Portal referral Supabase adapter", () => {
           error: { code: "42501", message: CONTACT.email },
           status,
         }),
+        "INTAKE",
       );
       expect(result).toEqual({ ok: false, reason });
       expect(JSON.stringify(result)).not.toContain(CONTACT.email);
@@ -109,7 +132,10 @@ describe("Portal referral Supabase adapter", () => {
     { ...authorizationEnvelope(), membership_status: "REVOKED" },
   ])("fails closed on unsafe authorize envelope %#", async (data) => {
     await expect(
-      authorizePortalReferralSupabaseClient(rpcClient(rpcSuccess(data))),
+      authorizePortalReferralSupabaseClient(
+        rpcClient(rpcSuccess(data)),
+        "INTAKE",
+      ),
     ).resolves.toEqual({ ok: false, reason: "adapter_unavailable" });
   });
 
@@ -157,6 +183,123 @@ describe("Portal referral Supabase adapter", () => {
     );
     await expect(api.listReferrals()).rejects.toThrow(
       "Portal referral adapter is unavailable",
+    );
+  });
+
+  it("returns only the exact referral-source detail projection", async () => {
+    const client = rpcClient(rpcSuccess(sourceDetailEnvelope()));
+    const api = createSupabasePortalReferralApi(client, authorization());
+    const expected = {
+      referralId: IDS.referral,
+      summary: "Adult participant needs community participation support",
+      region: "VIC_MELBOURNE",
+      serviceType: "SUPPORT_COORDINATION",
+      currentStatus: "SUBMITTED",
+      rowVersion: 1,
+      contact: CONTACT,
+      createdAt: "2026-08-24T00:00:00.000Z",
+      updatedAt: "2026-08-24T01:02:03.456Z",
+    } satisfies PortalReferralSourceDetail;
+
+    await expect(api.getReferral(IDS.referral)).resolves.toEqual(expected);
+    expect(client.rpc).toHaveBeenCalledWith(
+      PORTAL_REFERRAL_SUPABASE_RPC_NAMES.sourceDetail,
+      { p_referral_id: IDS.referral },
+    );
+  });
+
+  it("accepts an explicit null contact email without relaxing the contact shape", async () => {
+    const data = sourceDetailEnvelope();
+    const client = rpcClient(
+      rpcSuccess({ ...data, contact: { ...data.contact, email: null } }),
+    );
+    const api = createSupabasePortalReferralApi(client, authorization());
+
+    await expect(api.getReferral(IDS.referral)).resolves.toMatchObject({
+      contact: { name: CONTACT.name, phone: CONTACT.phone, email: null },
+    });
+  });
+
+  it("fails closed when source detail returns a different referral id", async () => {
+    const otherReferralId = "b0000000-0000-4000-8000-000000000002";
+    const client = rpcClient(
+      rpcSuccess({ ...sourceDetailEnvelope(), referral_id: otherReferralId }),
+    );
+    const api = createSupabasePortalReferralApi(client, authorization());
+
+    await expect(api.getReferral(IDS.referral)).rejects.toMatchObject({
+      code: "ADAPTER_UNAVAILABLE",
+    });
+    expect(client.rpc).toHaveBeenCalledWith(
+      PORTAL_REFERRAL_SUPABASE_RPC_NAMES.sourceDetail,
+      { p_referral_id: IDS.referral },
+    );
+  });
+
+  it.each([
+    { ...sourceDetailEnvelope(), extra: "private" },
+    omit(sourceDetailEnvelope(), "updated_at"),
+    { ...sourceDetailEnvelope(), referral_id: IDS.referral.toUpperCase() },
+    { ...sourceDetailEnvelope(), summary: "" },
+    { ...sourceDetailEnvelope(), summary: " private summary " },
+    { ...sourceDetailEnvelope(), region: "VIC_UNKNOWN" },
+    { ...sourceDetailEnvelope(), service_type: "FREE_TEXT" },
+    { ...sourceDetailEnvelope(), current_status: "UNKNOWN" },
+    { ...sourceDetailEnvelope(), row_version: 0 },
+    { ...sourceDetailEnvelope(), created_at: "2026-02-31T00:00:00Z" },
+    {
+      ...sourceDetailEnvelope(),
+      created_at: "2026-08-25T00:00:00Z",
+      updated_at: "2026-08-24T00:00:00Z",
+    },
+    { ...sourceDetailEnvelope(), contact: null },
+    {
+      ...sourceDetailEnvelope(),
+      contact: { ...CONTACT, private_note: "private" },
+    },
+    { ...sourceDetailEnvelope(), contact: omit(CONTACT, "email") },
+    { ...sourceDetailEnvelope(), contact: { ...CONTACT, name: null } },
+    { ...sourceDetailEnvelope(), contact: { ...CONTACT, phone: "" } },
+    { ...sourceDetailEnvelope(), contact: { ...CONTACT, email: 123 } },
+  ])("rejects unsafe source-detail envelope %#", async (data) => {
+    const api = createSupabasePortalReferralApi(
+      rpcClient(rpcSuccess(data)),
+      authorization(),
+    );
+    await expect(api.getReferral(IDS.referral)).rejects.toMatchObject({
+      code: "ADAPTER_UNAVAILABLE",
+    });
+  });
+
+  it("rejects a non-canonical referral id before the detail RPC", async () => {
+    const client = rpcClient(rpcSuccess(sourceDetailEnvelope()));
+    const api = createSupabasePortalReferralApi(client, authorization());
+
+    await expect(api.getReferral("not-a-referral-id")).rejects.toMatchObject({
+      code: "VALIDATION_ERROR",
+    });
+    expect(client.rpc).not.toHaveBeenCalled();
+  });
+
+  it("maps PORTAL_NOT_FOUND from source detail to the public workflow code", async () => {
+    const client = rpcClient({
+      data: null,
+      error: {
+        code: "P0001",
+        message: "PORTAL_NOT_FOUND",
+        details: CONTACT.phone,
+      },
+      status: 400,
+    });
+    const api = createSupabasePortalReferralApi(client, authorization());
+
+    const error = await captureError(() => api.getReferral(IDS.referral));
+    expect(error).toBeInstanceOf(PortalReferralWorkflowError);
+    expect((error as PortalReferralWorkflowError).code).toBe("NOT_FOUND");
+    expect(String(error)).not.toContain(CONTACT.phone);
+    expect(client.rpc).toHaveBeenCalledWith(
+      PORTAL_REFERRAL_SUPABASE_RPC_NAMES.sourceDetail,
+      { p_referral_id: IDS.referral },
     );
   });
 
@@ -354,7 +497,7 @@ describe("Portal referral Supabase adapter", () => {
       });
 
       await expect(
-        authorizePortalReferralSupabaseClient(client),
+        authorizePortalReferralSupabaseClient(client, "INTAKE"),
       ).resolves.toEqual({ ok: false, reason: "adapter_unavailable" });
     },
   );
@@ -426,6 +569,20 @@ function createEnvelope() {
     match_id: null,
     current_status: "SUBMITTED",
     row_version: 1,
+    updated_at: "2026-08-24T11:02:03.456+10:00",
+  } as const;
+}
+
+function sourceDetailEnvelope() {
+  return {
+    referral_id: IDS.referral,
+    summary: "Adult participant needs community participation support",
+    region: "VIC_MELBOURNE",
+    service_type: "SUPPORT_COORDINATION",
+    current_status: "SUBMITTED",
+    row_version: 1,
+    contact: CONTACT,
+    created_at: "2026-08-24T10:00:00.000+10:00",
     updated_at: "2026-08-24T11:02:03.456+10:00",
   } as const;
 }

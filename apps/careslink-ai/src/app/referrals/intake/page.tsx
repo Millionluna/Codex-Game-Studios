@@ -3,10 +3,15 @@ import { AppShell } from "@/components/app-shell";
 import { PageHeader } from "@/components/page-header";
 import { PortalReferralIntakeControls } from "@/components/portal-referral-workflow-controls";
 import { Card } from "@/components/ui";
-import { isPortalReferralRuntimeEnabled } from "@/lib/portal-referral-runtime.server";
+import {
+  isPortalReferralRuntimeEnabled,
+  isPortalReferralSourceDetailRuntimeEnabled,
+} from "@/lib/portal-referral-runtime.server";
 
 export default function ReferralIntakePage() {
   const portalReferralRuntimeEnabled = isPortalReferralRuntimeEnabled();
+  const portalReferralSourceDetailEnabled =
+    isPortalReferralSourceDetailRuntimeEnabled();
 
   return (
     <AppShell>
@@ -19,6 +24,7 @@ export default function ReferralIntakePage() {
       <div className="grid gap-5 xl:grid-cols-[1fr_360px]">
         <Card className="p-5">
           <PortalReferralIntakeControls
+            detailEnabled={portalReferralSourceDetailEnabled}
             enabled={portalReferralRuntimeEnabled}
           />
         </Card>

@@ -27,7 +27,7 @@ Current registration-retention hosted gate HEAD:
 `4cae6f1a08ce2bcc7e43456c275cf5e743f13fdf`
 
 This checkpoint covers the AI Web Portal reality audit, release sequencing,
-local Referral foundation and default-off intake runtime, plus source-only
+local Referral foundation and default-off intake/source-detail runtimes, plus source-only
 five-Note generation contracts. It
 does not modify the native App, Main Website, Native Auth/M0 implementation or
 served shared Product API routes. Those are prerequisites recorded in the
@@ -59,8 +59,8 @@ availability.
 | `/providers/onboarding`, `/providers/review` | static/mock | No | Forms/buttons imply a save/review that does not occur | Add canonical provider profile and admin review command after identity proof |
 | Provider profile generator | mixed: real `provider_drafts`, mock editing seed | Partial | Draft handoff can use an in-memory fallback and is not a canonical provider | Treat claimed draft only as intake seed |
 | `/provider-portal` | mock referrals | No | Accept/decline/request-info controls do nothing; provider identity is not DB-bound | Owner-scoped offered referrals plus atomic response command |
-| `/referrals`, `/referrals/intake`, `/referrals/[id]`, match page | legacy mock remains default; default-off source-only durable intake exists | List/create only when every gate passes; not deployed | Intake now has database-authorized create/list, but detail, triage, match, offer, response and audit remain disabled and surrounding data remains mock | Validate intake on an approved disposable Preview before replacing one page at a time |
-| `/referral-source-portal` | legacy mock remains default; same source-only intake controls are wired | List/create only when every gate passes; not deployed | No hosted runtime or activation; all later workflow actions remain unavailable | Reuse the same database-authorized list/create slice after exact-revision Preview approval |
+| `/referrals`, `/referrals/intake`, `/referrals/[id]`, match page | legacy mock remains default; default-off source-only durable intake and exact-tenant source detail exist | List/create/detail only behind independent gates; not deployed | Source detail now has database-authorized private read and no mock fallback, but triage, match, offer, response and audit remain disabled and surrounding data remains mock | Validate the exact intake/detail revision on an approved disposable Preview before replacing one page at a time |
+| `/referral-source-portal` | legacy mock remains default; source-only intake controls are wired and the UUID detail page has a separate gate | List/create/detail only behind independent gates; not deployed | No hosted runtime or activation; assignment and later workflow actions remain unavailable | Reuse the database-authorized source slice after exact-revision Preview approval |
 | `/referral-workspace/*` | mixed real access/material/outreach stores | Yes, for those tools | These are AI access and outreach tools, not the referral pipeline; some stores have memory fallback | Preserve and later link by canonical referral ID |
 | `/admin`, `/dashboard` | mock global metrics | No | Core pages have no real referral permission gate; must not receive real data yet | Add membership gate, then replace only the assignment queue |
 | Admin access requests/material usage | real/mixed | Yes | Manages AI access/metadata, not providers or referrals | Reuse its auth-first action pattern, not its business schema |
@@ -82,8 +82,8 @@ Two immediate Portal safety rules follow from this matrix:
 ## 2. Activation dependencies
 
 Referral activation depends on the separately versioned Native Auth/M0 and
-shared Product API contract. The current intake adds only a Web-cookie Portal
-route/database slice and does not alter those shared Product contracts, native
+shared Product API contract. The current intake/detail work adds only a
+Web-cookie Portal route/database slice and does not alter those shared Product contracts, native
 routes, flags or grants. In particular:
 
 - the existing workspace fallback role resolver is not authoritative for the
@@ -91,7 +91,7 @@ routes, flags or grants. In particular:
 - native redirect allowlists and the current Preview base URL remain absent;
 - Product API operation flags remain default-off and document write grants
   remain withheld;
-- the current intake slice is deliberately Web-cookie-only and rejects Bearer;
+- the current intake and source-detail slices are deliberately Web-cookie-only and reject Bearer;
   `/v1/me`, current-session proof and cookie/Bearer identity parity remain a
   separate gate before any App/shared-Product handoff.
 
@@ -1215,3 +1215,51 @@ has a current body of 162,857 bytes with SHA-256
 Deleted `r5`'s postcheck remains the historical Hosted proof of those owners,
 but `r5` did not execute these enhanced exact bodies. No fresh Hosted exact-
 body gate has occurred, and Production has not been touched.
+
+## 25. Portal Referral source-detail source/local runtime — 2026-08-25
+
+The next real user-value slice closes the source intake loop: an authenticated
+referral source can reopen one referral owned by its exact organization and see
+the private summary/contact originally submitted. It adds no assignment,
+provider response, follow-up, audit listing, document/export or Note/Points
+capability.
+
+`CARESLINK_PORTAL_REFERRAL_SOURCE_DETAIL_ENABLED` is independent from the
+intake operation gate. The base API/durable gates, exact non-Production Preview
+ref, master database row and new `referral_source_detail_v1` database row must
+also pass. The same migration adds a separate `referral_intake_v1` row. Master,
+intake and detail remain `enabled=false, preview_only=true`; master+detail cannot
+open direct Data API intake, and master+intake cannot open detail. The request
+scope stays cookie-only, rejects Bearer before client construction and uses a
+detail-specific authorization RPC over the existing fresh session/exact-one-
+source-membership context.
+
+The CLI-generated migration
+`20260825110251_add_portal_referral_source_detail_runtime.sql` replaces the
+private intake gate with master+intake and adds two authenticated-only,
+read-only source-detail `SECURITY DEFINER` RPCs with `search_path=''` under the
+migration-entry owner. They hold master+detail; the read applies the exact source
+organization predicate and returns a strict 9+3 DTO. Cross-tenant, missing and
+null identifiers share `PORTAL_NOT_FOUND`; no table grant or referral/contact/
+audit/receipt write is added. Adapter, route and browser bind response ID to
+request ID; the route strips wider legacy fields. The durable list exposes a
+detail link only when its gate is on, and the UUID page strictly parses success,
+never parses private error bodies, never reuses prior-ID state and never falls
+back to mock.
+
+The focused gate passed 9 files / 214 tests. The full gate passed 136 files /
+1,717 tests, TypeScript, lint, Next.js 16.2.9 webpack build with 63/63 static
+pages, the 73-file adapter sync check and diff checks. A temporary local
+PostgreSQL 16.15 (`server_version_num=160015`) minimum chain executed only the
+foundation, intake and source-detail migrations plus both the updated intake and
+new detail rollback suites under `ON_ERROR_STOP=1`. Cross-gate direct-RPC denial,
+intake create/list/replay, A/B isolation, expired/deleted sessions, revoked
+membership, all three flags, owner/ACL/search path, direct-table denial, zero
+writes, cleanup and final rollback passed. The temporary server/cluster were
+removed.
+
+This source/local gate is not a 31/31 clean repository apply, hosted
+GoTrue/PostgREST E2E, retained Preview, deployment or activation. Production
+and cloud data were not touched. The next implementation slice is Portal
+Assignment M1a: operator queue/detail, triage, provider candidates and offer,
+behind its own default-off gate and without provider accept/decline.

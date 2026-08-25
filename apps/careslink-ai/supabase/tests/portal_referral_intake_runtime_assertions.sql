@@ -1,14 +1,13 @@
 -- Manual rollback-only assertions for the Production-unapplied Portal Referral
--- intake runtime. Run only after the exact foundation and intake migrations on
--- a disposable database. No fixture may survive the final ROLLBACK.
+-- intake runtime. Run only after the exact foundation, intake and source-detail
+-- migrations on a disposable database. No fixture may survive the final
+-- ROLLBACK.
 -- Deleted r5 executed the prior 38843-byte body at SHA-256
 -- d434f916ff0aece191b0754e35393c0ab03ada7ec9849c75add8c04c16536182.
--- The current post-r5 proowner-hardened body is 39728 bytes at SHA-256
--- 2255331b99ff6c4ca05b3a79578c6daa601e26662633063aa004f43423e3729f.
--- It moves all five migration-entry function ownership checks from the
--- one-time postcheck into this committed suite. This exact augmented body has
--- source and static-contract evidence only until a fresh disposable Preview
--- reruns it; the deleted-r5 postcheck separately proved the same invariant.
+-- The current P1 operation-gated body is 40774 bytes at SHA-256
+-- f9934a85728d3d42f1109ac05675f8c25c7ac06b0e1c40231747828f30bc1195.
+-- It retains all five migration-entry ownership checks and nests the temporary
+-- Intake test window inside independently default-off master+Intake gates.
 
 begin;
 
@@ -61,8 +60,14 @@ begin
         where capability = 'referral_workflow_v1') is distinct from false
     or (select preview_only from public.portal_workflow_flags
         where capability = 'referral_workflow_v1') is distinct from true
+    or (select count(*) from public.portal_workflow_flags
+        where capability = 'referral_intake_v1') <> 1
+    or (select enabled from public.portal_workflow_flags
+        where capability = 'referral_intake_v1') is distinct from false
+    or (select preview_only from public.portal_workflow_flags
+        where capability = 'referral_intake_v1') is distinct from true
   then
-    raise exception 'portal flag is not default-off Preview-only';
+    raise exception 'portal Intake flags are not default-off Preview-only';
   end if;
 
   if to_regclass('public.portal_referrals_source_updated_id_idx') is null then
@@ -138,10 +143,13 @@ begin
   select lower(pg_get_functiondef(to_regprocedure(
     'careslink_portal_private.portal_referral_intake_assert_enabled()'
   ))) into v_definition;
-  if v_definition not like '%for share of flag%'
+  if strpos(v_definition, 'referral_workflow_v1') = 0
+    or strpos(v_definition, 'referral_intake_v1')
+      <= strpos(v_definition, 'referral_workflow_v1')
+    or v_definition not like '%for share of flag%'
     or v_definition like '%for key share%'
   then
-    raise exception 'capability row lock is weaker than FOR SHARE';
+    raise exception 'Intake master/operation gate order or lock drifted';
   end if;
 
   select lower(pg_get_functiondef(to_regprocedure(
@@ -303,6 +311,10 @@ select pg_catalog.set_config(
 update public.portal_workflow_flags
 set enabled = true, updated_at = now()
 where capability = 'referral_workflow_v1';
+
+update public.portal_workflow_flags
+set enabled = true, updated_at = now()
+where capability = 'referral_intake_v1';
 
 delete from auth.sessions
 where id = 'b5000000-0000-4000-8000-000000000005';
@@ -1107,6 +1119,10 @@ select pg_catalog.set_config(
 
 update public.portal_workflow_flags
 set enabled = false, updated_at = now()
+where capability = 'referral_intake_v1';
+
+update public.portal_workflow_flags
+set enabled = false, updated_at = now()
 where capability = 'referral_workflow_v1';
 
 select set_config(
@@ -1152,6 +1168,10 @@ begin
       where capability = 'referral_workflow_v1') is distinct from false
     or (select preview_only from public.portal_workflow_flags
         where capability = 'referral_workflow_v1') is distinct from true
+    or (select enabled from public.portal_workflow_flags
+        where capability = 'referral_intake_v1') is distinct from false
+    or (select preview_only from public.portal_workflow_flags
+        where capability = 'referral_intake_v1') is distinct from true
     or (select count(*) from public.portal_referrals) <> 3
     or (select count(*)
         from careslink_portal_private.portal_referral_contacts) <> 3

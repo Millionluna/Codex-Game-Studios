@@ -3,9 +3,15 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 
 import { readBoundedRequestText } from "./bounded-request-text.server";
-import type { PortalReferralApi } from "./portal-referral-adapter.server";
+import type {
+  PortalReferralApi,
+  PortalReferralSourceDetail,
+} from "./portal-referral-adapter.server";
+import { canonicalPortalReferralUuid } from "./portal-referral-id";
 import {
   PORTAL_REFERRAL_FOLLOW_UP_OUTCOME_CODES,
+  PORTAL_REFERRAL_PREVIEW_REGION_CODES,
+  PORTAL_REFERRAL_PREVIEW_SERVICE_TYPE_CODES,
   PORTAL_REFERRAL_STATUSES,
   PortalReferralWorkflowError,
   type PortalReferralFollowUpOutcomeCode,
@@ -19,9 +25,6 @@ import {
 import { assertCaresLinkV1IdempotencyKey } from "./v1/shared-contracts";
 
 const MAX_REQUEST_BYTES = 16_384;
-const UUID_PATTERN =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-
 export type PortalReferralRouteDependencies = Readonly<{
   resolveApi?: PortalReferralApiResolver;
   createCorrelationId?: () => string;
@@ -86,9 +89,18 @@ export async function handlePortalReferralGet(
     request,
     "GET_REFERRAL",
     dependencies,
-    async (api) => ({
-      body: { referral: await api.getReferral(assertUuid(referralId)) },
-    }),
+    async (api) => {
+      const expectedReferralId = assertUuid(referralId);
+      const referral = await api.getReferral(expectedReferralId);
+      return {
+        body: {
+          referral: projectPortalReferralSourceDetail(
+            expectedReferralId,
+            referral,
+          ),
+        },
+      };
+    },
   );
 }
 
@@ -431,10 +443,79 @@ function requiredOutcomeCode(value: unknown): PortalReferralFollowUpOutcomeCode 
 }
 
 function assertUuid(value: unknown) {
-  if (typeof value !== "string" || !UUID_PATTERN.test(value)) {
+  const canonical = canonicalPortalReferralUuid(value);
+  if (!canonical) {
     throw validationError();
   }
-  return value.toLowerCase();
+  return canonical;
+}
+
+function projectPortalReferralSourceDetail(
+  expectedReferralId: string,
+  value: Awaited<ReturnType<PortalReferralApi["getReferral"]>>,
+): PortalReferralSourceDetail {
+  const referralId = canonicalPortalReferralUuid(value.referralId);
+  const contact = value.contact;
+  const createdAt = responseInstant(value.createdAt);
+  const updatedAt = responseInstant(value.updatedAt);
+  if (
+    referralId !== expectedReferralId ||
+    !contact ||
+    !(PORTAL_REFERRAL_PREVIEW_REGION_CODES as readonly string[]).includes(
+      value.region,
+    ) ||
+    !(PORTAL_REFERRAL_PREVIEW_SERVICE_TYPE_CODES as readonly string[]).includes(
+      value.serviceType,
+    ) ||
+    !(PORTAL_REFERRAL_STATUSES as readonly string[]).includes(
+      value.currentStatus,
+    ) ||
+    !Number.isSafeInteger(value.rowVersion) ||
+    value.rowVersion < 1 ||
+    Date.parse(createdAt) > Date.parse(updatedAt)
+  ) {
+    throw invalidAdapterResponse();
+  }
+  return Object.freeze({
+    referralId,
+    summary: responseText(value.summary, 4_000),
+    region: value.region,
+    serviceType: value.serviceType,
+    currentStatus: value.currentStatus,
+    rowVersion: value.rowVersion,
+    contact: Object.freeze({
+      name: responseText(contact.name, 200),
+      phone: responseText(contact.phone, 100),
+      email: contact.email === null ? null : responseText(contact.email, 320),
+    }),
+    createdAt,
+    updatedAt,
+  });
+}
+
+function responseText(value: unknown, maxLength: number) {
+  if (typeof value !== "string") throw invalidAdapterResponse();
+  const normalized = value.trim();
+  if (!normalized || normalized !== value || value.length > maxLength) {
+    throw invalidAdapterResponse();
+  }
+  return value;
+}
+
+function responseInstant(value: unknown) {
+  if (typeof value !== "string") throw invalidAdapterResponse();
+  const instant = new Date(value);
+  if (!Number.isFinite(instant.getTime()) || instant.toISOString() !== value) {
+    throw invalidAdapterResponse();
+  }
+  return value;
+}
+
+function invalidAdapterResponse() {
+  return new PortalReferralWorkflowError(
+    "ADAPTER_UNAVAILABLE",
+    "Portal referral adapter is unavailable",
+  );
 }
 
 function validationError() {

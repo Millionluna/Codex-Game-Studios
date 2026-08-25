@@ -796,7 +796,19 @@ describe("Portal referral route adapter", () => {
     expect(bodies).toEqual([
       { items: [] },
       ack,
-      expect.objectContaining({ referral: expect.objectContaining({ referralId }) }),
+      {
+        referral: {
+          referralId,
+          summary: SUMMARY,
+          region: "VIC_MELBOURNE",
+          serviceType: "SUPPORT_COORDINATION",
+          currentStatus: "SUBMITTED",
+          rowVersion: 1,
+          contact: CONTACT,
+          createdAt: updatedAt,
+          updatedAt,
+        },
+      },
       ack,
       { items: [] },
       { ...ack, matchId },
@@ -810,6 +822,42 @@ describe("Portal referral route adapter", () => {
       expect.anything(),
       expect.objectContaining({ correlationId: SERVER_CORRELATION_ID }),
     );
+  });
+
+  it("rejects a valid detail response bound to another referral id", async () => {
+    const requestedId = "70000000-0000-7000-8000-000000000901";
+    const returnedId = "70000000-0000-7000-8000-000000000902";
+    const baseApi = createActorBoundPortalReferralApi(createWorkflow(), SOURCE_A);
+    const response = await handlePortalReferralGet(
+      getRequest(`/api/portal/referrals/${requestedId}`, "source-a"),
+      requestedId,
+      {
+        resolveApi: async () => ({
+          ok: true,
+          api: {
+            ...baseApi,
+            getReferral: async () => ({
+              referralId: returnedId,
+              summary: SUMMARY,
+              region: "VIC_MELBOURNE",
+              serviceType: "SUPPORT_COORDINATION",
+              currentStatus: "SUBMITTED",
+              rowVersion: 1,
+              contact: CONTACT,
+              createdAt: "2026-08-24T00:00:00.000Z",
+              updatedAt: "2026-08-24T00:00:00.000Z",
+            }),
+          },
+        }),
+        createCorrelationId: () => SERVER_CORRELATION_ID,
+      },
+    );
+
+    expect(response.status).toBe(503);
+    expect(await responseJson(response)).toEqual({
+      error: { code: "ADAPTER_UNAVAILABLE" },
+      correlationId: SERVER_CORRELATION_ID,
+    });
   });
 
   it.each([

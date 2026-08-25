@@ -16,6 +16,7 @@ const navigationMocks = vi.hoisted(() => ({
 }));
 const runtimeMocks = vi.hoisted(() => ({
   isPortalReferralRuntimeEnabled: vi.fn(() => false),
+  isPortalReferralSourceDetailRuntimeEnabled: vi.fn(() => false),
 }));
 
 vi.mock("next/navigation", () => ({
@@ -110,6 +111,10 @@ describe("Portal referral page wiring", () => {
   beforeEach(() => {
     runtimeMocks.isPortalReferralRuntimeEnabled.mockClear();
     runtimeMocks.isPortalReferralRuntimeEnabled.mockReturnValue(false);
+    runtimeMocks.isPortalReferralSourceDetailRuntimeEnabled.mockClear();
+    runtimeMocks.isPortalReferralSourceDetailRuntimeEnabled.mockReturnValue(
+      false,
+    );
   });
 
   it("uses the closed runtime gate on both source entry pages", () => {
@@ -129,10 +134,16 @@ describe("Portal referral page wiring", () => {
     expect(sourceMarkup).toContain("不是 Preview 数据库记录");
     expect(sourceMarkup).toContain("Preview runtime disabled");
     expect(runtimeMocks.isPortalReferralRuntimeEnabled).toHaveBeenCalledTimes(2);
+    expect(
+      runtimeMocks.isPortalReferralSourceDetailRuntimeEnabled,
+    ).toHaveBeenCalledTimes(2);
   });
 
   it("passes the server runtime result as a plain enabled boolean", () => {
     runtimeMocks.isPortalReferralRuntimeEnabled.mockReturnValue(true);
+    runtimeMocks.isPortalReferralSourceDetailRuntimeEnabled.mockReturnValue(
+      true,
+    );
 
     const intakeMarkup = renderToStaticMarkup(ReferralIntakePage());
     const sourceMarkup = renderToStaticMarkup(ReferralSourcePortalPage());
@@ -144,6 +155,9 @@ describe("Portal referral page wiring", () => {
     expect(intakeMarkup).toContain("不会显示摘要或联系人");
     expect(sourceMarkup).toContain("Preview runtime enabled");
     expect(sourceMarkup).toContain("Preview durable intake");
+    expect(
+      runtimeMocks.isPortalReferralSourceDetailRuntimeEnabled,
+    ).toHaveBeenCalledTimes(2);
   });
 
   it("withholds follow-up controls until a database-scoped identity is available", async () => {
@@ -160,6 +174,36 @@ describe("Portal referral page wiring", () => {
     expect(markup).not.toContain("04 0000 0000");
     expect(markup).not.toContain("来自微信群讨论");
     expect(markup).not.toContain("帕拉马塔一位普通话 participant");
+  });
+
+  it("renders a durable source-detail shell without falling back to a mock record", async () => {
+    runtimeMocks.isPortalReferralSourceDetailRuntimeEnabled.mockReturnValue(
+      true,
+    );
+    const page = await ReferralDetailPage({
+      params: Promise.resolve({
+        id: "11111111-1111-4111-8111-111111111111",
+      }),
+    });
+    const markup = renderToStaticMarkup(page);
+
+    expect(markup).toContain("Authorized referral detail");
+    expect(markup).toContain("Loading authorized referral detail");
+    expect(markup).toContain("不会回退到 mock");
+    expect(markup).not.toContain("旧版 demo fixture");
+    expect(markup).not.toContain("referral-001");
+  });
+
+  it("rejects legacy fixture ids while the durable source-detail gate is open", async () => {
+    runtimeMocks.isPortalReferralSourceDetailRuntimeEnabled.mockReturnValue(
+      true,
+    );
+    navigationMocks.notFound.mockClear();
+
+    await expect(
+      ReferralDetailPage({ params: Promise.resolve({ id: "referral-001" }) }),
+    ).rejects.toThrow("NEXT_NOT_FOUND");
+    expect(navigationMocks.notFound).toHaveBeenCalledOnce();
   });
 
   it("renders triage and offer boundaries without promoting mock IDs", async () => {

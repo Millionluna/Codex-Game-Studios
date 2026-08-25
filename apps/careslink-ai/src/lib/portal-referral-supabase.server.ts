@@ -6,7 +6,9 @@ import type {
   PortalReferralApi,
   PortalReferralApiMutationMetadata,
   PortalReferralCreateCommand,
+  PortalReferralSourceDetail,
 } from "./portal-referral-adapter.server";
+import { canonicalPortalReferralUuid } from "./portal-referral-id";
 import {
   PORTAL_REFERRAL_PREVIEW_REGION_CODES,
   PORTAL_REFERRAL_PREVIEW_SERVICE_TYPE_CODES,
@@ -21,9 +23,13 @@ import { assertCaresLinkV1IdempotencyKey } from "./v1/shared-contracts";
 
 export const PORTAL_REFERRAL_SUPABASE_RPC_NAMES = Object.freeze({
   authorize: "portal_referral_intake_authorize",
+  sourceDetailAuthorize: "portal_referral_source_detail_authorize",
   list: "portal_referral_intake_list",
   create: "portal_referral_intake_create",
+  sourceDetail: "portal_referral_source_detail",
 } as const);
+
+export type PortalReferralAuthorizationScope = "INTAKE" | "SOURCE_DETAIL";
 
 export type PortalReferralSupabaseRpcError = Readonly<{
   code?: unknown;
@@ -69,10 +75,14 @@ export type PortalReferralAuthorizationResolution =
 
 export async function authorizePortalReferralSupabaseClient(
   client: PortalReferralSessionScopedSupabaseRpcClient,
+  scope: PortalReferralAuthorizationScope,
 ): Promise<PortalReferralAuthorizationResolution> {
+  const rpcName = authorizationRpcName(scope);
+  if (!rpcName) return { ok: false, reason: "adapter_unavailable" };
+
   let result: PortalReferralSupabaseRpcResult;
   try {
-    result = await client.rpc(PORTAL_REFERRAL_SUPABASE_RPC_NAMES.authorize);
+    result = await client.rpc(rpcName);
   } catch {
     return { ok: false, reason: "adapter_unavailable" };
   }
@@ -91,6 +101,17 @@ export async function authorizePortalReferralSupabaseClient(
     };
   } catch {
     return { ok: false, reason: "adapter_unavailable" };
+  }
+}
+
+function authorizationRpcName(scope: PortalReferralAuthorizationScope) {
+  switch (scope) {
+    case "INTAKE":
+      return PORTAL_REFERRAL_SUPABASE_RPC_NAMES.authorize;
+    case "SOURCE_DETAIL":
+      return PORTAL_REFERRAL_SUPABASE_RPC_NAMES.sourceDetailAuthorize;
+    default:
+      return undefined;
   }
 }
 
@@ -157,7 +178,19 @@ export function createSupabasePortalReferralApi(
       return parseCreateEnvelope(data);
     },
 
-    getReferral: unsupported,
+    async getReferral(referralId: string) {
+      const requestedReferralId = requestUuid(referralId);
+      const data = await callWorkflowRpc(
+        client,
+        PORTAL_REFERRAL_SUPABASE_RPC_NAMES.sourceDetail,
+        { p_referral_id: requestedReferralId },
+      );
+      const detail = parseSourceDetailEnvelope(data);
+      if (detail.referralId !== requestedReferralId) {
+        throw invalidAdapterEnvelope();
+      }
+      return detail;
+    },
     triageReferral: unsupported,
     listProviderCandidates: unsupported,
     offerReferral: unsupported,
@@ -269,6 +302,46 @@ function parseCreateEnvelope(value: unknown): PortalReferralMutationAck {
     currentStatus: "SUBMITTED",
     rowVersion: safeRowVersion(envelope.row_version),
     updatedAt: safeTimestamp(envelope.updated_at),
+  });
+}
+
+function parseSourceDetailEnvelope(value: unknown): PortalReferralSourceDetail {
+  const envelope = exactRecord(value, [
+    "referral_id",
+    "summary",
+    "region",
+    "service_type",
+    "current_status",
+    "row_version",
+    "contact",
+    "created_at",
+    "updated_at",
+  ]);
+  const contact = exactRecord(envelope.contact, ["name", "phone", "email"]);
+  const createdAt = safeTimestamp(envelope.created_at);
+  const updatedAt = safeTimestamp(envelope.updated_at);
+  if (Date.parse(createdAt) > Date.parse(updatedAt)) {
+    throw invalidAdapterEnvelope();
+  }
+
+  return Object.freeze({
+    referralId: canonicalUuid(envelope.referral_id),
+    summary: safeResponseText(envelope.summary, 4_000),
+    region: catalogValue(envelope.region, PORTAL_REFERRAL_PREVIEW_REGION_CODES),
+    serviceType: catalogValue(
+      envelope.service_type,
+      PORTAL_REFERRAL_PREVIEW_SERVICE_TYPE_CODES,
+    ),
+    currentStatus: catalogValue(envelope.current_status, PORTAL_REFERRAL_STATUSES),
+    rowVersion: safeRowVersion(envelope.row_version),
+    contact: Object.freeze({
+      name: safeResponseText(contact.name, 200),
+      phone: safeResponseText(contact.phone, 100),
+      email:
+        contact.email === null ? null : safeResponseText(contact.email, 320),
+    }),
+    createdAt,
+    updatedAt,
   });
 }
 
@@ -472,10 +545,19 @@ function isRpcResult(value: unknown): value is PortalReferralSupabaseRpcResult {
 }
 
 function canonicalUuid(value: unknown) {
-  if (typeof value !== "string" || !UUID_PATTERN.test(value)) {
+  const canonical = canonicalPortalReferralUuid(value);
+  if (!canonical || canonical !== value) {
     throw invalidAdapterEnvelope();
   }
-  return value;
+  return canonical;
+}
+
+function requestUuid(value: unknown) {
+  const canonical = canonicalPortalReferralUuid(value);
+  if (!canonical) {
+    throw validationError();
+  }
+  return canonical;
 }
 
 function safeRowVersion(value: unknown) {
@@ -536,6 +618,15 @@ function requiredText(value: unknown, maxLength: number) {
   return normalized;
 }
 
+function safeResponseText(value: unknown, maxLength: number) {
+  if (typeof value !== "string") throw invalidAdapterEnvelope();
+  const normalized = value.trim();
+  if (!normalized || normalized !== value || value.length > maxLength) {
+    throw invalidAdapterEnvelope();
+  }
+  return value;
+}
+
 function assertMutationId(value: unknown) {
   try {
     return assertCaresLinkV1IdempotencyKey(
@@ -588,8 +679,6 @@ function invalidAdapterEnvelope() {
   );
 }
 
-const UUID_PATTERN =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const TIMESTAMP_PATTERN =
   /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d{1,6})?(Z|([+-])(\d{2}):(\d{2}))$/;
 const CORRELATION_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$/;

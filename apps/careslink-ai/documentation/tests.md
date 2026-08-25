@@ -143,6 +143,67 @@ These are source and disposable-local-database claims only. No hosted
 GoTrue/PostgREST cookie E2E, hosted Preview or Production migration, deployment,
 flag activation, retained business row or paid runtime resource is claimed.
 
+### Portal Referral source-detail runtime source/local checkpoint — 2026-08-25
+
+This slice adds one independently gated `GET_REFERRAL` path for a referral
+source to reopen a referral owned by its exact organization. The application
+base gate, source-detail application gate, master database flag and detail
+database flag all fail closed and remain off by default. A separate new intake
+database flag closes direct Data API list/create when only detail is enabled.
+The cookie-only resolver rejects Bearer before client construction, authorizes
+from fresh database session/membership state through
+`portal_referral_source_detail_authorize()`, and then invokes
+`portal_referral_source_detail(p_referral_id)`.
+
+The authenticated-only `SECURITY DEFINER` RPC holds the master and operation
+flag rows, reuses the intake context's post-lock session revalidation, joins the
+separately protected contact row and requires the exact source organization.
+Cross-tenant, absent and null IDs share `PORTAL_NOT_FOUND`. Its exact 9-field
+referral / 3-field contact DTO excludes tenant, actor, assignment, document,
+export and audit identities and performs no write. The server and browser both
+reject extra/missing fields, invalid catalog/status/version/time values and
+non-canonical response UUIDs; error bodies are never parsed into detail state.
+The adapter, route and browser bind the returned referral ID to the requested
+UUID; the route projects the exact DTO even if a future adapter returns a wider
+legacy view. When the durable detail gate is on, list items provide a same-origin
+detail link, the UUID page never falls back to a legacy mock record, and keyed
+component state cannot show the prior referral while navigating to another ID.
+
+| Command | Result |
+|---|---|
+| focused intake/source-detail gate | 9 files / 214 tests passed |
+| `pnpm test` | 136 files / 1,717 tests passed |
+| `pnpm exec tsc --noEmit --incremental false` | passed |
+| `pnpm lint` | passed |
+| `pnpm exec next build --webpack` | passed; Next static generation completed 63/63 |
+| `python3 tools/sync_codex_adapters.py --check` | passed; 73 files checked |
+| `git diff --check` | passed |
+
+A temporary Homebrew PostgreSQL 16.15 cluster
+(`server_version_num=160015`) loaded only the minimum compatible
+foundation → intake → source-detail migration chain and then ran
+the updated intake and new source-detail rollback suites with `ON_ERROR_STOP=1`.
+Both transactions passed. The source-detail suite proved master+detail cannot
+open intake authorize/list/create and master+intake cannot open either detail
+RPC, as well as default-off/master-only denial, exact Source A/B reads,
+bidirectional tenant denial, absent/null IDs, expired/deleted sessions, revoked
+membership, authenticated-only RPC ACL, entry-owner/search-path posture,
+direct-table denial, zero writes and cleanup. The updated intake suite reproved
+authorization, atomic create/list, replay/conflict and its existing session/
+tenant boundaries behind master + intake. The final postcheck retained all
+three flags off/Preview-only and zero referral/audit/receipt rows. The server
+was stopped and the temporary cluster deleted. This is deliberately not a
+31/31 repository clean-apply or hosted Supabase parity claim.
+
+The migration is 5,780 bytes / SHA-256
+`8e58ad2d7fcf68400925604b459dc972be7f7ef8608b1b496d5217a99ec0dc4e`;
+the source-detail rollback file is 29,059 bytes / SHA-256
+`2dc91eb69814a778d82a392d41c2d4aadc84a102b8df870a24db4bb41842dd98`.
+The updated intake BEGIN-through-ROLLBACK body is 40,774 bytes / SHA-256
+`f9934a85728d3d42f1109ac05675f8c25c7ac06b0e1c40231747828f30bc1195`.
+No cloud database, Preview deployment, Production migration, flag activation,
+retained user/business row or paid resource was used.
+
 ### Five-Note generation source/offline checkpoint — 2026-08-20
 
 Communication, Handover, Progress, NDIS and Incident Factual now share one
@@ -1259,7 +1320,7 @@ This does not prove a live, data-bearing cross-migration upgrade. The `202608100
 | Production-unapplied SQL boundary | `src/lib/v1/v1-shadow-migration-contract.test.ts`, `mobile-sync-migration-contract.test.ts`, isolated guarded-live and local engine evidence | additive/no legacy DML, owner isolation and explicit grants are source-checked; historical deleted `r4` passed the 13-file foundation manifest 13/13 and six rollback suites. At HEAD `c7b70e9f84b9b804779039711b85cc7eda55bd57`, deleted `r9` passed the exact 14-file worker manifest 14/14, seven rollback suites and independent hard-off/zero-row/role/RLS/ACL/9-RPC postchecks. Deleted `r20` additionally passed the PostgreSQL 17.6 true two-session claim/session/privacy race gate; deleted `r21` passed the Attempt 1/Attempt 2 historical-replay and post-purge matrix; deleted `r22` passed 15/15 and 7/7. The isolated PostgreSQL 16.15 gates added engine and strict two-backend evidence. Deleted Hosted r5 then passed the exact 30-file manifest, all 11 rollback suites and the independent owner/role/RLS/ACL/hard-off/zero-fixture postcheck. All diagnostic Previews and local test resources were removed. This is schema/transaction evidence only; runtime writes remain withheld |
 | Owner generation repository boundary | `note-generation-owner-repository.server.test.ts`, `note-generation-owner-runtime-migration-contract.test.ts` and `v1_note_generation_owner_runtime_rpc_shadow_assertions.sql` | exact private direct-query calls, owner-safe envelopes, default-empty admission, fresh session/privacy/catalog selection, idempotent atomic enqueue, status/cancel while hard-off and atomic cancellation are source/local-SQL tested. The local PG16.15 owner/posture/session-lock gate and deleted r5 Hosted 30/30 migration, 11/11 assertion and independent posture gate passed. No retained Preview, hosted Auth/Data API, route, caller grant, vault/model/Points or Production capability |
 | Worker-registration graceful retirement | `note-generation-registration-retirement-shadow-migration-contract.test.ts` and `v1_note_generation_registration_retirement_shadow_assertions.sql` | migration #29 preserves immutable digest-bound `APPROVED` registrations, adds the fourteenth forced-RLS table and validates append-only retirement, fixed reasons, exact sorted active-binding compare-and-retire, idempotent replay, new-admission/new-claim denial and existing-attempt drain/recovery. The local 29/29, 9/9, posture and two-ordering race gate plus deleted r5 Hosted 30/30, 11/11 and independent posture gate passed. No caller grant, route, credential, seed, activation, emergency revoke or Production capability |
-| Portal Referral intake runtime | `portal-referral-intake-runtime-migration-contract.test.ts`, route/runtime/Supabase/UI tests and `portal_referral_intake_runtime_assertions.sql` | default-off cookie-only list/create, auth-before-body, exact authenticated RPC grants, database-derived source tenant, post-lock wall-clock/session revalidation, metadata-only readback, atomic PII-separated create and replay/conflict boundaries passed source tests, the local clean 30/30, 10/10, independent-posture and 8/8 two-session gate, and the deleted r5 Hosted 30/30, 11/11 and Portal-owner/posture gate. Hosted GoTrue/PostgREST and activation remain unproved |
+| Portal Referral intake and source-detail runtime | intake/source-detail migration contracts, route/runtime/Supabase/UI tests and both rollback suites | default-off cookie-only list/create/detail; auth-first request scope; independent operation gates; exact authenticated RPC grants; database-derived source tenant; post-lock session revalidation; uniform cross-tenant/not-found detail; strict private DTO parsing; atomic PII-separated create and write-free detail passed source tests. Historical intake evidence includes local 30/30, 10/10, 8/8 two-session and deleted r5 Hosted 30/30/11/11 gates. The later exact source-detail migration has only its separately recorded local evidence; hosted GoTrue/PostgREST and activation remain unproved |
 | Runtime isolation | `src/lib/v1/runtime-boundary.test.ts` | audited NDIS routes and the new `/v1` adapter are the only allowed server boundaries; `/v1` remains disabled without explicit adapters |
 
 ### Current live/read-only evidence
@@ -1338,4 +1399,4 @@ The following suites are required before the corresponding V1 slice can be calle
 8. No signed PIA/data-map/subprocessor/NDB evidence is represented in automated tests.
 9. Current production refresh-token errors need a reproducible stale-cookie/session recovery test before V1 release.
 10. Build/test success is not a production V1 greenlight; migration, Preview/live safety and explicit owner approval remain mandatory.
-11. Portal Intake still lacks hosted GoTrue/PostgREST cookie E2E, actual Preview activation and every later triage/offer/response/follow-up/detail/audit operation.
+11. Portal Intake/source detail still lack hosted GoTrue/PostgREST cookie E2E and actual Preview activation; triage, offer, provider response, follow-up and audit remain unimplemented.

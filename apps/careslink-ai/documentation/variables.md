@@ -77,7 +77,8 @@ Table overrides are server configuration. Production should normally use migrati
 | `CARESLINK_V1_NATIVE_AUTH_EXPECTED_SUPABASE_REF` | Reserved server configuration name | future exact-ref binding for the native-auth Preview boundary | **do not configure**; currently used only by injected static tests, and no matching ref can bypass the compile-time disabled latch or target Production |
 | `CARESLINK_PORTAL_REFERRAL_API_ENABLED` | Server configuration | master gate for the Portal Referral route slice | only exact `true`; default/unset is off and is insufficient without every other Portal gate |
 | `CARESLINK_PORTAL_REFERRAL_DURABLE_ADAPTER_ENABLED` | Server configuration | independent gate for the request-scoped cookie Supabase adapter | only exact `true`; no memory fallback and no `service_role` fallback |
-| `CARESLINK_PORTAL_REFERRAL_INTAKE_ENABLED` | Server configuration | operation gate for only source referral list and create | only exact `true`; all triage, offer, response, follow-up, detail and audit operations remain disabled |
+| `CARESLINK_PORTAL_REFERRAL_INTAKE_ENABLED` | Server configuration | operation gate for only source referral list and create | only exact `true`; it does not enable source detail or any later workflow operation |
+| `CARESLINK_PORTAL_REFERRAL_SOURCE_DETAIL_ENABLED` | Server configuration | independent operation gate for an authenticated referral source to read one referral created by its own organization | only exact `true`; the base/durable gates and exact disposable-Preview ref must also pass; it does not enable intake, triage, offer, response, follow-up or audit |
 | `CARESLINK_PORTAL_REFERRAL_EXPECTED_SUPABASE_REF` | Server configuration | binds the Referral runtime to one reviewed disposable Preview branch | must exactly match the ref parsed from the server Supabase URL; non-Preview, missing/mismatch and the known Production ref fail closed before client construction |
 | `CARESLINK_V1_SHADOW_ENABLED` | Server configuration | master NDIS shadow kill switch | exact `true`; insufficient alone; unset/off outside disposable Preview |
 | `CARESLINK_V1_NDIS_DUAL_WRITE_ENABLED` | Server configuration | permits post-legacy-save projection | exact `true`; requires master + `VERCEL_ENV=preview` + verified branch ref |
@@ -87,7 +88,12 @@ Table overrides are server configuration. Production should normally use migrati
 
 The two reserved native-auth names are intentionally absent from `.env.example` because the capability is not activatable. Adding placeholders would incorrectly imply that configuration is an approved next step. Their guard tests use synthetic in-memory objects only; no deployment environment or secret is read.
 
-The database capability row `referral_workflow_v1` is a separate Portal gate. The source migration preserves `preview_only=true`, leaves the existing row and column default at `enabled=false`, and does not activate it. Portal intake introduces no new secret.
+The database capability rows `referral_workflow_v1`, `referral_intake_v1` and
+`referral_source_detail_v1` are separate Portal gates. All three remain
+`enabled=false, preview_only=true`; the source-detail migration does not activate
+any row. Direct Data API intake calls require master + intake, while source
+detail requires master + detail. Portal intake and source detail introduce no
+new secret.
 
 The privacy proof TTL is a code/contract constant of 1800 seconds for this
 temporary Preview gate. It is not configured through an environment variable
