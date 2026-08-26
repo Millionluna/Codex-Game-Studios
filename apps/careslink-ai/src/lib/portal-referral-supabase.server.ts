@@ -6,10 +6,12 @@ import type {
   PortalReferralApi,
   PortalReferralApiMutationMetadata,
   PortalReferralCreateCommand,
+  PortalReferralProviderFollowUpDetail,
   PortalReferralSourceDetail,
 } from "./portal-referral-adapter.server";
 import { canonicalPortalReferralUuid } from "./portal-referral-id";
 import {
+  PORTAL_REFERRAL_FOLLOW_UP_OUTCOME_CODES,
   PORTAL_REFERRAL_PREVIEW_REGION_CODES,
   PORTAL_REFERRAL_PREVIEW_SERVICE_TYPE_CODES,
   PORTAL_REFERRAL_STATUSES,
@@ -40,13 +42,17 @@ export const PORTAL_REFERRAL_SUPABASE_RPC_NAMES = Object.freeze({
   providerResponseAuthorize: "portal_referral_provider_response_authorize",
   providerResponseOffers: "portal_referral_provider_response_offers",
   providerResponseRespond: "portal_referral_provider_response_respond",
+  followUpAuthorize: "portal_referral_follow_up_authorize",
+  followUpDetail: "portal_referral_follow_up_detail",
+  followUpRecord: "portal_referral_follow_up_record",
 } as const);
 
 export type PortalReferralAuthorizationScope =
   | "INTAKE"
   | "SOURCE_DETAIL"
   | "ASSIGNMENT"
-  | "PROVIDER_RESPONSE";
+  | "PROVIDER_RESPONSE"
+  | "FOLLOW_UP";
 
 export type PortalReferralSupabaseRpcError = Readonly<{
   code?: unknown;
@@ -96,7 +102,7 @@ type PortalReferralAssignmentAuthorization =
       membershipStatus: "ACTIVE";
     }>;
 
-type PortalReferralProviderResponseAuthorization = Readonly<{
+type PortalReferralProviderAuthorization = Readonly<{
   userId: string;
   organizationId: string;
   organizationType: "PROVIDER";
@@ -110,7 +116,7 @@ type PortalReferralProviderResponseAuthorization = Readonly<{
 export type PortalReferralAuthorization =
   | PortalReferralSourceAuthorization
   | PortalReferralAssignmentAuthorization
-  | PortalReferralProviderResponseAuthorization;
+  | PortalReferralProviderAuthorization;
 
 export type PortalReferralAuthorizationResolution =
   | Readonly<{ ok: true; authorization: PortalReferralAuthorization }>
@@ -165,6 +171,8 @@ function authorizationRpcName(scope: PortalReferralAuthorizationScope) {
       return PORTAL_REFERRAL_SUPABASE_RPC_NAMES.assignmentAuthorize;
     case "PROVIDER_RESPONSE":
       return PORTAL_REFERRAL_SUPABASE_RPC_NAMES.providerResponseAuthorize;
+    case "FOLLOW_UP":
+      return PORTAL_REFERRAL_SUPABASE_RPC_NAMES.followUpAuthorize;
     default:
       return undefined;
   }
@@ -370,7 +378,7 @@ export function createSupabasePortalReferralApi(
       });
     },
     async listMyOffers() {
-      assertProviderResponseAuthorization(trustedAuthorization);
+      assertProviderAuthorization(trustedAuthorization);
       const data = await callWorkflowRpc(
         client,
         PORTAL_REFERRAL_SUPABASE_RPC_NAMES.providerResponseOffers,
@@ -380,7 +388,7 @@ export function createSupabasePortalReferralApi(
     },
 
     async respondToOffer(matchId, command, mutation) {
-      assertProviderResponseAuthorization(trustedAuthorization);
+      assertProviderAuthorization(trustedAuthorization);
       const requestedMatchId = requestUuid(matchId);
       const normalizedCommandRecord = exactRequestRecord(command, [
         "expectedVersion",
@@ -415,7 +423,58 @@ export function createSupabasePortalReferralApi(
       );
       return parseProviderResponseMutationEnvelope(data, normalizedCommand);
     },
-    recordFollowUp: unsupported,
+
+    async getProviderFollowUpReferral(referralId: string) {
+      assertProviderAuthorization(trustedAuthorization);
+      const requestedReferralId = requestUuid(referralId);
+      const data = await callWorkflowRpc(
+        client,
+        PORTAL_REFERRAL_SUPABASE_RPC_NAMES.followUpDetail,
+        { p_referral_id: requestedReferralId },
+      );
+      const detail = parseProviderFollowUpDetailEnvelope(data);
+      if (detail.referralId !== requestedReferralId) {
+        throw invalidAdapterEnvelope();
+      }
+      return detail;
+    },
+
+    async recordFollowUp(referralId, command, mutation) {
+      assertProviderAuthorization(trustedAuthorization);
+      const requestedReferralId = requestUuid(referralId);
+      const normalizedCommandRecord = exactRequestRecord(command, [
+        "expectedVersion",
+        "outcomeCode",
+      ]);
+      const normalizedCommand = Object.freeze({
+        referralId: requestedReferralId,
+        expectedVersion: requestRowVersion(
+          normalizedCommandRecord.expectedVersion,
+        ),
+        outcomeCode: catalogValue(
+          normalizedCommandRecord.outcomeCode,
+          PORTAL_REFERRAL_FOLLOW_UP_OUTCOME_CODES,
+          true,
+        ),
+      });
+      const hashes = createMutationRpcHashes(
+        trustedAuthorization,
+        "RECORD_FOLLOW_UP",
+        normalizedCommand,
+        mutation,
+      );
+      const data = await callWorkflowRpc(
+        client,
+        PORTAL_REFERRAL_SUPABASE_RPC_NAMES.followUpRecord,
+        {
+          p_referral_id: normalizedCommand.referralId,
+          p_expected_version: normalizedCommand.expectedVersion,
+          p_outcome_code: normalizedCommand.outcomeCode,
+          ...hashes,
+        },
+      );
+      return parseFollowUpMutationEnvelope(data, normalizedCommand);
+    },
     listAudit: unsupported,
   });
 }
@@ -426,7 +485,7 @@ function parseAuthorizationEnvelope(
 ): PortalReferralAuthorization {
   const envelope = exactRecord(
     value,
-    scope === "PROVIDER_RESPONSE"
+    isProviderAuthorizationScope(scope)
       ? [
           "authorized",
           "user_id",
@@ -457,7 +516,7 @@ function parseAuthorizationEnvelope(
       organizationStatus: envelope.organization_status,
       membershipRole: envelope.membership_role,
       membershipStatus: envelope.membership_status,
-      ...(scope === "PROVIDER_RESPONSE"
+      ...(isProviderAuthorizationScope(scope)
         ? {
             providerId: envelope.provider_id,
             providerReviewStatus: envelope.provider_review_status,
@@ -517,7 +576,7 @@ function parseAuthorization(
     authorization.organizationType === "PROVIDER" &&
     authorization.membershipRole === "provider_member" &&
     authorization.providerReviewStatus === "APPROVED" &&
-    (scope === undefined || scope === "PROVIDER_RESPONSE")
+    (scope === undefined || isProviderAuthorizationScope(scope))
   ) {
     return Object.freeze({
       ...base,
@@ -561,6 +620,12 @@ function parseAuthorization(
     });
   }
   throw invalidAdapterEnvelope();
+}
+
+function isProviderAuthorizationScope(
+  scope: PortalReferralAuthorizationScope,
+) {
+  return scope === "PROVIDER_RESPONSE" || scope === "FOLLOW_UP";
 }
 
 function parseListEnvelope(value: unknown): PortalReferralListItem[] {
@@ -656,6 +721,22 @@ function parseSourceDetailEnvelope(value: unknown): PortalReferralSourceDetail {
     }),
     createdAt,
     updatedAt,
+  });
+}
+
+function parseProviderFollowUpDetailEnvelope(
+  value: unknown,
+): PortalReferralProviderFollowUpDetail {
+  const detail = parseSourceDetailEnvelope(value);
+  if (
+    detail.currentStatus !== "ACCEPTED" &&
+    detail.currentStatus !== "IN_PROGRESS"
+  ) {
+    throw invalidAdapterEnvelope();
+  }
+  return Object.freeze({
+    ...detail,
+    currentStatus: detail.currentStatus,
   });
 }
 
@@ -957,6 +1038,36 @@ function parseProviderResponseMutationEnvelope(
   });
 }
 
+function parseFollowUpMutationEnvelope(
+  value: unknown,
+  expected: Readonly<{ referralId: string; expectedVersion: number }>,
+): PortalReferralMutationAck {
+  const envelope = exactRecord(value, [
+    "referral_id",
+    "match_id",
+    "current_status",
+    "row_version",
+    "updated_at",
+  ]);
+  const referralId = canonicalUuid(envelope.referral_id);
+  const rowVersion = safeRowVersion(envelope.row_version);
+  if (
+    referralId !== expected.referralId ||
+    envelope.match_id !== null ||
+    envelope.current_status !== "IN_PROGRESS" ||
+    rowVersion !== expected.expectedVersion + 1
+  ) {
+    throw invalidAdapterEnvelope();
+  }
+  return Object.freeze({
+    referralId,
+    matchId: null,
+    currentStatus: "IN_PROGRESS",
+    rowVersion,
+    updatedAt: safeTimestamp(envelope.updated_at),
+  });
+}
+
 function normalizeCreateCommand(
   value: PortalReferralCreateCommand,
 ): PortalReferralCreateCommand {
@@ -993,8 +1104,12 @@ function normalizeCreateCommand(
 function createMutationRpcHashes(
   authorization:
     | PortalReferralAssignmentAuthorization
-    | PortalReferralProviderResponseAuthorization,
-  kind: "TRIAGE_REFERRAL" | "OFFER_REFERRAL" | "RESPOND_TO_OFFER",
+    | PortalReferralProviderAuthorization,
+  kind:
+    | "TRIAGE_REFERRAL"
+    | "OFFER_REFERRAL"
+    | "RESPOND_TO_OFFER"
+    | "RECORD_FOLLOW_UP",
   command: Readonly<Record<string, unknown>>,
   mutation: PortalReferralApiMutationMetadata,
 ) {
@@ -1043,9 +1158,9 @@ function assertAssignmentAuthorization(
   }
 }
 
-function assertProviderResponseAuthorization(
+function assertProviderAuthorization(
   authorization: PortalReferralAuthorization,
-): asserts authorization is PortalReferralProviderResponseAuthorization {
+): asserts authorization is PortalReferralProviderAuthorization {
   if (
     authorization.membershipRole !== "provider_member" ||
     authorization.organizationType !== "PROVIDER" ||

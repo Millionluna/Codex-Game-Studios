@@ -95,6 +95,45 @@ describe("Portal referral provider response coordinator browser state", () => {
     }
   });
 
+  it("shows detail links only for accepted, active referrals when both gates are open", async () => {
+    const fetcher = vi.fn(async () =>
+      jsonResponse({
+        items: [
+          offer(),
+          offer({
+            matchId: MATCH_B,
+            referralId: REFERRAL_B,
+            matchStatus: "ACCEPTED",
+            currentStatus: "IN_PROGRESS",
+            rowVersion: 4,
+          }),
+          offer({
+            matchId: "e1111111-1111-4111-8111-111111111111",
+            referralId: "f1111111-1111-4111-8111-111111111111",
+            matchStatus: "ACCEPTED",
+            currentStatus: "NOTE_LINKED",
+            rowVersion: 5,
+          }),
+        ],
+      }),
+    );
+    vi.stubGlobal("fetch", fetcher);
+
+    await renderCoordinator({ followUpEnabled: true });
+    await waitForText("Open follow-up / 打开跟进");
+
+    const links = [...container.querySelectorAll<HTMLAnchorElement>("a")];
+    expect(links).toHaveLength(1);
+    expect(links[0]?.getAttribute("href")).toBe(
+      `/provider-portal/referrals/${REFERRAL_B}`,
+    );
+
+    await act(async () => {
+      root.render(<PortalReferralProviderResponseCoordinator enabled />);
+    });
+    expect(container.querySelectorAll("a")).toHaveLength(0);
+  });
+
   it("gives every offered-card action a unique safe name bound to its title", async () => {
     const fetcher = vi.fn(async () =>
       jsonResponse({
@@ -1168,9 +1207,13 @@ describe("Portal referral provider response coordinator browser state", () => {
   });
 });
 
-async function renderCoordinator() {
+async function renderCoordinator(
+  props: Readonly<{ followUpEnabled?: boolean }> = {},
+) {
   await act(async () => {
-    root.render(<PortalReferralProviderResponseCoordinator enabled />);
+    root.render(
+      <PortalReferralProviderResponseCoordinator enabled {...props} />,
+    );
   });
 }
 

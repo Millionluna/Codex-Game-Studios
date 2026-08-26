@@ -67,6 +67,19 @@ export type PortalReferralSourceDetail = Readonly<{
   updatedAt: string;
 }>;
 
+/** Exact accepted-referral projection for the independently gated provider slice. */
+export type PortalReferralProviderFollowUpDetail = Readonly<{
+  referralId: string;
+  summary: string;
+  region: string;
+  serviceType: string;
+  currentStatus: "ACCEPTED" | "IN_PROGRESS";
+  rowVersion: number;
+  contact: PortalReferralContact;
+  createdAt: string;
+  updatedAt: string;
+}>;
+
 export type PortalReferralApi = Readonly<{
   listReferrals(): MaybePromise<
     ReturnType<PortalReferralWorkflowPort["listReferrals"]>
@@ -110,10 +123,16 @@ export type PortalReferralApi = Readonly<{
     command: PortalReferralResponseCommand,
     mutation: PortalReferralApiMutationMetadata,
   ): MaybePromise<ReturnType<PortalReferralWorkflowPort["respondToOffer"]>>;
+  getProviderFollowUpReferral(
+    referralId: string,
+  ): MaybePromise<
+    | PortalReferralProviderFollowUpDetail
+    | ReturnType<PortalReferralWorkflowPort["getReferral"]>
+  >;
   recordFollowUp(
     referralId: string,
     command: PortalReferralFollowUpCommand,
-    mutation: PortalReferralMutationMetadata,
+    mutation: PortalReferralApiMutationMetadata,
   ): MaybePromise<ReturnType<PortalReferralWorkflowPort["recordFollowUp"]>>;
   listAudit(
     referralId: string,
@@ -161,6 +180,8 @@ export function createActorBoundPortalReferralApi(
         },
         mutation,
       ),
+    getProviderFollowUpReferral: (referralId) =>
+      workflow.getReferral(actor, referralId),
     recordFollowUp: (referralId, command, mutation) =>
       workflow.recordFollowUp(
         actor,

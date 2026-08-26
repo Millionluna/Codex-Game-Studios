@@ -34,12 +34,16 @@ import {
   getReadinessUpgradeOffers,
 } from "@/lib/provider-assessment";
 import { getProviderPortalData } from "@/lib/provider-portal";
-import { isPortalReferralProviderResponseRuntimeEnabled } from "@/lib/portal-referral-runtime.server";
+import {
+  isPortalReferralFollowUpRuntimeEnabled,
+  isPortalReferralProviderResponseRuntimeEnabled,
+} from "@/lib/portal-referral-runtime.server";
 import { getRolePortal } from "@/lib/role-portals";
 
 export default function ProviderPortalPage() {
   const providerResponseEnabled =
     isPortalReferralProviderResponseRuntimeEnabled();
+  const followUpEnabled = isPortalReferralFollowUpRuntimeEnabled();
 
   if (providerResponseEnabled) {
     return (
@@ -49,7 +53,10 @@ export default function ProviderPortalPage() {
           title="我的 referral 邀约"
           description="这里只显示当前数据库会话获准查看的 region、service、status 和 row version。接受或拒绝后会重新读取权威列表。"
         />
-        <PortalReferralProviderResponseCoordinator enabled />
+        <PortalReferralProviderResponseCoordinator
+          enabled
+          followUpEnabled={followUpEnabled}
+        />
       </AppShell>
     );
   }

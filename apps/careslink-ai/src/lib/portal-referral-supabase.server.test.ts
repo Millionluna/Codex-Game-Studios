@@ -12,7 +12,10 @@ import {
   type PortalReferralSessionScopedSupabaseRpcClient,
   type PortalReferralSupabaseRpcResult,
 } from "./portal-referral-supabase.server";
-import type { PortalReferralSourceDetail } from "./portal-referral-adapter.server";
+import type {
+  PortalReferralProviderFollowUpDetail,
+  PortalReferralSourceDetail,
+} from "./portal-referral-adapter.server";
 import {
   PortalReferralWorkflowError,
   createPortalReferralMutationPayloadHash,
@@ -184,19 +187,26 @@ describe("Portal referral Supabase adapter", () => {
     ).resolves.toEqual({ ok: false, reason: "adapter_unavailable" });
   });
 
-  it("strictly authorizes one approved provider membership for provider response", async () => {
-    const client = rpcClient(rpcSuccess(providerAuthorizationEnvelope()));
-
-    await expect(
-      authorizePortalReferralSupabaseClient(client, "PROVIDER_RESPONSE"),
-    ).resolves.toEqual({
-      ok: true,
-      authorization: providerAuthorization(),
-    });
-    expect(client.rpc).toHaveBeenCalledWith(
+  it.each([
+    [
+      "PROVIDER_RESPONSE",
       PORTAL_REFERRAL_SUPABASE_RPC_NAMES.providerResponseAuthorize,
-    );
-  });
+    ],
+    ["FOLLOW_UP", PORTAL_REFERRAL_SUPABASE_RPC_NAMES.followUpAuthorize],
+  ] as const)(
+    "strictly authorizes one approved provider membership for %s",
+    async (scope, rpcName) => {
+      const client = rpcClient(rpcSuccess(providerAuthorizationEnvelope()));
+
+      await expect(
+        authorizePortalReferralSupabaseClient(client, scope),
+      ).resolves.toEqual({
+        ok: true,
+        authorization: providerAuthorization(),
+      });
+      expect(client.rpc).toHaveBeenCalledWith(rpcName);
+    },
+  );
 
   it.each([
     { ...providerAuthorizationEnvelope(), private: CONTACT },
@@ -731,6 +741,124 @@ describe("Portal referral Supabase adapter", () => {
         command as never,
         { mutationId: MUTATION_ID, correlationId: CORRELATION_ID },
       ),
+    ).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
+    expect(client.rpc).not.toHaveBeenCalled();
+  });
+
+  it("returns only the exact accepted provider follow-up detail projection", async () => {
+    const client = rpcClient(rpcSuccess(providerFollowUpDetailEnvelope()));
+    const api = createSupabasePortalReferralApi(client, providerAuthorization());
+
+    await expect(api.getProviderFollowUpReferral(IDS.referral)).resolves.toEqual({
+      referralId: IDS.referral,
+      summary: "Adult participant needs community participation support",
+      region: "VIC_MELBOURNE",
+      serviceType: "SUPPORT_COORDINATION",
+      currentStatus: "ACCEPTED",
+      rowVersion: 4,
+      contact: CONTACT,
+      createdAt: "2026-08-24T00:00:00.000Z",
+      updatedAt: "2026-08-24T01:02:03.456Z",
+    } satisfies PortalReferralProviderFollowUpDetail);
+    expect(client.rpc).toHaveBeenCalledWith(
+      PORTAL_REFERRAL_SUPABASE_RPC_NAMES.followUpDetail,
+      { p_referral_id: IDS.referral },
+    );
+  });
+
+  it.each([
+    { ...providerFollowUpDetailEnvelope(), current_status: "OFFERED" },
+    { ...providerFollowUpDetailEnvelope(), current_status: "NOTE_LINKED" },
+    { ...providerFollowUpDetailEnvelope(), private: CONTACT },
+    { ...providerFollowUpDetailEnvelope(), referral_id: IDS.otherReferral },
+  ])("rejects an unsafe provider follow-up detail envelope %#", async (data) => {
+    const api = createSupabasePortalReferralApi(
+      rpcClient(rpcSuccess(data)),
+      providerAuthorization(),
+    );
+    await expect(
+      api.getProviderFollowUpReferral(IDS.referral),
+    ).rejects.toMatchObject({ code: "ADAPTER_UNAVAILABLE" });
+  });
+
+  it("hashes the canonical follow-up command and strictly binds its ACK", async () => {
+    const client = rpcClient(rpcSuccess(followUpMutationEnvelope()));
+    const api = createSupabasePortalReferralApi(client, providerAuthorization());
+
+    await expect(
+      api.recordFollowUp(
+        IDS.referral,
+        { outcomeCode: "CONTACT_CONFIRMED", expectedVersion: 4 },
+        { mutationId: MUTATION_ID, correlationId: CORRELATION_ID },
+      ),
+    ).resolves.toEqual({
+      referralId: IDS.referral,
+      matchId: null,
+      currentStatus: "IN_PROGRESS",
+      rowVersion: 5,
+      updatedAt: "2026-08-24T01:02:03.456Z",
+    });
+    expect(client.rpc).toHaveBeenCalledWith(
+      PORTAL_REFERRAL_SUPABASE_RPC_NAMES.followUpRecord,
+      {
+        p_referral_id: IDS.referral,
+        p_expected_version: 4,
+        p_outcome_code: "CONTACT_CONFIRMED",
+        p_mutation_id_hash: sha256(MUTATION_ID),
+        p_payload_hash: createPortalReferralMutationPayloadHash({
+          actor: {
+            organizationId: IDS.organization,
+            role: "provider_member",
+            providerId: IDS.provider,
+          },
+          kind: "RECORD_FOLLOW_UP",
+          command: {
+            referralId: IDS.referral,
+            expectedVersion: 4,
+            outcomeCode: "CONTACT_CONFIRMED",
+          },
+        }),
+        p_correlation_id_hash: sha256(CORRELATION_ID),
+      },
+    );
+  });
+
+  it.each([
+    { ...followUpMutationEnvelope(), match_id: IDS.match },
+    { ...followUpMutationEnvelope(), current_status: "ACCEPTED" },
+    { ...followUpMutationEnvelope(), row_version: 4 },
+    { ...followUpMutationEnvelope(), referral_id: IDS.otherReferral },
+    { ...followUpMutationEnvelope(), private: CONTACT },
+  ])("rejects an unbound follow-up ACK %#", async (data) => {
+    const api = createSupabasePortalReferralApi(
+      rpcClient(rpcSuccess(data)),
+      providerAuthorization(),
+    );
+    await expect(
+      api.recordFollowUp(
+        IDS.referral,
+        { outcomeCode: "CONTACT_CONFIRMED", expectedVersion: 4 },
+        { mutationId: MUTATION_ID, correlationId: CORRELATION_ID },
+      ),
+    ).rejects.toMatchObject({ code: "ADAPTER_UNAVAILABLE" });
+  });
+
+  it.each([
+    ["not-a-referral", { outcomeCode: "CONTACT_CONFIRMED", expectedVersion: 4 }],
+    [IDS.referral, { outcomeCode: "free text", expectedVersion: 4 }],
+    [IDS.referral, { outcomeCode: "CONTACT_CONFIRMED", expectedVersion: 0 }],
+    [
+      IDS.referral,
+      { outcomeCode: "CONTACT_CONFIRMED", expectedVersion: 4, actor: IDS.user },
+    ],
+  ])("rejects an unsafe follow-up command %# before RPC", async (referralId, command) => {
+    const client = rpcClient(rpcSuccess(followUpMutationEnvelope()));
+    const api = createSupabasePortalReferralApi(client, providerAuthorization());
+    await expect(
+      api.recordFollowUp(referralId, command as never, {
+        mutationId: MUTATION_ID,
+        correlationId: CORRELATION_ID,
+      }),
     ).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
     expect(client.rpc).not.toHaveBeenCalled();
   });
@@ -1315,6 +1443,30 @@ function providerResponseMutationEnvelope(
     row_version: rowVersion,
     updated_at: "2026-08-24T11:02:03.456+10:00",
   };
+}
+
+function providerFollowUpDetailEnvelope() {
+  return {
+    referral_id: IDS.referral,
+    summary: "Adult participant needs community participation support",
+    region: "VIC_MELBOURNE",
+    service_type: "SUPPORT_COORDINATION",
+    current_status: "ACCEPTED",
+    row_version: 4,
+    contact: CONTACT,
+    created_at: "2026-08-24T10:00:00.000+10:00",
+    updated_at: "2026-08-24T11:02:03.456+10:00",
+  } as const;
+}
+
+function followUpMutationEnvelope() {
+  return {
+    referral_id: IDS.referral,
+    match_id: null,
+    current_status: "IN_PROGRESS",
+    row_version: 5,
+    updated_at: "2026-08-24T11:02:03.456+10:00",
+  } as const;
 }
 
 function assignmentMutationEnvelope(

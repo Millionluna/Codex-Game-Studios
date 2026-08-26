@@ -594,6 +594,84 @@ flag or Production boundary. It postdates exact Hosted gate source `44f3bd6` and
 has no new paid Preview, Hosted/browser re-gate, Vercel deployment, merge,
 activation or Production evidence.
 
+### Portal Referral Follow-up M1c source/local checkpoint — 2026-08-26
+
+The first real M1c batch adds an independently gated approved-provider detail
+and fixed-code follow-up flow. The database must prove the exact assigned
+provider, one coherent accepted match and `ACCEPTED | IN_PROGRESS` before
+returning summary/contact. Mutation input is limited to expected version and
+one of five fixed outcomes; no free text, due date, history, actor/provider
+identity or operator/source write is served. Success atomically updates the
+referral version and writes one append-only follow-up, metadata-only audit and
+hash-only receipt.
+
+Tests were written red first. Independent review then exercised the complete
+client async state machine and closed the route-reuse, stale-completion,
+lifecycle-worker, per-resource pending and enable/disable ABA findings. Private
+detail is bound to the committed referral plus authorization epoch; stale work
+cannot revive another referral or release a write before an authoritative GET.
+Uncertain replay retains referral/status/version, outcome and key only inside
+the same authorization epoch, never summary/contact. The final independent
+review found no remaining P0/P1.
+
+| Command / gate | Result |
+|---|---|
+| focused M1c application + migration contracts | 11 files / 336 tests passed |
+| `pnpm test` | 147 files / 2,011 tests passed |
+| `pnpm exec tsc --noEmit --incremental false` | passed |
+| `pnpm lint` | passed |
+| `pnpm build` | passed after sandbox-only local process approval; Next.js 16.2.9 generated 64/64 pages |
+| PostgreSQL 16 minimum Portal chain | eight exact migration files clean-applied; Follow-up migration completed with all six flags default-off/Preview-only |
+| M1c rollback-only assertion | 1,171 lines executed through final `ROLLBACK`: exact Provider A/B detail isolation, fixed-code record, replay/conflict/stale/state, ACL/search path, atomic side effects and cleanup |
+| existing Portal regression assertions | Foundation, Intake, Source Detail, Assignment and Provider Response all passed after M1c was applied |
+| terminal PostgreSQL postcheck and cleanup | six flags off/Preview-only; Auth/Portal fixtures zero; three append-only triggers enabled; temporary cluster stopped and deleted |
+
+This initial source checkpoint created no true two-backend M1c race result.
+The later local gate below closes that one evidence gap only. It still creates
+no Hosted GoTrue/PostgREST/Data API gate, paid or retained Preview, Vercel
+deployment, merge, activation or Production SQL/write. Follow-up history,
+`next_due_at`, notifications, audit listing and document/export remain deferred.
+
+### Portal Referral Follow-up M1c true-concurrency local gate — 2026-08-26
+
+The retained M1c gate is a one-command, local-only PostgreSQL 16 lifecycle. It
+creates a fresh passwordless server with no TCP listener and exposes only a
+private `0700` Unix socket below its owned `0700` temporary root; host
+authentication is explicitly `reject`. It pins the exact eight-migration
+manifest, bootstrap/setup/cleanup SHA-256 bodies and complete live-harness
+source body, then opens distinct backend PIDs through a least-privilege runner.
+Teardown makes the runner `NOLOGIN`, drains only its exact sessions, performs
+cleanup and terminal postcheck, confirms PostgreSQL stopped and deletes the
+exact owned temporary directory. It rejects Hosted targets, public/arbitrary
+socket paths, passwords and generic database/`PG*` environment fallbacks.
+
+| Command / gate | Exact result |
+|---|---|
+| focused live-harness and lifecycle policy tests | 2 files / 28 tests passed |
+| `pnpm test` | 149 files / 2,039 tests passed |
+| `pnpm exec tsc --noEmit --incremental false` and `pnpm lint` | passed |
+| current M1c rollback-only assertion | all 1,249 lines executed through final `ROLLBACK`, including lock-aligned replay and `CLOSED` residual-binding denial |
+| exact database chain | PostgreSQL 16.15; 8/8 migrations; manifest SHA-256 `540562a57ed1e242354c6e02bf62e18eb0e6e3ecba7a5a4ef6e070d402482f9e` |
+| true multi-backend M1c concurrency | exact-current 8/8 twice on independent fresh private-socket clusters with internal high-port identifiers `50950` and `55918`: same-key replay, changed-payload conflict, different-key stale loser, same-provider actor scoping, session/provider/flag revoke-first, and ownership revoke with the old receipt replay started while revoke locks were still held, then denied after commit |
+| exact executable evidence | live harness `5cd432e1da2f6cefef7f8e86d7a557b0d2fe7e5d937d8e45189c0558ffe833f1`; bootstrap `b4d880a79275062e87e42014b5d1d1a8d9d77deb3dc5d7a25fb15239c1aea252`; setup `f86e76ccbce57a3ede4aacba2d1b29b5d280fca154a399b2cbb6a12e26d7d533`; cleanup `2c83c9c1b6f06fd6927036cfd4174dbad5e063bf26171a64cc02f50aca732b42` |
+| terminal cleanup | runner quiesced; SQL cleanup and independent postcheck passed; all six flags disabled/Preview-only; Auth/Portal fixtures zero; three append-only triggers enabled; PostgreSQL stopped normally; exact temp root removed |
+
+The blocker proof accepts PostgreSQL's documented lock-queue shape: every
+waiter must be in `Lock` wait and reach the intended controller PID through a
+graph containing only the scenario's known backend PIDs. Unknown PIDs, self
+edges or a chain that cannot reach the controller fail closed. This gate used
+no Supabase cloud service and adds no Hosted Auth/Data API, deployment,
+activation, merge or Production evidence.
+
+The post-review replay path now takes the same referral-then-ordered-match
+locks as a fresh mutation, rechecks the session after those locks, and requires
+the current provider assignment, `ACCEPTED | IN_PROGRESS` referral state and
+exactly one coherent accepted match before reusing an ACK. A `CLOSED` referral
+with deliberately retained historical bindings fails `PORTAL_NOT_FOUND`.
+The outer lifecycle verifies the exact live-harness bytes before execution; a
+mutation test removes a real scenario call while leaving its self-reported
+completion entry and proves the gate fails closed.
+
 ### Portal Referral Assignment M1a disposable Hosted Cookie gate — 2026-08-25
 
 The exact source commit was
@@ -1772,6 +1850,7 @@ This does not prove a live, data-bearing cross-migration upgrade. The `202608100
 | Owner generation repository boundary | `note-generation-owner-repository.server.test.ts`, `note-generation-owner-runtime-migration-contract.test.ts` and `v1_note_generation_owner_runtime_rpc_shadow_assertions.sql` | exact private direct-query calls, owner-safe envelopes, default-empty admission, fresh session/privacy/catalog selection, idempotent atomic enqueue, status/cancel while hard-off and atomic cancellation are source/local-SQL tested. The local PG16.15 owner/posture/session-lock gate and deleted r5 Hosted 30/30 migration, 11/11 assertion and independent posture gate passed. No retained Preview, hosted Auth/Data API, route, caller grant, vault/model/Points or Production capability |
 | Worker-registration graceful retirement | `note-generation-registration-retirement-shadow-migration-contract.test.ts` and `v1_note_generation_registration_retirement_shadow_assertions.sql` | migration #29 preserves immutable digest-bound `APPROVED` registrations, adds the fourteenth forced-RLS table and validates append-only retirement, fixed reasons, exact sorted active-binding compare-and-retire, idempotent replay, new-admission/new-claim denial and existing-attempt drain/recovery. The local 29/29, 9/9, posture and two-ordering race gate plus deleted r5 Hosted 30/30, 11/11 and independent posture gate passed. No caller grant, route, credential, seed, activation, emergency revoke or Production capability |
 | Portal Referral intake, source-detail, Assignment M1a and Provider Response M1b runtimes | four migration contracts, route/runtime/Supabase/UI tests and rollback suites | default-off cookie-only source list/create/detail, operator queue/detail/triage/candidates/offer and approved-provider metadata inbox/accept/decline; independent application/database operation gates; exact authenticated RPC grants; database-derived exact-one operator/provider contexts; tenant/provider isolation; post-lock session revalidation; strict DTO/ACK parsing; PII-separated create; assignment offer keeps `assigned_provider_id` null and M1b accept sets it from database context. M1a retains its deleted exact-current Hosted GoTrue/PostgREST Cookie evidence. Post-review M1b source `f45b19c` passed 8/271 focused and 143/1,935 full tests, its PostgreSQL 16.15 7/7 migration + 4/4 rollback gate and 6/6 real two-backend races. Exact gate source `44f3bd6` then passed the deleted no-data Preview's 33/33 migrations, 14/14 rollback suites, all 14 real two-provider SSR-cookie/Data API assertions and active-first/non-null-cursor delta 2/2, followed by clean terminal posture, final Advisors, three deletion probes and unchanged Production. The later focus/sign-in UI recovery passed only the local 8/274 and 143/1,938 gates and is not covered by `44f3bd6`. Neither Portal slice has a Vercel Preview deployment, retained activation or Production application |
+| Portal Referral Follow-up M1c runtime | M1c migration contract, route/runtime/Supabase/UI/browser tests, rollback suite and retained local concurrency lifecycle | default-off exact-provider accepted private detail plus five-code follow-up; A/B isolation, strict DTO/ACK, post-lock session checks, actor-bound hashes, atomic follow-up/audit/receipt/version writes and PII-safe resource/epoch-fenced lifecycle/replay are source/local tested. Receipt replay now takes referral→ordered-match locks and revalidates live session/assignment/status/coherent accepted tuple before reusing the ACK; `CLOSED` residual bindings fail closed. The application checkpoint passed 336 focused, 2,011 then-current full tests and 64/64 build pages; the post-review exact local gate passed 2/28 focused concurrency-policy tests, 149/2,039 current full tests and all 8/8 PostgreSQL 16.15 true multi-backend races twice through fresh no-TCP private-socket clusters with exact cleanup and an exact-hash-pinned live harness. Hosted Auth/Data API, deployment, activation and Production remain unproved |
 | Runtime isolation | `src/lib/v1/runtime-boundary.test.ts` | audited NDIS routes and the new `/v1` adapter are the only allowed server boundaries; `/v1` remains disabled without explicit adapters |
 
 ### Current live/read-only evidence

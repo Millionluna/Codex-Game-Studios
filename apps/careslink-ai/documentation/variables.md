@@ -81,6 +81,7 @@ Table overrides are server configuration. Production should normally use migrati
 | `CARESLINK_PORTAL_REFERRAL_SOURCE_DETAIL_ENABLED` | Server configuration | independent operation gate for an authenticated referral source to read one referral created by its own organization | only exact `true`; the base/durable gates and exact disposable-Preview ref must also pass; it does not enable intake, triage, offer, response, follow-up or audit |
 | `CARESLINK_PORTAL_REFERRAL_ASSIGNMENT_ENABLED` | Server configuration | independent operation gate for operator assignment queue/detail, triage, provider candidates and offer | only exact `true`; the base/durable gates and exact non-Production Preview ref must also pass. Because Assignment M1a still shares `/referrals` with source-role pages, its page latch also requires the intake and source-detail UI gates to be off; API operation authorization remains independent. It does not enable intake, source detail, provider accept/decline, follow-up, audit, document/export or assignment acceptance |
 | `CARESLINK_PORTAL_REFERRAL_PROVIDER_RESPONSE_ENABLED` | Server configuration | independent operation gate for an approved provider member's metadata-only offer inbox and ACCEPT/DECLINE response | only exact `true`; the base/durable gates and exact non-Production Preview ref must also pass. It does not inherit Assignment, Intake or Source Detail authorization and does not enable private provider detail, follow-up, audit, notification, document/export or Note/Points operations |
+| `CARESLINK_PORTAL_REFERRAL_FOLLOW_UP_ENABLED` | Server configuration | independent operation gate for an approved provider member to read one exactly assigned accepted referral and record a fixed-code follow-up | only exact `true`; the base/durable gates and exact non-Production Preview ref must also pass. It does not inherit Provider Response, Assignment, Intake or Source Detail authorization and does not enable history, scheduling, free text, audit listing, notifications, document/export or Note/Points operations |
 | `CARESLINK_PORTAL_REFERRAL_EXPECTED_SUPABASE_REF` | Server configuration | binds the Referral runtime to one reviewed disposable Preview branch | must exactly match the ref parsed from the server Supabase URL; non-Preview, missing/mismatch and the known Production ref fail closed before client construction |
 | `CARESLINK_V1_SHADOW_ENABLED` | Server configuration | master NDIS shadow kill switch | exact `true`; insufficient alone; unset/off outside disposable Preview |
 | `CARESLINK_V1_NDIS_DUAL_WRITE_ENABLED` | Server configuration | permits post-legacy-save projection | exact `true`; requires master + `VERCEL_ENV=preview` + verified branch ref |
@@ -92,12 +93,14 @@ The two reserved native-auth names are intentionally absent from `.env.example` 
 
 The database capability rows `referral_workflow_v1`, `referral_intake_v1`,
 `referral_source_detail_v1`, `referral_assignment_v1` and
-`referral_provider_response_v1` are separate Portal gates. Migration source
-defines all five rows as `enabled=false, preview_only=true`; none of the
+`referral_provider_response_v1` and `referral_follow_up_v1` are separate Portal
+gates. Migration source defines all six rows as
+`enabled=false, preview_only=true`; none of the
 operation migrations activates a row. Direct Data API calls require master plus
 their matching operation row, so
-intake, source detail, assignment and provider response cannot open one another.
-Assignment and Provider Response introduce no new secret.
+intake, source detail, assignment, provider response and follow-up cannot open
+one another. Assignment, Provider Response and Follow-up introduce no new
+secret.
 
 The privacy proof TTL is a code/contract constant of 1800 seconds for this
 temporary Preview gate. It is not configured through an environment variable

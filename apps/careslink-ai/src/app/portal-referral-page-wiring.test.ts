@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import ProviderPortalPage from "./provider-portal/page";
+import ProviderReferralFollowUpPage from "./provider-portal/referrals/[referralId]/page";
 import ReferralSourcePortalPage from "./referral-source-portal/page";
 import ReferralDetailPage from "./referrals/[id]/page";
 import ReferralMatchingPage from "./referrals/[id]/matches/page";
@@ -16,6 +17,7 @@ const navigationMocks = vi.hoisted(() => ({
 }));
 const runtimeMocks = vi.hoisted(() => ({
   isPortalReferralAssignmentRuntimeEnabled: vi.fn(() => false),
+  isPortalReferralFollowUpRuntimeEnabled: vi.fn(() => false),
   isPortalReferralProviderResponseRuntimeEnabled: vi.fn(() => false),
   isPortalReferralRuntimeEnabled: vi.fn(() => false),
   isPortalReferralSourceDetailRuntimeEnabled: vi.fn(() => false),
@@ -71,6 +73,9 @@ vi.mock("@/components/portal-referral-assignment-controls", async () =>
 );
 vi.mock("@/components/portal-referral-provider-response-controls", async () =>
   import("../components/portal-referral-provider-response-controls"),
+);
+vi.mock("@/components/portal-referral-provider-follow-up-controls", async () =>
+  import("../components/portal-referral-provider-follow-up-controls"),
 );
 vi.mock("@/components/referral-card", async () => {
   const React = await import("react");
@@ -136,6 +141,8 @@ describe("Portal referral page wiring", () => {
     runtimeMocks.isPortalReferralAssignmentRuntimeEnabled.mockReturnValue(
       false,
     );
+    runtimeMocks.isPortalReferralFollowUpRuntimeEnabled.mockClear();
+    runtimeMocks.isPortalReferralFollowUpRuntimeEnabled.mockReturnValue(false);
     runtimeMocks.isPortalReferralProviderResponseRuntimeEnabled.mockClear();
     runtimeMocks.isPortalReferralProviderResponseRuntimeEnabled.mockReturnValue(
       false,
@@ -325,6 +332,52 @@ describe("Portal referral page wiring", () => {
     expect(providerPortalMocks.getProviderPortalData).not.toHaveBeenCalled();
   });
 
+  it("keeps follow-up discovery inside the M1b inbox and separately gates private detail", async () => {
+    runtimeMocks.isPortalReferralFollowUpRuntimeEnabled.mockReturnValue(true);
+
+    const legacyMarkup = renderToStaticMarkup(ProviderPortalPage());
+    expect(legacyMarkup).toContain("Legacy mock referrals");
+    expect(legacyMarkup).not.toContain("Authorized provider offers");
+
+    runtimeMocks.isPortalReferralProviderResponseRuntimeEnabled.mockReturnValue(
+      true,
+    );
+    const inboxMarkup = renderToStaticMarkup(ProviderPortalPage());
+    expect(inboxMarkup).toContain("Authorized provider offers");
+    expect(
+      runtimeMocks.isPortalReferralFollowUpRuntimeEnabled,
+    ).toHaveBeenCalledTimes(2);
+
+    const detailMarkup = renderToStaticMarkup(
+      await ProviderReferralFollowUpPage({
+        params: Promise.resolve({ referralId: "a1111111-1111-4111-8111-111111111111" }),
+      }),
+    );
+    expect(detailMarkup).toContain("Provider follow-up M1c");
+    expect(detailMarkup).toContain("Loading authorized referral detail");
+    expect(detailMarkup).not.toContain("Legacy mock");
+  });
+
+  it("fails closed for disabled or non-canonical provider follow-up detail pages", async () => {
+    navigationMocks.notFound.mockClear();
+    await expect(
+      ProviderReferralFollowUpPage({
+        params: Promise.resolve({ referralId: "a1111111-1111-4111-8111-111111111111" }),
+      }),
+    ).rejects.toThrow("NEXT_NOT_FOUND");
+
+    runtimeMocks.isPortalReferralFollowUpRuntimeEnabled.mockReturnValue(true);
+    for (const referralId of [
+      "legacy-referral",
+      "A1111111-1111-4111-8111-111111111111",
+    ]) {
+      await expect(
+        ProviderReferralFollowUpPage({ params: Promise.resolve({ referralId }) }),
+      ).rejects.toThrow("NEXT_NOT_FOUND");
+    }
+    expect(navigationMocks.notFound).toHaveBeenCalledTimes(3);
+  });
+
   it("marks the core referral board as mock and keeps the real list adapter disabled", () => {
     const markup = renderToStaticMarkup(ReferralBoardPage());
 
@@ -353,6 +406,7 @@ describe("Portal referral page wiring", () => {
       "referrals/[id]/page.tsx",
       "referrals/[id]/matches/page.tsx",
       "provider-portal/page.tsx",
+      "provider-portal/referrals/[referralId]/page.tsx",
       "referral-source-portal/page.tsx",
     ].map((relativePath) =>
       readFileSync(join(process.cwd(), "src/app", relativePath), "utf8"),

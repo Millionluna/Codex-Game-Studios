@@ -81,7 +81,7 @@ availability.
 | `/providers`, `/providers/[id]` | `mock-data` | No | Unknown IDs fall back to the first mock provider; no provider table, membership or RLS | Real provider detail after M0 membership; unknown IDs return 404 |
 | `/providers/onboarding`, `/providers/review` | static/mock | No | Forms/buttons imply a save/review that does not occur | Add canonical provider profile and admin review command after identity proof |
 | Provider profile generator | mixed: real `provider_drafts`, mock editing seed | Partial | Draft handoff can use an in-memory fallback and is not a canonical provider | Treat claimed draft only as intake seed |
-| `/provider-portal` | legacy mock remains the gate-off default; a default-off Provider Response M1b workbench exists | Metadata-only own-offer list plus atomic accept/decline behind independent gates; not deployed | Exact gate source `44f3bd6` passed the deleted no-data Hosted re-gate, including real Cookie/Data API 14/14 and active-first/non-null-cursor 2/2. The later UI-only follow-up restores lost response focus, avoids stealing moved focus and provides a same-origin 401 sign-in return link; it has local evidence only. Accepted private detail, follow-up, notification, audit list and document/export remain absent | Keep every gate off; treat any new Hosted UI gate, merge, deployment and activation as separate approvals |
+| `/provider-portal` | legacy mock remains the gate-off default; default-off Provider Response M1b and Follow-up M1c source workbenches exist | Metadata-only own-offer list plus atomic accept/decline; eligible accepted items may open exact-provider private detail and record a fixed-code outcome behind a separate M1c gate; not deployed | M1b exact gate source `44f3bd6` passed the deleted no-data Hosted re-gate. M1c has source/local application evidence, resource/authorization-epoch fences, lock-aligned receipt replay and two fresh private-Unix-socket PostgreSQL 16.15 8/8 true multi-backend gates with exact cleanup. It still has no Hosted Auth/Data API evidence. Notification, history, audit list and document/export remain absent | Keep every gate off; treat M1c Hosted evidence, merge, deployment and activation as separate approvals |
 | `/referrals`, `/referrals/intake`, `/referrals/[id]`, match page | legacy mock remains default; default-off durable intake, exact-tenant source detail and operator Assignment M1a exist | List/create/source-detail plus operator queue/detail/triage/candidates/offer behind independent gates; not deployed | Gate-on assignment pages have no mock fallback and offer does not assign; Provider Response M1b completes accept/decline only on `/provider-portal`, while follow-up and audit remain disabled | Exact-current M1a commit `43659ab` and latest Hosted-validated M1b gate source `44f3bd6` passed separate deleted no-data Hosted Cookie gates; the current UI follow-up postdates the M1b gate, and no deployment or activation is authorized |
 | `/referral-source-portal` | legacy mock remains default; source-only intake controls are wired and the UUID detail page has a separate gate | List/create/detail only behind independent gates; not deployed | No hosted runtime or activation; the operator slice is independently gated and provider/later workflow actions remain unavailable | Reuse the database-authorized source slice after exact-revision Preview approval |
 | `/referral-workspace/*` | mixed real access/material/outreach stores | Yes, for those tools | These are AI access and outreach tools, not the referral pipeline; some stores have memory fallback | Preserve and later link by canonical referral ID |
@@ -1759,3 +1759,96 @@ tests, all 143 files / 1,938 tests, TypeScript, full lint, the Next.js 16.2.9
 This source postdates exact Hosted gate source `44f3bd6`. No new paid Preview,
 Hosted/browser re-gate, Vercel deployment, merge, activation or Production write
 was performed, so the prior Hosted evidence remains exact only for `44f3bd6`.
+
+## 34. Portal Referral Follow-up M1c first source/local checkpoint — 2026-08-26
+
+The next real provider-value slice is now implemented on its own branch and
+remains fully default-off. It adds:
+
+- `CARESLINK_PORTAL_REFERRAL_FOLLOW_UP_ENABLED` and database capability
+  `referral_follow_up_v1`, both independent from Provider Response;
+- `GET /api/portal/provider-referrals/{referralId}` for an exact assigned
+  approved provider's `ACCEPTED | IN_PROGRESS` private summary/contact;
+- existing `POST /api/portal/referrals/{referralId}/follow-ups` backed by a new
+  durable adapter and one of five fixed outcome codes;
+- CLI-generated migration
+  `20260826090841_add_portal_referral_follow_up_runtime.sql` with authorize,
+  detail and record RPCs, authenticated-only execution and no table grants;
+- a dedicated nested Provider Portal page with no mock fallback, authoritative
+  refresh, bounded requests, same-key uncertain replay and lifecycle
+  reauthorization.
+
+Every successful record uses expected version and actor-bound idempotency,
+locks referral before ordered matches, rechecks the Auth session, advances to or
+within `IN_PROGRESS`, and atomically writes one append-only follow-up, one
+metadata-only audit event and one hash-only receipt. Summary/contact are never
+copied to receipt, audit or uncertain replay state. Free text, `next_due_at`,
+history, notifications, audit listing, operator/source writes and
+document/export remain outside M1c.
+
+Red tests preceded each implementation sub-batch. Independent review exercised
+route reuse, overlapping GET/POST, stale completion, browser lifecycle workers,
+authorization changes and enable/disable ABA. Detail and pending work are now
+bound to the committed referral and authorization epoch; writes remain blocked
+until the matching authoritative read reconciles, and actor-scoped replay data
+never crosses an epoch. The final review found no remaining P0/P1. Final local
+application validation passed 11 focused files / 336 tests, all 147 files /
+2,011 tests, TypeScript, full lint and the Next.js 16.2.9 64/64-page production
+build.
+
+A temporary PostgreSQL 16 cluster clean-applied the exact eight-file minimum
+Portal chain. The 1,171-line M1c rollback suite and all five maintained Portal
+regression suites executed through `ROLLBACK`; terminal posture showed all six
+Portal flags disabled/Preview-only, zero Auth/Portal fixture rows and all three
+append-only triggers enabled. The server was stopped and its exact temporary
+directory deleted.
+
+This initial checkpoint performed no Hosted or Production action and did not
+yet contain a true two-backend M1c race. Section 35 closes that local race gate
+only. Paid or retained Preview, GoTrue/PostgREST/Data API evidence, Vercel
+deployment, merge, activation and Production migration/write remain separate
+approvals and gates.
+
+## 35. Portal Referral Follow-up M1c true-concurrency local gate — 2026-08-26
+
+The retained local-only gate creates a fresh passwordless PostgreSQL 16 server
+with no TCP listener, host authentication set to `reject`, and only a private
+`0700` Unix socket below its owned `0700` temporary root. It pins the exact
+eight-migration manifest, all three support SQL bodies and the complete live
+harness body. A least-privilege runner opens distinct backend PIDs for eight
+scenarios: same-key replay, same-key changed-payload conflict, different-key
+stale competition, two actors in the same provider, session revocation,
+provider suspension, Follow-up flag disablement, and ownership withdrawal with
+old-receipt replay denial.
+
+PostgreSQL 16.15 passed all 8/8 twice on independent fresh private-socket
+clusters with internal high-port identifiers `50950` and `55918`. Every
+winning mutation produced exactly one version advance, follow-up,
+metadata-only audit and hash-only actor-scoped receipt; every losing or revoked
+path returned the exact fixed code and wrote no extra effect. Ownership replay
+was launched while revoke still held the referral/match locks, was present in
+the exact blocker graph, and failed `PORTAL_NOT_FOUND` only after revoke
+committed. Focused policy/harness tests passed 2 files / 28 tests; the
+repository then passed 149 files / 2,039 tests, TypeScript and full lint.
+
+The manifest SHA-256 is
+`540562a57ed1e242354c6e02bf62e18eb0e6e3ecba7a5a4ef6e070d402482f9e`.
+The exact live harness is
+`5cd432e1da2f6cefef7f8e86d7a557b0d2fe7e5d937d8e45189c0558ffe833f1`;
+bootstrap/setup/cleanup are
+`b4d880a79275062e87e42014b5d1d1a8d9d77deb3dc5d7a25fb15239c1aea252`,
+`f86e76ccbce57a3ede4aacba2d1b29b5d280fca154a399b2cbb6a12e26d7d533`
+and `2c83c9c1b6f06fd6927036cfd4174dbad5e063bf26171a64cc02f50aca732b42`.
+The replay branch now uses the same referral-then-ordered-match locks as fresh
+mutations, revalidates session/live authority after locking and rejects a
+`CLOSED` referral even when historical assignment and accepted-match bindings
+remain. The outer lifecycle rejects a live harness whose exact bytes drift;
+its mutation regression removes one executed scenario call while preserving
+the self-reported completion entry and proves rejection.
+
+Teardown made the runner `NOLOGIN`, drained only its exact sessions, ran the
+pinned cleanup and independent terminal postcheck, retained all six Portal
+flags disabled/Preview-only with zero Auth/Portal fixtures and all three
+append-only triggers enabled, stopped PostgreSQL normally and deleted the exact
+owned temporary root. No Supabase cloud, Hosted Auth/Data API, paid Preview,
+Vercel deployment, merge, activation or Production system was touched.

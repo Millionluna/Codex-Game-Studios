@@ -5,6 +5,7 @@ import { randomUUID } from "node:crypto";
 import { readBoundedRequestText } from "./bounded-request-text.server";
 import type {
   PortalReferralApi,
+  PortalReferralProviderFollowUpDetail,
   PortalReferralSourceDetail,
 } from "./portal-referral-adapter.server";
 import { canonicalPortalReferralUuid } from "./portal-referral-id";
@@ -302,6 +303,30 @@ export async function handlePortalReferralResponse(
   );
 }
 
+export async function handlePortalReferralProviderFollowUpDetail(
+  request: Request,
+  referralId: string,
+  dependencies?: PortalReferralRouteDependencies,
+) {
+  if (request.method !== "GET") return methodNotAllowed("GET");
+  return withPortalReferralApi(
+    request,
+    "GET_PROVIDER_FOLLOW_UP_REFERRAL",
+    dependencies,
+    async (api) => {
+      const expectedReferralId = assertUuid(referralId);
+      return {
+        body: {
+          referral: projectPortalReferralProviderFollowUpDetail(
+            expectedReferralId,
+            await api.getProviderFollowUpReferral(expectedReferralId),
+          ),
+        },
+      };
+    },
+  );
+}
+
 export async function handlePortalReferralFollowUp(
   request: Request,
   referralId: string,
@@ -312,20 +337,22 @@ export async function handlePortalReferralFollowUp(
     request,
     "RECORD_FOLLOW_UP",
     dependencies,
-    async (api) => {
+    async (api, correlationId) => {
       assertMutationTransport(request);
-      const mutation = getMutationMetadata(request);
+      const mutation = { ...getMutationMetadata(request), correlationId };
       const body = await readJsonObject(request);
       assertExactKeys(body, ["outcomeCode", "expectedVersion"]);
       const outcomeCode = requiredOutcomeCode(body.outcomeCode);
+      const expectedReferralId = assertUuid(referralId);
+      const expectedVersion = requiredVersion(body.expectedVersion);
       return {
-        body: await api.recordFollowUp(
-          assertUuid(referralId),
-          {
-            outcomeCode,
-            expectedVersion: requiredVersion(body.expectedVersion),
-          },
-          mutation,
+        body: projectPortalReferralFollowUpMutation(
+          await api.recordFollowUp(
+            expectedReferralId,
+            { outcomeCode, expectedVersion },
+            mutation,
+          ),
+          { referralId: expectedReferralId, expectedVersion },
         ),
       };
     },
@@ -583,6 +610,53 @@ function projectPortalReferralSourceDetail(
   });
 }
 
+function projectPortalReferralProviderFollowUpDetail(
+  expectedReferralId: string,
+  value: Awaited<
+    ReturnType<PortalReferralApi["getProviderFollowUpReferral"]>
+  >,
+): PortalReferralProviderFollowUpDetail {
+  if (!value || typeof value !== "object") {
+    throw invalidAdapterResponse();
+  }
+  const referralId = canonicalPortalReferralUuid(value.referralId);
+  const contact = value.contact;
+  const createdAt = responseInstant(value.createdAt);
+  const updatedAt = responseInstant(value.updatedAt);
+  if (
+    referralId !== expectedReferralId ||
+    !contact ||
+    !(PORTAL_REFERRAL_PREVIEW_REGION_CODES as readonly string[]).includes(
+      value.region,
+    ) ||
+    !(PORTAL_REFERRAL_PREVIEW_SERVICE_TYPE_CODES as readonly string[]).includes(
+      value.serviceType,
+    ) ||
+    (value.currentStatus !== "ACCEPTED" &&
+      value.currentStatus !== "IN_PROGRESS") ||
+    !Number.isSafeInteger(value.rowVersion) ||
+    value.rowVersion < 1 ||
+    Date.parse(createdAt) > Date.parse(updatedAt)
+  ) {
+    throw invalidAdapterResponse();
+  }
+  return Object.freeze({
+    referralId,
+    summary: responseText(value.summary, 4_000),
+    region: value.region,
+    serviceType: value.serviceType,
+    currentStatus: value.currentStatus,
+    rowVersion: value.rowVersion,
+    contact: Object.freeze({
+      name: responseText(contact.name, 200),
+      phone: responseText(contact.phone, 100),
+      email: contact.email === null ? null : responseText(contact.email, 320),
+    }),
+    createdAt,
+    updatedAt,
+  });
+}
+
 const ASSIGNMENT_STATUSES = ["SUBMITTED", "TRIAGED", "OFFERED"] as const;
 
 function projectPortalReferralAssignmentQueue(
@@ -815,6 +889,28 @@ function projectPortalReferralProviderResponse(
     referralId,
     matchId,
     currentStatus,
+    rowVersion: value.rowVersion,
+    updatedAt: responseInstant(value.updatedAt),
+  });
+}
+
+function projectPortalReferralFollowUpMutation(
+  value: PortalReferralMutationAck,
+  expected: Readonly<{ referralId: string; expectedVersion: number }>,
+): PortalReferralMutationAck {
+  const referralId = responseUuid(value?.referralId);
+  if (
+    referralId !== expected.referralId ||
+    value.matchId !== null ||
+    value.currentStatus !== "IN_PROGRESS" ||
+    value.rowVersion !== expected.expectedVersion + 1
+  ) {
+    throw invalidAdapterResponse();
+  }
+  return Object.freeze({
+    referralId,
+    matchId: null,
+    currentStatus: "IN_PROGRESS",
     rowVersion: value.rowVersion,
     updatedAt: responseInstant(value.updatedAt),
   });

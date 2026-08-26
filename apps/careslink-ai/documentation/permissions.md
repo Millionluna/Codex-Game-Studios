@@ -175,6 +175,29 @@ inbox. The durable M1b route does not yet serve the
 post-accept private referral detail that the broader foundation permission model
 reserves for a later independently reviewed read slice.
 
+Follow-up M1c supplies that independently reviewed provider-only continuation
+behind `referral_follow_up_v1`. Its authenticated-only definer RPCs are
+`portal_referral_follow_up_authorize()`,
+`portal_referral_follow_up_detail(uuid)` and
+`portal_referral_follow_up_record(uuid,bigint,text,text,text,text)`. The detail
+RPC returns summary/contact only after re-deriving the exact-one active approved
+provider, proving `assigned_provider_id`, one coherent accepted match and an
+`ACCEPTED` or `IN_PROGRESS` referral. Missing and cross-provider identifiers are
+uniformly not found. The record RPC accepts only expected version plus one of
+five fixed outcomes; actor, organization and provider remain database-derived,
+and `next_due_at`, free text and history are not served.
+
+Record holds master then Follow-up gates, serializes the actor+mutation lane,
+locks referral before all matches, rechecks the Auth session after waits and
+rebuilds the canonical payload hash in PostgreSQL. A success changes
+`ACCEPTED → IN_PROGRESS` or records another `IN_PROGRESS → IN_PROGRESS` event,
+increments the referral version once, and atomically writes one append-only
+follow-up, one metadata-only audit event and one hash-only receipt. Exact replay
+revalidates current provider assignment and accepted-match ownership before
+returning the metadata-only ACK. No Portal table grant, anon/service-role RPC,
+operator/source mutation, history, notification, audit-list or document/export
+permission is added.
+
 The default runtime now supplies a request-scoped cookie client only after the
 base API and durable-adapter gates, the selected independent operation gate and
 the exact non-Production Preview ref pass. It

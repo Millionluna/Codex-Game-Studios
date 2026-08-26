@@ -84,6 +84,16 @@ database-derived provider atomically; `DECLINE` returns the referral to triage.
 The slice does not expose summary/contact, enable follow-up or audit listing, or
 authorize a deployment or Production activation.
 
+Follow-up M1c is a separately gated provider-only continuation. After the
+database re-proves an exact active approved provider assignment and coherent
+accepted match, it serves one private accepted-referral detail and accepts only
+one of five fixed outcome codes. Each mutation advances the referral to or
+within `IN_PROGRESS`, increments its version, and atomically appends one
+follow-up, metadata-only audit event and hash-only receipt. It does not expose
+history, `next_due_at`, free text, operator/source writes, notifications,
+document/export or audit listing. The source and database flags default off and
+the migration remains Production-unapplied.
+
 ## Supabase Access Control Store
 
 Access requests, access codes, and future AI usage audit events use an

@@ -234,6 +234,24 @@ reauthorization. Even when a new user belongs to the same provider and sees the
 same offer, the prior user's key is never restored; a still-actionable offer
 must create a new command.
 
+Follow-up M1c adds a fifth independently gated application operation without
+widening the M1b inbox or the operator/source roles. An eligible accepted item
+links to `/provider-portal/referrals/{referralId}` only while the Follow-up gate
+is open. The nested page has no mock fallback and loads
+`GET /api/portal/provider-referrals/{referralId}`; the database returns private
+summary/contact only for the exact assigned approved provider with one coherent
+accepted match and `ACCEPTED | IN_PROGRESS` state. The page records one fixed
+outcome through `POST /api/portal/referrals/{referralId}/follow-ups`, then
+re-reads authoritative detail.
+
+The client never accepts free text, a due date, actor/provider identity or
+history. Network uncertainty retains only referral/status/version, outcome and
+the same idempotency key, not summary/contact. Any failed authoritative read
+clears the private snapshot and replay key; focus, visible-tab, auth-storage and
+persisted-page events synchronously clear state before reauthorization. Render
+state is also bound to the current referral ID, so a reused A→B component cannot
+briefly expose A's contact or submit A's command under B's URL.
+
 At historical pre-review exact source
 `cc1e53cc88666a3e3f18ac55058295db408535ee`, this M1b flow passed a separate
 deleted no-data Hosted gate on Preview ref
