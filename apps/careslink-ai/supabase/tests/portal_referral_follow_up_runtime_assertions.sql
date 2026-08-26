@@ -183,6 +183,15 @@ begin
     or v_record_definition not like '%public.v1_shadow_content_sha256%'
     or v_record_definition not like
       '%p_payload_hash is distinct from v_payload_hash%'
+    or (length(lower(v_record_definition)) - length(replace(
+      lower(v_record_definition), 'for update of referral', ''
+    ))) / length('for update of referral') <> 2
+    or (length(lower(v_record_definition)) - length(replace(
+      lower(v_record_definition), 'order by match.id', ''
+    ))) / length('order by match.id') <> 2
+    or (length(lower(v_record_definition)) - length(replace(
+      lower(v_record_definition), 'for update of match', ''
+    ))) / length('for update of match') <> 2
     or strpos(lower(v_record_definition), 'for update of referral') = 0
     or strpos(lower(v_record_definition), 'order by match.id')
       <= strpos(lower(v_record_definition), 'for update of referral')
@@ -973,6 +982,75 @@ begin
   exception when sqlstate 'P0001' then
     if sqlerrm <> 'APPEND_ONLY_RESOURCE' then raise; end if;
   end;
+end;
+$$;
+
+-- A receipt remains only an ACK cache. Even with the historical provider
+-- assignment and accepted match deliberately left behind, a CLOSED referral
+-- must fail replay authority closed instead of returning the old ACK.
+select pg_catalog.set_config(
+  'role', pg_catalog.current_setting('careslink.assertion_entry_role'), false
+);
+update public.portal_referrals
+set current_status = 'CLOSED'
+where id = 'e3100000-0000-4000-8000-000000000001'
+  and current_status = 'IN_PROGRESS'
+  and assigned_provider_id = 'd3200000-0000-4000-8000-000000000002';
+do $$
+begin
+  if (select current_status from public.portal_referrals
+      where id = 'e3100000-0000-4000-8000-000000000001')
+        is distinct from 'CLOSED'
+    or (select assigned_provider_id from public.portal_referrals
+        where id = 'e3100000-0000-4000-8000-000000000001')
+        is distinct from 'd3200000-0000-4000-8000-000000000002'::uuid
+    or (select status from public.portal_referral_matches
+        where id = 'f3100000-0000-4000-8000-000000000001')
+        is distinct from 'ACCEPTED'
+  then
+    raise exception 'Follow-up CLOSED residual-binding fixture drifted';
+  end if;
+end;
+$$;
+
+set local role authenticated;
+select pg_catalog.set_config(
+  'request.jwt.claims',
+  '{"role":"authenticated","sub":"a3100000-0000-4000-8000-000000000001","session_id":"b3100000-0000-4000-8000-000000000001"}',
+  true
+);
+do $$
+begin
+  begin
+    perform public.portal_referral_follow_up_record(
+      'e3100000-0000-4000-8000-000000000001', 4,
+      'CONTACT_CONFIRMED', repeat('3', 64),
+      pg_catalog.current_setting('careslink.follow_up.accepted_hash'),
+      repeat('4', 64)
+    );
+    raise exception 'Follow-up replayed a CLOSED residual binding';
+  exception when sqlstate 'P0001' then
+    if sqlerrm <> 'PORTAL_NOT_FOUND' then raise; end if;
+  end;
+end;
+$$;
+
+select pg_catalog.set_config(
+  'role', pg_catalog.current_setting('careslink.assertion_entry_role'), false
+);
+update public.portal_referrals
+set current_status = 'IN_PROGRESS'
+where id = 'e3100000-0000-4000-8000-000000000001'
+  and current_status = 'CLOSED'
+  and assigned_provider_id = 'd3200000-0000-4000-8000-000000000002';
+do $$
+begin
+  if (select current_status from public.portal_referrals
+      where id = 'e3100000-0000-4000-8000-000000000001')
+        is distinct from 'IN_PROGRESS'
+  then
+    raise exception 'Follow-up CLOSED residual-binding fixture did not restore';
+  end if;
 end;
 $$;
 

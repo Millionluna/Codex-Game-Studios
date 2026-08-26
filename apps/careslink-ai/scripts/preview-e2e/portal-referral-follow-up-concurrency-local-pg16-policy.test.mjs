@@ -9,6 +9,7 @@ import {
   PORTAL_FOLLOW_UP_CONCURRENCY_RUNNER_ROLE,
   PortalFollowUpConcurrencyPolicyError,
   assertPortalFollowUpConcurrencyDistinctBackends,
+  assertPortalFollowUpConcurrencyLiveHarnessSource,
   assertPortalFollowUpConcurrencyLocalPg16SqlPolicy,
   assertPortalFollowUpConcurrencyMigrationManifest,
   assertPortalFollowUpConcurrencyPg16Version,
@@ -23,6 +24,7 @@ import {
 import {
   PortalFollowUpConcurrencyLocalPg16Error,
   mergePortalFollowUpConcurrencyLifecycleFailure,
+  retirePortalFollowUpConcurrencyPostgresCandidate,
 } from "./portal-referral-follow-up-concurrency-local-pg16.mjs";
 
 const RUNNER_URL = new URL(
@@ -42,11 +44,18 @@ const CLEANUP_SQL_URL = new URL(
   "./portal-referral-follow-up-concurrency-cleanup.sql",
   import.meta.url,
 );
+const LIVE_HARNESS_URL = new URL(
+  "./portal-referral-follow-up-concurrency.mjs",
+  import.meta.url,
+);
 
-function validDatabaseUrl(port = 55_432) {
+const SOCKET_DIRECTORY =
+  "/private/tmp/careslink-portal-follow-up-pg16.aB12cD/socket";
+
+function validDatabaseUrl(port = 55_432, socketDirectory = SOCKET_DIRECTORY) {
   return (
     `postgresql://${PORTAL_FOLLOW_UP_CONCURRENCY_RUNNER_ROLE}` +
-    `@127.0.0.1:${port}/postgres`
+    `@localhost:${port}/postgres?host=${encodeURIComponent(socketDirectory)}`
   );
 }
 
@@ -62,12 +71,13 @@ function expectPolicyCode(operation, code) {
 }
 
 describe("Portal Follow-up M1c local PG16 policy", () => {
-  it("accepts only its canonical credential-free IPv4 high-port target", () => {
+  it("accepts only its canonical credential-free private Unix socket target", () => {
     expect(validatePortalFollowUpConcurrencyDatabaseUrl(validDatabaseUrl()))
       .toEqual({
         ok: true,
         policyVersion: PORTAL_FOLLOW_UP_CONCURRENCY_MARKER,
-        hostname: "127.0.0.1",
+        transport: "unix-domain-socket",
+        socketDirectory: SOCKET_DIRECTORY,
         port: 55_432,
         database: "postgres",
         databaseRole: PORTAL_FOLLOW_UP_CONCURRENCY_RUNNER_ROLE,
@@ -79,16 +89,17 @@ describe("Portal Follow-up M1c local PG16 policy", () => {
     expect(assertPortalFollowUpConcurrencyPolicyRegression()).toMatchObject({
       ok: true,
       expectedPostgresMajor: 16,
-      requiredHost: "127.0.0.1",
+      transport: "unix-domain-socket",
+      socketDirectory: SOCKET_DIRECTORY,
       migrationCount: 8,
     });
   });
 
   it.each([
-    [validDatabaseUrl().replace("127.0.0.1", "localhost"), "targetDenied"],
+    [validDatabaseUrl().replace("localhost", "127.0.0.1"), "targetDenied"],
     [
       validDatabaseUrl().replace(
-        "127.0.0.1",
+        "localhost",
         "db.example.invalid",
       ),
       "targetDenied",
@@ -102,8 +113,10 @@ describe("Portal Follow-up M1c local PG16 policy", () => {
       ),
       "credentialsDenied",
     ],
-    [validDatabaseUrl() + "?sslmode=disable", "queryDenied"],
+    [validDatabaseUrl() + "&sslmode=disable", "queryDenied"],
     [validDatabaseUrl() + "#fragment", "queryDenied"],
+    [validDatabaseUrl(55_432, "/tmp/public-socket"), "targetDenied"],
+    [validDatabaseUrl().replace(/\?host=.*/, ""), "queryDenied"],
     [validDatabaseUrl().replace("/postgres", "/template1"), "databaseDenied"],
     [validDatabaseUrl().replace("postgresql://", "postgres://"), "targetDenied"],
   ])("rejects unsafe database URL %s", (value, errorKey) => {
@@ -179,11 +192,11 @@ describe("Portal Follow-up M1c local PG16 policy", () => {
     ).toMatchObject({
       ok: true,
       bootstrapSha256:
-        "701128cf64b7e5f4eb28e64f1ae7a0d95b8deb4e9ca68c6ac338560b99c3145f",
+        "b4d880a79275062e87e42014b5d1d1a8d9d77deb3dc5d7a25fb15239c1aea252",
       setupSha256:
-        "5cbbceaa939ac537ce9fa99de6854c3c7ac386c4b54235e1a47c3915593a6f1a",
+        "f86e76ccbce57a3ede4aacba2d1b29b5d280fca154a399b2cbb6a12e26d7d533",
       cleanupSha256:
-        "2f42934e46935df897c0a2173096d11f3a63bf9fb1a538f6d284f2125caef30e",
+        "2c83c9c1b6f06fd6927036cfd4174dbad5e063bf26171a64cc02f50aca732b42",
       exactSqlBodiesLocked: true,
       truncateDenied: true,
       hostedTargetDenied: true,
@@ -201,6 +214,35 @@ describe("Portal Follow-up M1c local PG16 policy", () => {
         PORTAL_FOLLOW_UP_CONCURRENCY_POLICY_ERROR_CODES.sqlPolicyFailed,
       );
     }
+  });
+
+  it("pins the exact live harness and rejects an omitted scenario call", async () => {
+    const source = await readFile(LIVE_HARNESS_URL, "utf8");
+    expect(assertPortalFollowUpConcurrencyLiveHarnessSource(source)).toEqual({
+      ok: true,
+      liveHarnessSha256:
+        "5cd432e1da2f6cefef7f8e86d7a557b0d2fe7e5d937d8e45189c0558ffe833f1",
+      exactLiveHarnessBodyLocked: true,
+      invocationCountsLocked: true,
+      completionOrderLocked: true,
+    });
+
+    const invocation =
+      "    await runSameKeyReplayRace(Client, databaseUrl, target);\n";
+    const completion =
+      "completed.push(PORTAL_FOLLOW_UP_CONCURRENCY_SCENARIOS[0]);";
+    expect(source.split(invocation)).toHaveLength(2);
+    const omittedScenario = source.replace(invocation, "");
+    expect(omittedScenario).not.toContain(invocation);
+    expect(omittedScenario).toContain(completion);
+    expectPolicyCode(
+      () => assertPortalFollowUpConcurrencyLiveHarnessSource(omittedScenario),
+      PORTAL_FOLLOW_UP_CONCURRENCY_POLICY_ERROR_CODES.liveHarnessPolicyFailed,
+    );
+    expectPolicyCode(
+      () => assertPortalFollowUpConcurrencyLiveHarnessSource(source + "\n"),
+      PORTAL_FOLLOW_UP_CONCURRENCY_POLICY_ERROR_CODES.liveHarnessPolicyFailed,
+    );
   });
 
   it("locks PG16, temp-root, CLI and timeout policy", () => {
@@ -265,7 +307,7 @@ describe("Portal Follow-up M1c local PG16 policy", () => {
     expect(
       assertPortalFollowUpConcurrencyPreflight(
         {
-          server_addr: "127.0.0.1",
+          server_addr: null,
           server_port: 55_432,
           database_name: "postgres",
           session_user_name: PORTAL_FOLLOW_UP_CONCURRENCY_RUNNER_ROLE,
@@ -275,9 +317,34 @@ describe("Portal Follow-up M1c local PG16 policy", () => {
           ssl_in_use: false,
           bootstrap_marker: PORTAL_FOLLOW_UP_CONCURRENCY_MARKER,
         },
-        { port: 55_432 },
+        { port: 55_432, socketDirectory: SOCKET_DIRECTORY },
       ),
-    ).toMatchObject({ ok: true, backendPid: 101, serverVersionNum: 160015 });
+    ).toMatchObject({
+      ok: true,
+      backendPid: 101,
+      serverVersionNum: 160015,
+      transport: "unix-domain-socket",
+      socketDirectory: SOCKET_DIRECTORY,
+    });
+    expectPolicyCode(
+      () =>
+        assertPortalFollowUpConcurrencyPreflight(
+          {
+            server_addr: "127.0.0.1",
+            socket_directory: SOCKET_DIRECTORY,
+            server_port: 55_432,
+            database_name: "postgres",
+            session_user_name: PORTAL_FOLLOW_UP_CONCURRENCY_RUNNER_ROLE,
+            current_user_name: PORTAL_FOLLOW_UP_CONCURRENCY_RUNNER_ROLE,
+            server_version_num: "160015",
+            backend_pid: 102,
+            ssl_in_use: false,
+            bootstrap_marker: PORTAL_FOLLOW_UP_CONCURRENCY_MARKER,
+          },
+          { port: 55_432, socketDirectory: SOCKET_DIRECTORY },
+        ),
+      PORTAL_FOLLOW_UP_CONCURRENCY_POLICY_ERROR_CODES.preflightFailed,
+    );
     expect(assertPortalFollowUpConcurrencyDistinctBackends(101, 202, 303))
       .toEqual([101, 202, 303]);
     expectPolicyCode(
@@ -322,13 +389,64 @@ describe("Portal Follow-up M1c local PG16 policy", () => {
     expect(String(error)).not.toContain("secret");
   });
 
+  it("retains candidate ownership when postgres stop does not complete", async () => {
+    const instance = { exited: false };
+    const lifecycle = { postgresInstance: instance, port: 55_432 };
+    const stopFailure = new PortalFollowUpConcurrencyLocalPg16Error(
+      "PORTAL_FOLLOW_UP_CONCURRENCY_LOCAL_PG16_STOP_FAILED",
+      "postgres-stop",
+    );
+
+    await expect(
+      retirePortalFollowUpConcurrencyPostgresCandidate(
+        lifecycle,
+        instance,
+        async () => {
+          throw stopFailure;
+        },
+      ),
+    ).rejects.toBe(stopFailure);
+    expect(lifecycle).toEqual({
+      postgresInstance: instance,
+      port: 55_432,
+    });
+
+    await expect(
+      retirePortalFollowUpConcurrencyPostgresCandidate(
+        lifecycle,
+        instance,
+        async () => ({ stopped: true, forced: true }),
+      ),
+    ).rejects.toMatchObject({
+      code: "PORTAL_FOLLOW_UP_CONCURRENCY_LOCAL_PG16_STOP_FAILED",
+      stage: "postgres-stop",
+    });
+    expect(lifecycle).toEqual({
+      postgresInstance: instance,
+      port: 55_432,
+    });
+
+    instance.exited = true;
+    await expect(
+      retirePortalFollowUpConcurrencyPostgresCandidate(
+        lifecycle,
+        instance,
+        async () => ({ stopped: true, forced: false }),
+      ),
+    ).resolves.toEqual({ stopped: true, forced: false });
+    expect(lifecycle).toEqual({ postgresInstance: null, port: null });
+  });
+
   it("owns the complete local lifecycle without shell or database fallbacks", async () => {
     const source = await readFile(RUNNER_URL, "utf8");
     for (const required of [
       "mkdtemp(TEMP_ROOT_PREFIX)",
       "createPortCandidates()",
       "randomInt(policy.minimumPort, policy.maximumPort + 1)",
-      "--auth-host=trust",
+      "--auth-host=reject",
+      "unix_socket_permissions=0700",
+      "encodeURIComponent(lifecycle.socketDirectory)",
+      "passwordless-private-unix-socket",
       "portal-referral-follow-up-concurrency-local-pg16-bootstrap.sql",
       "portal-referral-follow-up-concurrency-setup.sql",
       "portal-referral-follow-up-concurrency.mjs",
@@ -338,6 +456,7 @@ describe("Portal Follow-up M1c local PG16 policy", () => {
       "pg_terminate_backend",
       "POSTCHECK_QUERY",
       "stopPostgresInstance",
+      "retirePortalFollowUpConcurrencyPostgresCandidate",
       "exactDeleteTempRoot",
       "withLifecycleDeadline",
       "PORTAL_FOLLOW_UP_CONCURRENCY_LOCAL_PG16_TIMEOUTS.exactDeleteMs",
@@ -355,6 +474,11 @@ describe("Portal Follow-up M1c local PG16 policy", () => {
       expect(migration.file).toMatch(/^2026[0-9]{10}_[a-z0-9_]+\.sql$/);
     }
     expect(source).not.toContain("shell: true");
+    expect(source).not.toContain("--auth-host=trust");
+    expect(source).not.toContain("--host=127.0.0.1");
+    expect(source).not.toContain(
+      "stopPostgresInstance(instance, 1_000).catch(() => undefined)",
+    );
     expect(source).not.toMatch(/pg_catalog\.(?:current_user|session_user)/);
     expect(source).not.toMatch(
       /process\.env\.(?:DATABASE_URL|DIRECT_URL|PGHOST|PGPASSWORD|SUPABASE_DB_URL)/,

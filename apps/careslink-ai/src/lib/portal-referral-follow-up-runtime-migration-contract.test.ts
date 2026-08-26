@@ -208,30 +208,136 @@ describe("Portal referral Follow-up M1c runtime migration contract", () => {
 
   it("locks referral then all matches, rechecks session and atomically records the fixed-code transition", () => {
     const record = functionBlock("public.portal_referral_follow_up_record(");
-    const referralLock = record.indexOf("for update of referral");
-    const matchOrder = record.indexOf("order by match.id", referralLock);
-    const matchLock = record.indexOf("for update of match", matchOrder);
-    const sessionAfterLocks = record.indexOf(
-      "portal_referral_provider_response_assert_session(",
-      matchLock,
+    const receiptLookup = record.indexOf("select receipt.*");
+    const replayStart = record.indexOf("if found then", receiptLookup);
+    const replayReturn = record.indexOf(
+      "return jsonb_build_object(",
+      replayStart,
     );
-    const versionCheck = record.indexOf(
-      "if v_referral.row_version <> p_expected_version",
-    );
-    const stateCheck = record.indexOf(
-      "v_referral.current_status not in ('ACCEPTED', 'IN_PROGRESS')",
+    const replayEnd = record.indexOf("\n  end if;", replayReturn);
+    const freshStart = record.indexOf(
+      "-- Discover only provider-owned work",
+      replayEnd,
     );
     const firstWrite = record.indexOf(
       "insert into public.portal_referral_followups",
+      freshStart,
     );
 
-    expect(referralLock).toBeGreaterThanOrEqual(0);
-    expect(matchOrder).toBeGreaterThan(referralLock);
-    expect(matchLock).toBeGreaterThan(matchOrder);
-    expect(sessionAfterLocks).toBeGreaterThan(matchLock);
-    expect(versionCheck).toBeGreaterThan(sessionAfterLocks);
+    expect(receiptLookup).toBeGreaterThanOrEqual(0);
+    expect(replayStart).toBeGreaterThan(receiptLookup);
+    expect(replayReturn).toBeGreaterThan(replayStart);
+    expect(replayEnd).toBeGreaterThan(replayReturn);
+    expect(freshStart).toBeGreaterThan(replayEnd);
+    expect(firstWrite).toBeGreaterThan(freshStart);
+
+    const replay = record.slice(replayStart, replayEnd);
+    const fresh = record.slice(freshStart, firstWrite);
+    expect(countOccurrences(record, "for update of referral")).toBe(2);
+    expect(countOccurrences(record, "order by match.id")).toBe(2);
+    expect(countOccurrences(record, "for update of match")).toBe(2);
+
+    const replayReferralLock = replay.indexOf("for update of referral");
+    const replayMatchOrder = replay.indexOf(
+      "order by match.id",
+      replayReferralLock,
+    );
+    const replayMatchLock = replay.indexOf(
+      "for update of match",
+      replayMatchOrder,
+    );
+    const replaySessionAfterLocks = replay.indexOf(
+      "portal_referral_provider_response_assert_session(",
+      replayMatchLock,
+    );
+    const replayAcceptedCount = replay.indexOf(
+      "select count(*)",
+      replaySessionAfterLocks,
+    );
+    const replayAssignmentCheck = replay.indexOf(
+      "v_referral.assigned_provider_id is distinct from v_provider_id",
+      replayAcceptedCount,
+    );
+    const replayStatusCheck = replay.indexOf(
+      "v_referral.current_status not in ('ACCEPTED', 'IN_PROGRESS')",
+      replayAssignmentCheck,
+    );
+    const replayAcceptedCheck = replay.indexOf(
+      "v_accepted_match_count <> 1",
+      replayStatusCheck,
+    );
+    const replayAck = replay.indexOf(
+      "return jsonb_build_object(",
+      replayAcceptedCheck,
+    );
+
+    expect(replayReferralLock).toBeGreaterThanOrEqual(0);
+    expect(replayMatchOrder).toBeGreaterThan(replayReferralLock);
+    expect(replayMatchLock).toBeGreaterThan(replayMatchOrder);
+    expect(replaySessionAfterLocks).toBeGreaterThan(replayMatchLock);
+    expect(replayAcceptedCount).toBeGreaterThan(replaySessionAfterLocks);
+    expect(replayAssignmentCheck).toBeGreaterThan(replayAcceptedCount);
+    expect(replayStatusCheck).toBeGreaterThan(replayAssignmentCheck);
+    expect(replayAcceptedCheck).toBeGreaterThan(replayStatusCheck);
+    expect(replayAck).toBeGreaterThan(replayAcceptedCheck);
+
+    for (const predicate of [
+      "referral.id = v_receipt.response_referral_id",
+      "match.referral_id = v_referral.id",
+      "match.provider_id = v_provider_id",
+      "match.status = 'ACCEPTED'",
+      "match.offered_at is not null",
+      "match.responded_by is not null",
+      "match.responded_at is not null",
+      "message = 'PORTAL_NOT_FOUND'",
+    ]) {
+      expect(replay).toContain(predicate);
+    }
+
+    const freshReferralLock = fresh.indexOf("for update of referral");
+    const freshMatchOrder = fresh.indexOf(
+      "order by match.id",
+      freshReferralLock,
+    );
+    const freshMatchLock = fresh.indexOf(
+      "for update of match",
+      freshMatchOrder,
+    );
+    const freshSessionAfterLocks = fresh.indexOf(
+      "portal_referral_provider_response_assert_session(",
+      freshMatchLock,
+    );
+    const freshAssignmentCheck = fresh.indexOf(
+      "v_referral.assigned_provider_id is distinct from v_provider_id",
+      freshSessionAfterLocks,
+    );
+    const freshAcceptedCheck = fresh.indexOf(
+      "if v_accepted_match_count <> 1 then",
+      freshSessionAfterLocks,
+    );
+    const freshAcceptedCount = fresh.indexOf(
+      "select count(*)",
+      freshAssignmentCheck,
+    );
+    const versionCheck = fresh.indexOf(
+      "if v_referral.row_version <> p_expected_version",
+      freshAcceptedCheck,
+    );
+    const stateCheck = fresh.indexOf(
+      "v_referral.current_status not in ('ACCEPTED', 'IN_PROGRESS')",
+      versionCheck,
+    );
+
+    expect(freshReferralLock).toBeGreaterThanOrEqual(0);
+    expect(freshMatchOrder).toBeGreaterThan(freshReferralLock);
+    expect(freshMatchLock).toBeGreaterThan(freshMatchOrder);
+    expect(freshSessionAfterLocks).toBeGreaterThan(freshMatchLock);
+    expect(freshAssignmentCheck).toBeGreaterThan(freshSessionAfterLocks);
+    expect(freshAcceptedCount).toBeGreaterThan(freshAssignmentCheck);
+    expect(freshAcceptedCheck).toBeGreaterThan(freshAcceptedCount);
+    expect(versionCheck).toBeGreaterThan(freshAcceptedCheck);
     expect(stateCheck).toBeGreaterThan(versionCheck);
-    expect(firstWrite).toBeGreaterThan(stateCheck);
+    expect(stateCheck).toBeGreaterThanOrEqual(0);
 
     for (const predicate of [
       "referral.assigned_provider_id = v_provider_id",
@@ -257,21 +363,6 @@ describe("Portal referral Follow-up M1c runtime migration contract", () => {
       "v_referral.row_version + 1",
     ]) {
       expect(record).toContain(predicate);
-    }
-
-    const replayBinding = record.slice(
-      record.indexOf("if found then"),
-      record.indexOf("return jsonb_build_object(", record.indexOf("if found then")),
-    );
-    for (const predicate of [
-      "referral.id = v_receipt.response_referral_id",
-      "referral.assigned_provider_id = v_provider_id",
-      "match.referral_id = referral.id",
-      "match.provider_id = v_provider_id",
-      "match.status = 'ACCEPTED'",
-      "portal_referral_provider_response_assert_session(",
-    ]) {
-      expect(replayBinding).toContain(predicate);
     }
   });
 
@@ -300,6 +391,7 @@ describe("Portal referral Follow-up M1c runtime migration contract", () => {
       "Follow-up accepted a forged payload hash",
       "Follow-up replay drifted",
       "Follow-up changed-payload replay succeeded",
+      "Follow-up replayed a CLOSED residual binding",
       "Follow-up atomic state drifted",
       "Second competing Follow-up succeeded",
       "Ambiguous provider context was authorized",

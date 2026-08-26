@@ -371,32 +371,59 @@ begin
         message = 'PORTAL_IDEMPOTENCY_CONFLICT';
     end if;
 
-    -- A receipt is an ACK cache, not an authorization cache. Replays must
-    -- still resolve to this actor's currently assigned coherent accepted work.
-    if not exists (
-      select 1
-      from public.portal_referrals as referral
-      join public.portal_referral_matches as match
-        on match.referral_id = referral.id
-      where referral.id = v_receipt.response_referral_id
-        and referral.assigned_provider_id = v_provider_id
-        and match.referral_id = referral.id
-        and match.provider_id = v_provider_id
-        and match.status = 'ACCEPTED'
-        and match.offered_at is not null
-        and match.responded_by is not null
-        and match.responded_at is not null
-    ) then
+    -- A receipt is an ACK cache, not an authorization cache. Take the same
+    -- referral-then-ordered-matches locks as fresh workflow mutations before
+    -- revalidating live authority. This prevents a replay from returning a
+    -- stale ACK while ownership revocation is still in flight.
+    select referral.*
+    into v_referral
+    from public.portal_referrals as referral
+    where referral.id = v_receipt.response_referral_id
+    for update of referral;
+
+    if not found then
+      perform
+        careslink_portal_private.portal_referral_provider_response_assert_session(
+          v_user_id,
+          v_session_id
+        );
       raise exception using
         errcode = 'P0001',
         message = 'PORTAL_NOT_FOUND';
     end if;
+
+    perform 1
+    from public.portal_referral_matches as match
+    where match.referral_id = v_referral.id
+    order by match.id
+    for update of match;
 
     perform
       careslink_portal_private.portal_referral_provider_response_assert_session(
         v_user_id,
         v_session_id
       );
+
+    select count(*)
+    into v_accepted_match_count
+    from public.portal_referral_matches as match
+    where match.referral_id = v_referral.id
+      and match.provider_id = v_provider_id
+      and match.status = 'ACCEPTED'
+      and match.offered_at is not null
+      and match.responded_by is not null
+      and match.responded_at is not null;
+
+    -- Replay authority fails closed: a closed/terminal referral, revoked
+    -- assignment, or incoherent accepted tuple must never reuse the old ACK.
+    if v_referral.assigned_provider_id is distinct from v_provider_id
+      or v_referral.current_status not in ('ACCEPTED', 'IN_PROGRESS')
+      or v_accepted_match_count <> 1
+    then
+      raise exception using
+        errcode = 'P0001',
+        message = 'PORTAL_NOT_FOUND';
+    end if;
 
     return jsonb_build_object(
       'referral_id', v_receipt.response_referral_id,

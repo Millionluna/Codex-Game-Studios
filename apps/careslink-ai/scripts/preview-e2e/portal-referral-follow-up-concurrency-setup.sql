@@ -18,10 +18,14 @@ begin
     or current_database() <> 'postgres'
     or pg_catalog.current_setting('server_version_num')::integer < 160000
     or pg_catalog.current_setting('server_version_num')::integer >= 170000
-    or pg_catalog.inet_server_addr() is distinct from
-      '127.0.0.1'::pg_catalog.inet
-    or pg_catalog.inet_server_port() < 49152
-    or pg_catalog.inet_server_port() > 65535
+    or pg_catalog.inet_server_addr() is not null
+    or pg_catalog.inet_server_port() is not null
+    or pg_catalog.current_setting('port')::integer < 49152
+    or pg_catalog.current_setting('port')::integer > 65535
+    or pg_catalog.current_setting('listen_addresses') <> ''
+    or pg_catalog.current_setting('unix_socket_directories') !~
+      '^/private/tmp/careslink-portal-follow-up-pg16[.][a-zA-Z0-9]{6,}/socket$'
+    or pg_catalog.current_setting('unix_socket_permissions') <> '0700'
     or coalesce(v_ssl, false)
     or pg_catalog.current_setting(
       'careslink.portal_follow_up_concurrency_marker',
@@ -775,10 +779,14 @@ declare
 begin
   if session_user <> 'careslink_portal_follow_up_concurrency_runner'
     or v_application_name !~ '^careslink-portal-follow-up-race-(replay|same-key-conflict|different-key-stale|same-provider-actors|session|provider|flag|ownership-first)-(a|b|control|observer)$'
-    or pg_catalog.inet_server_addr() is distinct from
-      '127.0.0.1'::pg_catalog.inet
-    or pg_catalog.inet_server_port() < 49152
-    or pg_catalog.inet_server_port() > 65535
+    or pg_catalog.inet_server_addr() is not null
+    or pg_catalog.inet_server_port() is not null
+    or pg_catalog.current_setting('port')::integer < 49152
+    or pg_catalog.current_setting('port')::integer > 65535
+    or pg_catalog.current_setting('listen_addresses') <> ''
+    or pg_catalog.current_setting('unix_socket_directories') !~
+      '^/private/tmp/careslink-portal-follow-up-pg16[.][a-zA-Z0-9]{6,}/socket$'
+    or pg_catalog.current_setting('unix_socket_permissions') <> '0700'
     or pg_catalog.current_setting('server_version_num')::integer < 160000
     or pg_catalog.current_setting('server_version_num')::integer >= 170000
     or pg_catalog.current_setting(

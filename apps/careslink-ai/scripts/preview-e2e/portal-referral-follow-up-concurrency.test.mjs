@@ -107,6 +107,77 @@ function zeroEffectState() {
   };
 }
 
+function ownershipReceiptReplayIsExactlyWired(source) {
+  const ownershipStart = source.indexOf("async function runOwnershipRace(");
+  const ownershipEnd = source.indexOf(
+    "async function cleanupFixture(",
+    ownershipStart,
+  );
+  if (ownershipStart < 0 || ownershipEnd <= ownershipStart) return false;
+
+  const ownershipSource = source.slice(ownershipStart, ownershipEnd);
+  const revokeStart = ownershipSource.indexOf(".revoke_ownership(");
+  const replayStart = ownershipSource.indexOf(
+    "const replay = captureDatabaseOperation(",
+  );
+  const blockerStart = ownershipSource.indexOf(
+    "await waitForExactBlockers(",
+    replayStart,
+  );
+  const commitStart = ownershipSource.indexOf(
+    'await query(scenario.control.client, "commit")',
+    blockerStart,
+  );
+  const completionStart = ownershipSource.indexOf(
+    "const [waiterOutcome, replayOutcome] = await Promise.all([waiter, replay]);",
+    commitStart,
+  );
+  if (
+    revokeStart < 0 ||
+    replayStart <= revokeStart ||
+    blockerStart <= replayStart ||
+    commitStart <= blockerStart ||
+    completionStart <= commitStart
+  ) {
+    return false;
+  }
+
+  const beforeRevoke = ownershipSource.slice(0, revokeStart);
+  const replayCall = ownershipSource.slice(replayStart, blockerStart);
+  const blockerProof = ownershipSource.slice(blockerStart, commitStart);
+  const completionProof = ownershipSource.slice(completionStart);
+  const actorPattern = /configureJwt\(\s*scenario\.a\.client,\s*fixture\.actor_a_user_id,\s*fixture\.actor_a_session_id,\s*\)/;
+  const firstReceiptPattern = /const first = await captureDatabaseOperation\(\s*recordQuery\(\s*scenario\.a\.client,\s*fixture,\s*"CONTACT_CONFIRMED",\s*MUTATIONS\.ownershipReceipt,\s*fixture\.contact_confirmed_hash,\s*CORRELATIONS\.ownershipReceipt,\s*\),\s*\);/;
+  const replayReceiptPattern = /const replay = captureDatabaseOperation\(\s*recordQuery\(\s*scenario\.a\.client,\s*fixture,\s*"CONTACT_CONFIRMED",\s*MUTATIONS\.ownershipReceipt,\s*fixture\.contact_confirmed_hash,\s*CORRELATIONS\.ownershipReceipt,\s*\),\s*\);/;
+  const replayFailurePattern = /!replayOutcome\.ok\s*&&\s*replayOutcome\.sqlState === "P0001"\s*&&\s*replayOutcome\.reason === "PORTAL_NOT_FOUND"/;
+
+  return (
+    actorPattern.test(beforeRevoke) &&
+    firstReceiptPattern.test(beforeRevoke) &&
+    replayReceiptPattern.test(replayCall) &&
+    blockerProof.includes("[scenario.a.pid]: [scenario.control.pid]") &&
+    replayFailurePattern.test(completionProof)
+  );
+}
+
+function replaceOwnershipReplayMutation(source, replacement) {
+  const ownershipStart = source.indexOf("async function runOwnershipRace(");
+  const replayStart = source.indexOf(
+    "const replay = captureDatabaseOperation(",
+    ownershipStart,
+  );
+  const mutationStart = source.indexOf(
+    "MUTATIONS.ownershipReceipt",
+    replayStart,
+  );
+  if (ownershipStart < 0 || replayStart < 0 || mutationStart < 0) return source;
+  return (
+    source.slice(0, mutationStart) +
+    replacement +
+    source.slice(mutationStart + "MUTATIONS.ownershipReceipt".length)
+  );
+}
+
 describe("Portal Referral Follow-up true-concurrency live harness", () => {
   it("pins the eight launch-relevant races and bounded waits", () => {
     expect(PORTAL_FOLLOW_UP_CONCURRENCY_SCENARIOS).toEqual([
@@ -227,6 +298,20 @@ describe("Portal Referral Follow-up true-concurrency live harness", () => {
         }),
       );
     }
+  });
+
+  it("launches receipt replay while ownership revocation still holds locks", async () => {
+    const source = await readFile(HARNESS_URL, "utf8");
+    expect(ownershipReceiptReplayIsExactlyWired(source)).toBe(true);
+
+    const wrongMutationSource = replaceOwnershipReplayMutation(
+      source,
+      "MUTATIONS.ownershipWaiter",
+    );
+    expect(wrongMutationSource).not.toBe(source);
+    expect(ownershipReceiptReplayIsExactlyWired(wrongMutationSource)).toBe(
+      false,
+    );
   });
 
   it("pins the complete winner side-effect and receipt tuple", () => {

@@ -3,12 +3,25 @@ import { createHash } from "node:crypto";
 const CONTROL_CHARACTER_PATTERN = /[\u0000-\u001f\u007f]/;
 const TEMP_ROOT_PATTERN =
   /^\/private\/tmp\/careslink-portal-follow-up-pg16\.[a-zA-Z0-9]{6,}$/;
+const SOCKET_DIRECTORY_PATTERN =
+  /^\/private\/tmp\/careslink-portal-follow-up-pg16\.[a-zA-Z0-9]{6,}\/socket$/;
 const BOOTSTRAP_SQL_SHA256 =
-  "701128cf64b7e5f4eb28e64f1ae7a0d95b8deb4e9ca68c6ac338560b99c3145f";
+  "b4d880a79275062e87e42014b5d1d1a8d9d77deb3dc5d7a25fb15239c1aea252";
 const SETUP_SQL_SHA256 =
-  "5cbbceaa939ac537ce9fa99de6854c3c7ac386c4b54235e1a47c3915593a6f1a";
+  "f86e76ccbce57a3ede4aacba2d1b29b5d280fca154a399b2cbb6a12e26d7d533";
 const CLEANUP_SQL_SHA256 =
-  "2f42934e46935df897c0a2173096d11f3a63bf9fb1a538f6d284f2125caef30e";
+  "2c83c9c1b6f06fd6927036cfd4174dbad5e063bf26171a64cc02f50aca732b42";
+const LIVE_HARNESS_SHA256 =
+  "5cd432e1da2f6cefef7f8e86d7a557b0d2fe7e5d937d8e45189c0558ffe833f1";
+const LIVE_HARNESS_INVOCATION_REQUIREMENTS = Object.freeze([
+  Object.freeze(["await runSameKeyReplayRace(", 1]),
+  Object.freeze(["await runSameKeyConflictRace(", 1]),
+  Object.freeze(["await runDifferentKeyRace(", 1]),
+  Object.freeze(["await runSameProviderActorRace(", 1]),
+  Object.freeze(["await runRevocationFirstRace(", 2]),
+  Object.freeze(["await runFlagRace(", 1]),
+  Object.freeze(["await runOwnershipRace(", 1]),
+]);
 
 export const PORTAL_FOLLOW_UP_CONCURRENCY_DATABASE_URL_ENV =
   "CARESLINK_PORTAL_FOLLOW_UP_LOCAL_PG16_DATABASE_URL";
@@ -68,7 +81,7 @@ export const PORTAL_FOLLOW_UP_CONCURRENCY_LOCAL_PG16_MIGRATIONS =
     Object.freeze({
       file: "20260826090841_add_portal_referral_follow_up_runtime.sql",
       sha256:
-        "c6db98c2ae73c12808446c2287e89671d419fa1718068137fe5203c084270538",
+        "cb904d048827ff16603b19a1116f33529cba134471fe1555cfd0ea858d6fb99e",
     }),
   ]);
 
@@ -94,7 +107,7 @@ export const PORTAL_FOLLOW_UP_CONCURRENCY_LOCAL_PG16_POLICY =
     maximumPort: 65_535,
     deniedPort: 5_432,
     portCandidateCount: 8,
-    requiredHost: "127.0.0.1",
+    connectionUriHost: "localhost",
     requiredDatabase: "postgres",
     requiredRole: PORTAL_FOLLOW_UP_CONCURRENCY_RUNNER_ROLE,
     requiredScheme: "postgresql:",
@@ -142,6 +155,8 @@ export const PORTAL_FOLLOW_UP_CONCURRENCY_POLICY_ERROR_CODES =
     migrationManifestFailed:
       "PORTAL_FOLLOW_UP_CONCURRENCY_MIGRATION_MANIFEST_FAILED",
     sqlPolicyFailed: "PORTAL_FOLLOW_UP_CONCURRENCY_SQL_POLICY_FAILED",
+    liveHarnessPolicyFailed:
+      "PORTAL_FOLLOW_UP_CONCURRENCY_LIVE_HARNESS_POLICY_FAILED",
     tempRootDenied: "PORTAL_FOLLOW_UP_CONCURRENCY_TEMP_ROOT_DENIED",
     binaryDenied: "PORTAL_FOLLOW_UP_CONCURRENCY_PG16_BINARY_DENIED",
     timeoutPolicyFailed:
@@ -196,7 +211,7 @@ export function validatePortalFollowUpConcurrencyDatabaseUrl(value) {
 
   if (
     url.protocol !== policy.requiredScheme ||
-    url.hostname !== policy.requiredHost
+    url.hostname !== policy.connectionUriHost
   ) {
     fail(PORTAL_FOLLOW_UP_CONCURRENCY_POLICY_ERROR_CODES.targetDenied);
   }
@@ -209,8 +224,25 @@ export function validatePortalFollowUpConcurrencyDatabaseUrl(value) {
   if (url.pathname !== "/" + policy.requiredDatabase) {
     fail(PORTAL_FOLLOW_UP_CONCURRENCY_POLICY_ERROR_CODES.databaseDenied);
   }
-  if (value.includes("?") || value.includes("#")) {
+  if (value.includes("#")) {
     fail(PORTAL_FOLLOW_UP_CONCURRENCY_POLICY_ERROR_CODES.queryDenied);
+  }
+
+  const socketParameters = [...url.searchParams.entries()];
+  const socketDirectory = url.searchParams.get("host");
+  if (
+    socketParameters.length !== 1 ||
+    socketParameters[0]?.[0] !== "host"
+  ) {
+    fail(PORTAL_FOLLOW_UP_CONCURRENCY_POLICY_ERROR_CODES.queryDenied);
+  }
+  if (
+    typeof socketDirectory !== "string" ||
+    !SOCKET_DIRECTORY_PATTERN.test(socketDirectory) ||
+    socketDirectory.includes("..") ||
+    CONTROL_CHARACTER_PATTERN.test(socketDirectory)
+  ) {
+    fail(PORTAL_FOLLOW_UP_CONCURRENCY_POLICY_ERROR_CODES.targetDenied);
   }
 
   const port = Number(url.port);
@@ -228,11 +260,13 @@ export function validatePortalFollowUpConcurrencyDatabaseUrl(value) {
     "//" +
     policy.requiredRole +
     "@" +
-    policy.requiredHost +
+    policy.connectionUriHost +
     ":" +
     port +
     "/" +
-    policy.requiredDatabase;
+    policy.requiredDatabase +
+    "?host=" +
+    encodeURIComponent(socketDirectory);
   if (value !== canonical) {
     fail(PORTAL_FOLLOW_UP_CONCURRENCY_POLICY_ERROR_CODES.urlInvalid);
   }
@@ -240,7 +274,8 @@ export function validatePortalFollowUpConcurrencyDatabaseUrl(value) {
   return Object.freeze({
     ok: true,
     policyVersion: policy.version,
-    hostname: policy.requiredHost,
+    transport: "unix-domain-socket",
+    socketDirectory,
     port,
     database: policy.requiredDatabase,
     databaseRole: policy.requiredRole,
@@ -281,7 +316,7 @@ export function assertPortalFollowUpConcurrencyPreflight(row, target) {
     typeof row !== "object" ||
     target === null ||
     typeof target !== "object" ||
-    row.server_addr !== policy.requiredHost ||
+    row.server_addr !== null ||
     Number(row.server_port) !== target.port ||
     row.database_name !== policy.requiredDatabase ||
     row.session_user_name !== policy.requiredRole ||
@@ -299,6 +334,8 @@ export function assertPortalFollowUpConcurrencyPreflight(row, target) {
     backendPid: Number(row.backend_pid),
     serverVersionNum: Number(row.server_version_num),
     port: Number(row.server_port),
+    socketDirectory: target.socketDirectory,
+    transport: "unix-domain-socket",
     sslInUse: false,
     marker: row.bootstrap_marker,
   });
@@ -374,7 +411,9 @@ export function assertPortalFollowUpConcurrencyLocalPg16SqlPolicy(
 
   const bootstrapFragments = [
     PORTAL_FOLLOW_UP_CONCURRENCY_MARKER,
-    "127.0.0.1",
+    "unix_socket_directories",
+    "unix_socket_permissions",
+    "listen_addresses",
     "server_version_num",
     "create role anon",
     "create role authenticated",
@@ -387,6 +426,9 @@ export function assertPortalFollowUpConcurrencyLocalPg16SqlPolicy(
   ];
   const setupFragments = [
     PORTAL_FOLLOW_UP_CONCURRENCY_MARKER,
+    "unix_socket_directories",
+    "unix_socket_permissions",
+    "listen_addresses",
     PORTAL_FOLLOW_UP_CONCURRENCY_RUNNER_ROLE,
     PORTAL_FOLLOW_UP_CONCURRENCY_SUPPORT_SCHEMA,
     "portal_referral_follow_up_record",
@@ -411,6 +453,9 @@ export function assertPortalFollowUpConcurrencyLocalPg16SqlPolicy(
   ];
   const cleanupFragments = [
     PORTAL_FOLLOW_UP_CONCURRENCY_MARKER,
+    "unix_socket_directories",
+    "unix_socket_permissions",
+    "listen_addresses",
     PORTAL_FOLLOW_UP_CONCURRENCY_RUNNER_ROLE,
     PORTAL_FOLLOW_UP_CONCURRENCY_SUPPORT_SCHEMA,
     "PORTAL_FOLLOW_UP_CONCURRENCY_CLEANUP_ACTIVE_RUNNER",
@@ -473,6 +518,42 @@ export function assertPortalFollowUpConcurrencyLocalPg16SqlPolicy(
     exactCleanupLocked: true,
     truncateDenied: true,
     hostedTargetDenied: true,
+  });
+}
+
+export function assertPortalFollowUpConcurrencyLiveHarnessSource(source) {
+  const invocationCountsLocked =
+    typeof source === "string" &&
+    LIVE_HARNESS_INVOCATION_REQUIREMENTS.every(
+      ([fragment, expectedCount]) =>
+        source.split(fragment).length - 1 === expectedCount,
+    );
+  const completionOrderLocked =
+    typeof source === "string" &&
+    Array.from({ length: 8 }, (_, index) =>
+      `completed.push(PORTAL_FOLLOW_UP_CONCURRENCY_SCENARIOS[${index}]);`,
+    ).every((fragment) => source.split(fragment).length - 1 === 1);
+  const liveHarnessSha256 =
+    typeof source === "string"
+      ? createHash("sha256").update(source, "utf8").digest("hex")
+      : null;
+
+  if (
+    liveHarnessSha256 !== LIVE_HARNESS_SHA256 ||
+    !invocationCountsLocked ||
+    !completionOrderLocked
+  ) {
+    fail(
+      PORTAL_FOLLOW_UP_CONCURRENCY_POLICY_ERROR_CODES.liveHarnessPolicyFailed,
+    );
+  }
+
+  return Object.freeze({
+    ok: true,
+    liveHarnessSha256,
+    exactLiveHarnessBodyLocked: true,
+    invocationCountsLocked: true,
+    completionOrderLocked: true,
   });
 }
 
@@ -560,22 +641,25 @@ function capturePolicyError(operation) {
 export function assertPortalFollowUpConcurrencyPolicyRegression() {
   const policy = PORTAL_FOLLOW_UP_CONCURRENCY_LOCAL_PG16_POLICY;
   const role = PORTAL_FOLLOW_UP_CONCURRENCY_RUNNER_ROLE;
+  const socketDirectory =
+    "/private/tmp/careslink-portal-follow-up-pg16.aB12cD/socket";
+  const encodedSocketDirectory = encodeURIComponent(socketDirectory);
   const valid = validatePortalFollowUpConcurrencyDatabaseUrl(
-    `postgresql://${role}@127.0.0.1:55432/postgres`,
+    `postgresql://${role}@localhost:55432/postgres?host=${encodedSocketDirectory}`,
   );
   const hosted = capturePolicyError(() =>
     validatePortalFollowUpConcurrencyDatabaseUrl(
-      `postgresql://${role}@db.example.invalid:55432/postgres`,
+      `postgresql://${role}@db.example.invalid:55432/postgres?host=${encodedSocketDirectory}`,
     ),
   );
   const password = capturePolicyError(() =>
     validatePortalFollowUpConcurrencyDatabaseUrl(
-      `postgresql://${role}:forbidden@127.0.0.1:55432/postgres`,
+      `postgresql://${role}:forbidden@localhost:55432/postgres?host=${encodedSocketDirectory}`,
     ),
   );
   const defaultPort = capturePolicyError(() =>
     validatePortalFollowUpConcurrencyDatabaseUrl(
-      `postgresql://${role}@127.0.0.1:5432/postgres`,
+      `postgresql://${role}@localhost:5432/postgres?host=${encodedSocketDirectory}`,
     ),
   );
 
@@ -597,7 +681,8 @@ export function assertPortalFollowUpConcurrencyPolicyRegression() {
     ok: true,
     policyVersion: policy.version,
     expectedPostgresMajor: policy.expectedPostgresMajor,
-    requiredHost: policy.requiredHost,
+    transport: valid.transport,
+    socketDirectory: valid.socketDirectory,
     minimumPort: policy.minimumPort,
     sslMode: "disabled",
     passwordMaterial: "absent",

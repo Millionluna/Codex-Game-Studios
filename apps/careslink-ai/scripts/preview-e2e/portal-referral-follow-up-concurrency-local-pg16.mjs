@@ -28,6 +28,7 @@ import {
   PORTAL_FOLLOW_UP_CONCURRENCY_RUNNER_ROLE,
   PORTAL_FOLLOW_UP_CONCURRENCY_SUPPORT_SCHEMA,
   PortalFollowUpConcurrencyPolicyError,
+  assertPortalFollowUpConcurrencyLiveHarnessSource,
   assertPortalFollowUpConcurrencyLocalPg16SqlPolicy,
   assertPortalFollowUpConcurrencyMigrationManifest,
   assertPortalFollowUpConcurrencyPg16Version,
@@ -404,11 +405,38 @@ async function stopPostgresInstance(instance, timeoutMs) {
   return Object.freeze({ stopped: true, forced: true });
 }
 
-function psqlConnectionArguments(port) {
+export async function retirePortalFollowUpConcurrencyPostgresCandidate(
+  lifecycle,
+  instance,
+  stopInstance = stopPostgresInstance,
+) {
+  if (
+    !lifecycle ||
+    lifecycle.postgresInstance !== instance ||
+    !Number.isSafeInteger(lifecycle.port)
+  ) {
+    fail(
+      "PORTAL_FOLLOW_UP_CONCURRENCY_LOCAL_PG16_STOP_FAILED",
+      "postgres-stop",
+    );
+  }
+  const stopState = await stopInstance(instance, 1_000);
+  if (stopState?.stopped !== true || !instance.exited) {
+    fail(
+      "PORTAL_FOLLOW_UP_CONCURRENCY_LOCAL_PG16_STOP_FAILED",
+      "postgres-stop",
+    );
+  }
+  lifecycle.postgresInstance = null;
+  lifecycle.port = null;
+  return stopState;
+}
+
+function psqlConnectionArguments(socketDirectory, port) {
   return [
     "-X",
     "--no-password",
-    "--host=127.0.0.1",
+    `--host=${socketDirectory}`,
     `--port=${port}`,
     "--username=postgres",
     "--dbname=postgres",
@@ -427,7 +455,10 @@ async function runPsqlFile(
   const signal = teardown ? undefined : lifecycle.signal;
   return runCommand(
     lifecycle.pg.binaries.psql,
-    [...psqlConnectionArguments(lifecycle.port), `--file=${sqlPath}`],
+    [
+      ...psqlConnectionArguments(lifecycle.socketDirectory, lifecycle.port),
+      `--file=${sqlPath}`,
+    ],
     {
       env: lifecycle.commandEnv,
       timeoutMs: remainingTimeout(deadline, maximumTimeoutMs, stage),
@@ -449,7 +480,7 @@ async function runPsqlQuery(
   return runCommand(
     lifecycle.pg.binaries.psql,
     [
-      ...psqlConnectionArguments(lifecycle.port),
+      ...psqlConnectionArguments(lifecycle.socketDirectory, lifecycle.port),
       "--tuples-only",
       "--no-align",
       `--command=${query}`,
@@ -463,7 +494,7 @@ async function runPsqlQuery(
   );
 }
 
-function startupPreflightQuery(dataDirectory, port) {
+function startupPreflightQuery(dataDirectory, socketDirectory, port) {
   return `
 select case when
   current_user = 'postgres'
@@ -471,9 +502,13 @@ select case when
   and pg_catalog.current_database() = 'postgres'
   and pg_catalog.current_setting('server_version_num')::integer
     between 160000 and 169999
-  and pg_catalog.host(pg_catalog.inet_server_addr()) = '127.0.0.1'
-  and pg_catalog.inet_server_port() = ${port}
-  and pg_catalog.current_setting('listen_addresses') = '127.0.0.1'
+  and pg_catalog.inet_server_addr() is null
+  and pg_catalog.inet_server_port() is null
+  and pg_catalog.current_setting('port')::integer = ${port}
+  and pg_catalog.current_setting('listen_addresses') = ''
+  and pg_catalog.current_setting('unix_socket_directories') =
+    '${socketDirectory}'
+  and pg_catalog.current_setting('unix_socket_permissions') = '0700'
   and pg_catalog.current_setting('ssl') = 'off'
   and pg_catalog.current_setting('cluster_name') =
     '${PORTAL_FOLLOW_UP_CONCURRENCY_CLUSTER_NAME}'
@@ -508,13 +543,15 @@ async function startPostgres(lifecycle, logDescriptor) {
       "-D",
       lifecycle.dataDirectory,
       "-h",
-      "127.0.0.1",
+      "",
       "-p",
       String(port),
       "-c",
       "ssl=off",
       "-c",
       `unix_socket_directories=${lifecycle.socketDirectory}`,
+      "-c",
+      "unix_socket_permissions=0700",
       "-c",
       `cluster_name=${PORTAL_FOLLOW_UP_CONCURRENCY_CLUSTER_NAME}`,
       "-c",
@@ -560,7 +597,7 @@ async function startPostgres(lifecycle, logDescriptor) {
         await runCommand(
           lifecycle.pg.binaries.pg_isready,
           [
-            "--host=127.0.0.1",
+            `--host=${lifecycle.socketDirectory}`,
             `--port=${port}`,
             "--username=postgres",
             "--dbname=postgres",
@@ -581,7 +618,11 @@ async function startPostgres(lifecycle, logDescriptor) {
         );
         const preflight = await runPsqlQuery(
           lifecycle,
-          startupPreflightQuery(lifecycle.dataDirectory, port),
+          startupPreflightQuery(
+            lifecycle.dataDirectory,
+            lifecycle.socketDirectory,
+            port,
+          ),
           "postgres-start",
           Math.max(1, candidateDeadline - performance.now()),
         );
@@ -598,9 +639,10 @@ async function startPostgres(lifecycle, logDescriptor) {
     if (accepted && !instance.exited) {
       return Object.freeze({ instance, port, candidateCount: candidates.length });
     }
-    await stopPostgresInstance(instance, 1_000).catch(() => undefined);
-    lifecycle.postgresInstance = null;
-    lifecycle.port = null;
+    await retirePortalFollowUpConcurrencyPostgresCandidate(
+      lifecycle,
+      instance,
+    );
   }
 
   fail(
@@ -609,7 +651,7 @@ async function startPostgres(lifecycle, logDescriptor) {
   );
 }
 
-function quiesceQuery(port) {
+function quiesceQuery(socketDirectory, port) {
   return `
 do $careslink$
 begin
@@ -618,8 +660,13 @@ begin
     or pg_catalog.current_database() <> 'postgres'
     or pg_catalog.current_setting('server_version_num')::integer
       not between 160000 and 169999
-    or pg_catalog.host(pg_catalog.inet_server_addr()) <> '127.0.0.1'
-    or pg_catalog.inet_server_port() <> ${port}
+    or pg_catalog.inet_server_addr() is not null
+    or pg_catalog.inet_server_port() is not null
+    or pg_catalog.current_setting('port')::integer <> ${port}
+    or pg_catalog.current_setting('listen_addresses') <> ''
+    or pg_catalog.current_setting('unix_socket_directories') <>
+      '${socketDirectory}'
+    or pg_catalog.current_setting('unix_socket_permissions') <> '0700'
     or pg_catalog.current_setting(
       'careslink.portal_follow_up_concurrency_marker', true
     ) is distinct from '${PORTAL_FOLLOW_UP_CONCURRENCY_MARKER}'
@@ -667,7 +714,7 @@ select case when not exists (
     and (
       activity.backend_type <> 'client backend'
       or activity.datname <> 'postgres'
-      or pg_catalog.host(activity.client_addr) is distinct from '127.0.0.1'
+      or activity.client_addr is not null
       or activity.application_name !~
         '^careslink-portal-follow-up-race-(replay|same-key-conflict|different-key-stale|same-provider-actors|session|provider|flag|ownership-first)-(a|b|control|observer)$'
     )
@@ -682,7 +729,7 @@ from (
   where activity.usename = '${PORTAL_FOLLOW_UP_CONCURRENCY_RUNNER_ROLE}'
     and activity.backend_type = 'client backend'
     and activity.datname = 'postgres'
-    and pg_catalog.host(activity.client_addr) = '127.0.0.1'
+    and activity.client_addr is null
     and activity.application_name ~
       '^careslink-portal-follow-up-race-(replay|same-key-conflict|different-key-stale|same-provider-actors|session|provider|flag|ownership-first)-(a|b|control|observer)$'
 ) as terminated_runner
@@ -692,7 +739,7 @@ where terminated_runner.terminated;
 async function quiesceRunner(lifecycle) {
   await runPsqlQuery(
     lifecycle,
-    quiesceQuery(lifecycle.port),
+    quiesceQuery(lifecycle.socketDirectory, lifecycle.port),
     "runner-quiesce",
     PORTAL_FOLLOW_UP_CONCURRENCY_LOCAL_PG16_TIMEOUTS.quiesceMs,
     { teardown: true },
@@ -867,7 +914,7 @@ function parseLiveHarnessResult(stdout) {
     value?.ok !== true ||
     value?.gate !== "portal-referral-follow-up-concurrency" ||
     Number(value?.postgresMajor) !== 16 ||
-    value?.target !== "passwordless-ipv4-loopback" ||
+    value?.target !== "passwordless-private-unix-socket" ||
     value?.marker !== PORTAL_FOLLOW_UP_CONCURRENCY_MARKER ||
     Number(value?.scenariosPassed) !== 8 ||
     !Array.isArray(value?.scenarios) ||
@@ -939,6 +986,8 @@ async function readAndValidateFiles() {
     setupSql,
     cleanupSql,
   );
+  const livePolicy =
+    assertPortalFollowUpConcurrencyLiveHarnessSource(liveSource);
   const combinedSql = `${bootstrapSql}\n${setupSql}\n${cleanupSql}`;
   if (
     !bootstrapSql.includes(PORTAL_FOLLOW_UP_CONCURRENCY_MARKER) ||
@@ -959,6 +1008,7 @@ async function readAndValidateFiles() {
   return Object.freeze({
     manifest,
     migrationEntries: Object.freeze(migrationEntries),
+    livePolicy,
     paths,
     sqlPolicy,
   });
@@ -1167,6 +1217,7 @@ export async function runPortalFollowUpConcurrencyLocalPg16({
     lifecycle.dataDirectory = join(lifecycle.tempRoot, "data");
     lifecycle.socketDirectory = join(lifecycle.tempRoot, "socket");
     await mkdir(lifecycle.socketDirectory, { mode: 0o700 });
+    await chmod(lifecycle.socketDirectory, 0o700);
     lifecycle.logHandle = await open(
       join(lifecycle.tempRoot, "postgres.log"),
       "a",
@@ -1182,7 +1233,7 @@ export async function runPortalFollowUpConcurrencyLocalPg16({
           "--encoding=UTF8",
           "--locale=C",
           "--auth-local=trust",
-          "--auth-host=trust",
+          "--auth-host=reject",
           "--data-checksums",
           "--no-sync",
         ],
@@ -1235,7 +1286,8 @@ export async function runPortalFollowUpConcurrencyLocalPg16({
 
     const databaseUrl =
       `postgresql://${PORTAL_FOLLOW_UP_CONCURRENCY_RUNNER_ROLE}` +
-      `@127.0.0.1:${lifecycle.port}/postgres`;
+      `@localhost:${lifecycle.port}/postgres?host=` +
+      encodeURIComponent(lifecycle.socketDirectory);
     validatePortalFollowUpConcurrencyDatabaseUrl(databaseUrl);
     liveResult = await measureStage(timings, "live-harness", async () => {
       try {
@@ -1307,10 +1359,11 @@ export async function runPortalFollowUpConcurrencyLocalPg16({
     policyVersion: PORTAL_FOLLOW_UP_CONCURRENCY_MARKER,
     postgresVersion: lifecycle.pg.version,
     postgresMajor: 16,
-    target: "fresh-passwordless-ipv4-loopback",
+    target: "fresh-passwordless-private-unix-socket",
     port: lifecycle.port,
     migrationCount: files.manifest.migrationCount,
     migrationManifestSha256: files.manifest.manifestSha256,
+    liveHarnessSha256: files.livePolicy.liveHarnessSha256,
     supportSqlSha256: Object.freeze({
       bootstrap: files.sqlPolicy.bootstrapSha256,
       setup: files.sqlPolicy.setupSha256,

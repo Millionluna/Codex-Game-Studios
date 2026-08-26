@@ -183,7 +183,7 @@ async function connectClient(Client, databaseUrl, target, applicationName) {
       client,
       "select " +
         "pg_catalog.host(pg_catalog.inet_server_addr()) as server_addr, " +
-        "pg_catalog.inet_server_port() as server_port, " +
+        "pg_catalog.current_setting('port') as server_port, " +
         "pg_catalog.current_database() as database_name, " +
         "session_user as session_user_name, " +
         "current_user as current_user_name, " +
@@ -1208,12 +1208,7 @@ async function runOwnershipRace(Client, databaseUrl, target) {
         CORRELATIONS.ownershipWaiter,
       ),
     );
-    await waitForExactBlockers(scenario.observer, {
-      [scenario.b.pid]: [scenario.control.pid],
-    });
-    await query(scenario.control.client, "commit");
-    const waiterOutcome = await waiter;
-    const replay = await captureDatabaseOperation(
+    const replay = captureDatabaseOperation(
       recordQuery(
         scenario.a.client,
         fixture,
@@ -1223,13 +1218,19 @@ async function runOwnershipRace(Client, databaseUrl, target) {
         CORRELATIONS.ownershipReceipt,
       ),
     );
+    await waitForExactBlockers(scenario.observer, {
+      [scenario.a.pid]: [scenario.control.pid],
+      [scenario.b.pid]: [scenario.control.pid],
+    });
+    await query(scenario.control.client, "commit");
+    const [waiterOutcome, replayOutcome] = await Promise.all([waiter, replay]);
     assert(
       !waiterOutcome.ok &&
         waiterOutcome.sqlState === "P0001" &&
         waiterOutcome.reason === "PORTAL_NOT_FOUND" &&
-        !replay.ok &&
-        replay.sqlState === "P0001" &&
-        replay.reason === "PORTAL_NOT_FOUND",
+        !replayOutcome.ok &&
+        replayOutcome.sqlState === "P0001" &&
+        replayOutcome.reason === "PORTAL_NOT_FOUND",
       "PORTAL_FOLLOW_UP_CONCURRENCY_OWNERSHIP_RACE_FAILED",
     );
     try {
@@ -1367,7 +1368,7 @@ export async function runPortalFollowUpConcurrencyHarness(env = process.env) {
     ok: true,
     gate: "portal-referral-follow-up-concurrency",
     postgresMajor: 16,
-    target: "passwordless-ipv4-loopback",
+    target: "passwordless-private-unix-socket",
     marker: PORTAL_FOLLOW_UP_CONCURRENCY_MARKER,
     scenariosPassed: completed.length,
     scenarios: Object.freeze(completed),
