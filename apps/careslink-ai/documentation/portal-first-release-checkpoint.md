@@ -81,7 +81,7 @@ availability.
 | `/providers`, `/providers/[id]` | `mock-data` | No | Unknown IDs fall back to the first mock provider; no provider table, membership or RLS | Real provider detail after M0 membership; unknown IDs return 404 |
 | `/providers/onboarding`, `/providers/review` | static/mock | No | Forms/buttons imply a save/review that does not occur | Add canonical provider profile and admin review command after identity proof |
 | Provider profile generator | mixed: real `provider_drafts`, mock editing seed | Partial | Draft handoff can use an in-memory fallback and is not a canonical provider | Treat claimed draft only as intake seed |
-| `/provider-portal` | legacy mock remains the gate-off default; default-off Provider Response M1b and Follow-up M1c source workbenches exist | Metadata-only own-offer list plus atomic accept/decline; eligible accepted items may open exact-provider private detail and record a fixed-code outcome behind a separate M1c gate; not deployed | M1b exact gate source `44f3bd6` passed the deleted no-data Hosted re-gate. M1c has source/local application and PostgreSQL 16 evidence only, with resource/authorization-epoch fences and no remaining independently reviewed P0/P1; it has no Hosted Auth/Data API or true two-backend M1c race evidence. Notification, history, audit list and document/export remain absent | Keep every gate off; treat M1c concurrency/Hosted evidence, merge, deployment and activation as separate approvals |
+| `/provider-portal` | legacy mock remains the gate-off default; default-off Provider Response M1b and Follow-up M1c source workbenches exist | Metadata-only own-offer list plus atomic accept/decline; eligible accepted items may open exact-provider private detail and record a fixed-code outcome behind a separate M1c gate; not deployed | M1b exact gate source `44f3bd6` passed the deleted no-data Hosted re-gate. M1c has source/local application evidence, resource/authorization-epoch fences, no remaining independently reviewed P0/P1 and a fresh PostgreSQL 16.15 8/8 true multi-backend gate with exact cleanup. It still has no Hosted Auth/Data API evidence. Notification, history, audit list and document/export remain absent | Keep every gate off; treat M1c Hosted evidence, merge, deployment and activation as separate approvals |
 | `/referrals`, `/referrals/intake`, `/referrals/[id]`, match page | legacy mock remains default; default-off durable intake, exact-tenant source detail and operator Assignment M1a exist | List/create/source-detail plus operator queue/detail/triage/candidates/offer behind independent gates; not deployed | Gate-on assignment pages have no mock fallback and offer does not assign; Provider Response M1b completes accept/decline only on `/provider-portal`, while follow-up and audit remain disabled | Exact-current M1a commit `43659ab` and latest Hosted-validated M1b gate source `44f3bd6` passed separate deleted no-data Hosted Cookie gates; the current UI follow-up postdates the M1b gate, and no deployment or activation is authorized |
 | `/referral-source-portal` | legacy mock remains default; source-only intake controls are wired and the UUID detail page has a separate gate | List/create/detail only behind independent gates; not deployed | No hosted runtime or activation; the operator slice is independently gated and provider/later workflow actions remain unavailable | Reuse the database-authorized source slice after exact-revision Preview approval |
 | `/referral-workspace/*` | mixed real access/material/outreach stores | Yes, for those tools | These are AI access and outreach tools, not the referral pipeline; some stores have memory fallback | Preserve and later link by canonical referral ID |
@@ -1803,7 +1803,34 @@ Portal flags disabled/Preview-only, zero Auth/Portal fixture rows and all three
 append-only triggers enabled. The server was stopped and its exact temporary
 directory deleted.
 
-This checkpoint performs no Hosted or Production action. It creates no paid or
-retained Preview, GoTrue/PostgREST/Data API evidence, true two-backend M1c race,
-Vercel deployment, merge, activation or Production migration/write. Those are
-separate approvals and gates.
+This initial checkpoint performed no Hosted or Production action and did not
+yet contain a true two-backend M1c race. Section 35 closes that local race gate
+only. Paid or retained Preview, GoTrue/PostgREST/Data API evidence, Vercel
+deployment, merge, activation and Production migration/write remain separate
+approvals and gates.
+
+## 35. Portal Referral Follow-up M1c true-concurrency local gate — 2026-08-26
+
+The retained local-only gate creates a fresh passwordless PostgreSQL 16 server
+on a random high `127.0.0.1` port and pins the exact eight-migration manifest
+plus all three support SQL hashes. A least-privilege runner opens distinct
+backend PIDs for eight scenarios: same-key replay, same-key changed-payload
+conflict, different-key stale competition, two actors in the same provider,
+session revocation, provider suspension, Follow-up flag disablement, and
+ownership withdrawal followed by old-receipt replay denial.
+
+PostgreSQL 16.15 passed all 8/8 twice on independent fresh clusters using
+random high ports `58861` and `50122`. Every winning mutation produced exactly
+one version advance, follow-up, metadata-only audit and hash-only actor-scoped
+receipt; every losing or revoked path returned the exact fixed code and wrote
+no extra effect. The blocker graph was limited to each scenario's known PIDs
+and had to reach its exact controller PID. Focused policy/harness tests passed
+2 files / 23 tests; the repository then passed 149 files / 2,034 tests,
+TypeScript and full lint.
+
+Teardown made the runner `NOLOGIN`, drained only its exact sessions, ran the
+pinned cleanup and independent terminal postcheck, retained all six Portal
+flags disabled/Preview-only with zero Auth/Portal fixtures and all three
+append-only triggers enabled, stopped PostgreSQL normally and deleted the exact
+owned temporary root. No Supabase cloud, Hosted Auth/Data API, paid Preview,
+Vercel deployment, merge, activation or Production system was touched.

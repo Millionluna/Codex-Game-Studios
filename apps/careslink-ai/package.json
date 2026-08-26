@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
+    "test:local:portal-follow-up-concurrency": "node scripts/preview-e2e/portal-referral-follow-up-concurrency-local-pg16.mjs",
     "test:preview:e2e:policy": "vitest run scripts/preview-e2e",
     "test:preview:e2e:worker-rpc": "node scripts/preview-e2e/note-worker-rpc-concurrency.mjs"
   },
