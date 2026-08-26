@@ -203,8 +203,11 @@ the exact database-derived approved provider through
 `GET /api/portal/referral-offers` and
 `portal_referral_provider_response_offers(integer,uuid)`. Each item contains only match and
 referral IDs, frozen region/service codes, match/referral status and referral
-row version. It never includes source identity, summary or contact and never
-falls back to a legacy provider fixture.
+row version. This is one bounded first-page snapshot: live `OFFERED` rows are
+selected before `ACCEPTED` history, then the strict DTO is returned in ascending
+match-ID order. The frozen cursor argument rejects non-null values; M1b does not
+yet expose pagination. It never includes source identity, summary or contact
+and never falls back to a legacy provider fixture.
 
 An `OFFERED` item can be answered at
 `POST /api/portal/referral-offers/{matchId}/response` with only `ACCEPT` or
@@ -222,12 +225,18 @@ and metadata-only audit event; stable replay returns the original ACK. Private
 provider detail, follow-up, notifications, audit listing, document/export and
 Note/Points remain outside M1b. While a response is pending, manual refresh and
 other offer decisions are locked. If transport outcome is uncertain, the UI
-retains the exact original command and idempotency key; other decisions stay
-blocked until an authoritative refresh resolves it or the same response is
-replayed for receipt-safe reconciliation.
+retains the exact original command and idempotency key within the same browser
+authorization epoch; other decisions stay blocked until an authoritative
+refresh resolves it or the same response is replayed for receipt-safe
+reconciliation. Focus, visible-tab, auth-storage and persisted-page lifecycle
+events synchronously clear the old projection and command before
+reauthorization. Even when a new user belongs to the same provider and sees the
+same offer, the prior user's key is never restored; a still-actionable offer
+must create a new command.
 
-At exact source `cc1e53cc88666a3e3f18ac55058295db408535ee`, this M1b
-flow passed a separate deleted no-data Hosted gate on Preview ref
+At historical pre-review exact source
+`cc1e53cc88666a3e3f18ac55058295db408535ee`, this M1b flow passed a separate
+deleted no-data Hosted gate on Preview ref
 `aupndcptwlqmjlgeifdj`: 33/33 migrations, 14/14 rollback suites and the real
 local-HTTPS Next/GoTrue SSR-cookie/Data API matrix with independent Provider A
 and B sessions. The matrix covered no-cookie and Bearer denial, exact
@@ -245,6 +254,17 @@ gate: M1b remains default-off and Production-unapplied, with no retained
 Preview/runtime, deployment, merge or activation. Private accepted detail,
 follow-up, notifications, audit listing and document/export remain outside the
 flow.
+
+Post-review source `f45b19c596edd0bdbe01eba17e6e5fa136df5225`
+adds the active-offer-first bounded snapshot, 10-second request/body timeout,
+principal-boundary lifecycle clearing, unique safe action names and a retained
+local-only PostgreSQL 16 concurrency harness. It passed 8 focused files / 271
+tests, the full 143-file / 1,935-test suite, TypeScript, lint, the 64/64-page
+production build, 73-file adapter sync and diff checks. PostgreSQL 16.15 passed
+the seven-migration chain, all four Portal rollback suites and 6/6 real
+two-backend response races. These are local post-review results only; the
+deleted `cc1e53c` Hosted run does not cover this source, so a new authorized
+no-data Hosted re-gate remains mandatory before merge or promotion.
 
 ## 12. Legacy Profile / Readiness / Referrals
 

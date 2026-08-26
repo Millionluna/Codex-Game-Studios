@@ -161,14 +161,17 @@ metadata.
 
 The inbox is limited to the caller's own `OFFERED` or `ACCEPTED` match rows and
 returns only match/referral IDs, frozen region/service codes, match/referral
-status and referral row version. No table grant or provider match RLS policy is
-added. Response holds master then provider-response gates, serializes the
-actor+mutation lane, locks referral before its matches, refreshes session and
-provider authority after waits, and verifies the supplied payload hash against a
-database-rebuilt canonical command. `ACCEPT` completes the previously absent
-assignment binding; `DECLINE` returns the referral to triage. Exact completed
-replay may return only its historical metadata ACK even after a decline removes
-the offer from the inbox. The durable M1b route does not yet serve the
+status and referral row version. The bounded first page selects live `OFFERED`
+rows before `ACCEPTED` history, then returns the strict DTO in ascending match-ID
+order; a non-null cursor fails validation because M1b has no pagination
+contract yet. No table grant or provider match RLS policy is added. Response
+holds master then provider-response gates, serializes the actor+mutation lane,
+locks referral before its matches, refreshes session and provider authority
+after waits, and verifies the supplied payload hash against a database-rebuilt
+canonical command. `ACCEPT` completes the previously absent assignment binding;
+`DECLINE` returns the referral to triage. Exact completed replay may return only
+its historical metadata ACK even after a decline removes the offer from the
+inbox. The durable M1b route does not yet serve the
 post-accept private referral detail that the broader foundation permission model
 reserves for a later independently reviewed read slice.
 
@@ -210,8 +213,9 @@ the default `ACTIVE_HEALTHY` project before and after; it was never a SQL, Auth,
 route or other write target. No Vercel deployment, merge, retained Preview,
 Production migration or activation is claimed.
 
-Exact M1b source `cc1e53cc88666a3e3f18ac55058295db408535ee`
-subsequently passed a separate deleted no-data Hosted gate on Preview ref
+Historical pre-review M1b source
+`cc1e53cc88666a3e3f18ac55058295db408535ee` subsequently passed a separate
+deleted no-data Hosted gate on Preview ref
 `aupndcptwlqmjlgeifdj`: 33/33 migrations, all 14/14 rollback suites and the
 real local-HTTPS Next/GoTrue SSR-cookie/Data API matrix with two independent
 provider sessions. The only Supabase connection values in the Next environment
@@ -242,6 +246,19 @@ direct Portal table write grant. M1b remains default-off and
 Production-unapplied. No Preview/runtime was retained, and no Vercel deployment,
 merge, activation, private accepted-detail read, follow-up, notification, audit
 list or document/export permission was added.
+
+Post-review source `f45b19c596edd0bdbe01eba17e6e5fa136df5225`
+keeps transport-uncertain replay only inside one browser authorization epoch.
+Focus, visible-tab, auth-storage and persisted-page boundaries clear both the
+old projection and old command before reauthorization, so another active member
+of the same provider cannot inherit the prior actor's idempotency key. It also
+adds the active-offer-first bounded inbox, 10-second request/body timeout and
+the real local PostgreSQL 16 two-backend race gate. Local validation passed 8
+focused files / 271 tests, 143 files / 1,935 tests, TypeScript, lint, 64/64
+static pages, adapter/diff checks, the seven-migration chain, all four Portal
+rollback suites and 6/6 concurrency scenarios. This source has not received a
+Hosted re-gate; the `cc1e53c` Preview evidence must not be attributed to it, and
+merge/promotion remains blocked pending a newly authorized no-data Preview run.
 
 `supabase/migrations/20260809120000_create_v1_shadow_foundation.sql` defines the following controls. It was applied only to a disposable `with_data=false` branch and has not been applied to Production Supabase:
 

@@ -32,7 +32,10 @@ Historical Portal Assignment M1a Hosted Cookie gate source:
 Current Portal Assignment M1a exact-current Hosted Cookie gate source:
 `43659ab16e9af6d9c73d0a55f8fe8b30b3ce9ee2`
 
-Current Portal Provider Response M1b exact-current Hosted Cookie/Data API gate
+Current Portal Provider Response M1b post-review source:
+`f45b19c596edd0bdbe01eba17e6e5fa136df5225`
+
+Historical pre-review Portal Provider Response M1b Hosted Cookie/Data API gate
 source:
 `cc1e53cc88666a3e3f18ac55058295db408535ee`
 
@@ -43,9 +46,10 @@ does not modify the native App, Main Website, Native Auth/M0 implementation or
 served shared Product API routes. Those are prerequisites recorded in the
 existing versioned contract documentation. All new Referral and Note generation
 capabilities remain default-off, Production-unapplied and absent from retained
-Preview runtime. Deleted disposable exact-current Previews now supply Hosted
-Cookie/Data API evidence for Assignment M1a and Provider Response M1b only; they
-do not make either runtime available. The private worker RPC migration passed
+Preview runtime. Deleted disposable exact-revision Previews supply Hosted
+Cookie/Data API evidence for Assignment M1a and historical pre-review Provider
+Response source `cc1e53c` only; they do not make either runtime available, and
+the M1b result does not cover post-review source `f45b19c`. The private worker RPC migration passed
 the isolated PostgreSQL 17.6 migration/assertion gate on deleted disposable
 `r9`; deleted no-data `r20` subsequently passed its PostgreSQL 17.6 true
 two-session claim/session/privacy race gate, and deleted no-data `r21` passed
@@ -70,8 +74,8 @@ availability.
 | `/providers`, `/providers/[id]` | `mock-data` | No | Unknown IDs fall back to the first mock provider; no provider table, membership or RLS | Real provider detail after M0 membership; unknown IDs return 404 |
 | `/providers/onboarding`, `/providers/review` | static/mock | No | Forms/buttons imply a save/review that does not occur | Add canonical provider profile and admin review command after identity proof |
 | Provider profile generator | mixed: real `provider_drafts`, mock editing seed | Partial | Draft handoff can use an in-memory fallback and is not a canonical provider | Treat claimed draft only as intake seed |
-| `/provider-portal` | legacy mock remains the gate-off default; a default-off Provider Response M1b workbench exists | Metadata-only own-offer list plus atomic accept/decline behind independent gates; not deployed | Exact-source commit `cc1e53c` passed a deleted no-data Hosted Cookie/Data API gate; accepted private detail, follow-up, notification, audit list and document/export remain absent | Keep every gate off; treat the deleted Preview as evidence only and separately review any later detail, follow-up, deployment or activation slice |
-| `/referrals`, `/referrals/intake`, `/referrals/[id]`, match page | legacy mock remains default; default-off durable intake, exact-tenant source detail and operator Assignment M1a exist | List/create/source-detail plus operator queue/detail/triage/candidates/offer behind independent gates; not deployed | Gate-on assignment pages have no mock fallback and offer does not assign; Provider Response M1b completes accept/decline only on `/provider-portal`, while follow-up and audit remain disabled | Exact-current M1a commit `43659ab` and M1b commit `cc1e53c` passed separate deleted no-data Hosted Cookie gates; neither result implies deployment or activation |
+| `/provider-portal` | legacy mock remains the gate-off default; a default-off Provider Response M1b workbench exists | Metadata-only own-offer list plus atomic accept/decline behind independent gates; not deployed | Historical exact-source commit `cc1e53c` passed a deleted no-data Hosted Cookie/Data API gate; post-review `f45b19c` adds inbox, lifecycle and concurrency hardening but has only local evidence; accepted private detail, follow-up, notification, audit list and document/export remain absent | Keep every gate off; re-gate `f45b19c` on a newly authorized no-data Preview before merge or promotion |
+| `/referrals`, `/referrals/intake`, `/referrals/[id]`, match page | legacy mock remains default; default-off durable intake, exact-tenant source detail and operator Assignment M1a exist | List/create/source-detail plus operator queue/detail/triage/candidates/offer behind independent gates; not deployed | Gate-on assignment pages have no mock fallback and offer does not assign; Provider Response M1b completes accept/decline only on `/provider-portal`, while follow-up and audit remain disabled | Exact-current M1a commit `43659ab` and historical M1b commit `cc1e53c` passed separate deleted no-data Hosted Cookie gates; post-review M1b `f45b19c` still requires a new Hosted gate |
 | `/referral-source-portal` | legacy mock remains default; source-only intake controls are wired and the UUID detail page has a separate gate | List/create/detail only behind independent gates; not deployed | No hosted runtime or activation; the operator slice is independently gated and provider/later workflow actions remain unavailable | Reuse the database-authorized source slice after exact-revision Preview approval |
 | `/referral-workspace/*` | mixed real access/material/outreach stores | Yes, for those tools | These are AI access and outreach tools, not the referral pipeline; some stores have memory fallback | Preserve and later link by canonical referral ID |
 | `/admin`, `/dashboard` | mock global metrics | No | Core pages have no real referral permission gate; must not receive real data yet | Add membership gate, then replace only the assignment queue |
@@ -1442,7 +1446,7 @@ At that M1a gate closure, provider response M1b remained the next separately
 approved slice; Section 29 records its later source/local implementation.
 Follow-up and audit listing remain unimplemented.
 
-## 29. Portal Referral Provider Response M1b source/local checkpoint — 2026-08-26
+## 29. Portal Referral Provider Response M1b initial source/local checkpoint — 2026-08-26
 
 M1b is an independently gated, default-off Provider surface based on merged
 integration commit `1b5f42c9ef84bbcc51b4d2fc284a2f0a87d9431c`. Its only served operations
@@ -1466,7 +1470,7 @@ capacity remains an offer-time M1a condition. Helpers receive no API execution,
 the public RPCs use `search_path=''`, and no Portal table grant or wider provider
 match policy is introduced.
 
-The inbox is capped at 50 and strictly returns only `matchId`, `referralId`,
+At this initial checkpoint, the inbox was capped at 50 and strictly returned only `matchId`, `referralId`,
 frozen region/service, match/referral status and referral row version. Response
 rebuilds the canonical payload using the database-derived organization, role and
 provider, serializes actor+mutation, and locks referral before all of its matches
@@ -1483,10 +1487,10 @@ workbench that never promotes legacy mock identity or private text. The only new
 HTTP operations are `GET /api/portal/referral-offers` and
 `POST /api/portal/referral-offers/{matchId}/response`. Pending mutations block
 manual refresh; a network-uncertain response keeps the original command and
-idempotency key for an exact reconciliation replay instead of enabling a second
-decision with a new key.
+idempotency key for an exact reconciliation replay inside the same
+authorization epoch instead of enabling a second decision with a new key.
 
-Local PostgreSQL 16.15 applied the exact-current minimum seven-migration
+Local PostgreSQL 16.15 applied the then-current minimum seven-migration
 foundation→mobile-sync→Portal-foundation→intake→source-detail→assignment→M1b
 chain after a clean database rebuild. The M1b rollback-only assertion passed
 after proving default-off gates, exact Provider A/B authorization, bounded
@@ -1509,7 +1513,7 @@ PostgREST E2E, Vercel deployment, merge, runtime activation, Production SQL/writ
 or retained test resource is claimed. Those actions remain outside this batch
 and require separate approval.
 
-## 30. Portal Referral Provider Response M1b exact-current Hosted Cookie/Data API gate — 2026-08-26
+## 30. Portal Referral Provider Response M1b historical exact-source Hosted Cookie/Data API gate — 2026-08-26
 
 The exact source commit
 `cc1e53cc88666a3e3f18ac55058295db408535ee` from PR #6, based on
@@ -1602,3 +1606,53 @@ target. This gate closes only exact-revision M1b Hosted Cookie/Data API evidence
 It did not deploy Vercel, merge PR #6, retain or activate a Preview runtime,
 enable Production, or implement accepted-provider private detail, follow-up,
 notification, audit listing, document/export, Note or Points behavior.
+
+This evidence is exact only for pre-review source
+`cc1e53cc88666a3e3f18ac55058295db408535ee`; it does not cover the later PR #6
+review fixes recorded below.
+
+## 31. Portal Referral Provider Response M1b post-review hardening — 2026-08-26
+
+Exact implementation source `f45b19c596edd0bdbe01eba17e6e5fa136df5225`
+closes the final PR review findings while leaving all runtime and database gates
+default-off:
+
+- the bounded first page selects `OFFERED` rows before `ACCEPTED` history so
+  terminal history cannot crowd out a live decision, then returns the selected
+  rows in strict ascending match-ID DTO order; non-null cursor input now fails
+  validation because pagination remains outside M1b;
+- both transport and successful response-body parsing have a 10-second timeout;
+- response, refresh and retry controls are genuinely mutually exclusive, and
+  repeated offer actions have unique no-ID accessible names;
+- focus, visible-tab, Supabase auth-storage and persisted-page signals clear the
+  old DOM and old uncertain command before a debounced authoritative GET. An
+  authorization epoch prevents a lifecycle-preceding in-flight failure from
+  writing its command back, so another member of the same provider never
+  inherits the prior actor's idempotency key; and
+- six retained local-only harness files prove real PostgreSQL concurrency on
+  separate backend PIDs without accepting password auth or a Hosted target.
+
+Repository validation passed 8 focused files / 271 tests, all 143 files / 1,935
+tests, TypeScript, full lint, the Next.js 16.2.9 64/64-page production build,
+the 73-file adapter check and patch checks. PostgreSQL 16.15 passed the minimum
+7/7 migration chain, Intake/Source Detail/Assignment/Provider Response 4/4
+rollback suites and all 6/6 real two-backend scenarios: same-key single effect,
+exactly one different-key ACCEPT/DECLINE winner, session/provider/flag
+revocation during waits failing closed, and M1b decline followed by an M1a
+offer without deadlock. Harness contracts additionally passed 16/16 focused
+tests and five Preview-policy files / 91 tests.
+
+The post-review migration is 22,513 bytes / SHA-256
+`256f713df793d4cbae5b6c63119f2acb26460f73bf963ffde3f72f465384e0a6`;
+its rollback assertion is 52,339 bytes / SHA-256
+`b939a5f0e3e3536b4b245f48acc5d801b1ad64361ff89a2560e08065bc571f0c`;
+and its migration-contract test is 16,647 bytes / SHA-256
+`adb384b745bf0e26ddb4d85811bf096e1ea8e9bdbdd968e4232616f3417f3b4a`.
+Terminal cleanup removed the support schema/runner and temporary cluster, left
+all five Portal flags disabled, zero Auth/Portal fixtures and no listener on
+the fixed loopback port.
+
+No Hosted Preview, Vercel deployment, merge, activation or Production write
+occurred in this post-review batch. Because the deleted Section 30 Preview
+proved only `cc1e53c`, source `f45b19c` requires a newly authorized no-data
+Hosted re-gate before PR #6 may merge or advance toward Production.
