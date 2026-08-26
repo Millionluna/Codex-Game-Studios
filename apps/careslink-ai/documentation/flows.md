@@ -262,9 +262,22 @@ local-only PostgreSQL 16 concurrency harness. It passed 8 focused files / 271
 tests, the full 143-file / 1,935-test suite, TypeScript, lint, the 64/64-page
 production build, 73-file adapter sync and diff checks. PostgreSQL 16.15 passed
 the seven-migration chain, all four Portal rollback suites and 6/6 real
-two-backend response races. These are local post-review results only; the
-deleted `cc1e53c` Hosted run does not cover this source, so a new authorized
-no-data Hosted re-gate remains mandatory before merge or promotion.
+two-backend response races. Exact gate source HEAD
+`44f3bd68699dc953e2666bf033dac2b5e26a4d30` then passed the post-review Hosted
+re-gate on deleted no-data Preview `portal-provider-response-m1b-r2-20260826`
+(id `fb2e7d39-436d-48d5-a890-ad53b23b1fc6`; ref
+`nhupgyxczlvtddycrgyw`). The exact 33/33 migration chain and 14/14 rollback
+suites passed, followed by the historical real Cookie/Data API assertions
+14/14 and exact-current active-first/non-null-cursor checks 2/2. The final
+postcheck left four Auth tables and all 11 Portal fixture domains at zero, all
+five flags off/Preview-only, all three append-only triggers enabled, zero API
+Portal table grants and zero temporary migration roles. Final Advisors were
+21 INFO / 17 WARN / 0 ERROR for security and 106 INFO / 24 WARN / 0 ERROR for
+performance. Three consecutive deletion probes found both branch id and ref
+absent; Production remained the default `ACTIVE_HEALTHY` project at the same
+19 migrations.
+This closes the post-review Hosted evidence prerequisite only; it does not
+authorize merge, deployment, activation or Production application.
 
 ## 12. Legacy Profile / Readiness / Referrals
 

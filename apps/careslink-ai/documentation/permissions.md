@@ -256,9 +256,26 @@ adds the active-offer-first bounded inbox, 10-second request/body timeout and
 the real local PostgreSQL 16 two-backend race gate. Local validation passed 8
 focused files / 271 tests, 143 files / 1,935 tests, TypeScript, lint, 64/64
 static pages, adapter/diff checks, the seven-migration chain, all four Portal
-rollback suites and 6/6 concurrency scenarios. This source has not received a
-Hosted re-gate; the `cc1e53c` Preview evidence must not be attributed to it, and
-merge/promotion remains blocked pending a newly authorized no-data Preview run.
+rollback suites and 6/6 concurrency scenarios. Exact gate source HEAD
+`44f3bd68699dc953e2666bf033dac2b5e26a4d30` then passed a newly authorized
+no-data Hosted re-gate on deleted Preview
+`portal-provider-response-m1b-r2-20260826` (id
+`fb2e7d39-436d-48d5-a890-ad53b23b1fc6`; ref
+`nhupgyxczlvtddycrgyw`). The database path was restricted to explicit linked
+CLI queries against that ref and rejected all direct-connection variables;
+the Next process received only the Preview Supabase URL and publishable key as
+Supabase connection values, while the Auth admin key stayed only in the
+one-time matrix process. The exact migration/suite gate passed 33/33 and 14/14;
+the real SSR-cookie/Data API matrix passed its historical 14/14 assertions and
+the exact-current active-first/non-null-cursor checks 2/2. Final teardown left
+zero rows across the four Auth tables and 11 Portal fixture domains, all five
+flags off/Preview-only, all three append-only triggers enabled, zero API Portal
+table grants and zero temporary migration roles. Final Advisors were security
+21 INFO / 17 WARN / 0 ERROR and performance 106 INFO / 24 WARN / 0 ERROR.
+The branch was deleted and three probes found its id/ref absent; Production
+remained the default `ACTIVE_HEALTHY` project with the same 19 migrations. This
+closes the post-review Hosted evidence prerequisite without granting merge, deployment,
+activation, private-detail access or any Production permission.
 
 `supabase/migrations/20260809120000_create_v1_shadow_foundation.sql` defines the following controls. It was applied only to a disposable `with_data=false` branch and has not been applied to Production Supabase:
 
