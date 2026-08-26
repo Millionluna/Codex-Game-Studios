@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import {
   useCallback,
   useEffect,
@@ -256,7 +257,8 @@ export function portalReferralProviderResponseClearsOffers(
 
 export function PortalReferralProviderResponseCoordinator({
   enabled = false,
-}: Readonly<{ enabled?: boolean }>) {
+  followUpEnabled = false,
+}: Readonly<{ enabled?: boolean; followUpEnabled?: boolean }>) {
   const [offersResult, setOffersResult] =
     useState<PortalReferralProviderOffersResult>();
   const [refreshing, setRefreshing] = useState(false);
@@ -813,9 +815,22 @@ export function PortalReferralProviderResponseCoordinator({
                       </button>
                     </div>
                   ) : (
-                    <p className="mt-4 text-sm text-[#5d6d68]">
-                      Accepted / 已接受 · Response is read-only.
-                    </p>
+                    <div className="mt-4 grid gap-3">
+                      <p className="text-sm text-[#5d6d68]">
+                        Accepted / 已接受 · Response is read-only.
+                      </p>
+                      {followUpEnabled &&
+                      offer.matchStatus === "ACCEPTED" &&
+                      (offer.currentStatus === "ACCEPTED" ||
+                        offer.currentStatus === "IN_PROGRESS") ? (
+                        <Link
+                          href={`/provider-portal/referrals/${offer.referralId}`}
+                          className="taito-secondary w-fit px-4"
+                        >
+                          Open follow-up / 打开跟进
+                        </Link>
+                      ) : null}
+                    </div>
                   )}
                 </Card>
               </li>

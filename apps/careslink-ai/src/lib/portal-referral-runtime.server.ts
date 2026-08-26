@@ -25,6 +25,8 @@ export const CARESLINK_PORTAL_REFERRAL_ASSIGNMENT_FLAG =
   "CARESLINK_PORTAL_REFERRAL_ASSIGNMENT_ENABLED" as const;
 export const CARESLINK_PORTAL_REFERRAL_PROVIDER_RESPONSE_FLAG =
   "CARESLINK_PORTAL_REFERRAL_PROVIDER_RESPONSE_ENABLED" as const;
+export const CARESLINK_PORTAL_REFERRAL_FOLLOW_UP_FLAG =
+  "CARESLINK_PORTAL_REFERRAL_FOLLOW_UP_ENABLED" as const;
 export const CARESLINK_PORTAL_REFERRAL_EXPECTED_SUPABASE_REF_FLAG =
   "CARESLINK_PORTAL_REFERRAL_EXPECTED_SUPABASE_REF" as const;
 
@@ -38,6 +40,7 @@ export type PortalReferralRuntimeEnv = Readonly<{
   CARESLINK_PORTAL_REFERRAL_SOURCE_DETAIL_ENABLED?: string;
   CARESLINK_PORTAL_REFERRAL_ASSIGNMENT_ENABLED?: string;
   CARESLINK_PORTAL_REFERRAL_PROVIDER_RESPONSE_ENABLED?: string;
+  CARESLINK_PORTAL_REFERRAL_FOLLOW_UP_ENABLED?: string;
   CARESLINK_PORTAL_REFERRAL_EXPECTED_SUPABASE_REF?: string;
   NEXT_PUBLIC_SUPABASE_ANON_KEY?: string;
   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY?: string;
@@ -59,6 +62,7 @@ export type PortalReferralOperation =
   | "OFFER_REFERRAL"
   | "LIST_MY_OFFERS"
   | "RESPOND_TO_OFFER"
+  | "GET_PROVIDER_FOLLOW_UP_REFERRAL"
   | "RECORD_FOLLOW_UP"
   | "LIST_AUDIT";
 
@@ -158,6 +162,16 @@ export function isPortalReferralProviderResponseRuntimeEnabled(
   );
 }
 
+export function isPortalReferralFollowUpRuntimeEnabled(
+  env: PortalReferralRuntimeEnv = process.env as PortalReferralRuntimeEnv,
+) {
+  return (
+    isPortalReferralBaseRuntimeEnabled(env) &&
+    isPortalReferralOperationEnabled("GET_PROVIDER_FOLLOW_UP_REFERRAL", env) &&
+    isPortalReferralOperationEnabled("RECORD_FOLLOW_UP", env)
+  );
+}
+
 /**
  * Assignment M1a and the source-role pages still share `/referrals`. Keep the
  * page-level assignment latch closed if either source-role surface is active.
@@ -189,6 +203,9 @@ export function isPortalReferralOperationEnabled(
     case "LIST_MY_OFFERS":
     case "RESPOND_TO_OFFER":
       return env.CARESLINK_PORTAL_REFERRAL_PROVIDER_RESPONSE_ENABLED === "true";
+    case "GET_PROVIDER_FOLLOW_UP_REFERRAL":
+    case "RECORD_FOLLOW_UP":
+      return env.CARESLINK_PORTAL_REFERRAL_FOLLOW_UP_ENABLED === "true";
     default:
       return false;
   }
@@ -275,6 +292,9 @@ function authorizationScopeForOperation(
     case "LIST_MY_OFFERS":
     case "RESPOND_TO_OFFER":
       return "PROVIDER_RESPONSE";
+    case "GET_PROVIDER_FOLLOW_UP_REFERRAL":
+    case "RECORD_FOLLOW_UP":
+      return "FOLLOW_UP";
     default:
       return undefined;
   }
