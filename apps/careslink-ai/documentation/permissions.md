@@ -210,15 +210,38 @@ the default `ACTIVE_HEALTHY` project before and after; it was never a SQL, Auth,
 route or other write target. No Vercel deployment, merge, retained Preview,
 Production migration or activation is claimed.
 
-The exact-current branch's security advisors returned 21 INFO / 14 WARN and
-performance advisors returned 105 INFO / 24 WARN, with no ERROR. The
-authenticated-executable `SECURITY DEFINER` warnings include intentionally
-narrow Portal RPCs: each remains covered by the master plus operation-specific
-database gates, the exact non-Production application target, fresh Auth
-user/session checks and exact membership/tenant authorization; all use
-`search_path=''`, and authenticated callers receive no direct Portal table
-write grant. The WARN findings therefore remain visible review items rather
-than an unrestricted definer or all-project security-green claim.
+Exact M1b source `cc1e53cc88666a3e3f18ac55058295db408535ee`
+subsequently passed a separate deleted no-data Hosted gate on Preview ref
+`aupndcptwlqmjlgeifdj`: 33/33 migrations, all 14/14 rollback suites and the
+real local-HTTPS Next/GoTrue SSR-cookie/Data API matrix with two independent
+provider sessions. The only Supabase connection values in the Next environment
+were the branch URL and publishable key. The service role was confined to one-time Auth administration,
+and the direct non-pooling database credential was confined to fixture setup and
+verification; neither credential entered the Next environment. The matrix
+proved no-cookie and Bearer rejection before authority, Provider A/B list and
+mutation isolation, exact no-PII projections, transport,
+stale-version and idempotency rejection, stable ACCEPT/DECLINE replay,
+hash-bound terminal database effects and global revocation of saved old cookies,
+including Provider A's Cookie carrying a still-unexpired access JWT. Fixed
+teardown left all four Auth tables and all 11 Portal business
+tables at zero, all five flags off/Preview-only and all three append-only
+triggers enabled. Three consecutive deletion probes found the exact ref absent;
+Production remained the default healthy project at 19 migrations and received
+no SQL, Auth, route or other write.
+
+The deleted M1b Preview's security advisors returned 21 INFO / 17 WARN and its
+performance advisors returned 105 INFO / 24 WARN, with zero ERROR. Three WARN
+are the intentionally narrow authenticated-executable Provider Response
+`SECURITY DEFINER` RPCs. Like the 21 INFO / 14 WARN recorded for the earlier
+Assignment `r2`, these are visible review items rather than an unrestricted
+definer or all-project security-green claim: every RPC remains covered by the
+master plus operation-specific database gates, the exact non-Production
+application target, fresh Auth user/session checks and exact membership/tenant
+authorization; all use `search_path=''`, and authenticated callers receive no
+direct Portal table write grant. M1b remains default-off and
+Production-unapplied. No Preview/runtime was retained, and no Vercel deployment,
+merge, activation, private accepted-detail read, follow-up, notification, audit
+list or document/export permission was added.
 
 `supabase/migrations/20260809120000_create_v1_shadow_foundation.sql` defines the following controls. It was applied only to a disposable `with_data=false` branch and has not been applied to Production Supabase:
 

@@ -226,6 +226,26 @@ retains the exact original command and idempotency key; other decisions stay
 blocked until an authoritative refresh resolves it or the same response is
 replayed for receipt-safe reconciliation.
 
+At exact source `cc1e53cc88666a3e3f18ac55058295db408535ee`, this M1b
+flow passed a separate deleted no-data Hosted gate on Preview ref
+`aupndcptwlqmjlgeifdj`: 33/33 migrations, 14/14 rollback suites and the real
+local-HTTPS Next/GoTrue SSR-cookie/Data API matrix with independent Provider A
+and B sessions. The matrix covered no-cookie and Bearer denial, exact
+tenant-scoped/no-PII inboxes, cross-provider not-found, invalid transport, stale
+and idempotency conflicts, stable ACCEPT/DECLINE replay, exact final lists/database
+hashes and global-session revocation of saved old cookies, including Provider
+A's Cookie carrying a still-unexpired access JWT. Teardown
+left the four Auth tables and 11 Portal business tables at zero, all five flags
+off/Preview-only and all three append-only triggers enabled; three consecutive
+probes confirmed deletion. Security advisors returned 21 INFO / 17 WARN,
+including three narrow authenticated M1b `SECURITY DEFINER` WARN; performance
+advisors returned 105 INFO / 24 WARN, with zero ERROR. Production remained
+unchanged at 19 migrations. This closes only the disposable Hosted evidence
+gate: M1b remains default-off and Production-unapplied, with no retained
+Preview/runtime, deployment, merge or activation. Private accepted detail,
+follow-up, notifications, audit listing and document/export remain outside the
+flow.
+
 ## 12. Legacy Profile / Readiness / Referrals
 
 These Web routes keep their current profile, access-code, guided material and outreach flow for regression compatibility. They are not part of App parity, do not create canonical AI Note documents and must not grant or debit the personal V1 Points wallet unless a future approved contract explicitly adds that service.
