@@ -23,8 +23,10 @@ const IDS = {
   organization: "20000000-0000-4000-8000-000000000001",
   sourceOrganization: "20000000-0000-4000-8000-000000000002",
   referral: "b0000000-0000-4000-8000-000000000001",
+  otherReferral: "b0000000-0000-4000-8000-000000000002",
   provider: "c0000000-0000-4000-8000-000000000001",
   match: "d0000000-0000-4000-8000-000000000001",
+  otherMatch: "d0000000-0000-4000-8000-000000000002",
 } as const;
 const MUTATION_ID = "portal-create-private-0001";
 const CORRELATION_ID = "server-correlation-0001";
@@ -182,6 +184,37 @@ describe("Portal referral Supabase adapter", () => {
     ).resolves.toEqual({ ok: false, reason: "adapter_unavailable" });
   });
 
+  it("strictly authorizes one approved provider membership for provider response", async () => {
+    const client = rpcClient(rpcSuccess(providerAuthorizationEnvelope()));
+
+    await expect(
+      authorizePortalReferralSupabaseClient(client, "PROVIDER_RESPONSE"),
+    ).resolves.toEqual({
+      ok: true,
+      authorization: providerAuthorization(),
+    });
+    expect(client.rpc).toHaveBeenCalledWith(
+      PORTAL_REFERRAL_SUPABASE_RPC_NAMES.providerResponseAuthorize,
+    );
+  });
+
+  it.each([
+    { ...providerAuthorizationEnvelope(), private: CONTACT },
+    omit(providerAuthorizationEnvelope(), "provider_id"),
+    { ...providerAuthorizationEnvelope(), provider_id: IDS.provider.toUpperCase() },
+    { ...providerAuthorizationEnvelope(), provider_review_status: "SUSPENDED" },
+    { ...providerAuthorizationEnvelope(), organization_type: "REFERRAL_SOURCE" },
+    { ...providerAuthorizationEnvelope(), membership_role: "referral_source" },
+    authorizationEnvelope(),
+  ])("fails closed on an unsafe provider authorization %#", async (data) => {
+    await expect(
+      authorizePortalReferralSupabaseClient(
+        rpcClient(rpcSuccess(data)),
+        "PROVIDER_RESPONSE",
+      ),
+    ).resolves.toEqual({ ok: false, reason: "adapter_unavailable" });
+  });
+
   it("does not widen source and assignment authorization scopes", async () => {
     await expect(
       authorizePortalReferralSupabaseClient(
@@ -206,6 +239,30 @@ describe("Portal referral Supabase adapter", () => {
       assignmentAuthorization("PLATFORM", "platform_admin"),
     );
     await expect(assignmentApi.listReferrals()).rejects.toMatchObject({
+      code: "FORBIDDEN",
+    });
+
+    await expect(
+      authorizePortalReferralSupabaseClient(
+        rpcClient(rpcSuccess(providerAuthorizationEnvelope())),
+        "ASSIGNMENT",
+      ),
+    ).resolves.toEqual({ ok: false, reason: "adapter_unavailable" });
+    await expect(
+      authorizePortalReferralSupabaseClient(
+        rpcClient(rpcSuccess(assignmentAuthorizationEnvelope("PLATFORM", "platform_admin"))),
+        "PROVIDER_RESPONSE",
+      ),
+    ).resolves.toEqual({ ok: false, reason: "adapter_unavailable" });
+
+    const providerApi = createSupabasePortalReferralApi(
+      rpcClient(rpcSuccess(providerOffersEnvelope())),
+      providerAuthorization(),
+    );
+    await expect(providerApi.listReferrals()).rejects.toMatchObject({
+      code: "FORBIDDEN",
+    });
+    await expect(sourceApi.listMyOffers()).rejects.toMatchObject({
       code: "FORBIDDEN",
     });
   });
@@ -495,6 +552,187 @@ describe("Portal referral Supabase adapter", () => {
         correlationId: CORRELATION_ID,
       }),
     ).rejects.toMatchObject({ code: "ADAPTER_UNAVAILABLE" });
+  });
+
+  it("lists only bounded provider-owned offer metadata in match-id order", async () => {
+    const client = rpcClient(rpcSuccess(providerOffersEnvelope()));
+    const api = createSupabasePortalReferralApi(
+      client,
+      providerAuthorization(),
+    );
+
+    await expect(api.listMyOffers()).resolves.toEqual([
+      {
+        matchId: IDS.match,
+        referralId: IDS.referral,
+        region: "VIC_MELBOURNE",
+        serviceType: "SUPPORT_COORDINATION",
+        matchStatus: "OFFERED",
+        currentStatus: "OFFERED",
+        rowVersion: 3,
+      },
+    ]);
+    expect(client.rpc).toHaveBeenCalledWith(
+      PORTAL_REFERRAL_SUPABASE_RPC_NAMES.providerResponseOffers,
+      { p_limit: 50, p_after_match_id: null },
+    );
+  });
+
+  it.each([
+    "ACCEPTED",
+    "IN_PROGRESS",
+    "NOTE_LINKED",
+    "EXPORTED",
+    "COMPLETED",
+    "CLOSED",
+  ] as const)(
+    "accepts an accepted provider offer with downstream %s referral status",
+    async (currentStatus) => {
+    const api = createSupabasePortalReferralApi(
+      rpcClient(
+        rpcSuccess({
+          items: [
+            providerOfferItem({
+              match_status: "ACCEPTED",
+              current_status: currentStatus,
+              row_version: 5,
+            }),
+          ],
+        }),
+      ),
+      providerAuthorization(),
+    );
+
+    await expect(api.listMyOffers()).resolves.toMatchObject([
+      { matchStatus: "ACCEPTED", currentStatus, rowVersion: 5 },
+    ]);
+    },
+  );
+
+  it.each([
+    { ...providerOffersEnvelope(), contact: CONTACT },
+    { items: [{ ...providerOfferItem(), summary: "private summary" }] },
+    { items: [{ ...providerOfferItem(), match_status: "DECLINED" }] },
+    { items: [{ ...providerOfferItem(), current_status: "TRIAGED" }] },
+    {
+      items: [
+        providerOfferItem({
+          match_status: "ACCEPTED",
+          current_status: "OFFERED",
+        }),
+      ],
+    },
+    { items: [providerOfferItem(), providerOfferItem()] },
+    {
+      items: [
+        providerOfferItem({
+          match_id: IDS.otherMatch,
+          referral_id: IDS.otherReferral,
+        }),
+        providerOfferItem(),
+      ],
+    },
+    { items: Array.from({ length: 51 }, () => providerOfferItem()) },
+  ])("rejects an unsafe provider offers envelope %#", async (data) => {
+    const api = createSupabasePortalReferralApi(
+      rpcClient(rpcSuccess(data)),
+      providerAuthorization(),
+    );
+    await expect(api.listMyOffers()).rejects.toMatchObject({
+      code: "ADAPTER_UNAVAILABLE",
+    });
+  });
+
+  it.each([
+    ["ACCEPT", "ACCEPTED"],
+    ["DECLINE", "TRIAGED"],
+  ] as const)(
+    "hashes the canonical provider %s response and strictly binds its ACK",
+    async (decision, currentStatus) => {
+      const client = rpcClient(
+        rpcSuccess(providerResponseMutationEnvelope(currentStatus, 4)),
+      );
+      const api = createSupabasePortalReferralApi(
+        client,
+        providerAuthorization(),
+      );
+
+      await expect(
+        api.respondToOffer(
+          IDS.match,
+          { decision, expectedVersion: 3 },
+          { mutationId: MUTATION_ID, correlationId: CORRELATION_ID },
+        ),
+      ).resolves.toEqual({
+        referralId: IDS.referral,
+        matchId: IDS.match,
+        currentStatus,
+        rowVersion: 4,
+        updatedAt: "2026-08-24T01:02:03.456Z",
+      });
+      expect(client.rpc).toHaveBeenCalledWith(
+        PORTAL_REFERRAL_SUPABASE_RPC_NAMES.providerResponseRespond,
+        {
+          p_match_id: IDS.match,
+          p_expected_version: 3,
+          p_decision: decision,
+          p_mutation_id_hash: sha256(MUTATION_ID),
+          p_payload_hash: createPortalReferralMutationPayloadHash({
+            actor: {
+              organizationId: IDS.organization,
+              role: "provider_member",
+              providerId: IDS.provider,
+            },
+            kind: "RESPOND_TO_OFFER",
+            command: {
+              matchId: IDS.match,
+              expectedVersion: 3,
+              decision,
+            },
+          }),
+          p_correlation_id_hash: sha256(CORRELATION_ID),
+        },
+      );
+    },
+  );
+
+  it.each([
+    providerResponseMutationEnvelope("OFFERED", 4),
+    providerResponseMutationEnvelope("ACCEPTED", 3),
+    { ...providerResponseMutationEnvelope("ACCEPTED", 4), match_id: IDS.otherMatch },
+    { ...providerResponseMutationEnvelope("ACCEPTED", 4), private: CONTACT },
+  ])("rejects an unbound provider response ACK %#", async (data) => {
+    const api = createSupabasePortalReferralApi(
+      rpcClient(rpcSuccess(data)),
+      providerAuthorization(),
+    );
+    await expect(
+      api.respondToOffer(
+        IDS.match,
+        { decision: "ACCEPT", expectedVersion: 3 },
+        { mutationId: MUTATION_ID, correlationId: CORRELATION_ID },
+      ),
+    ).rejects.toMatchObject({ code: "ADAPTER_UNAVAILABLE" });
+  });
+
+  it.each([
+    ["not-a-match", { decision: "ACCEPT", expectedVersion: 3 }],
+    [IDS.match, { decision: "RETRY", expectedVersion: 3 }],
+    [IDS.match, { decision: "ACCEPT", expectedVersion: 0 }],
+    [IDS.match, { decision: "ACCEPT", expectedVersion: 3, actor: IDS.user }],
+  ])("rejects an unsafe provider response command %# before RPC", async (matchId, command) => {
+    const client = rpcClient(
+      rpcSuccess(providerResponseMutationEnvelope("ACCEPTED", 4)),
+    );
+    const api = createSupabasePortalReferralApi(client, providerAuthorization());
+    await expect(
+      api.respondToOffer(
+        matchId,
+        command as never,
+        { mutationId: MUTATION_ID, correlationId: CORRELATION_ID },
+      ),
+    ).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
+    expect(client.rpc).not.toHaveBeenCalled();
   });
 
   it("lists only exact metadata fields using a fixed bounded cursor", async () => {
@@ -934,6 +1172,33 @@ function assignmentAuthorization(
   } as PortalReferralAuthorization;
 }
 
+function providerAuthorizationEnvelope() {
+  return {
+    authorized: true,
+    user_id: IDS.user,
+    organization_id: IDS.organization,
+    organization_type: "PROVIDER",
+    organization_status: "ACTIVE",
+    membership_role: "provider_member",
+    membership_status: "ACTIVE",
+    provider_id: IDS.provider,
+    provider_review_status: "APPROVED",
+  } as const;
+}
+
+function providerAuthorization(): PortalReferralAuthorization {
+  return {
+    userId: IDS.user,
+    organizationId: IDS.organization,
+    organizationType: "PROVIDER",
+    organizationStatus: "ACTIVE",
+    membershipRole: "provider_member",
+    membershipStatus: "ACTIVE",
+    providerId: IDS.provider,
+    providerReviewStatus: "APPROVED",
+  };
+}
+
 function authorization(): PortalReferralAuthorization {
   return {
     userId: IDS.user,
@@ -1010,6 +1275,46 @@ function providerCandidateEnvelope() {
 
 function providerCandidatesEnvelope() {
   return { items: [providerCandidateEnvelope()] };
+}
+
+function providerOfferItem(
+  overrides: Partial<{
+    match_id: string;
+    referral_id: string;
+    region: string;
+    service_type: string;
+    match_status: string;
+    current_status: string;
+    row_version: number;
+  }> = {},
+) {
+  return {
+    match_id: IDS.match,
+    referral_id: IDS.referral,
+    region: "VIC_MELBOURNE",
+    service_type: "SUPPORT_COORDINATION",
+    match_status: "OFFERED",
+    current_status: "OFFERED",
+    row_version: 3,
+    ...overrides,
+  };
+}
+
+function providerOffersEnvelope() {
+  return { items: [providerOfferItem()] };
+}
+
+function providerResponseMutationEnvelope(
+  currentStatus: string,
+  rowVersion: number,
+) {
+  return {
+    referral_id: IDS.referral,
+    match_id: IDS.match,
+    current_status: currentStatus,
+    row_version: rowVersion,
+    updated_at: "2026-08-24T11:02:03.456+10:00",
+  };
 }
 
 function assignmentMutationEnvelope(

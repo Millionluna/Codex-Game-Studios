@@ -13,6 +13,7 @@ import {
 import { AppShell } from "@/components/app-shell";
 import { MobileAppFrame } from "@/components/mobile-app-frame";
 import { PageHeader } from "@/components/page-header";
+import { PortalReferralProviderResponseCoordinator } from "@/components/portal-referral-provider-response-controls";
 import { PortalReferralWorkflowBoundary } from "@/components/portal-referral-workflow-controls";
 import { ShareCardPreview } from "@/components/share-card";
 import {
@@ -33,9 +34,26 @@ import {
   getReadinessUpgradeOffers,
 } from "@/lib/provider-assessment";
 import { getProviderPortalData } from "@/lib/provider-portal";
+import { isPortalReferralProviderResponseRuntimeEnabled } from "@/lib/portal-referral-runtime.server";
 import { getRolePortal } from "@/lib/role-portals";
 
 export default function ProviderPortalPage() {
+  const providerResponseEnabled =
+    isPortalReferralProviderResponseRuntimeEnabled();
+
+  if (providerResponseEnabled) {
+    return (
+      <AppShell>
+        <PageHeader
+          eyebrow="Provider response Preview"
+          title="我的 referral 邀约"
+          description="这里只显示当前数据库会话获准查看的 region、service、status 和 row version。接受或拒绝后会重新读取权威列表。"
+        />
+        <PortalReferralProviderResponseCoordinator enabled />
+      </AppShell>
+    );
+  }
+
   const portal = getRolePortal("referral_receiver");
   const {
     provider,

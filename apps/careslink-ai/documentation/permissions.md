@@ -75,7 +75,7 @@ Current admin pages may display access-request metadata, feature counts, statuse
 
 ## V1 shadow permission contract and isolated evidence
 
-### Portal Referral foundation, intake, source-detail and Assignment M1a runtime (default-off and Production-unapplied)
+### Portal Referral foundation, intake, source-detail, Assignment M1a and Provider Response M1b runtimes (default-off and Production-unapplied)
 
 The Portal Referral foundation introduces organization membership, provider,
 referral, separately protected contact, match, follow-up, receipt, audit,
@@ -124,7 +124,8 @@ eligibility query: active PROVIDER organization, APPROVED review,
 AVAILABLE/LIMITED capacity, exact region/service and at least one active
 provider member. Offer checks the authorized referral before provider
 eligibility, promotes or creates one match and keeps
-`assigned_provider_id=null`; provider response remains unavailable. Triage and
+`assigned_provider_id=null`; under Assignment M1a alone, provider response is
+still unavailable. Triage and
 offer use actor+mutation advisory serialization, expected row versions, fresh
 post-lock session checks, SHA-256 payload/idempotency/correlation values and one
 audit plus one receipt. Session time is sampled only after Auth row locks; the
@@ -145,6 +146,35 @@ copy contact, summary, client correlation or raw idempotency values. Raw match
 and audit rows are limited to platform admin or the tenant partner operator in
 the draft RLS contract.
 
+Provider Response M1b adds an independent `referral_provider_response_v1`
+database gate and three authenticated-only definer RPCs:
+`portal_referral_provider_response_authorize()`,
+`portal_referral_provider_response_offers(integer,uuid)` and
+`portal_referral_provider_response_respond(uuid,bigint,text,text,text,text)`.
+The context must resolve exactly one active
+`provider_member` in an active PROVIDER organization with one APPROVED provider;
+zero, multiple, suspended or non-approved contexts fail closed. Capacity is an
+offer-time M1a eligibility condition and is not reinterpreted as provider
+authority while an already-issued offer is answered. Provider identity is
+always database-derived and is never accepted from the route, body or JWT user
+metadata.
+
+The inbox is limited to the caller's own `OFFERED` or `ACCEPTED` match rows and
+returns only match/referral IDs, frozen region/service codes, match/referral
+status and referral row version. The bounded first page selects live `OFFERED`
+rows before `ACCEPTED` history, then returns the strict DTO in ascending match-ID
+order; a non-null cursor fails validation because M1b has no pagination
+contract yet. No table grant or provider match RLS policy is added. Response
+holds master then provider-response gates, serializes the actor+mutation lane,
+locks referral before its matches, refreshes session and provider authority
+after waits, and verifies the supplied payload hash against a database-rebuilt
+canonical command. `ACCEPT` completes the previously absent assignment binding;
+`DECLINE` returns the referral to triage. Exact completed replay may return only
+its historical metadata ACK even after a decline removes the offer from the
+inbox. The durable M1b route does not yet serve the
+post-accept private referral detail that the broader foundation permission model
+reserves for a later independently reviewed read slice.
+
 The default runtime now supplies a request-scoped cookie client only after the
 base API and durable-adapter gates, the selected independent operation gate and
 the exact non-Production Preview ref pass. It
@@ -155,8 +185,11 @@ membership required by the selected operation; actor, organization and role
 are never accepted from the body. Source list is metadata-only and create
 atomically writes referral, private contact, audit and receipt rows with hashed
 mutation/correlation identifiers. Source detail is read-only. Assignment reads
-or performs only triage/offer as described above. All application and database
-flags remain off. Exact pre-review commit `526aa1e` remains the historical
+or performs only triage/offer, while Provider Response reads the caller's
+metadata-only inbox or performs only accept/decline as described above. All
+application flags are off, and every database flag row defaults off in migration
+source. Exact pre-review commit `526aa1e`
+remains the historical
 deleted-disposable Hosted 32/32 migration, then-current 13/13 rollback and real
 GoTrue SSR-cookie route-E2E baseline. Exact-current hardening HEAD
 `43659ab16e9af6d9c73d0a55f8fe8b30b3ce9ee2` separately passed 32/32 migrations
@@ -180,15 +213,71 @@ the default `ACTIVE_HEALTHY` project before and after; it was never a SQL, Auth,
 route or other write target. No Vercel deployment, merge, retained Preview,
 Production migration or activation is claimed.
 
-The exact-current branch's security advisors returned 21 INFO / 14 WARN and
-performance advisors returned 105 INFO / 24 WARN, with no ERROR. The
-authenticated-executable `SECURITY DEFINER` warnings include intentionally
-narrow Portal RPCs: each remains covered by the master plus operation-specific
-database gates, the exact non-Production application target, fresh Auth
-user/session checks and exact membership/tenant authorization; all use
-`search_path=''`, and authenticated callers receive no direct Portal table
-write grant. The WARN findings therefore remain visible review items rather
-than an unrestricted definer or all-project security-green claim.
+Historical pre-review M1b source
+`cc1e53cc88666a3e3f18ac55058295db408535ee` subsequently passed a separate
+deleted no-data Hosted gate on Preview ref
+`aupndcptwlqmjlgeifdj`: 33/33 migrations, all 14/14 rollback suites and the
+real local-HTTPS Next/GoTrue SSR-cookie/Data API matrix with two independent
+provider sessions. The only Supabase connection values in the Next environment
+were the branch URL and publishable key. The service role was confined to one-time Auth administration,
+and the direct non-pooling database credential was confined to fixture setup and
+verification; neither credential entered the Next environment. The matrix
+proved no-cookie and Bearer rejection before authority, Provider A/B list and
+mutation isolation, exact no-PII projections, transport,
+stale-version and idempotency rejection, stable ACCEPT/DECLINE replay,
+hash-bound terminal database effects and global revocation of saved old cookies,
+including Provider A's Cookie carrying a still-unexpired access JWT. Fixed
+teardown left all four Auth tables and all 11 Portal business
+tables at zero, all five flags off/Preview-only and all three append-only
+triggers enabled. Three consecutive deletion probes found the exact ref absent;
+Production remained the default healthy project at 19 migrations and received
+no SQL, Auth, route or other write.
+
+The deleted M1b Preview's security advisors returned 21 INFO / 17 WARN and its
+performance advisors returned 105 INFO / 24 WARN, with zero ERROR. Three WARN
+are the intentionally narrow authenticated-executable Provider Response
+`SECURITY DEFINER` RPCs. Like the 21 INFO / 14 WARN recorded for the earlier
+Assignment `r2`, these are visible review items rather than an unrestricted
+definer or all-project security-green claim: every RPC remains covered by the
+master plus operation-specific database gates, the exact non-Production
+application target, fresh Auth user/session checks and exact membership/tenant
+authorization; all use `search_path=''`, and authenticated callers receive no
+direct Portal table write grant. M1b remains default-off and
+Production-unapplied. No Preview/runtime was retained, and no Vercel deployment,
+merge, activation, private accepted-detail read, follow-up, notification, audit
+list or document/export permission was added.
+
+Post-review source `f45b19c596edd0bdbe01eba17e6e5fa136df5225`
+keeps transport-uncertain replay only inside one browser authorization epoch.
+Focus, visible-tab, auth-storage and persisted-page boundaries clear both the
+old projection and old command before reauthorization, so another active member
+of the same provider cannot inherit the prior actor's idempotency key. It also
+adds the active-offer-first bounded inbox, 10-second request/body timeout and
+the real local PostgreSQL 16 two-backend race gate. Local validation passed 8
+focused files / 271 tests, 143 files / 1,935 tests, TypeScript, lint, 64/64
+static pages, adapter/diff checks, the seven-migration chain, all four Portal
+rollback suites and 6/6 concurrency scenarios. Exact gate source HEAD
+`44f3bd68699dc953e2666bf033dac2b5e26a4d30` then passed a newly authorized
+no-data Hosted re-gate on deleted Preview
+`portal-provider-response-m1b-r2-20260826` (id
+`fb2e7d39-436d-48d5-a890-ad53b23b1fc6`; ref
+`nhupgyxczlvtddycrgyw`). The database path was restricted to explicit linked
+CLI queries against that ref and rejected all direct-connection variables;
+the Next process received only the Preview Supabase URL and publishable key as
+Supabase connection values, while the Auth admin key stayed only in the
+one-time matrix process. The exact migration/suite gate passed 33/33 and 14/14;
+the real SSR-cookie/Data API matrix passed its historical 14/14 assertions and
+the exact-current active-first/non-null-cursor checks 2/2. Final teardown left
+zero rows across the four Auth tables and 11 Portal fixture domains, all five
+flags off/Preview-only, all three append-only triggers enabled, zero API Portal
+table grants and zero temporary migration roles. Final Advisors were security
+21 INFO / 17 WARN / 0 ERROR and performance 106 INFO / 24 WARN / 0 ERROR.
+The branch was deleted and three probes found its id/ref absent; Production
+remained the default `ACTIVE_HEALTHY` project with the same 19 migrations. This
+closes the post-review Hosted evidence prerequisite without granting merge, deployment,
+activation, private-detail access or any Production permission.
+The later focus/sign-in UI recovery in the current PR postdates exact gate
+source `44f3bd6`, has local-only evidence and adds no permission.
 
 `supabase/migrations/20260809120000_create_v1_shadow_foundation.sql` defines the following controls. It was applied only to a disposable `with_data=false` branch and has not been applied to Production Supabase:
 

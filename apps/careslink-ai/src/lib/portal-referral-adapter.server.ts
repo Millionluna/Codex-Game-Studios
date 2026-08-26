@@ -108,7 +108,7 @@ export type PortalReferralApi = Readonly<{
   respondToOffer(
     matchId: string,
     command: PortalReferralResponseCommand,
-    mutation: PortalReferralMutationMetadata,
+    mutation: PortalReferralApiMutationMetadata,
   ): MaybePromise<ReturnType<PortalReferralWorkflowPort["respondToOffer"]>>;
   recordFollowUp(
     referralId: string,

@@ -143,7 +143,7 @@ There is no app-owned notification preference, push token, in-app inbox, email f
 
 Security, reminders, content/digest, Points and marketing are separate preferences. Payloads contain only opaque IDs and safe type. Daily/Weekdays/Weekly/Off is explicit; content push is normally capped at one proactive item per day. Open requires reauthentication and resolves to a safe resource/recovery state.
 
-## 11. Portal Referral intake and Assignment M1a (inactive runtimes)
+## 11. Portal Referral intake, Assignment M1a and Provider Response M1b (inactive runtimes)
 
 When every default-off application gate and the exact non-Production Preview ref pass, the browser first requests a metadata-only source list. The server creates a request-scoped cookie Supabase client, rejects Bearer authorization and calls the database authorize RPC before enabling private inputs. The database revalidates its separate flag, Auth session/user and one active referral-source membership. Only then may create atomically write the referral, separately protected contact, metadata-only audit and idempotency receipt; the UI renders only the metadata ACK/list. An authorization-boundary failure disables further submission. This path uses no OpenAI call, Points, service role, worker or background retry. It remains source/local only, with all gates and the database flag off and no hosted deployment.
 
@@ -195,6 +195,91 @@ and one hashed idempotency receipt; exact replay is stable, changed payload is a
 conflict and stale version refreshes the authoritative detail. Provider
 accept/decline, follow-up, audit listing, document/export and completion remain
 outside M1a.
+
+Provider Response M1b adds a fourth independent operation gate without opening
+the operator or source surfaces. After the base, durable, exact Preview-ref and
+provider-response gates pass, `/provider-portal` requests at most 50 offers for
+the exact database-derived approved provider through
+`GET /api/portal/referral-offers` and
+`portal_referral_provider_response_offers(integer,uuid)`. Each item contains only match and
+referral IDs, frozen region/service codes, match/referral status and referral
+row version. This is one bounded first-page snapshot: live `OFFERED` rows are
+selected before `ACCEPTED` history, then the strict DTO is returned in ascending
+match-ID order. The frozen cursor argument rejects non-null values; M1b does not
+yet expose pagination. It never includes source identity, summary or contact
+and never falls back to a legacy provider fixture.
+
+An `OFFERED` item can be answered at
+`POST /api/portal/referral-offers/{matchId}/response` with only `ACCEPT` or
+`DECLINE`, the expected referral version and a transport idempotency key; the
+database mutation is
+`portal_referral_provider_response_respond(uuid,bigint,text,text,text,text)`.
+The request-scoped Cookie
+adapter rejects Bearer before client creation; the database independently
+revalidates the Auth session, one active `provider_member`, its active PROVIDER
+organization and its APPROVED provider binding. `ACCEPT` atomically advances
+both match and referral to `ACCEPTED` and sets `assigned_provider_id` from that
+database context. `DECLINE` marks the match `DECLINED`, returns the referral to
+`TRIAGED` and leaves it unassigned. Each success writes one hash-only receipt
+and metadata-only audit event; stable replay returns the original ACK. Private
+provider detail, follow-up, notifications, audit listing, document/export and
+Note/Points remain outside M1b. While a response is pending, manual refresh and
+other offer decisions are locked. If transport outcome is uncertain, the UI
+retains the exact original command and idempotency key within the same browser
+authorization epoch; other decisions stay blocked until an authoritative
+refresh resolves it or the same response is replayed for receipt-safe
+reconciliation. Focus, visible-tab, auth-storage and persisted-page lifecycle
+events synchronously clear the old projection and command before
+reauthorization. Even when a new user belongs to the same provider and sees the
+same offer, the prior user's key is never restored; a still-actionable offer
+must create a new command.
+
+At historical pre-review exact source
+`cc1e53cc88666a3e3f18ac55058295db408535ee`, this M1b flow passed a separate
+deleted no-data Hosted gate on Preview ref
+`aupndcptwlqmjlgeifdj`: 33/33 migrations, 14/14 rollback suites and the real
+local-HTTPS Next/GoTrue SSR-cookie/Data API matrix with independent Provider A
+and B sessions. The matrix covered no-cookie and Bearer denial, exact
+tenant-scoped/no-PII inboxes, cross-provider not-found, invalid transport, stale
+and idempotency conflicts, stable ACCEPT/DECLINE replay, exact final lists/database
+hashes and global-session revocation of saved old cookies, including Provider
+A's Cookie carrying a still-unexpired access JWT. Teardown
+left the four Auth tables and 11 Portal business tables at zero, all five flags
+off/Preview-only and all three append-only triggers enabled; three consecutive
+probes confirmed deletion. Security advisors returned 21 INFO / 17 WARN,
+including three narrow authenticated M1b `SECURITY DEFINER` WARN; performance
+advisors returned 105 INFO / 24 WARN, with zero ERROR. Production remained
+unchanged at 19 migrations. This closes only the disposable Hosted evidence
+gate: M1b remains default-off and Production-unapplied, with no retained
+Preview/runtime, deployment, merge or activation. Private accepted detail,
+follow-up, notifications, audit listing and document/export remain outside the
+flow.
+
+Post-review source `f45b19c596edd0bdbe01eba17e6e5fa136df5225`
+adds the active-offer-first bounded snapshot, 10-second request/body timeout,
+principal-boundary lifecycle clearing, unique safe action names and a retained
+local-only PostgreSQL 16 concurrency harness. It passed 8 focused files / 271
+tests, the full 143-file / 1,935-test suite, TypeScript, lint, the 64/64-page
+production build, 73-file adapter sync and diff checks. PostgreSQL 16.15 passed
+the seven-migration chain, all four Portal rollback suites and 6/6 real
+two-backend response races. Exact gate source HEAD
+`44f3bd68699dc953e2666bf033dac2b5e26a4d30` then passed the post-review Hosted
+re-gate on deleted no-data Preview `portal-provider-response-m1b-r2-20260826`
+(id `fb2e7d39-436d-48d5-a890-ad53b23b1fc6`; ref
+`nhupgyxczlvtddycrgyw`). The exact 33/33 migration chain and 14/14 rollback
+suites passed, followed by the historical real Cookie/Data API assertions
+14/14 and exact-current active-first/non-null-cursor checks 2/2. The final
+postcheck left four Auth tables and all 11 Portal fixture domains at zero, all
+five flags off/Preview-only, all three append-only triggers enabled, zero API
+Portal table grants and zero temporary migration roles. Final Advisors were
+21 INFO / 17 WARN / 0 ERROR for security and 106 INFO / 24 WARN / 0 ERROR for
+performance. Three consecutive deletion probes found both branch id and ref
+absent; Production remained the default `ACTIVE_HEALTHY` project at the same
+19 migrations.
+This closes the post-review Hosted evidence prerequisite only; it does not
+authorize merge, deployment, activation or Production application.
+The later focus/sign-in UI recovery in the current PR postdates exact gate
+source `44f3bd6`, has local-only evidence and is not claimed by that gate.
 
 ## 12. Legacy Profile / Readiness / Referrals
 

@@ -816,6 +816,164 @@ describe("Portal referral route adapter", () => {
     });
   });
 
+  it("strictly projects provider offers and binds response ACKs to server correlation", async () => {
+    const matchId = "70000000-0000-4000-8000-000000000801";
+    const referralId = "70000000-0000-4000-8000-000000000802";
+    const closedMatchId = "70000000-0000-4000-8000-000000000803";
+    const closedReferralId = "70000000-0000-4000-8000-000000000804";
+    const updatedAt = "2026-08-24T00:00:00.000Z";
+    const baseApi = createActorBoundPortalReferralApi(
+      createWorkflow(),
+      PROVIDER_A,
+    );
+    const listMyOffers = vi.fn(async () => [
+      {
+        matchId,
+        referralId,
+        region: "VIC_MELBOURNE" as const,
+        serviceType: "SUPPORT_COORDINATION" as const,
+        matchStatus: "OFFERED" as const,
+        currentStatus: "OFFERED" as const,
+        rowVersion: 3,
+        privateSummary: SUMMARY,
+      },
+      {
+        matchId: closedMatchId,
+        referralId: closedReferralId,
+        region: "VIC_GEELONG" as const,
+        serviceType: "DAILY_LIVING_SUPPORT" as const,
+        matchStatus: "ACCEPTED" as const,
+        currentStatus: "CLOSED" as const,
+        rowVersion: 8,
+      },
+    ]);
+    const respondToOffer = vi.fn(async () => ({
+      referralId,
+      matchId,
+      currentStatus: "ACCEPTED" as const,
+      rowVersion: 4,
+      updatedAt,
+      privateContact: CONTACT,
+    }));
+    const api = {
+      ...baseApi,
+      listMyOffers,
+      respondToOffer,
+    } satisfies PortalReferralApi;
+    const dependencies = {
+      resolveApi: async () => ({ ok: true as const, api }),
+      createCorrelationId: () => SERVER_CORRELATION_ID,
+    };
+
+    const offersResponse = await handlePortalReferralOffers(
+      getRequest("/api/portal/referral-offers", "provider-a"),
+      dependencies,
+    );
+    expect(await responseJson(offersResponse)).toEqual({
+      items: [
+        {
+          matchId,
+          referralId,
+          region: "VIC_MELBOURNE",
+          serviceType: "SUPPORT_COORDINATION",
+          matchStatus: "OFFERED",
+          currentStatus: "OFFERED",
+          rowVersion: 3,
+        },
+        {
+          matchId: closedMatchId,
+          referralId: closedReferralId,
+          region: "VIC_GEELONG",
+          serviceType: "DAILY_LIVING_SUPPORT",
+          matchStatus: "ACCEPTED",
+          currentStatus: "CLOSED",
+          rowVersion: 8,
+        },
+      ],
+    });
+
+    const response = await handlePortalReferralResponse(
+      mutationRequest(
+        `/api/portal/referral-offers/${matchId}/response`,
+        "provider-a",
+        "portal-provider-response-001",
+        { decision: "ACCEPT", expectedVersion: 3 },
+      ),
+      matchId,
+      dependencies,
+    );
+    expect(await responseJson(response)).toEqual({
+      referralId,
+      matchId,
+      currentStatus: "ACCEPTED",
+      rowVersion: 4,
+      updatedAt,
+    });
+    expect(respondToOffer).toHaveBeenCalledWith(
+      matchId,
+      { decision: "ACCEPT", expectedVersion: 3 },
+      {
+        mutationId: "portal-provider-response-001",
+        correlationId: SERVER_CORRELATION_ID,
+      },
+    );
+
+    const invalidOffers = await handlePortalReferralOffers(
+      getRequest("/api/portal/referral-offers", "provider-a"),
+      {
+        ...dependencies,
+        resolveApi: async () => ({
+          ok: true as const,
+          api: {
+            ...api,
+            listMyOffers: async () => [
+              {
+                ...(await listMyOffers())[0]!,
+                currentStatus: "TRIAGED" as const,
+              },
+            ],
+          } as PortalReferralApi,
+        }),
+      },
+    );
+    expect(invalidOffers.status).toBe(503);
+    expect(await responseJson(invalidOffers)).toEqual({
+      error: { code: "ADAPTER_UNAVAILABLE" },
+      correlationId: SERVER_CORRELATION_ID,
+    });
+
+    const invalidAck = await handlePortalReferralResponse(
+      mutationRequest(
+        `/api/portal/referral-offers/${matchId}/response`,
+        "provider-a",
+        "portal-provider-response-002",
+        { decision: "ACCEPT", expectedVersion: 3 },
+      ),
+      matchId,
+      {
+        ...dependencies,
+        resolveApi: async () => ({
+          ok: true as const,
+          api: {
+            ...api,
+            respondToOffer: async () => ({
+              referralId,
+              matchId: IDS.providerA,
+              currentStatus: "ACCEPTED",
+              rowVersion: 4,
+              updatedAt,
+            }),
+          },
+        }),
+      },
+    );
+    expect(invalidAck.status).toBe(503);
+    expect(await responseJson(invalidAck)).toEqual({
+      error: { code: "ADAPTER_UNAVAILABLE" },
+      correlationId: SERVER_CORRELATION_ID,
+    });
+  });
+
   it("rejects unsupported methods before resolving an adapter", async () => {
     const resolveApi = vi.fn<PortalReferralApiResolver>();
     const response = await handlePortalReferralCollection(
@@ -849,6 +1007,12 @@ describe("Portal referral route adapter", () => {
       ...ack,
       matchId,
       currentStatus: "OFFERED" as const,
+      rowVersion: 2,
+    };
+    const responseAck = {
+      ...ack,
+      matchId,
+      currentStatus: "ACCEPTED" as const,
       rowVersion: 2,
     };
     const assignmentDetail = {
@@ -889,7 +1053,7 @@ describe("Portal referral route adapter", () => {
       listProviderCandidates: vi.fn(async () => []),
       offerReferral: vi.fn(async () => offerAck),
       listMyOffers: vi.fn(async () => []),
-      respondToOffer: vi.fn(async () => ({ ...ack, matchId })),
+      respondToOffer: vi.fn(async () => responseAck),
       recordFollowUp: vi.fn(async () => ack),
       listAudit: vi.fn(async () => []),
     } satisfies PortalReferralApi;
@@ -1013,7 +1177,7 @@ describe("Portal referral route adapter", () => {
       { items: [] },
       offerAck,
       { items: [] },
-      { ...ack, matchId },
+      responseAck,
       ack,
       { items: [] },
     ]);
@@ -1029,6 +1193,11 @@ describe("Portal referral route adapter", () => {
     );
     expect(api.offerReferral).toHaveBeenCalledWith(
       referralId,
+      expect.anything(),
+      expect.objectContaining({ correlationId: SERVER_CORRELATION_ID }),
+    );
+    expect(api.respondToOffer).toHaveBeenCalledWith(
+      matchId,
       expect.anything(),
       expect.objectContaining({ correlationId: SERVER_CORRELATION_ID }),
     );

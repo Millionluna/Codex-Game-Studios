@@ -18,6 +18,7 @@ import {
   type PortalReferralAssignmentQueueItem,
   type PortalReferralFollowUpOutcomeCode,
   type PortalReferralMutationAck,
+  type PortalReferralOfferListItem,
   type PortalReferralProviderCandidate,
 } from "./portal-referral-workflow";
 import {
@@ -258,7 +259,11 @@ export async function handlePortalReferralOffers(
     request,
     "LIST_MY_OFFERS",
     dependencies,
-    async (api) => ({ body: { items: await api.listMyOffers() } }),
+    async (api) => ({
+      body: {
+        items: projectPortalReferralProviderOffers(await api.listMyOffers()),
+      },
+    }),
   );
 }
 
@@ -272,23 +277,25 @@ export async function handlePortalReferralResponse(
     request,
     "RESPOND_TO_OFFER",
     dependencies,
-    async (api) => {
+    async (api, correlationId) => {
       assertMutationTransport(request);
-      const mutation = getMutationMetadata(request);
+      const mutation = { ...getMutationMetadata(request), correlationId };
       const body = await readJsonObject(request);
       assertExactKeys(body, ["decision", "expectedVersion"]);
       const decision = body.decision;
       if (decision !== "ACCEPT" && decision !== "DECLINE") {
         throw validationError();
       }
+      const expectedMatchId = assertUuid(matchId);
+      const expectedVersion = requiredVersion(body.expectedVersion);
       return {
-        body: await api.respondToOffer(
-          assertUuid(matchId),
-          {
-            decision,
-            expectedVersion: requiredVersion(body.expectedVersion),
-          },
-          mutation,
+        body: projectPortalReferralProviderResponse(
+          await api.respondToOffer(
+            expectedMatchId,
+            { decision, expectedVersion },
+            mutation,
+          ),
+          { matchId: expectedMatchId, expectedVersion, decision },
         ),
       };
     },
@@ -698,6 +705,66 @@ function projectPortalReferralProviderCandidates(
   });
 }
 
+const PROVIDER_RESPONSE_ACCEPTED_STATUSES = [
+  "ACCEPTED",
+  "IN_PROGRESS",
+  "NOTE_LINKED",
+  "EXPORTED",
+  "COMPLETED",
+  "CLOSED",
+] as const;
+
+function projectPortalReferralProviderOffers(
+  value: readonly PortalReferralOfferListItem[],
+): PortalReferralOfferListItem[] {
+  if (!Array.isArray(value) || value.length > 50) {
+    throw invalidAdapterResponse();
+  }
+  const seenMatchIds = new Set<string>();
+  const seenReferralIds = new Set<string>();
+  let previousMatchId: string | undefined;
+  return value.map((item) => {
+    const matchId = responseUuid(item?.matchId);
+    const referralId = responseUuid(item?.referralId);
+    if (
+      seenMatchIds.has(matchId) ||
+      seenReferralIds.has(referralId) ||
+      (previousMatchId !== undefined && matchId <= previousMatchId) ||
+      (item.matchStatus !== "OFFERED" && item.matchStatus !== "ACCEPTED") ||
+      !(PORTAL_REFERRAL_PREVIEW_REGION_CODES as readonly string[]).includes(
+        item.region,
+      ) ||
+      !(
+        PORTAL_REFERRAL_PREVIEW_SERVICE_TYPE_CODES as readonly string[]
+      ).includes(item.serviceType) ||
+      !(PORTAL_REFERRAL_STATUSES as readonly string[]).includes(
+        item.currentStatus,
+      ) ||
+      !Number.isSafeInteger(item.rowVersion) ||
+      item.rowVersion < 1 ||
+      (item.matchStatus === "OFFERED" && item.currentStatus !== "OFFERED") ||
+      (item.matchStatus === "ACCEPTED" &&
+        !(PROVIDER_RESPONSE_ACCEPTED_STATUSES as readonly string[]).includes(
+          item.currentStatus,
+        ))
+    ) {
+      throw invalidAdapterResponse();
+    }
+    seenMatchIds.add(matchId);
+    seenReferralIds.add(referralId);
+    previousMatchId = matchId;
+    return Object.freeze({
+      matchId,
+      referralId,
+      region: item.region,
+      serviceType: item.serviceType,
+      matchStatus: item.matchStatus,
+      currentStatus: item.currentStatus,
+      rowVersion: item.rowVersion,
+    });
+  });
+}
+
 function projectPortalReferralAssignmentMutation(
   value: PortalReferralMutationAck,
   expected: Readonly<{
@@ -721,6 +788,33 @@ function projectPortalReferralAssignmentMutation(
     referralId,
     matchId,
     currentStatus: expected.currentStatus,
+    rowVersion: value.rowVersion,
+    updatedAt: responseInstant(value.updatedAt),
+  });
+}
+
+function projectPortalReferralProviderResponse(
+  value: PortalReferralMutationAck,
+  expected: Readonly<{
+    matchId: string;
+    expectedVersion: number;
+    decision: "ACCEPT" | "DECLINE";
+  }>,
+): PortalReferralMutationAck {
+  const referralId = responseUuid(value?.referralId);
+  const matchId = responseUuid(value?.matchId);
+  const currentStatus = expected.decision === "ACCEPT" ? "ACCEPTED" : "TRIAGED";
+  if (
+    matchId !== expected.matchId ||
+    value.currentStatus !== currentStatus ||
+    value.rowVersion !== expected.expectedVersion + 1
+  ) {
+    throw invalidAdapterResponse();
+  }
+  return Object.freeze({
+    referralId,
+    matchId,
+    currentStatus,
     rowVersion: value.rowVersion,
     updatedAt: responseInstant(value.updatedAt),
   });

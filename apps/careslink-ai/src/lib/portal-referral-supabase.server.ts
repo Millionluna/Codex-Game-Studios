@@ -20,6 +20,7 @@ import {
   type PortalReferralAssignmentQueueItem,
   type PortalReferralListItem,
   type PortalReferralMutationAck,
+  type PortalReferralOfferListItem,
   type PortalReferralProviderCandidate,
 } from "./portal-referral-workflow";
 import { assertCaresLinkV1IdempotencyKey } from "./v1/shared-contracts";
@@ -36,12 +37,16 @@ export const PORTAL_REFERRAL_SUPABASE_RPC_NAMES = Object.freeze({
   assignmentTriage: "portal_referral_assignment_triage",
   assignmentCandidates: "portal_referral_assignment_candidates",
   assignmentOffer: "portal_referral_assignment_offer",
+  providerResponseAuthorize: "portal_referral_provider_response_authorize",
+  providerResponseOffers: "portal_referral_provider_response_offers",
+  providerResponseRespond: "portal_referral_provider_response_respond",
 } as const);
 
 export type PortalReferralAuthorizationScope =
   | "INTAKE"
   | "SOURCE_DETAIL"
-  | "ASSIGNMENT";
+  | "ASSIGNMENT"
+  | "PROVIDER_RESPONSE";
 
 export type PortalReferralSupabaseRpcError = Readonly<{
   code?: unknown;
@@ -91,9 +96,21 @@ type PortalReferralAssignmentAuthorization =
       membershipStatus: "ACTIVE";
     }>;
 
+type PortalReferralProviderResponseAuthorization = Readonly<{
+  userId: string;
+  organizationId: string;
+  organizationType: "PROVIDER";
+  organizationStatus: "ACTIVE";
+  membershipRole: "provider_member";
+  membershipStatus: "ACTIVE";
+  providerId: string;
+  providerReviewStatus: "APPROVED";
+}>;
+
 export type PortalReferralAuthorization =
   | PortalReferralSourceAuthorization
-  | PortalReferralAssignmentAuthorization;
+  | PortalReferralAssignmentAuthorization
+  | PortalReferralProviderResponseAuthorization;
 
 export type PortalReferralAuthorizationResolution =
   | Readonly<{ ok: true; authorization: PortalReferralAuthorization }>
@@ -146,6 +163,8 @@ function authorizationRpcName(scope: PortalReferralAuthorizationScope) {
       return PORTAL_REFERRAL_SUPABASE_RPC_NAMES.sourceDetailAuthorize;
     case "ASSIGNMENT":
       return PORTAL_REFERRAL_SUPABASE_RPC_NAMES.assignmentAuthorize;
+    case "PROVIDER_RESPONSE":
+      return PORTAL_REFERRAL_SUPABASE_RPC_NAMES.providerResponseAuthorize;
     default:
       return undefined;
   }
@@ -350,8 +369,52 @@ export function createSupabasePortalReferralApi(
         match: "NON_NULL",
       });
     },
-    listMyOffers: unsupported,
-    respondToOffer: unsupported,
+    async listMyOffers() {
+      assertProviderResponseAuthorization(trustedAuthorization);
+      const data = await callWorkflowRpc(
+        client,
+        PORTAL_REFERRAL_SUPABASE_RPC_NAMES.providerResponseOffers,
+        { p_limit: 50, p_after_match_id: null },
+      );
+      return parseProviderResponseOffersEnvelope(data);
+    },
+
+    async respondToOffer(matchId, command, mutation) {
+      assertProviderResponseAuthorization(trustedAuthorization);
+      const requestedMatchId = requestUuid(matchId);
+      const normalizedCommandRecord = exactRequestRecord(command, [
+        "expectedVersion",
+        "decision",
+      ]);
+      const decision = normalizedCommandRecord.decision;
+      if (decision !== "ACCEPT" && decision !== "DECLINE") {
+        throw validationError();
+      }
+      const normalizedCommand = Object.freeze({
+        matchId: requestedMatchId,
+        expectedVersion: requestRowVersion(
+          normalizedCommandRecord.expectedVersion,
+        ),
+        decision,
+      });
+      const hashes = createMutationRpcHashes(
+        trustedAuthorization,
+        "RESPOND_TO_OFFER",
+        normalizedCommand,
+        mutation,
+      );
+      const data = await callWorkflowRpc(
+        client,
+        PORTAL_REFERRAL_SUPABASE_RPC_NAMES.providerResponseRespond,
+        {
+          p_match_id: normalizedCommand.matchId,
+          p_expected_version: normalizedCommand.expectedVersion,
+          p_decision: normalizedCommand.decision,
+          ...hashes,
+        },
+      );
+      return parseProviderResponseMutationEnvelope(data, normalizedCommand);
+    },
     recordFollowUp: unsupported,
     listAudit: unsupported,
   });
@@ -361,15 +424,30 @@ function parseAuthorizationEnvelope(
   value: unknown,
   scope: PortalReferralAuthorizationScope,
 ): PortalReferralAuthorization {
-  const envelope = exactRecord(value, [
-    "authorized",
-    "user_id",
-    "organization_id",
-    "organization_type",
-    "organization_status",
-    "membership_role",
-    "membership_status",
-  ]);
+  const envelope = exactRecord(
+    value,
+    scope === "PROVIDER_RESPONSE"
+      ? [
+          "authorized",
+          "user_id",
+          "organization_id",
+          "organization_type",
+          "organization_status",
+          "membership_role",
+          "membership_status",
+          "provider_id",
+          "provider_review_status",
+        ]
+      : [
+          "authorized",
+          "user_id",
+          "organization_id",
+          "organization_type",
+          "organization_status",
+          "membership_role",
+          "membership_status",
+        ],
+  );
   if (envelope.authorized !== true) throw invalidAdapterEnvelope();
   return parseAuthorization(
     {
@@ -379,6 +457,12 @@ function parseAuthorizationEnvelope(
       organizationStatus: envelope.organization_status,
       membershipRole: envelope.membership_role,
       membershipStatus: envelope.membership_status,
+      ...(scope === "PROVIDER_RESPONSE"
+        ? {
+            providerId: envelope.provider_id,
+            providerReviewStatus: envelope.provider_review_status,
+          }
+        : {}),
     },
     scope,
   );
@@ -388,14 +472,35 @@ function parseAuthorization(
   value: unknown,
   scope?: PortalReferralAuthorizationScope,
 ): PortalReferralAuthorization {
-  const authorization = exactRecord(value, [
-    "userId",
-    "organizationId",
-    "organizationType",
-    "organizationStatus",
-    "membershipRole",
-    "membershipStatus",
-  ]);
+  const providerShape = Boolean(
+    value &&
+      typeof value === "object" &&
+      !Array.isArray(value) &&
+      (Object.prototype.hasOwnProperty.call(value, "providerId") ||
+        Object.prototype.hasOwnProperty.call(value, "providerReviewStatus")),
+  );
+  const authorization = exactRecord(
+    value,
+    providerShape
+      ? [
+          "userId",
+          "organizationId",
+          "organizationType",
+          "organizationStatus",
+          "membershipRole",
+          "membershipStatus",
+          "providerId",
+          "providerReviewStatus",
+        ]
+      : [
+          "userId",
+          "organizationId",
+          "organizationType",
+          "organizationStatus",
+          "membershipRole",
+          "membershipStatus",
+        ],
+  );
   if (
     authorization.organizationStatus !== "ACTIVE" ||
     authorization.membershipStatus !== "ACTIVE"
@@ -409,9 +514,23 @@ function parseAuthorization(
     membershipStatus: "ACTIVE" as const,
   };
   if (
+    authorization.organizationType === "PROVIDER" &&
+    authorization.membershipRole === "provider_member" &&
+    authorization.providerReviewStatus === "APPROVED" &&
+    (scope === undefined || scope === "PROVIDER_RESPONSE")
+  ) {
+    return Object.freeze({
+      ...base,
+      organizationType: "PROVIDER",
+      membershipRole: "provider_member",
+      providerId: canonicalUuid(authorization.providerId),
+      providerReviewStatus: "APPROVED",
+    });
+  }
+  if (
     authorization.organizationType === "REFERRAL_SOURCE" &&
     authorization.membershipRole === "referral_source" &&
-    scope !== "ASSIGNMENT"
+    (scope === undefined || scope === "INTAKE" || scope === "SOURCE_DETAIL")
   ) {
     return Object.freeze({
       ...base,
@@ -691,6 +810,81 @@ function parseProviderCandidatesEnvelope(
   });
 }
 
+const PORTAL_REFERRAL_ACCEPTED_PROVIDER_STATUSES = [
+  "ACCEPTED",
+  "IN_PROGRESS",
+  "NOTE_LINKED",
+  "EXPORTED",
+  "COMPLETED",
+  "CLOSED",
+] as const;
+
+function parseProviderResponseOffersEnvelope(
+  value: unknown,
+): PortalReferralOfferListItem[] {
+  const envelope = exactRecord(value, ["items"]);
+  if (!Array.isArray(envelope.items) || envelope.items.length > 50) {
+    throw invalidAdapterEnvelope();
+  }
+  const seenMatchIds = new Set<string>();
+  const seenReferralIds = new Set<string>();
+  let previousMatchId: string | undefined;
+  return envelope.items.map((entry) => {
+    const item = exactRecord(entry, [
+      "match_id",
+      "referral_id",
+      "region",
+      "service_type",
+      "match_status",
+      "current_status",
+      "row_version",
+    ]);
+    const matchId = canonicalUuid(item.match_id);
+    const referralId = canonicalUuid(item.referral_id);
+    if (
+      seenMatchIds.has(matchId) ||
+      seenReferralIds.has(referralId) ||
+      (previousMatchId !== undefined && matchId <= previousMatchId)
+    ) {
+      throw invalidAdapterEnvelope();
+    }
+    seenMatchIds.add(matchId);
+    seenReferralIds.add(referralId);
+    previousMatchId = matchId;
+
+    const matchStatus = catalogValue(item.match_status, [
+      "OFFERED",
+      "ACCEPTED",
+    ] as const);
+    const currentStatus = catalogValue(
+      item.current_status,
+      PORTAL_REFERRAL_STATUSES,
+    );
+    if (
+      (matchStatus === "OFFERED" && currentStatus !== "OFFERED") ||
+      (matchStatus === "ACCEPTED" &&
+        !(
+          PORTAL_REFERRAL_ACCEPTED_PROVIDER_STATUSES as readonly string[]
+        ).includes(currentStatus))
+    ) {
+      throw invalidAdapterEnvelope();
+    }
+
+    return Object.freeze({
+      matchId,
+      referralId,
+      region: catalogValue(item.region, PORTAL_REFERRAL_PREVIEW_REGION_CODES),
+      serviceType: catalogValue(
+        item.service_type,
+        PORTAL_REFERRAL_PREVIEW_SERVICE_TYPE_CODES,
+      ),
+      matchStatus,
+      currentStatus,
+      rowVersion: safeRowVersion(item.row_version),
+    });
+  });
+}
+
 function parseAssignmentMutationEnvelope(
   value: unknown,
   expected: Readonly<{
@@ -723,6 +917,41 @@ function parseAssignmentMutationEnvelope(
     referralId,
     matchId,
     currentStatus: expected.currentStatus,
+    rowVersion,
+    updatedAt: safeTimestamp(envelope.updated_at),
+  });
+}
+
+function parseProviderResponseMutationEnvelope(
+  value: unknown,
+  expected: Readonly<{
+    matchId: string;
+    expectedVersion: number;
+    decision: "ACCEPT" | "DECLINE";
+  }>,
+): PortalReferralMutationAck {
+  const envelope = exactRecord(value, [
+    "referral_id",
+    "match_id",
+    "current_status",
+    "row_version",
+    "updated_at",
+  ]);
+  const referralId = canonicalUuid(envelope.referral_id);
+  const matchId = canonicalUuid(envelope.match_id);
+  const rowVersion = safeRowVersion(envelope.row_version);
+  const currentStatus = expected.decision === "ACCEPT" ? "ACCEPTED" : "TRIAGED";
+  if (
+    matchId !== expected.matchId ||
+    envelope.current_status !== currentStatus ||
+    rowVersion !== expected.expectedVersion + 1
+  ) {
+    throw invalidAdapterEnvelope();
+  }
+  return Object.freeze({
+    referralId,
+    matchId,
+    currentStatus,
     rowVersion,
     updatedAt: safeTimestamp(envelope.updated_at),
   });
@@ -762,8 +991,10 @@ function normalizeCreateCommand(
 }
 
 function createMutationRpcHashes(
-  authorization: PortalReferralAssignmentAuthorization,
-  kind: "TRIAGE_REFERRAL" | "OFFER_REFERRAL",
+  authorization:
+    | PortalReferralAssignmentAuthorization
+    | PortalReferralProviderResponseAuthorization,
+  kind: "TRIAGE_REFERRAL" | "OFFER_REFERRAL" | "RESPOND_TO_OFFER",
   command: Readonly<Record<string, unknown>>,
   mutation: PortalReferralApiMutationMetadata,
 ) {
@@ -775,7 +1006,10 @@ function createMutationRpcHashes(
       actor: {
         organizationId: authorization.organizationId,
         role: authorization.membershipRole,
-        providerId: null,
+        providerId:
+          authorization.membershipRole === "provider_member"
+            ? authorization.providerId
+            : null,
       },
       kind,
       command,
@@ -801,6 +1035,21 @@ function assertAssignmentAuthorization(
   if (
     authorization.membershipRole !== "platform_admin" &&
     authorization.membershipRole !== "partner_operator"
+  ) {
+    throw new PortalReferralWorkflowError(
+      "FORBIDDEN",
+      "Portal referral operation is not enabled",
+    );
+  }
+}
+
+function assertProviderResponseAuthorization(
+  authorization: PortalReferralAuthorization,
+): asserts authorization is PortalReferralProviderResponseAuthorization {
+  if (
+    authorization.membershipRole !== "provider_member" ||
+    authorization.organizationType !== "PROVIDER" ||
+    authorization.providerReviewStatus !== "APPROVED"
   ) {
     throw new PortalReferralWorkflowError(
       "FORBIDDEN",

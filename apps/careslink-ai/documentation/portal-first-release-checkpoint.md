@@ -2,8 +2,8 @@
 
 Date: 2026-08-26
 
-Branch: `codex/careslink-portal-assignment-m1a`
-Base HEAD inspected: `4e582ffb7f9a61fde3364916dc517379dcdcc1d4`
+Branch: `codex/careslink-portal-provider-response-m1b`
+Base HEAD inspected: `1b5f42c9ef84bbcc51b4d2fc284a2f0a87d9431c`
 
 Current five-Note local batch base: `63c10ea2e94ee4efdba7ffdbeb5aabbee6fcfa3b`
 
@@ -32,14 +32,31 @@ Historical Portal Assignment M1a Hosted Cookie gate source:
 Current Portal Assignment M1a exact-current Hosted Cookie gate source:
 `43659ab16e9af6d9c73d0a55f8fe8b30b3ce9ee2`
 
+Latest Hosted-validated Portal Provider Response M1b implementation source:
+`f45b19c596edd0bdbe01eba17e6e5fa136df5225`
+
+Latest Hosted-validated Portal Provider Response M1b exact-source gate:
+`44f3bd68699dc953e2666bf033dac2b5e26a4d30`
+
+Current Portal Provider Response M1b UI recovery source: this PR's post-gate
+branch state; local-only and not covered by `44f3bd6` Hosted evidence.
+
+Historical pre-review Portal Provider Response M1b Hosted Cookie/Data API gate
+source:
+`cc1e53cc88666a3e3f18ac55058295db408535ee`
+
 This checkpoint covers the AI Web Portal reality audit, release sequencing,
-local Referral foundation and default-off intake/source-detail/Assignment M1a runtimes, plus source-only
-five-Note generation contracts. It
+local Referral foundation and default-off intake/source-detail/Assignment M1a/
+Provider Response M1b runtimes, plus source-only five-Note generation contracts. It
 does not modify the native App, Main Website, Native Auth/M0 implementation or
 served shared Product API routes. Those are prerequisites recorded in the
-existing versioned contract documentation. All new Referral and Note
-generation capabilities remain local, default-off, Production-unapplied and
-absent from retained Preview runtime. The private worker RPC migration passed
+existing versioned contract documentation. All new Referral and Note generation
+capabilities remain default-off, Production-unapplied and absent from retained
+Preview runtime. Deleted disposable exact-revision Previews supply Hosted
+Cookie/Data API evidence for Assignment M1a, historical pre-review Provider
+Response source `cc1e53c`, and the later exact-source M1b gate
+`44f3bd6`; they do not cover the post-gate UI recovery follow-up or make either
+runtime available. The private worker RPC migration passed
 the isolated PostgreSQL 17.6 migration/assertion gate on deleted disposable
 `r9`; deleted no-data `r20` subsequently passed its PostgreSQL 17.6 true
 two-session claim/session/privacy race gate, and deleted no-data `r21` passed
@@ -64,8 +81,8 @@ availability.
 | `/providers`, `/providers/[id]` | `mock-data` | No | Unknown IDs fall back to the first mock provider; no provider table, membership or RLS | Real provider detail after M0 membership; unknown IDs return 404 |
 | `/providers/onboarding`, `/providers/review` | static/mock | No | Forms/buttons imply a save/review that does not occur | Add canonical provider profile and admin review command after identity proof |
 | Provider profile generator | mixed: real `provider_drafts`, mock editing seed | Partial | Draft handoff can use an in-memory fallback and is not a canonical provider | Treat claimed draft only as intake seed |
-| `/provider-portal` | mock referrals | No | Accept/decline/request-info controls do nothing; provider identity is not DB-bound | Owner-scoped offered referrals plus atomic response command |
-| `/referrals`, `/referrals/intake`, `/referrals/[id]`, match page | legacy mock remains default; default-off durable intake, exact-tenant source detail and operator Assignment M1a exist | List/create/source-detail plus operator queue/detail/triage/candidates/offer behind independent gates; not deployed | Gate-on assignment pages have no mock fallback and offer does not assign/accept; provider response, follow-up and audit remain disabled | Exact-current M1a commit `43659ab` passed a deleted no-data Hosted Cookie gate; keep every gate off and take provider response M1b only under separate approval, with no deployment or activation implied |
+| `/provider-portal` | legacy mock remains the gate-off default; a default-off Provider Response M1b workbench exists | Metadata-only own-offer list plus atomic accept/decline behind independent gates; not deployed | Exact gate source `44f3bd6` passed the deleted no-data Hosted re-gate, including real Cookie/Data API 14/14 and active-first/non-null-cursor 2/2. The later UI-only follow-up restores lost response focus, avoids stealing moved focus and provides a same-origin 401 sign-in return link; it has local evidence only. Accepted private detail, follow-up, notification, audit list and document/export remain absent | Keep every gate off; treat any new Hosted UI gate, merge, deployment and activation as separate approvals |
+| `/referrals`, `/referrals/intake`, `/referrals/[id]`, match page | legacy mock remains default; default-off durable intake, exact-tenant source detail and operator Assignment M1a exist | List/create/source-detail plus operator queue/detail/triage/candidates/offer behind independent gates; not deployed | Gate-on assignment pages have no mock fallback and offer does not assign; Provider Response M1b completes accept/decline only on `/provider-portal`, while follow-up and audit remain disabled | Exact-current M1a commit `43659ab` and latest Hosted-validated M1b gate source `44f3bd6` passed separate deleted no-data Hosted Cookie gates; the current UI follow-up postdates the M1b gate, and no deployment or activation is authorized |
 | `/referral-source-portal` | legacy mock remains default; source-only intake controls are wired and the UUID detail page has a separate gate | List/create/detail only behind independent gates; not deployed | No hosted runtime or activation; the operator slice is independently gated and provider/later workflow actions remain unavailable | Reuse the database-authorized source slice after exact-revision Preview approval |
 | `/referral-workspace/*` | mixed real access/material/outreach stores | Yes, for those tools | These are AI access and outreach tools, not the referral pipeline; some stores have memory fallback | Preserve and later link by canonical referral ID |
 | `/admin`, `/dashboard` | mock global metrics | No | Core pages have no real referral permission gate; must not receive real data yet | Add membership gate, then replace only the assignment queue |
@@ -1431,7 +1448,314 @@ migrations unchanged; it was never a SQL, Auth or route target. No application
 deployment, merge, retained Preview, Production write, runtime activation or
 provider response capability resulted.
 
-This closes the exact-current Assignment M1a Hosted Cookie evidence gap only.
-The next functional slice remains provider response M1b under a separate plan
-and explicit approval; assignment finalization, follow-up and audit listing also
-remain unimplemented.
+This closed the exact-current Assignment M1a Hosted Cookie evidence gap only.
+At that M1a gate closure, provider response M1b remained the next separately
+approved slice; Section 29 records its later source/local implementation.
+Follow-up and audit listing remain unimplemented.
+
+## 29. Portal Referral Provider Response M1b initial source/local checkpoint — 2026-08-26
+
+M1b is an independently gated, default-off Provider surface based on merged
+integration commit `1b5f42c9ef84bbcc51b4d2fc284a2f0a87d9431c`. Its only served operations
+are the current approved provider's metadata-only offer inbox and an atomic
+`ACCEPT` or `DECLINE` response. It does not inherit Intake, Source Detail or
+Assignment authorization and does not add provider private detail, follow-up,
+notification, audit listing, document/export, Note/Points, deployment or
+Production activation.
+
+CLI-generated migration
+`20260825153340_add_portal_referral_provider_response_runtime.sql` adds the
+independent `referral_provider_response_v1` row, an inbox index, private
+enabled/session/exact-provider helpers and three authenticated-only definer
+RPCs: `portal_referral_provider_response_authorize()`,
+`portal_referral_provider_response_offers(integer,uuid)` and
+`portal_referral_provider_response_respond(uuid,bigint,text,text,text,text)`.
+Every RPC requires master then provider-response database gates. Provider
+context is derived only from the live Cookie principal, Auth session, one active
+`provider_member`, its active PROVIDER organization and one APPROVED provider;
+capacity remains an offer-time M1a condition. Helpers receive no API execution,
+the public RPCs use `search_path=''`, and no Portal table grant or wider provider
+match policy is introduced.
+
+At this initial checkpoint, the inbox was capped at 50 and strictly returned only `matchId`, `referralId`,
+frozen region/service, match/referral status and referral row version. Response
+rebuilds the canonical payload using the database-derived organization, role and
+provider, serializes actor+mutation, and locks referral before all of its matches
+to preserve M1a ordering. `ACCEPT` changes both rows to `ACCEPTED` and sets
+`assigned_provider_id`; `DECLINE` marks the match `DECLINED`, returns the referral
+to `TRIAGED` and leaves it unassigned. Each success writes one metadata-only
+audit event and one hash-only receipt. Exact replay returns the historical ACK;
+changed payload, stale version and losing concurrent decisions fail closed.
+
+The application adds an exact `CARESLINK_PORTAL_REFERRAL_PROVIDER_RESPONSE_ENABLED`
+gate, a `PROVIDER_RESPONSE` authorization scope, strict Supabase and route DTO
+projection, server-created correlation hashing and a gate-on Provider Portal
+workbench that never promotes legacy mock identity or private text. The only new
+HTTP operations are `GET /api/portal/referral-offers` and
+`POST /api/portal/referral-offers/{matchId}/response`. Pending mutations block
+manual refresh; a network-uncertain response keeps the original command and
+idempotency key for an exact reconciliation replay inside the same
+authorization epoch instead of enabling a second decision with a new key.
+
+Local PostgreSQL 16.15 applied the then-current minimum seven-migration
+foundation→mobile-sync→Portal-foundation→intake→source-detail→assignment→M1b
+chain after a clean database rebuild. The M1b rollback-only assertion passed
+after proving default-off gates, exact Provider A/B authorization, bounded
+no-PII `OFFERED`/`ACCEPTED` (including downstream `CLOSED`) inbox behavior,
+NULL-safe corrupt accepted-state denial, offer-time-only capacity,
+stale/forged/cross-provider denial, ACCEPT/DECLINE atomicity, exact replay,
+changed-payload conflict, ACLs and zero fixture residue. The existing Intake,
+Source Detail and Assignment rollback suites then all passed against the same
+migrated database. Final postcheck found all five Portal flags
+`enabled=false, preview_only=true`, zero Auth/Portal fixtures, zero client table
+grants, authenticated-only execution on the three M1b RPCs and enabled
+append-only audit/receipt triggers. The cluster and bootstrap file were stopped
+and permanently removed.
+
+Repository verification passed 7 focused files / 244 tests, the full 142 files /
+1,908 tests, TypeScript, full lint, the 64/64-page Next production build, the
+73-file Codex-adapter sync check and `git diff --check`. This is local
+source/database evidence only. No paid or Hosted Supabase Preview, GoTrue or
+PostgREST E2E, Vercel deployment, merge, runtime activation, Production SQL/write
+or retained test resource is claimed. Those actions remain outside this batch
+and require separate approval.
+
+## 30. Portal Referral Provider Response M1b historical exact-source Hosted Cookie/Data API gate — 2026-08-26
+
+The exact source commit
+`cc1e53cc88666a3e3f18ac55058295db408535ee` from PR #6, based on
+`codex/careslink-ai-documents-v1-auth-gate`, was validated on disposable
+Supabase Preview `portal-provider-response-m1b-r1-20260826` (id
+`40ae62be-b7ba-4170-a39b-c33972022d10`, ref
+`aupndcptwlqmjlgeifdj`). It was a non-default, `persistent=false`,
+`with_data=false` child of Production project `adocsnwnslxhxcjgbyee`, running
+PostgreSQL 17.6 (`server_version_num=170006`) and reported `ACTIVE_HEALTHY`
+before use. The confirmed branch charge was US$0.01344/hour plus usage; the
+deleted branch has no continuing charge, and no unmeasured accrued total is
+inferred.
+
+Official Supabase CLI 2.115.0 clean-applied the exact repository migration
+manifest, and local and remote registries matched 33/33. The ordered
+migration-basename inventory had SHA-256
+`07102bb3e4697db80b38a2c9ecd67cdede8c98c59db15768903b370371bf5ba2`.
+All 14 rollback-only suites passed. The 13 suites run through the branch direct
+non-pooling connection were `v1_shadow_contract`, `v1_ndis_shadow_integration`,
+`v1_mobile_sync_shadow`, `v1_privacy_review_shadow`,
+`portal_referral_workflow_foundation`, `portal_referral_intake_runtime`,
+`portal_referral_source_detail_runtime`, `portal_referral_assignment_runtime`,
+`portal_referral_provider_response_runtime`,
+`v1_note_generation_durable_foundation`,
+`v1_note_generation_worker_rpc_shadow`,
+`v1_note_generation_owner_runtime_rpc_shadow` and
+`v1_note_generation_registration_retirement_shadow`. The 14th,
+`migration_entry_role_restore`, used a short-lived `LOGIN` role and a distinct
+short-lived `NOLOGIN CREATEROLE` entry actor, and proved
+`session_user <> current_user`. Both external roles and the suite's internal
+temporary role were removed. The exact M1b migration was
+21,868 bytes with SHA-256
+`2ab4bb434f1a40432061f7a77c0e075dd55dc872467f67c9d545c04fe73ad04c`;
+its rollback assertion was 46,392 bytes with SHA-256
+`76aab212a45adc57ffbd8686e5e7cd515bd43b9611bdf4e6f22535475f9aa71a`;
+the migration-contract test was 16,215 bytes with SHA-256
+`ab41392f01dcd98a792f571a0ec7eabb1f36dbbfdaea6d2eac84d612647a6047`.
+
+The exact-source local HTTPS Next runtime used the branch URL and publishable
+key with `VERCEL_ENV=preview`, the exact non-Production ref pin, and only the
+base, durable-adapter and Provider Response application gates open. Intake,
+Source Detail and Assignment remained off. At the database layer, only the
+master and Provider Response rows were enabled for the matrix. The branch
+service-role key was confined to one-time Auth administration and never entered
+the application environment. The direct non-pooling database credential was
+confined to fixture setup and verification and likewise never entered the
+application environment. Real Hosted GoTrue SSR cookies and PostgREST then
+passed all 14 recorded evidence checks:
+
+| Hosted M1b Cookie/Data API evidence | Exact result |
+|---|---|
+| `noCookieRejected` | A GET without a Cookie returned `401 AUTH_REQUIRED`. |
+| `bearerRejected` | A valid Provider A Cookie combined with any `Authorization` header returned `401 AUTH_REQUIRED` for GET and a valid POST, with zero writes. |
+| `pageRendered` | Provider A opened `/provider-portal` with `200`; the page rendered `Authorized provider offers` and no fixture-private value. |
+| `tenantListsExact` | Provider A received exactly two and Provider B exactly one own-provider row; both GETs returned `200`, every initial row was `OFFERED`/`OFFERED` v3, and each seven-field no-PII list was ordered by ascending match ID. |
+| `crossProviderHidden` | A-to-B, B-to-A and random valid-v4 match response attempts all returned the same `404 NOT_FOUND`. |
+| `transportRejected` | A `127.0.0.1` wrong-origin request returned `403 FORBIDDEN`; `text/plain` returned `400 VALIDATION_ERROR`; neither wrote state. |
+| `staleRejected` | Provider B's own `OFFERED` match with stale `expectedVersion=2` returned `409 STALE_REFERRAL` and wrote nothing. |
+| `acceptReplayStable` | Provider A remained `UNAVAILABLE`, yet the first `ACCEPT` returned `200`, set match/referral to `ACCEPTED`, assigned Provider A and advanced match/referral to v2/v4, proving capacity was an offer-time condition; replaying the original key and payload returned an identical body and retained exactly one audit event and receipt. |
+| `idempotencyConflict` | Reusing that key with a changed decision returned `409 IDEMPOTENCY_CONFLICT`. |
+| `declineReplayStable` | The first independent `DECLINE` returned `200`, set the match to `DECLINED`, returned the referral to `TRIAGED` unassigned and advanced match/referral to v2/v4; exact replay was stable and retained exactly one audit event and receipt. |
+| `finalListExact` | Provider A's final inbox retained only its `ACCEPTED`/`ACCEPTED` v4 offer, its declined offer disappeared, and Provider B still saw only its unchanged `OFFERED`/`OFFERED` v3 row. |
+| `finalDatabaseExact` | ACCEPT, DECLINE and unchanged-B referral/match status, version and actor fields were exact. Recomputed SHA-256 values exactly matched audit mutation/correlation hashes and receipt mutation/payload hashes, with no raw idempotency key or correlation ID stored; for each decision, all four checked authoritative timestamps exactly matched its returned ACK. |
+| `providerARevoked` | After Provider A global logout, its still-unexpired JWT's `session_id` was absent; the saved Cookie returned `401 SESSION_REVOKED` for GET and the original ACCEPT replay POST. |
+| `providerBRevoked` | Provider B's session likewise disappeared, and its saved Cookie returned `401 SESSION_REVOKED` for GET. |
+
+After both global sign-outs and saved-Cookie revocation checks, fixed database
+cleanup closed the master gate before Provider Response, removed every
+run-scoped business row and restored all three append-only triggers. It then
+hard-deleted both one-time Auth users and removed the local harness and
+short-lived certificate; no local project link was retained. The independent
+terminal postcheck retained the exact 33 migration rows; all five Portal flags
+at `enabled=false, preview_only=true`; zero rows in the four checked Auth tables
+and all 11 Portal business tables; zero API-role Portal table grants; the exact
+M1b owner, empty-search-path and authenticated/public/private function ACL
+posture; a valid/ready/live inbox index; three enabled append-only triggers; and
+zero temporary migration roles.
+
+Supabase security advisors returned 21 INFO, 17 WARN and zero ERROR;
+performance advisors returned 105 INFO, 24 WARN and zero ERROR. The intended
+authenticated `SECURITY DEFINER` Portal RPC warnings remain explicit review
+items bounded by default-off gates, database-derived authorization, fresh Auth
+session checks, `search_path=''` and no direct client table grant; these counts
+are not an all-project security-green claim.
+
+The Preview was deleted, and three consecutive observations found both its id
+and ref absent. Production remained the default project with the same 19
+migration versions before and after; it was never a SQL, Auth, Data API or route
+target. This gate closes only exact-revision M1b Hosted Cookie/Data API evidence.
+It did not deploy Vercel, merge PR #6, retain or activate a Preview runtime,
+enable Production, or implement accepted-provider private detail, follow-up,
+notification, audit listing, document/export, Note or Points behavior.
+
+This evidence is exact only for pre-review source
+`cc1e53cc88666a3e3f18ac55058295db408535ee`; it does not cover the later PR #6
+review fixes recorded below.
+
+## 31. Portal Referral Provider Response M1b post-review hardening — 2026-08-26
+
+Exact implementation source `f45b19c596edd0bdbe01eba17e6e5fa136df5225`
+closes the final PR review findings while leaving all runtime and database gates
+default-off:
+
+- the bounded first page selects `OFFERED` rows before `ACCEPTED` history so
+  terminal history cannot crowd out a live decision, then returns the selected
+  rows in strict ascending match-ID DTO order; non-null cursor input now fails
+  validation because pagination remains outside M1b;
+- both transport and successful response-body parsing have a 10-second timeout;
+- response, refresh and retry controls are genuinely mutually exclusive, and
+  repeated offer actions have unique no-ID accessible names;
+- focus, visible-tab, Supabase auth-storage and persisted-page signals clear the
+  old DOM and old uncertain command before a debounced authoritative GET. An
+  authorization epoch prevents a lifecycle-preceding in-flight failure from
+  writing its command back, so another member of the same provider never
+  inherits the prior actor's idempotency key; and
+- six retained local-only harness files prove real PostgreSQL concurrency on
+  separate backend PIDs without accepting password auth or a Hosted target.
+
+Repository validation passed 8 focused files / 271 tests, all 143 files / 1,935
+tests, TypeScript, full lint, the Next.js 16.2.9 64/64-page production build,
+the 73-file adapter check and patch checks. PostgreSQL 16.15 passed the minimum
+7/7 migration chain, Intake/Source Detail/Assignment/Provider Response 4/4
+rollback suites and all 6/6 real two-backend scenarios: same-key single effect,
+exactly one different-key ACCEPT/DECLINE winner, session/provider/flag
+revocation during waits failing closed, and M1b decline followed by an M1a
+offer without deadlock. Harness contracts additionally passed 16/16 focused
+tests and five Preview-policy files / 91 tests.
+
+The post-review migration is 22,513 bytes / SHA-256
+`256f713df793d4cbae5b6c63119f2acb26460f73bf963ffde3f72f465384e0a6`;
+its rollback assertion is 52,339 bytes / SHA-256
+`b939a5f0e3e3536b4b245f48acc5d801b1ad64361ff89a2560e08065bc571f0c`;
+and its migration-contract test is 16,647 bytes / SHA-256
+`adb384b745bf0e26ddb4d85811bf096e1ea8e9bdbdd968e4232616f3417f3b4a`.
+Terminal cleanup removed the support schema/runner and temporary cluster, left
+all five Portal flags disabled, zero Auth/Portal fixtures and no listener on
+the fixed loopback port.
+
+No Hosted Preview, Vercel deployment, merge, activation or Production write
+occurred in this post-review source batch. Section 32 records the later
+exact-source disposable Hosted re-gate; that evidence closes only the gate for
+`44f3bd6`, without covering the still-later Section 33 UI follow-up or itself
+authorizing merge or advancement toward Production.
+
+## 32. Portal Referral Provider Response M1b exact-source Hosted re-gate — 2026-08-26
+
+Exact gate source HEAD `44f3bd68699dc953e2666bf033dac2b5e26a4d30`
+is the documentation-only child of implementation source
+`f45b19c596edd0bdbe01eba17e6e5fa136df5225`. The approved disposable branch was
+`portal-provider-response-m1b-r2-20260826` (id
+`fb2e7d39-436d-48d5-a890-ad53b23b1fc6`; ref
+`nhupgyxczlvtddycrgyw`) under Production parent
+`adocsnwnslxhxcjgbyee`. It was non-default, `persistent=false`,
+`with_data=false`, `ACTIVE_HEALTHY`, and created only after confirmation of the
+US$0.01344/hour branch rate plus usage.
+
+The exact local and remote migration manifests matched 33/33. Their ordered
+basename SHA-256 was
+`07102bb3e4697db80b38a2c9ecd67cdede8c98c59db15768903b370371bf5ba2`;
+the ordered content SHA-256 was
+`168212c92ac6bcdc646c52f74bf0dc72b716120f3ef3de8d3768a2a190dad8a2`.
+All 14 maintained rollback suites passed. The special Hosted role-restoration
+suite used distinct short-lived login and entry roles on one PostgreSQL 17.6
+connection, proved `session_user <> current_user`, and removed every temporary
+role. The exact M1b migration, rollback assertion and migration-contract hashes
+remained those recorded in Section 31. The focused exact-head application gate
+also passed 8 files / 271 tests, and the production build generated 64/64 pages.
+
+The exact local Next source ran on a native self-signed loopback HTTPS socket;
+the application process received only the Preview Supabase URL, publishable
+key, exact ref pin and application gates. The Auth admin key existed only in the
+one-time matrix process. Fixture SQL was restricted to linked CLI queries with
+the exact Preview ref; the harness rejected Production and all direct database
+connection variables. Three one-time confirmed GoTrue users supplied two
+independent provider contexts and a same-provider second member. A preliminary
+reverse-proxy attempt stopped at the HTTPS transport guard with `403` before
+mutation, and its terminal cleanup already proved zero Auth/Portal residue; the
+native-TLS rerun then passed.
+
+The real GoTrue SSR-cookie, Next route and PostgREST matrix passed all 14
+historical assertions: no-cookie/Bearer denial, page rendering with no private
+sentinel, exact seven-field tenant lists, uniform cross-provider/random `404`,
+Origin/media-type denial, stale rejection, ACCEPT and DECLINE exact replay,
+idempotency conflict, exact final lists/database actors, versions,
+assignments, mutation/correlation/payload hashes and timestamps, plus saved-old
+Cookie revocation for Providers A and B. Exact-gate-source delta checks also passed
+2/2: two higher-id live offers were selected before the lowest 48 of 50 accepted
+history rows under the 50-row bound, and direct authenticated PostgREST rejected
+the frozen non-null cursor. The built-in browser separately rendered the real
+Provider Portal workbench, reached the signed-out stable state and reported no
+console error or Next error overlay. Lifecycle, coalescing and timeout fault
+behavior remains attributed to the exact focused 271-test batch rather than
+this minimal Hosted matrix. The later response-focus and sign-in recovery work
+in Section 33 is not attributed to either result.
+
+Terminal cleanup left all five workflow flags disabled and Preview-only; all
+four checked Auth tables and all 11 Portal fixture domains contained zero rows;
+all three append-only triggers were enabled; API roles had zero effective Portal
+table privileges; and temporary migration roles were absent. Final security
+Advisors returned 21 INFO / 17 WARN / 0 ERROR. Final performance Advisors
+returned 106 INFO / 24 WARN / 0 ERROR; the live inbox query exercised its
+dedicated index, removing one pre-matrix unused-index INFO. These WARN results
+remain explicit backlog, not an all-project green claim.
+
+The local link, recovery IDs, certificate/key and temporary harness were
+removed. The exact branch was deleted, and three consecutive branch-list probes
+found both its id and ref absent. Production remained the default
+`ACTIVE_HEALTHY` project with the exact same 19 migration versions captured
+before the gate; it received no SQL, Auth, Data API, route or other write. This
+closed PR #6's then-current post-review Hosted re-gate for exact source
+`44f3bd6` only; it does not cover the later UI source in Section 33. No Vercel
+deployment, merge, retained runtime, flag activation, private accepted-detail,
+follow-up, notification, audit listing, document/export or Production approval
+is created by this evidence.
+
+## 33. Portal Referral Provider Response M1b post-gate UI recovery — 2026-08-26
+
+The current PR's later UI-only source resolves the two final-review P2 findings
+without changing the Provider Response route, server adapter, migration, RPC,
+database grants, flags or Production boundary:
+
+- Accept and Decline now move lost keyboard focus to an accurate live result
+  while the authoritative list refreshes, then fall back to the same offer, the
+  first remaining offer or the workbench heading only if the focused interim
+  node disappears. Connected user-selected focus is never taken back during a
+  slow POST or GET.
+- `AUTH_REQUIRED` now renders and focuses a same-origin
+  `/auth/login?next=%2Fprovider-portal` recovery link.
+
+The browser regression was written first and failed on the missing waiting-state
+focus/message, completion focus theft and slow-POST focus theft before the
+implementation passed it. Final local validation passed 8 focused files / 274
+tests, all 143 files / 1,938 tests, TypeScript, full lint, the Next.js 16.2.9
+64/64-page production build, the 73-file adapter check and `git diff --check`.
+
+This source postdates exact Hosted gate source `44f3bd6`. No new paid Preview,
+Hosted/browser re-gate, Vercel deployment, merge, activation or Production write
+was performed, so the prior Hosted evidence remains exact only for `44f3bd6`.
