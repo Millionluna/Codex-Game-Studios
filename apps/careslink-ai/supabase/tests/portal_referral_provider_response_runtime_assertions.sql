@@ -19,6 +19,7 @@ declare
   v_definition text;
   v_gate_definition text;
   v_context_definition text;
+  v_index_definition text;
   v_offers_definition text;
   v_respond_definition text;
   v_search_path text;
@@ -54,10 +55,26 @@ begin
     raise exception 'Provider Response flags are not default-off Preview-only';
   end if;
 
-  if pg_catalog.to_regclass(
+  select lower(pg_catalog.pg_get_indexdef(index_relation.oid))
+  into v_index_definition
+  from pg_catalog.pg_class as index_relation
+  where index_relation.oid = pg_catalog.to_regclass(
     'public.portal_matches_provider_response_inbox_idx'
-  ) is null then
-    raise exception 'Provider Response inbox index is missing';
+  );
+
+  if v_index_definition is null
+    or strpos(v_index_definition, 'provider_id') = 0
+    or strpos(v_index_definition, 'status = ''offered''::text')
+      <= strpos(v_index_definition, 'provider_id')
+    or strpos(v_index_definition, ' desc')
+      <= strpos(v_index_definition, 'status = ''offered''::text')
+    or strpos(v_index_definition, ', id)')
+      <= strpos(v_index_definition, ' desc')
+    or v_index_definition not like '%include (referral_id, status)%'
+    or v_index_definition not like
+      '%where (status = any (array[''offered''::text, ''accepted''::text]))%'
+  then
+    raise exception 'Provider Response inbox index posture drifted';
   end if;
 
   foreach v_signature in array array[
@@ -151,7 +168,12 @@ begin
       '%match.status = ''ACCEPTED''%match.offered_at is not null%'
     or v_offers_definition not like
       '%referral.assigned_provider_id is not distinct from v_provider_id%'
-    or v_offers_definition not like '%order by match.id%'
+    or lower(v_offers_definition) not like
+      '%if p_after_match_id is not null then%portal_validation_error%'
+    or lower(v_offers_definition) like '%match.id > p_after_match_id%'
+    or lower(v_offers_definition) not like
+      '%order by (match.status = ''offered'') desc,%match.id%'
+    or lower(v_offers_definition) not like '%order by item.match_id%'
     or v_offers_definition like '%referral.summary%'
     or v_offers_definition like '%contact_%'
     or v_offers_definition like '%source_organization_id%'
@@ -596,7 +618,6 @@ do $$
 declare
   v_authorization jsonb;
   v_inbox jsonb;
-  v_page jsonb;
 begin
   v_authorization := public.portal_referral_provider_response_authorize();
   if v_authorization is distinct from jsonb_build_object(
@@ -642,16 +663,15 @@ begin
     raise exception 'Provider Response no-PII inbox drifted: %', v_inbox;
   end if;
 
-  v_page := public.portal_referral_provider_response_offers(
-    1,
-    'f2100000-0000-4000-8000-000000000001'
-  );
-  if jsonb_array_length(v_page->'items') is distinct from 1
-    or v_page->'items'->0->>'match_id' is distinct from
-      'f2200000-0000-4000-8000-000000000002'
-  then
-    raise exception 'Provider Response match-id keyset drifted: %', v_page;
-  end if;
+  begin
+    perform public.portal_referral_provider_response_offers(
+      1,
+      'f2100000-0000-4000-8000-000000000001'
+    );
+    raise exception 'Provider Response inbox accepted a non-NULL cursor';
+  exception when sqlstate 'P0001' then
+    if sqlerrm <> 'PORTAL_VALIDATION_ERROR' then raise; end if;
+  end;
 
   begin
     perform public.portal_referral_provider_response_offers(51, null);
@@ -668,6 +688,145 @@ begin
   end;
 end;
 $$;
+
+-- A full first page of accepted history must not crowd a live offer out of the
+-- bounded inbox. The selected page prioritizes OFFERED rows, while the returned
+-- DTO remains globally ordered by match id for the existing parser.
+select pg_catalog.set_config(
+  'role',
+  pg_catalog.current_setting('careslink.assertion_entry_role'),
+  false
+);
+insert into public.portal_referrals (
+  id, source_organization_id, source_user_id, summary, region, service_type,
+  current_status, assigned_provider_id, row_version, created_at, updated_at
+)
+select
+  ('e3000000-0000-4000-8000-' ||
+    lpad(sequence.value::text, 12, '0'))::uuid,
+  'c2100000-0000-4000-8000-000000000001'::uuid,
+  'a2500000-0000-4000-8000-000000000005'::uuid,
+  'Provider Response accepted history fixture ' || sequence.value,
+  'VIC_MELBOURNE',
+  'SUPPORT_COORDINATION',
+  'CLOSED',
+  'd2200000-0000-4000-8000-000000000002'::uuid,
+  8,
+  '2026-08-26 02:00:00+00'::timestamptz +
+    sequence.value * interval '1 second',
+  '2026-08-26 02:00:00+00'::timestamptz +
+    sequence.value * interval '1 second'
+from generate_series(1, 50) as sequence(value);
+insert into public.portal_referral_matches (
+  id, referral_id, provider_id, score, status, offered_by, offered_at,
+  responded_by, responded_at, row_version, created_at, updated_at
+)
+select
+  ('f3000000-0000-4000-8000-' ||
+    lpad(sequence.value::text, 12, '0'))::uuid,
+  ('e3000000-0000-4000-8000-' ||
+    lpad(sequence.value::text, 12, '0'))::uuid,
+  'd2200000-0000-4000-8000-000000000002'::uuid,
+  null,
+  'ACCEPTED',
+  'a2600000-0000-4000-8000-000000000006'::uuid,
+  '2026-08-26 02:00:00+00'::timestamptz +
+    sequence.value * interval '1 second',
+  'a2100000-0000-4000-8000-000000000001'::uuid,
+  '2026-08-26 02:00:00+00'::timestamptz +
+    sequence.value * interval '1 second',
+  2,
+  '2026-08-26 02:00:00+00'::timestamptz +
+    sequence.value * interval '1 second',
+  '2026-08-26 02:00:00+00'::timestamptz +
+    sequence.value * interval '1 second'
+from generate_series(1, 50) as sequence(value);
+insert into public.portal_referrals (
+  id, source_organization_id, source_user_id, summary, region, service_type,
+  current_status, assigned_provider_id, row_version, created_at, updated_at
+) values (
+  'e9000000-0000-4000-8000-000000000001',
+  'c2100000-0000-4000-8000-000000000001',
+  'a2500000-0000-4000-8000-000000000005',
+  'Provider Response active offer priority fixture',
+  'VIC_MELBOURNE', 'SUPPORT_COORDINATION', 'OFFERED', null, 3,
+  '2026-08-26 02:02:00+00', '2026-08-26 02:02:00+00'
+);
+insert into public.portal_referral_matches (
+  id, referral_id, provider_id, score, status, offered_by, offered_at,
+  responded_by, responded_at, row_version, created_at, updated_at
+) values (
+  'ff000000-0000-4000-8000-000000000001',
+  'e9000000-0000-4000-8000-000000000001',
+  'd2200000-0000-4000-8000-000000000002',
+  null, 'OFFERED', 'a2600000-0000-4000-8000-000000000006',
+  '2026-08-26 02:02:00+00', null, null, 1,
+  '2026-08-26 02:02:00+00', '2026-08-26 02:02:00+00'
+);
+
+set local role authenticated;
+do $$
+declare
+  v_inbox jsonb;
+begin
+  v_inbox := public.portal_referral_provider_response_offers(50, null);
+  if jsonb_array_length(v_inbox->'items') is distinct from 50
+    or not exists (
+      select 1
+      from jsonb_array_elements(v_inbox->'items') as item(value)
+      where value->>'match_id' =
+          'ff000000-0000-4000-8000-000000000001'
+        and value->>'match_status' = 'OFFERED'
+    )
+    or (
+      select count(*)
+      from jsonb_array_elements(v_inbox->'items') as item(value)
+      where value->>'match_status' = 'OFFERED'
+    ) <> 3
+    or (
+      select count(*)
+      from jsonb_array_elements(v_inbox->'items') as item(value)
+      where value->>'match_status' = 'ACCEPTED'
+    ) <> 47
+    or exists (
+      select 1
+      from (
+        select
+          (item.value->>'match_id')::uuid as match_id,
+          lag((item.value->>'match_id')::uuid) over (
+            order by item.ordinality
+          ) as previous_match_id
+        from jsonb_array_elements(v_inbox->'items') with ordinality
+          as item(value, ordinality)
+      ) as ordered
+      where ordered.previous_match_id is not null
+        and ordered.match_id <= ordered.previous_match_id
+    )
+  then
+    raise exception
+      'Provider Response active offer priority drifted: %', v_inbox;
+  end if;
+end;
+$$;
+select pg_catalog.set_config(
+  'role',
+  pg_catalog.current_setting('careslink.assertion_entry_role'),
+  false
+);
+delete from public.portal_referral_matches
+where id = 'ff000000-0000-4000-8000-000000000001'
+  or id in (
+    select ('f3000000-0000-4000-8000-' ||
+      lpad(sequence.value::text, 12, '0'))::uuid
+    from generate_series(1, 50) as sequence(value)
+  );
+delete from public.portal_referrals
+where id = 'e9000000-0000-4000-8000-000000000001'
+  or id in (
+    select ('e3000000-0000-4000-8000-' ||
+      lpad(sequence.value::text, 12, '0'))::uuid
+    from generate_series(1, 50) as sequence(value)
+  );
 
 -- A structurally corrupt accepted match must fail closed, not disappear through
 -- SQL three-valued logic when the referral assignment is unexpectedly NULL.

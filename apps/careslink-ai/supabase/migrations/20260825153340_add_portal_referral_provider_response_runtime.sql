@@ -9,11 +9,16 @@ insert into public.portal_workflow_flags (
   preview_only
 ) values ('referral_provider_response_v1', false, true);
 
--- The frozen memory contract orders the provider inbox by match id. Keep the
--- database projection bounded and support that exact provider/id keyset without
--- indexing terminal match states that never appear in the inbox.
+-- The bounded first-page snapshot selects live offers before accepted history,
+-- with match id as the stable tie-breaker. Its DTO remains globally match-id
+-- ordered for the strict adapter parser. Do not index terminal match states that
+-- never appear in this inbox.
 create index portal_matches_provider_response_inbox_idx
-  on public.portal_referral_matches (provider_id, id)
+  on public.portal_referral_matches (
+    provider_id,
+    ((status = 'OFFERED')) desc,
+    id
+  )
   include (referral_id, status)
   where status in ('OFFERED', 'ACCEPTED');
 
@@ -354,6 +359,15 @@ begin
       message = 'PORTAL_VALIDATION_ERROR';
   end if;
 
+  -- The UUID argument remains in the frozen RPC signature, but M1b currently
+  -- serves only one bounded snapshot. A future pagination contract must add an
+  -- OFFERED/ACCEPTED-aware cursor instead of overloading match-id ordering.
+  if p_after_match_id is not null then
+    raise exception using
+      errcode = 'P0001',
+      message = 'PORTAL_VALIDATION_ERROR';
+  end if;
+
   if exists (
     select 1
     from public.portal_referral_matches as match
@@ -393,6 +407,9 @@ begin
       message = 'PORTAL_INVALID_STATE_TRANSITION';
   end if;
 
+  -- Selection priority is applied before LIMIT so accepted history cannot crowd
+  -- out a live offer. The aggregate keeps the returned DTO equivalent to
+  -- order by match.id for the existing strict parser.
   select coalesce(
     jsonb_agg(
       jsonb_build_object(
@@ -422,7 +439,6 @@ begin
       on referral.id = match.referral_id
     where match.provider_id = v_provider_id
       and match.status in ('OFFERED', 'ACCEPTED')
-      and (p_after_match_id is null or match.id > p_after_match_id)
       and (
         (
           match.status = 'OFFERED'
@@ -449,7 +465,7 @@ begin
           and referral.assigned_provider_id is not distinct from v_provider_id
         )
       )
-    order by match.id
+    order by (match.status = 'OFFERED') desc, match.id
     limit p_limit
   ) as item;
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 
 import { canonicalPortalReferralUuid } from "../lib/portal-referral-id";
 import {
@@ -21,6 +21,10 @@ const ACCEPTED_PROVIDER_REFERRAL_STATUSES = [
   "CLOSED",
 ] as const;
 const MAX_PROVIDER_OFFERS = 50;
+export const PORTAL_REFERRAL_PROVIDER_RESPONSE_REQUEST_TIMEOUT_MS = 10_000;
+export const PORTAL_REFERRAL_PROVIDER_RESPONSE_LIFECYCLE_DEBOUNCE_MS = 50;
+const SUPABASE_AUTH_STORAGE_KEY_PATTERN =
+  /^sb-[a-z0-9]+-auth-token(?:\.\d+)?$/i;
 
 type PortalReferralProviderOfferStatus =
   (typeof PROVIDER_OFFER_STATUSES)[number];
@@ -114,6 +118,25 @@ export function createPortalReferralProviderResponseRequestTracker() {
   });
 }
 
+async function runPortalReferralProviderResponseRequest<T>(
+  request: (signal: AbortSignal) => Promise<T>,
+) {
+  const controller = new AbortController();
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_resolve, reject) => {
+    timeoutId = globalThis.setTimeout(() => {
+      controller.abort();
+      reject(new Error("Portal referral provider response request timed out"));
+    }, PORTAL_REFERRAL_PROVIDER_RESPONSE_REQUEST_TIMEOUT_MS);
+  });
+
+  try {
+    return await Promise.race([request(controller.signal), timeout]);
+  } finally {
+    if (timeoutId !== undefined) globalThis.clearTimeout(timeoutId);
+  }
+}
+
 export async function loadPortalReferralProviderOffers({
   enabled = false,
   fetcher = globalThis.fetch,
@@ -124,15 +147,18 @@ export async function loadPortalReferralProviderOffers({
   if (!enabled) return disabledResult();
 
   try {
-    const response = await fetcher("/api/portal/referral-offers", {
-      method: "GET",
-      credentials: "same-origin",
-      cache: "no-store",
-      headers: { accept: "application/json" },
+    return await runPortalReferralProviderResponseRequest(async (signal) => {
+      const response = await fetcher("/api/portal/referral-offers", {
+        method: "GET",
+        credentials: "same-origin",
+        cache: "no-store",
+        headers: { accept: "application/json" },
+        signal,
+      });
+      if (!response.ok) return failureResult(response.status);
+      const items = parseProviderOffersEnvelope(await response.json());
+      return items ? { ok: true as const, items } : requestFailedResult();
     });
-    if (!response.ok) return failureResult(response.status);
-    const items = parseProviderOffersEnvelope(await response.json());
-    return items ? { ok: true, items } : requestFailedResult();
   } catch {
     return requestFailedResult();
   }
@@ -176,13 +202,22 @@ export async function submitPortalReferralProviderResponse({
   }
 
   try {
-    const response = await fetcher(request.url, request.init);
-    if (!response.ok) {
-      // Error bodies can contain echoed private input or implementation detail.
-      return failureResult(response.status);
-    }
-    const ack = parseProviderResponseAck(await response.json(), offer, decision);
-    return ack ? { ok: true, ack } : requestFailedResult();
+    return await runPortalReferralProviderResponseRequest(async (signal) => {
+      const response = await fetcher(request.url, {
+        ...request.init,
+        signal,
+      });
+      if (!response.ok) {
+        // Error bodies can contain echoed private input or implementation detail.
+        return failureResult(response.status);
+      }
+      const ack = parseProviderResponseAck(
+        await response.json(),
+        offer,
+        decision,
+      );
+      return ack ? { ok: true as const, ack } : requestFailedResult();
+    });
   } catch {
     return requestFailedResult();
   }
@@ -235,6 +270,20 @@ export function PortalReferralProviderResponseCoordinator({
   const mutationTrackerRef = useRef<ReturnType<
     typeof createPortalReferralProviderResponseRequestTracker
   > | null>(null);
+  const inFlightSubmitRef = useRef<
+    Promise<PortalReferralProviderResponseResult> | undefined
+  >(undefined);
+  const authorizationEpochRef = useRef(0);
+  const inFlightRefreshRef = useRef<
+    Promise<PortalReferralProviderOffersResult> | undefined
+  >(undefined);
+  const lifecycleRefreshActiveRef = useRef(false);
+  const lifecycleRefreshQueuedRef = useRef(false);
+  const lifecycleRefreshRunningRef = useRef(false);
+  const lifecycleRefreshTimerRef = useRef<ReturnType<
+    typeof setTimeout
+  > | null>(null);
+  const accessibilityRootId = useId();
   if (listTrackerRef.current == null) {
     listTrackerRef.current = createPortalReferralProviderResponseRequestTracker();
   }
@@ -243,27 +292,23 @@ export function PortalReferralProviderResponseCoordinator({
       createPortalReferralProviderResponseRequestTracker();
   }
 
-  const refreshOffers = useCallback(
-    async ({ clear = true }: Readonly<{ clear?: boolean }> = {}) => {
-      const tracker = listTrackerRef.current;
-      if (!enabled || !tracker) return;
-      const token = tracker.begin("provider-offers");
-      if (clear) setOffersResult(undefined);
-      setRefreshing(true);
-      const loaded = await loadPortalReferralProviderOffers({ enabled });
-      if (!tracker.isCurrent(token)) return;
-      setOffersResult(loaded);
+  const commitLoadedOffers = useCallback(
+    (loaded: PortalReferralProviderOffersResult) => {
       if (loaded.ok) {
-        const current = uncertainAttemptRef.current;
-        if (current) {
-          const originalOfferIsStillPending = loaded.items.some(
+        const candidate = uncertainAttemptRef.current;
+        if (candidate) {
+          const exactOfferIsStillPending = loaded.items.some(
             (item) =>
-              item.matchId === current.offer.matchId &&
+              item.matchId === candidate.offer.matchId &&
+              item.referralId === candidate.offer.referralId &&
               item.matchStatus === "OFFERED" &&
               item.currentStatus === "OFFERED" &&
-              item.rowVersion === current.offer.rowVersion,
+              item.rowVersion === candidate.offer.rowVersion,
           );
-          if (!originalOfferIsStillPending) {
+          if (exactOfferIsStillPending) {
+            setUncertainAttempt(candidate);
+            setMutationResult({ ok: false, code: "REQUEST_FAILED" });
+          } else {
             uncertainAttemptRef.current = undefined;
             setUncertainAttempt(undefined);
             setMutationResult((currentResult) =>
@@ -275,12 +320,105 @@ export function PortalReferralProviderResponseCoordinator({
             );
           }
         }
+      } else if (
+        loaded.code === "AUTH_REQUIRED" ||
+        loaded.code === "FORBIDDEN" ||
+        loaded.code === "CAPABILITY_DISABLED"
+      ) {
+        uncertainAttemptRef.current = undefined;
+        setUncertainAttempt(undefined);
+        setMutationResult(undefined);
       }
+      setOffersResult(loaded);
       setRefreshing(false);
+    },
+    [],
+  );
+
+  const refreshOffers = useCallback(
+    async ({ clear = true }: Readonly<{ clear?: boolean }> = {}) => {
+      const tracker = listTrackerRef.current;
+      if (!enabled || !tracker) return;
+      const token = tracker.begin("provider-offers");
+      if (clear) setOffersResult(undefined);
+      setRefreshing(true);
+      const request = loadPortalReferralProviderOffers({ enabled });
+      inFlightRefreshRef.current = request;
+      const loaded = await request;
+      if (inFlightRefreshRef.current === request) {
+        inFlightRefreshRef.current = undefined;
+      }
+      if (!tracker.isCurrent(token)) return;
+      commitLoadedOffers(loaded);
       return loaded;
     },
-    [enabled],
+    [commitLoadedOffers, enabled],
   );
+
+  const reauthorizeAfterBrowserLifecycleEvent = useCallback(() => {
+    if (!enabled || !lifecycleRefreshActiveRef.current) return;
+
+    // A resumed page may belong to a different or revoked Cookie principal.
+    // Remove the previous projection and command synchronously before any
+    // network result. The same provider can have multiple users, so an exact
+    // offer match alone cannot prove that an old idempotency key still belongs
+    // to the current principal.
+    authorizationEpochRef.current += 1;
+    listTrackerRef.current?.invalidate();
+    mutationTrackerRef.current?.invalidate();
+    uncertainAttemptRef.current = undefined;
+    setOffersResult(undefined);
+    setPending(undefined);
+    setMutationResult(undefined);
+    setUncertainAttempt(undefined);
+    setRefreshing(true);
+
+    lifecycleRefreshQueuedRef.current = true;
+    if (lifecycleRefreshRunningRef.current) return;
+    if (lifecycleRefreshTimerRef.current !== null) {
+      globalThis.clearTimeout(lifecycleRefreshTimerRef.current);
+    }
+
+    lifecycleRefreshTimerRef.current = globalThis.setTimeout(() => {
+      lifecycleRefreshTimerRef.current = null;
+      if (
+        !lifecycleRefreshActiveRef.current ||
+        lifecycleRefreshRunningRef.current
+      ) {
+        return;
+      }
+
+      lifecycleRefreshRunningRef.current = true;
+      void (async () => {
+        try {
+          while (
+            lifecycleRefreshActiveRef.current &&
+            lifecycleRefreshQueuedRef.current
+          ) {
+            const inFlightSubmit = inFlightSubmitRef.current;
+            if (inFlightSubmit) {
+              await inFlightSubmit;
+              if (!lifecycleRefreshActiveRef.current) return;
+            }
+
+            const inFlightRefresh = inFlightRefreshRef.current;
+            if (inFlightRefresh) {
+              await inFlightRefresh;
+              if (!lifecycleRefreshActiveRef.current) return;
+            }
+
+            // Coalesce every lifecycle signal received while the decision was
+            // settling. A later signal during the GET invalidates its token and
+            // leaves this flag set for one more authoritative read.
+            lifecycleRefreshQueuedRef.current = false;
+            await refreshOffers();
+          }
+        } finally {
+          lifecycleRefreshRunningRef.current = false;
+        }
+      })();
+    }, PORTAL_REFERRAL_PROVIDER_RESPONSE_LIFECYCLE_DEBOUNCE_MS);
+  }, [enabled, refreshOffers]);
 
   useEffect(() => {
     if (!enabled) return;
@@ -288,16 +426,59 @@ export function PortalReferralProviderResponseCoordinator({
     const mutationTracker = mutationTrackerRef.current;
     if (!listTracker) return;
     const token = listTracker.begin("provider-offers");
-    void loadPortalReferralProviderOffers({ enabled }).then((loaded) => {
+    const request = loadPortalReferralProviderOffers({ enabled });
+    inFlightRefreshRef.current = request;
+    void request.then((loaded) => {
+      if (inFlightRefreshRef.current === request) {
+        inFlightRefreshRef.current = undefined;
+      }
       if (!listTracker.isCurrent(token)) return;
-      setOffersResult(loaded);
-      setRefreshing(false);
+      commitLoadedOffers(loaded);
     });
     return () => {
       listTracker.invalidate();
       mutationTracker?.invalidate();
     };
-  }, [enabled]);
+  }, [commitLoadedOffers, enabled]);
+
+  useEffect(() => {
+    if (!enabled) return;
+    lifecycleRefreshActiveRef.current = true;
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        reauthorizeAfterBrowserLifecycleEvent();
+      }
+    };
+    const handleStorage = (event: StorageEvent) => {
+      if (
+        event.key === null ||
+        SUPABASE_AUTH_STORAGE_KEY_PATTERN.test(event.key)
+      ) {
+        reauthorizeAfterBrowserLifecycleEvent();
+      }
+    };
+    const handlePageShow = (event: PageTransitionEvent) => {
+      if (event.persisted) reauthorizeAfterBrowserLifecycleEvent();
+    };
+
+    window.addEventListener("focus", reauthorizeAfterBrowserLifecycleEvent);
+    window.addEventListener("pageshow", handlePageShow);
+    window.addEventListener("storage", handleStorage);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      lifecycleRefreshActiveRef.current = false;
+      lifecycleRefreshQueuedRef.current = false;
+      if (lifecycleRefreshTimerRef.current !== null) {
+        globalThis.clearTimeout(lifecycleRefreshTimerRef.current);
+        lifecycleRefreshTimerRef.current = null;
+      }
+      window.removeEventListener("focus", reauthorizeAfterBrowserLifecycleEvent);
+      window.removeEventListener("pageshow", handlePageShow);
+      window.removeEventListener("storage", handleStorage);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [enabled, reauthorizeAfterBrowserLifecycleEvent]);
 
   async function respond(
     offer: PortalReferralProviderOffer,
@@ -313,6 +494,9 @@ export function PortalReferralProviderResponseCoordinator({
     );
     if (
       pending ||
+      inFlightSubmitRef.current ||
+      inFlightRefreshRef.current ||
+      refreshing ||
       (uncertainAttempt && !isExactUncertainReplay) ||
       offer.matchStatus !== "OFFERED" ||
       offer.currentStatus !== "OFFERED" ||
@@ -329,43 +513,72 @@ export function PortalReferralProviderResponseCoordinator({
     setMutationResult(undefined);
     const idempotencyKey =
       replayIdempotencyKey ?? createProviderResponseMutationId(decision);
-    const result = await submitPortalReferralProviderResponse({
+    const attempt = { offer, decision, idempotencyKey } as const;
+    const authorizationEpoch = authorizationEpochRef.current;
+    const submit = submitPortalReferralProviderResponse({
       enabled,
       offer,
       decision,
       idempotencyKey,
     });
+    inFlightSubmitRef.current = submit;
+    const result = await submit;
+    if (inFlightSubmitRef.current === submit) {
+      inFlightSubmitRef.current = undefined;
+    }
+    if (
+      authorizationEpochRef.current === authorizationEpoch &&
+      !result.ok &&
+      result.code === "REQUEST_FAILED"
+    ) {
+      uncertainAttemptRef.current = attempt;
+    } else {
+      uncertainAttemptRef.current = undefined;
+    }
     if (!tracker.isCurrent(token)) return;
     setMutationResult(result);
     if (!result.ok && result.code === "REQUEST_FAILED") {
-      const attempt = { offer, decision, idempotencyKey } as const;
-      uncertainAttemptRef.current = attempt;
       setUncertainAttempt(attempt);
     } else {
-      uncertainAttemptRef.current = undefined;
       setUncertainAttempt(undefined);
     }
 
-    if (portalReferralProviderResponseRequiresAuthoritativeRefresh(result)) {
-      await refreshOffers();
-    } else if (
-      !result.ok &&
-      portalReferralProviderResponseClearsOffers(result)
-    ) {
-      listTrackerRef.current?.invalidate();
-      setRefreshing(false);
-      setOffersResult({ ok: false, code: result.code });
+    try {
+      if (portalReferralProviderResponseRequiresAuthoritativeRefresh(result)) {
+        await refreshOffers();
+      } else if (
+        !result.ok &&
+        portalReferralProviderResponseClearsOffers(result)
+      ) {
+        listTrackerRef.current?.invalidate();
+        setRefreshing(false);
+        setOffersResult({ ok: false, code: result.code });
+      }
+    } finally {
+      if (tracker.isCurrent(token)) setPending(undefined);
     }
-    if (tracker.isCurrent(token)) setPending(undefined);
   }
 
   function manuallyRefresh() {
-    if (pending) return;
+    if (
+      pending ||
+      inFlightSubmitRef.current ||
+      inFlightRefreshRef.current ||
+      refreshing ||
+      !offersResult
+    ) {
+      return;
+    }
     mutationTrackerRef.current?.invalidate();
     setPending(undefined);
     setMutationResult(undefined);
     void refreshOffers({ clear: false });
   }
+
+  const responseControlsBusy =
+    Boolean(pending) ||
+    refreshing ||
+    !offersResult;
 
   if (!enabled) {
     return (
@@ -394,7 +607,7 @@ export function PortalReferralProviderResponseCoordinator({
           </div>
           <button
             type="button"
-            disabled={Boolean(pending)}
+            disabled={responseControlsBusy}
             className="taito-secondary px-3"
             onClick={manuallyRefresh}
           >
@@ -418,8 +631,9 @@ export function PortalReferralProviderResponseCoordinator({
           offersResult.code === "CONFLICT" ? (
             <button
               type="button"
+              disabled={responseControlsBusy}
               className="taito-secondary w-fit px-3"
-              onClick={() => void refreshOffers()}
+              onClick={manuallyRefresh}
             >
               Retry offers / 重试邀约
             </button>
@@ -433,18 +647,25 @@ export function PortalReferralProviderResponseCoordinator({
         </Card>
       ) : (
         <ul className="grid gap-4">
-          {offersResult.items.map((offer) => {
+          {offersResult.items.map((offer, index) => {
             const offerPending = pending?.matchId === offer.matchId;
             const uncertainOffer =
               uncertainAttempt?.offer.matchId === offer.matchId
                 ? uncertainAttempt
                 : undefined;
+            const offerNumber = index + 1;
+            const offerTitleId = `${accessibilityRootId}-offer-${offerNumber}-title`;
+            const acceptLabelId = `${accessibilityRootId}-offer-${offerNumber}-accept`;
+            const declineLabelId = `${accessibilityRootId}-offer-${offerNumber}-decline`;
             return (
               <li key={offer.matchId}>
                 <Card className="p-5">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
-                      <h3 className="text-lg font-semibold text-[#263834]">
+                      <h3
+                        id={offerTitleId}
+                        className="text-lg font-semibold text-[#263834]"
+                      >
                         {displayRegion(offer.region)} · {displayService(offer.serviceType)}
                       </h3>
                       <p className="mt-2 text-sm text-[#5d6d68]">
@@ -462,7 +683,7 @@ export function PortalReferralProviderResponseCoordinator({
                       </p>
                       <button
                         type="button"
-                        disabled={Boolean(pending)}
+                        disabled={responseControlsBusy}
                         className="taito-secondary w-fit px-4 disabled:cursor-not-allowed disabled:opacity-50"
                         onClick={() =>
                           void respond(
@@ -481,31 +702,43 @@ export function PortalReferralProviderResponseCoordinator({
                     <div className="mt-4 flex flex-wrap gap-2">
                       <button
                         type="button"
+                        aria-labelledby={`${acceptLabelId} ${offerTitleId}`}
                         disabled={
-                          Boolean(pending) ||
+                          responseControlsBusy ||
                           Boolean(uncertainAttempt) ||
                           !strictExpectedVersion(offer.rowVersion)
                         }
                         className="taito-primary px-4 disabled:cursor-not-allowed disabled:opacity-50"
                         onClick={() => void respond(offer, "ACCEPT")}
                       >
-                        {offerPending && pending?.decision === "ACCEPT"
-                          ? "Accepting…"
-                          : "Accept / 接受"}
+                        <span id={acceptLabelId}>
+                          {offerPending && pending?.decision === "ACCEPT"
+                            ? "Accepting…"
+                            : "Accept / 接受"}
+                          <span className="sr-only">
+                            {` offer ${offerNumber} / 邀约 ${offerNumber}`}
+                          </span>
+                        </span>
                       </button>
                       <button
                         type="button"
+                        aria-labelledby={`${declineLabelId} ${offerTitleId}`}
                         disabled={
-                          Boolean(pending) ||
+                          responseControlsBusy ||
                           Boolean(uncertainAttempt) ||
                           !strictExpectedVersion(offer.rowVersion)
                         }
                         className="taito-secondary px-4 disabled:cursor-not-allowed disabled:opacity-50"
                         onClick={() => void respond(offer, "DECLINE")}
                       >
-                        {offerPending && pending?.decision === "DECLINE"
-                          ? "Declining…"
-                          : "Decline / 拒绝"}
+                        <span id={declineLabelId}>
+                          {offerPending && pending?.decision === "DECLINE"
+                            ? "Declining…"
+                            : "Decline / 拒绝"}
+                          <span className="sr-only">
+                            {` offer ${offerNumber} / 邀约 ${offerNumber}`}
+                          </span>
+                        </span>
                       </button>
                     </div>
                   ) : (

@@ -10,6 +10,7 @@ vi.mock("./ui", async () => {
 });
 
 import {
+  PORTAL_REFERRAL_PROVIDER_RESPONSE_REQUEST_TIMEOUT_MS,
   PortalReferralProviderResponseCoordinator,
   createPortalReferralProviderResponseRequestTracker,
   loadPortalReferralProviderOffers,
@@ -69,6 +70,7 @@ describe("Portal referral provider response controls", () => {
       credentials: "same-origin",
       cache: "no-store",
       headers: { accept: "application/json" },
+      signal: expect.anything(),
     });
     expect(Object.keys(offered).sort()).toEqual(
       [
@@ -81,6 +83,39 @@ describe("Portal referral provider response controls", () => {
         "rowVersion",
       ].sort(),
     );
+  });
+
+  it("bounds both a never-resolving fetch and a never-resolving success body", async () => {
+    vi.useFakeTimers();
+    try {
+      const transportResult = loadPortalReferralProviderOffers({
+        enabled: true,
+        fetcher: vi.fn(
+          () =>
+            new Promise<Pick<Response, "ok" | "status" | "json">>(() =>
+              undefined,
+            ),
+        ),
+      });
+      const bodyResult = loadPortalReferralProviderOffers({
+        enabled: true,
+        fetcher: vi.fn(async () => ({
+          ok: true,
+          status: 200,
+          json: () => new Promise<unknown>(() => undefined),
+        })),
+      });
+
+      await vi.advanceTimersByTimeAsync(
+        PORTAL_REFERRAL_PROVIDER_RESPONSE_REQUEST_TIMEOUT_MS,
+      );
+      await expect(Promise.all([transportResult, bodyResult])).resolves.toEqual([
+        { ok: false, code: "REQUEST_FAILED" },
+        { ok: false, code: "REQUEST_FAILED" },
+      ]);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it.each([

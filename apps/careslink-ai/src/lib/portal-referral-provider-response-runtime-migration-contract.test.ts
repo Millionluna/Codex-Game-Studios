@@ -32,11 +32,11 @@ describe("Portal referral Provider Response M1b runtime migration contract", () 
     expect(deploymentStatements).not.toMatch(/\bgrant\b[^;]*\bon\s+table\b/i);
     expect(deploymentStatements).not.toMatch(/\b(?:create|alter|drop)\s+policy\b/i);
     expect(migration).toMatch(
-      /create index portal_matches_provider_response_inbox_idx\s+on public\.portal_referral_matches \(provider_id, id\)\s+include \(referral_id, status\)\s+where status in \('OFFERED', 'ACCEPTED'\);/,
+      /create index portal_matches_provider_response_inbox_idx\s+on public\.portal_referral_matches \(\s*provider_id,\s*\(\(status = 'OFFERED'\)\) desc,\s*id\s*\)\s+include \(referral_id, status\)\s+where status in \('OFFERED', 'ACCEPTED'\);/,
     );
   });
 
-  it("exposes exactly authorize, id-keyset offers and respond as hardened authenticated-only RPCs", () => {
+  it("exposes exactly authorize, bounded first-page offers and respond as hardened authenticated-only RPCs", () => {
     expect(
       migration.match(
         /create function public\.portal_referral_provider_response_/g,
@@ -166,7 +166,7 @@ describe("Portal referral Provider Response M1b runtime migration contract", () 
     expect(authorize).toContain("'provider_review_status', 'APPROVED'");
   });
 
-  it("keeps the provider inbox bounded, tenant-scoped, id-keyset ordered and PII-free", () => {
+  it("keeps the provider first-page inbox bounded, prioritized, tenant-scoped and PII-free", () => {
     const offers = functionBlock(
       "public.portal_referral_provider_response_offers(",
     );
@@ -174,10 +174,11 @@ describe("Portal referral Provider Response M1b runtime migration contract", () 
       "p_limit integer default 50",
       "p_after_match_id uuid default null",
       "p_limit is null or p_limit < 1 or p_limit > 50",
+      "p_after_match_id is not null",
       "match.provider_id = v_provider_id",
       "match.status in ('OFFERED', 'ACCEPTED')",
-      "p_after_match_id is null or match.id > p_after_match_id",
-      "order by match.id",
+      "order by (match.status = 'OFFERED') desc, match.id",
+      ") order by item.match_id",
       "limit p_limit",
       "return jsonb_build_object('items', v_items)",
     ]) {
@@ -198,6 +199,10 @@ describe("Portal referral Provider Response M1b runtime migration contract", () 
       /referral\.summary|contact_|source_organization|display_name|phone|email/i,
     );
     expect(offers).not.toContain("p_before_updated_at");
+    expect(offers).not.toContain("match.id > p_after_match_id");
+    expect(
+      countOccurrences(offers, "message = 'PORTAL_VALIDATION_ERROR'"),
+    ).toBe(2);
     expect(offers).toContain("message = 'PORTAL_INVALID_STATE_TRANSITION'");
     expect(countOccurrences(offers, "'CLOSED'")).toBe(2);
     expect(
@@ -324,6 +329,7 @@ describe("Portal referral Provider Response M1b runtime migration contract", () 
 
     for (const marker of [
       "Provider Response flags are not default-off Preview-only",
+      "Provider Response inbox index posture drifted",
       "Provider Response gate lock order drifted",
       "Provider Response exact-one provider context drifted",
       "Provider Response bounded no-PII inbox drifted",
@@ -332,6 +338,8 @@ describe("Portal referral Provider Response M1b runtime migration contract", () 
       "private helper ACL drifted",
       "API table grant drifted",
       "Provider Response no-PII inbox drifted",
+      "Provider Response inbox accepted a non-NULL cursor",
+      "Provider Response active offer priority drifted",
       "Provider Response silently hid corrupt accepted assignment",
       "Capacity is an offer-time eligibility input only",
       "'UNAVAILABLE'",
