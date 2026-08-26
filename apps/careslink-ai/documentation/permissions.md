@@ -276,6 +276,8 @@ The branch was deleted and three probes found its id/ref absent; Production
 remained the default `ACTIVE_HEALTHY` project with the same 19 migrations. This
 closes the post-review Hosted evidence prerequisite without granting merge, deployment,
 activation, private-detail access or any Production permission.
+The later focus/sign-in UI recovery in the current PR postdates exact gate
+source `44f3bd6`, has local-only evidence and adds no permission.
 
 `supabase/migrations/20260809120000_create_v1_shadow_foundation.sql` defines the following controls. It was applied only to a disposable `with_data=false` branch and has not been applied to Production Supabase:
 

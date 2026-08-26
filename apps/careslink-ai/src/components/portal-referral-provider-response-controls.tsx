@@ -1,6 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useId, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type RefObject,
+} from "react";
 
 import { canonicalPortalReferralUuid } from "../lib/portal-referral-id";
 import {
@@ -21,6 +28,8 @@ const ACCEPTED_PROVIDER_REFERRAL_STATUSES = [
   "CLOSED",
 ] as const;
 const MAX_PROVIDER_OFFERS = 50;
+const PROVIDER_PORTAL_SIGN_IN_HREF =
+  "/auth/login?next=%2Fprovider-portal" as const;
 export const PORTAL_REFERRAL_PROVIDER_RESPONSE_REQUEST_TIMEOUT_MS = 10_000;
 export const PORTAL_REFERRAL_PROVIDER_RESPONSE_LIFECYCLE_DEBOUNCE_MS = 50;
 const SUPABASE_AUTH_STORAGE_KEY_PATTERN =
@@ -283,6 +292,12 @@ export function PortalReferralProviderResponseCoordinator({
   const lifecycleRefreshTimerRef = useRef<ReturnType<
     typeof setTimeout
   > | null>(null);
+  const providerResponseHeadingRef = useRef<HTMLHeadingElement>(null);
+  const mutationNoticeRef = useRef<HTMLParagraphElement>(null);
+  const signInLinkRef = useRef<HTMLAnchorElement>(null);
+  const offerFocusTargetsRef = useRef(new Map<string, HTMLHeadingElement>());
+  const responseFocusMatchIdRef = useRef<string | undefined>(undefined);
+  const [responseFocusVersion, setResponseFocusVersion] = useState(0);
   const accessibilityRootId = useId();
   if (listTrackerRef.current == null) {
     listTrackerRef.current = createPortalReferralProviderResponseRequestTracker();
@@ -480,6 +495,34 @@ export function PortalReferralProviderResponseCoordinator({
     };
   }, [enabled, reauthorizeAfterBrowserLifecycleEvent]);
 
+  useEffect(() => {
+    if (responseFocusVersion === 0) return;
+    const matchId = responseFocusMatchIdRef.current;
+    responseFocusMatchIdRef.current = undefined;
+    const activeElement = document.activeElement;
+    if (
+      activeElement &&
+      activeElement !== document.body &&
+      activeElement !== document.documentElement &&
+      activeElement.isConnected
+    ) {
+      return;
+    }
+    const matchedOffer = matchId
+      ? offerFocusTargetsRef.current.get(matchId)
+      : undefined;
+    const firstOffer = [...offerFocusTargetsRef.current.values()].find(
+      (candidate) => candidate.isConnected,
+    );
+    const target =
+      signInLinkRef.current ??
+      mutationNoticeRef.current ??
+      (matchedOffer?.isConnected ? matchedOffer : undefined) ??
+      firstOffer ??
+      providerResponseHeadingRef.current;
+    target?.focus();
+  }, [responseFocusVersion]);
+
   async function respond(
     offer: PortalReferralProviderOffer,
     decision: "ACCEPT" | "DECLINE",
@@ -542,6 +585,11 @@ export function PortalReferralProviderResponseCoordinator({
     } else {
       setUncertainAttempt(undefined);
     }
+    const scheduleResponseFocus = () => {
+      responseFocusMatchIdRef.current = offer.matchId;
+      setResponseFocusVersion((current) => current + 1);
+    };
+    scheduleResponseFocus();
 
     try {
       if (portalReferralProviderResponseRequiresAuthoritativeRefresh(result)) {
@@ -555,7 +603,10 @@ export function PortalReferralProviderResponseCoordinator({
         setOffersResult({ ok: false, code: result.code });
       }
     } finally {
-      if (tracker.isCurrent(token)) setPending(undefined);
+      if (tracker.isCurrent(token)) {
+        setPending(undefined);
+        scheduleResponseFocus();
+      }
     }
   }
 
@@ -598,7 +649,11 @@ export function PortalReferralProviderResponseCoordinator({
             <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#0f766e]">
               Provider response M1b
             </p>
-            <h2 className="mt-2 text-lg font-semibold">
+            <h2
+              ref={providerResponseHeadingRef}
+              tabIndex={-1}
+              className="mt-2 text-lg font-semibold"
+            >
               My authorized referral offers / 我的邀约
             </h2>
             <p className="mt-1 text-sm leading-6 text-[#5d6d68]">
@@ -627,8 +682,16 @@ export function PortalReferralProviderResponseCoordinator({
           <p aria-live="polite" className="text-sm text-[#7a4b00]">
             {providerResponseFailureMessage(offersResult.code)}
           </p>
-          {offersResult.code === "REQUEST_FAILED" ||
-          offersResult.code === "CONFLICT" ? (
+          {offersResult.code === "AUTH_REQUIRED" ? (
+            <a
+              ref={signInLinkRef}
+              href={PROVIDER_PORTAL_SIGN_IN_HREF}
+              className="taito-secondary w-fit px-3"
+            >
+              Sign in again / 重新登录
+            </a>
+          ) : offersResult.code === "REQUEST_FAILED" ||
+            offersResult.code === "CONFLICT" ? (
             <button
               type="button"
               disabled={responseControlsBusy}
@@ -664,6 +727,14 @@ export function PortalReferralProviderResponseCoordinator({
                     <div>
                       <h3
                         id={offerTitleId}
+                        ref={(node) => {
+                          if (node) {
+                            offerFocusTargetsRef.current.set(offer.matchId, node);
+                          } else {
+                            offerFocusTargetsRef.current.delete(offer.matchId);
+                          }
+                        }}
+                        tabIndex={-1}
                         className="text-lg font-semibold text-[#263834]"
                       >
                         {displayRegion(offer.region)} · {displayService(offer.serviceType)}
@@ -753,17 +824,29 @@ export function PortalReferralProviderResponseCoordinator({
         </ul>
       )}
 
-      <ProviderResponseMutationNotice result={mutationResult} />
+      <ProviderResponseMutationNotice
+        focusRef={mutationNoticeRef}
+        refreshing={refreshing}
+        result={mutationResult}
+      />
     </section>
   );
 }
 
 function ProviderResponseMutationNotice({
+  focusRef,
+  refreshing,
   result,
-}: Readonly<{ result: PortalReferralProviderResponseResult | undefined }>) {
+}: Readonly<{
+  focusRef: RefObject<HTMLParagraphElement | null>;
+  refreshing: boolean;
+  result: PortalReferralProviderResponseResult | undefined;
+}>) {
   if (!result) return null;
   const message = result.ok
-    ? "Response saved. The authorized offer list was refreshed."
+    ? refreshing
+      ? "Response saved. Refreshing the authorized offer list."
+      : "Response saved. The authorized offer list was refreshed."
     : result.code === "CONFLICT"
       ? "The offer changed. The authorized offer list was refreshed."
       : result.code === "NOT_FOUND"
@@ -772,7 +855,12 @@ function ProviderResponseMutationNotice({
         ? "The response outcome is uncertain. Refresh or retry the same response to reconcile it."
         : providerResponseFailureMessage(result.code);
   return (
-    <p aria-live="polite" className="text-sm text-[#5d6d68]">
+    <p
+      ref={focusRef}
+      aria-live="polite"
+      tabIndex={-1}
+      className="text-sm text-[#5d6d68]"
+    >
       {message}
     </p>
   );

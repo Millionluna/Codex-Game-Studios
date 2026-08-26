@@ -278,6 +278,8 @@ absent; Production remained the default `ACTIVE_HEALTHY` project at the same
 19 migrations.
 This closes the post-review Hosted evidence prerequisite only; it does not
 authorize merge, deployment, activation or Production application.
+The later focus/sign-in UI recovery in the current PR postdates exact gate
+source `44f3bd6`, has local-only evidence and is not claimed by that gate.
 
 ## 12. Legacy Profile / Readiness / Referrals
 

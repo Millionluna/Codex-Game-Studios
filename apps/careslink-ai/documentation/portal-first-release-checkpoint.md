@@ -32,11 +32,14 @@ Historical Portal Assignment M1a Hosted Cookie gate source:
 Current Portal Assignment M1a exact-current Hosted Cookie gate source:
 `43659ab16e9af6d9c73d0a55f8fe8b30b3ce9ee2`
 
-Current Portal Provider Response M1b post-review source:
+Latest Hosted-validated Portal Provider Response M1b implementation source:
 `f45b19c596edd0bdbe01eba17e6e5fa136df5225`
 
-Current Portal Provider Response M1b exact-current Hosted gate source:
+Latest Hosted-validated Portal Provider Response M1b exact-source gate:
 `44f3bd68699dc953e2666bf033dac2b5e26a4d30`
+
+Current Portal Provider Response M1b UI recovery source: this PR's post-gate
+branch state; local-only and not covered by `44f3bd6` Hosted evidence.
 
 Historical pre-review Portal Provider Response M1b Hosted Cookie/Data API gate
 source:
@@ -51,8 +54,9 @@ existing versioned contract documentation. All new Referral and Note generation
 capabilities remain default-off, Production-unapplied and absent from retained
 Preview runtime. Deleted disposable exact-revision Previews supply Hosted
 Cookie/Data API evidence for Assignment M1a, historical pre-review Provider
-Response source `cc1e53c`, and the later exact-current M1b gate source
-`44f3bd6`; they do not make either runtime available. The private worker RPC migration passed
+Response source `cc1e53c`, and the later exact-source M1b gate
+`44f3bd6`; they do not cover the post-gate UI recovery follow-up or make either
+runtime available. The private worker RPC migration passed
 the isolated PostgreSQL 17.6 migration/assertion gate on deleted disposable
 `r9`; deleted no-data `r20` subsequently passed its PostgreSQL 17.6 true
 two-session claim/session/privacy race gate, and deleted no-data `r21` passed
@@ -77,8 +81,8 @@ availability.
 | `/providers`, `/providers/[id]` | `mock-data` | No | Unknown IDs fall back to the first mock provider; no provider table, membership or RLS | Real provider detail after M0 membership; unknown IDs return 404 |
 | `/providers/onboarding`, `/providers/review` | static/mock | No | Forms/buttons imply a save/review that does not occur | Add canonical provider profile and admin review command after identity proof |
 | Provider profile generator | mixed: real `provider_drafts`, mock editing seed | Partial | Draft handoff can use an in-memory fallback and is not a canonical provider | Treat claimed draft only as intake seed |
-| `/provider-portal` | legacy mock remains the gate-off default; a default-off Provider Response M1b workbench exists | Metadata-only own-offer list plus atomic accept/decline behind independent gates; not deployed | Exact gate source `44f3bd6` passed the deleted no-data Hosted re-gate, including real Cookie/Data API 14/14 and active-first/non-null-cursor 2/2; accepted private detail, follow-up, notification, audit list and document/export remain absent | Keep every gate off; treat merge, deployment and activation as separate approvals |
-| `/referrals`, `/referrals/intake`, `/referrals/[id]`, match page | legacy mock remains default; default-off durable intake, exact-tenant source detail and operator Assignment M1a exist | List/create/source-detail plus operator queue/detail/triage/candidates/offer behind independent gates; not deployed | Gate-on assignment pages have no mock fallback and offer does not assign; Provider Response M1b completes accept/decline only on `/provider-portal`, while follow-up and audit remain disabled | Exact-current M1a commit `43659ab` and exact-current M1b gate source `44f3bd6` passed separate deleted no-data Hosted Cookie gates; no deployment or activation is authorized |
+| `/provider-portal` | legacy mock remains the gate-off default; a default-off Provider Response M1b workbench exists | Metadata-only own-offer list plus atomic accept/decline behind independent gates; not deployed | Exact gate source `44f3bd6` passed the deleted no-data Hosted re-gate, including real Cookie/Data API 14/14 and active-first/non-null-cursor 2/2. The later UI-only follow-up restores lost response focus, avoids stealing moved focus and provides a same-origin 401 sign-in return link; it has local evidence only. Accepted private detail, follow-up, notification, audit list and document/export remain absent | Keep every gate off; treat any new Hosted UI gate, merge, deployment and activation as separate approvals |
+| `/referrals`, `/referrals/intake`, `/referrals/[id]`, match page | legacy mock remains default; default-off durable intake, exact-tenant source detail and operator Assignment M1a exist | List/create/source-detail plus operator queue/detail/triage/candidates/offer behind independent gates; not deployed | Gate-on assignment pages have no mock fallback and offer does not assign; Provider Response M1b completes accept/decline only on `/provider-portal`, while follow-up and audit remain disabled | Exact-current M1a commit `43659ab` and latest Hosted-validated M1b gate source `44f3bd6` passed separate deleted no-data Hosted Cookie gates; the current UI follow-up postdates the M1b gate, and no deployment or activation is authorized |
 | `/referral-source-portal` | legacy mock remains default; source-only intake controls are wired and the UUID detail page has a separate gate | List/create/detail only behind independent gates; not deployed | No hosted runtime or activation; the operator slice is independently gated and provider/later workflow actions remain unavailable | Reuse the database-authorized source slice after exact-revision Preview approval |
 | `/referral-workspace/*` | mixed real access/material/outreach stores | Yes, for those tools | These are AI access and outreach tools, not the referral pipeline; some stores have memory fallback | Preserve and later link by canonical referral ID |
 | `/admin`, `/dashboard` | mock global metrics | No | Core pages have no real referral permission gate; must not receive real data yet | Add membership gate, then replace only the assignment queue |
@@ -1657,10 +1661,11 @@ the fixed loopback port.
 
 No Hosted Preview, Vercel deployment, merge, activation or Production write
 occurred in this post-review source batch. Section 32 records the later
-exact-current disposable Hosted re-gate; that evidence closes the re-gate
-prerequisite without itself authorizing merge or advancement toward Production.
+exact-source disposable Hosted re-gate; that evidence closes only the gate for
+`44f3bd6`, without covering the still-later Section 33 UI follow-up or itself
+authorizing merge or advancement toward Production.
 
-## 32. Portal Referral Provider Response M1b exact-current Hosted re-gate — 2026-08-26
+## 32. Portal Referral Provider Response M1b exact-source Hosted re-gate — 2026-08-26
 
 Exact gate source HEAD `44f3bd68699dc953e2666bf033dac2b5e26a4d30`
 is the documentation-only child of implementation source
@@ -1701,14 +1706,15 @@ sentinel, exact seven-field tenant lists, uniform cross-provider/random `404`,
 Origin/media-type denial, stale rejection, ACCEPT and DECLINE exact replay,
 idempotency conflict, exact final lists/database actors, versions,
 assignments, mutation/correlation/payload hashes and timestamps, plus saved-old
-Cookie revocation for Providers A and B. Exact-current delta checks also passed
+Cookie revocation for Providers A and B. Exact-gate-source delta checks also passed
 2/2: two higher-id live offers were selected before the lowest 48 of 50 accepted
 history rows under the 50-row bound, and direct authenticated PostgREST rejected
 the frozen non-null cursor. The built-in browser separately rendered the real
 Provider Portal workbench, reached the signed-out stable state and reported no
-console error or Next error overlay; lifecycle/coalescing/timeout/accessibility
-fault behavior remains attributed to the exact focused 271-test batch rather
-than this minimal Hosted matrix.
+console error or Next error overlay. Lifecycle, coalescing and timeout fault
+behavior remains attributed to the exact focused 271-test batch rather than
+this minimal Hosted matrix. The later response-focus and sign-in recovery work
+in Section 33 is not attributed to either result.
 
 Terminal cleanup left all five workflow flags disabled and Preview-only; all
 four checked Auth tables and all 11 Portal fixture domains contained zero rows;
@@ -1724,7 +1730,32 @@ removed. The exact branch was deleted, and three consecutive branch-list probes
 found both its id and ref absent. Production remained the default
 `ACTIVE_HEALTHY` project with the exact same 19 migration versions captured
 before the gate; it received no SQL, Auth, Data API, route or other write. This
-closes PR #6's post-review Hosted re-gate prerequisite only. No Vercel
+closed PR #6's then-current post-review Hosted re-gate for exact source
+`44f3bd6` only; it does not cover the later UI source in Section 33. No Vercel
 deployment, merge, retained runtime, flag activation, private accepted-detail,
 follow-up, notification, audit listing, document/export or Production approval
 is created by this evidence.
+
+## 33. Portal Referral Provider Response M1b post-gate UI recovery — 2026-08-26
+
+The current PR's later UI-only source resolves the two final-review P2 findings
+without changing the Provider Response route, server adapter, migration, RPC,
+database grants, flags or Production boundary:
+
+- Accept and Decline now move lost keyboard focus to an accurate live result
+  while the authoritative list refreshes, then fall back to the same offer, the
+  first remaining offer or the workbench heading only if the focused interim
+  node disappears. Connected user-selected focus is never taken back during a
+  slow POST or GET.
+- `AUTH_REQUIRED` now renders and focuses a same-origin
+  `/auth/login?next=%2Fprovider-portal` recovery link.
+
+The browser regression was written first and failed on the missing waiting-state
+focus/message, completion focus theft and slow-POST focus theft before the
+implementation passed it. Final local validation passed 8 focused files / 274
+tests, all 143 files / 1,938 tests, TypeScript, full lint, the Next.js 16.2.9
+64/64-page production build, the 73-file adapter check and `git diff --check`.
+
+This source postdates exact Hosted gate source `44f3bd6`. No new paid Preview,
+Hosted/browser re-gate, Vercel deployment, merge, activation or Production write
+was performed, so the prior Hosted evidence remains exact only for `44f3bd6`.

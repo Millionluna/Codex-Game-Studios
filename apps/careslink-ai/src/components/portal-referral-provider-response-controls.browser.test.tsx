@@ -485,44 +485,244 @@ describe("Portal referral provider response coordinator browser state", () => {
     expect(offerReads).toBe(2);
   });
 
-  it("blocks duplicate responses and refreshes the authoritative list after success", async () => {
-    const response = deferred<Response>();
+  it.each([
+    [
+      "accept",
+      "Accept / 接受",
+      "Decline / 拒绝",
+      "Accepting…",
+      "ACCEPTED",
+      /^portal\.provider-response\.accept:/,
+    ],
+    [
+      "decline",
+      "Decline / 拒绝",
+      "Accept / 接受",
+      "Declining…",
+      "TRIAGED",
+      /^portal\.provider-response\.decline:/,
+    ],
+  ] as const)(
+    "blocks duplicate %s responses, refreshes authority, and restores focus",
+    async (
+      _label,
+      decisionButtonLabel,
+      competingButtonLabel,
+      pendingLabel,
+      responseStatus,
+      idempotencyKeyPattern,
+    ) => {
+      const response = deferred<Response>();
+      const refreshed = deferred<Response>();
+      let offerReads = 0;
+      const fetcher = vi.fn(
+        async (input: RequestInfo | URL, init?: RequestInit) => {
+          if (String(input) === offersUrl() && init?.method === "GET") {
+            offerReads += 1;
+            if (offerReads === 1) {
+              return jsonResponse({ items: [offer()] });
+            }
+            if (offerReads === 2) return refreshed.promise;
+            throw new Error(`Unexpected duplicate refresh ${offerReads}`);
+          }
+          if (
+            String(input) === responseUrl(MATCH_A) &&
+            init?.method === "POST"
+          ) {
+            return response.promise;
+          }
+          throw new Error(
+            `Unexpected request: ${init?.method} ${String(input)}`,
+          );
+        },
+      );
+      vi.stubGlobal("fetch", fetcher);
+
+      await renderCoordinator();
+      await waitForText("Accept / 接受");
+      const decisionButton = buttons(
+        decisionButtonLabel,
+      )[0] as HTMLButtonElement;
+      decisionButton.focus();
+      expect(document.activeElement).toBe(decisionButton);
+      await clickButton(decisionButtonLabel);
+      await waitForText(pendingLabel);
+      await clickButton(competingButtonLabel);
+      expect(postCalls(fetcher)).toHaveLength(1);
+      const refreshButton = buttons("Refresh offers / 刷新邀约")[0];
+      expect(refreshButton).toBeInstanceOf(HTMLButtonElement);
+      expect((refreshButton as HTMLButtonElement).disabled).toBe(true);
+      await clickButton("Refresh offers / 刷新邀约");
+      expect(offerReads).toBe(1);
+
+      await act(async () => {
+        response.resolve(
+          jsonResponse({
+            referralId: REFERRAL_A,
+            matchId: MATCH_A,
+            currentStatus: responseStatus,
+            rowVersion: 4,
+            updatedAt: UPDATED_AT,
+          }),
+        );
+        await response.promise;
+      });
+      await waitForText("Refreshing the authorized offer list");
+      const refreshingNotice = elementWithText(
+        "p",
+        "Response saved. Refreshing the authorized offer list.",
+      );
+      expect(refreshingNotice?.getAttribute("tabindex")).toBe("-1");
+      expect(document.activeElement).toBe(refreshingNotice);
+      const userSelectedHeading = elementWithText(
+        "h2",
+        "My authorized referral offers / 我的邀约",
+      ) as HTMLHeadingElement;
+      userSelectedHeading.focus();
+      expect(document.activeElement).toBe(userSelectedHeading);
+
+      await act(async () => {
+        refreshed.resolve(
+          jsonResponse({
+            items:
+              responseStatus === "ACCEPTED"
+                ? [
+                    offer({
+                      matchStatus: "ACCEPTED",
+                      currentStatus: "ACCEPTED",
+                      rowVersion: 4,
+                    }),
+                  ]
+                : [],
+          }),
+        );
+        await refreshed.promise;
+      });
+      await waitForText(
+        responseStatus === "ACCEPTED"
+          ? "Response is read-only"
+          : "No authorized referral offers",
+      );
+
+      expect(offerReads).toBe(2);
+      expect(postCalls(fetcher)).toHaveLength(1);
+      expect(buttons("Accept / 接受")).toHaveLength(0);
+      expect(buttons("Decline / 拒绝")).toHaveLength(0);
+      expect(text()).toContain("Response saved");
+      const mutationNotice = elementWithText("p", "Response saved");
+      expect(mutationNotice?.getAttribute("tabindex")).toBe("-1");
+      expect(document.activeElement).toBe(userSelectedHeading);
+      const postInit = postCalls(fetcher)[0]?.[1];
+      expect(new Headers(postInit?.headers).get("idempotency-key")).toMatch(
+        idempotencyKeyPattern,
+      );
+    },
+  );
+
+  it("falls back to the reconciled offer heading when the interim notice is removed", async () => {
+    const refreshed = deferred<Response>();
     let offerReads = 0;
-    const fetcher = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      if (String(input) === offersUrl() && init?.method === "GET") {
-        offerReads += 1;
-        return jsonResponse({
-          items: [
-            offer(
-              offerReads === 1
-                ? {}
-                : {
-                    matchStatus: "ACCEPTED",
-                    currentStatus: "ACCEPTED",
-                    rowVersion: 4,
-                  },
-            ),
-          ],
-        });
-      }
-      if (String(input) === responseUrl(MATCH_A) && init?.method === "POST") {
-        return response.promise;
-      }
-      throw new Error(`Unexpected request: ${init?.method} ${String(input)}`);
-    });
+    const fetcher = vi.fn(
+      async (input: RequestInfo | URL, init?: RequestInit) => {
+        if (String(input) === offersUrl() && init?.method === "GET") {
+          offerReads += 1;
+          if (offerReads === 1) return jsonResponse({ items: [offer()] });
+          if (offerReads === 2) return refreshed.promise;
+          throw new Error(`Unexpected duplicate refresh ${offerReads}`);
+        }
+        if (
+          String(input) === responseUrl(MATCH_A) &&
+          init?.method === "POST"
+        ) {
+          return jsonResponse({
+            referralId: REFERRAL_A,
+            matchId: MATCH_A,
+            currentStatus: "ACCEPTED",
+            rowVersion: 99,
+            updatedAt: UPDATED_AT,
+          });
+        }
+        throw new Error(`Unexpected request: ${init?.method} ${String(input)}`);
+      },
+    );
     vi.stubGlobal("fetch", fetcher);
 
     await renderCoordinator();
     await waitForText("Accept / 接受");
+    const acceptButton = buttons("Accept / 接受")[0] as HTMLButtonElement;
+    acceptButton.focus();
+    expect(document.activeElement).toBe(acceptButton);
+    await clickButton("Accept / 接受");
+    await waitForText("response outcome is uncertain");
+    const interimNotice = elementWithText(
+      "p",
+      "The response outcome is uncertain",
+    );
+    expect(document.activeElement).toBe(interimNotice);
+
+    await act(async () => {
+      refreshed.resolve(
+        jsonResponse({
+          items: [
+            offer({
+              matchStatus: "ACCEPTED",
+              currentStatus: "ACCEPTED",
+              rowVersion: 4,
+            }),
+          ],
+        }),
+      );
+      await refreshed.promise;
+    });
+    await waitForText("Response is read-only");
+
+    expect(offerReads).toBe(2);
+    expect(
+      elementWithText("p", "The response outcome is uncertain"),
+    ).toBeUndefined();
+    const reconciledOfferHeading = elementWithText(
+      "h3",
+      "Melbourne / 墨尔本 · Support coordination / 支持协调",
+    );
+    expect(reconciledOfferHeading?.getAttribute("tabindex")).toBe("-1");
+    expect(document.activeElement).toBe(reconciledOfferHeading);
+  });
+
+  it("does not steal focus moved while a provider response is still submitting", async () => {
+    const response = deferred<Response>();
+    const refreshed = deferred<Response>();
+    let offerReads = 0;
+    const fetcher = vi.fn(
+      async (input: RequestInfo | URL, init?: RequestInit) => {
+        if (String(input) === offersUrl() && init?.method === "GET") {
+          offerReads += 1;
+          if (offerReads === 1) return jsonResponse({ items: [offer()] });
+          if (offerReads === 2) return refreshed.promise;
+          throw new Error(`Unexpected duplicate refresh ${offerReads}`);
+        }
+        if (
+          String(input) === responseUrl(MATCH_A) &&
+          init?.method === "POST"
+        ) {
+          return response.promise;
+        }
+        throw new Error(`Unexpected request: ${init?.method} ${String(input)}`);
+      },
+    );
+    vi.stubGlobal("fetch", fetcher);
+
+    await renderCoordinator();
+    await waitForText("Accept / 接受");
+    const acceptButton = buttons("Accept / 接受")[0] as HTMLButtonElement;
+    acceptButton.focus();
     await clickButton("Accept / 接受");
     await waitForText("Accepting…");
-    await clickButton("Decline / 拒绝");
-    expect(postCalls(fetcher)).toHaveLength(1);
-    const refreshButton = buttons("Refresh offers / 刷新邀约")[0];
-    expect(refreshButton).toBeInstanceOf(HTMLButtonElement);
-    expect((refreshButton as HTMLButtonElement).disabled).toBe(true);
-    await clickButton("Refresh offers / 刷新邀约");
-    expect(offerReads).toBe(1);
+    const userSelectedHeading = elementWithText(
+      "h2",
+      "My authorized referral offers / 我的邀约",
+    ) as HTMLHeadingElement;
+    userSelectedHeading.focus();
+    expect(document.activeElement).toBe(userSelectedHeading);
 
     await act(async () => {
       response.resolve(
@@ -536,16 +736,16 @@ describe("Portal referral provider response coordinator browser state", () => {
       );
       await response.promise;
     });
-    await waitForText("Response is read-only");
+    await waitForText("Refreshing the authorized offer list");
 
-    expect(offerReads).toBe(2);
-    expect(postCalls(fetcher)).toHaveLength(1);
-    expect(buttons("Accept / 接受")).toHaveLength(0);
-    expect(text()).toContain("Response saved");
-    const postInit = postCalls(fetcher)[0]?.[1];
-    expect(new Headers(postInit?.headers).get("idempotency-key")).toMatch(
-      /^portal\.provider-response\.accept:/,
-    );
+    expect(document.activeElement).toBe(userSelectedHeading);
+
+    await act(async () => {
+      refreshed.resolve(jsonResponse({ items: [] }));
+      await refreshed.promise;
+    });
+    await waitForText("No authorized referral offers");
+    expect(document.activeElement).toBe(userSelectedHeading);
   });
 
   it.each([
@@ -835,6 +1035,11 @@ describe("Portal referral provider response coordinator browser state", () => {
 
       await renderCoordinator();
       await waitForText("Melbourne / 墨尔本");
+      const declineButton = buttons("Decline / 拒绝")[0] as HTMLButtonElement;
+      if (status === 401) {
+        declineButton.focus();
+        expect(document.activeElement).toBe(declineButton);
+      }
       await clickButton("Decline / 拒绝");
       await waitForText(
         status === 401
@@ -848,6 +1053,15 @@ describe("Portal referral provider response coordinator browser state", () => {
       expect(text()).not.toContain("Melbourne / 墨尔本");
       expect(text()).not.toContain("must-not-render");
       expect(text()).not.toContain("Accept / 接受");
+      const signInLink = elementWithText("a", "Sign in again / 重新登录");
+      if (status === 401) {
+        expect(signInLink?.getAttribute("href")).toBe(
+          "/auth/login?next=%2Fprovider-portal",
+        );
+        expect(document.activeElement).toBe(signInLink);
+      } else {
+        expect(signInLink).toBeUndefined();
+      }
     },
   );
 
@@ -1023,6 +1237,12 @@ async function advanceRequestTimeout() {
 
 function text() {
   return container.textContent ?? "";
+}
+
+function elementWithText(selector: string, expected: string) {
+  return [...container.querySelectorAll(selector)].find((candidate) =>
+    candidate.textContent?.includes(expected),
+  );
 }
 
 function labelledByName(button: Element) {
