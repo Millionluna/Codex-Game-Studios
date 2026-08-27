@@ -1853,6 +1853,33 @@ This does not prove a live, data-bearing cross-migration upgrade. The `202608100
 | Portal Referral Follow-up M1c runtime | M1c migration contract, route/runtime/Supabase/UI/browser tests, rollback suite and retained local concurrency lifecycle | default-off exact-provider accepted private detail plus five-code follow-up; A/B isolation, strict DTO/ACK, post-lock session checks, actor-bound hashes, atomic follow-up/audit/receipt/version writes and PII-safe resource/epoch-fenced lifecycle/replay are source/local tested. Receipt replay now takes referral→ordered-match locks and revalidates live session/assignment/status/coherent accepted tuple before reusing the ACK; `CLOSED` residual bindings fail closed. The application checkpoint passed 336 focused, 2,011 then-current full tests and 64/64 build pages; the post-review exact local gate passed 2/28 focused concurrency-policy tests, 149/2,039 current full tests and all 8/8 PostgreSQL 16.15 true multi-backend races twice through fresh no-TCP private-socket clusters with exact cleanup and an exact-hash-pinned live harness. Hosted Auth/Data API, deployment, activation and Production remain unproved |
 | Runtime isolation | `src/lib/v1/runtime-boundary.test.ts` | audited NDIS routes and the new `/v1` adapter are the only allowed server boundaries; `/v1` remains disabled without explicit adapters |
 
+### Communication Note provider-evaluation source gate — 2026-08-27
+
+The first Communication-specific provider slice adds a real fixed-endpoint
+OpenAI Responses HTTPS adapter and a digest-bound evaluation policy, while
+keeping the adapter unreachable from routes and worker registries. Three deeply
+frozen synthetic fixtures cover English, Simplified Chinese, Traditional
+Chinese and mixed-language inputs. Exact Arabic-number multisets, required fact
+markers, shared privacy/output checks and Communication decision-language
+refusals fail closed. The runtime adapter additionally requires a matching local
+event date/hour-minute and exact non-date Arabic-number quantity multisets in
+all three drafts; source-backed additional dates/times remain valid, while lists
+cannot introduce new numeric tokens.
+Provider responses require the exact policy model and Response object, one
+completed assistant output, bounded JSON and strict candidate keys; unverified
+`EXACT` model revisions are rejected, and error bodies, note text, raw provider
+IDs, facts and credentials are absent from evidence.
+
+The focused gate passes 79 tests across the provider, golden/refusal,
+registered-worker and runtime-boundary suites, and TypeScript passes with no
+emit. The full local gate passes 151 test files / 2,062 tests, full lint and a
+64/64-page Next 16.2.9 production build using webpack. Every provider call is
+mocked. The test-only model identifier is not an approved current model. There
+was no OpenAI call, API-key or environment change, database/Points activity,
+route/UI, deployment, commit or push. Readiness stays compile-time `false`.
+Detailed scope and activation blockers are in
+`documentation/communication-note-provider-evaluation-m1d.md`.
+
 ### Current live/read-only evidence
 
 - Supabase migrations, tables, RLS flags, policies, grants, function grants and aggregate row counts were checked read-only.

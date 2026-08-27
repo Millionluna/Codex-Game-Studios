@@ -120,6 +120,31 @@ export type CaresLinkV1NoteProviderCost =
       pricingVersion: string;
     }>;
 
+export const CARESLINK_V1_NOTE_PROVIDER_EXECUTION_REASONS = [
+  "PROVIDER_TRANSIENT",
+  "PROVIDER_PERMANENT",
+  "PROVIDER_OUTPUT_INVALID",
+  "CANCELLED",
+  "POLICY_MISMATCH",
+] as const;
+
+export type CaresLinkV1NoteProviderExecutionReason =
+  (typeof CARESLINK_V1_NOTE_PROVIDER_EXECUTION_REASONS)[number];
+
+/**
+ * Content-free adapter failure understood by the registered worker. Provider
+ * response bodies, request IDs, facts and credentials must never be attached.
+ */
+export class CaresLinkV1NoteProviderExecutionError extends Error {
+  readonly reason: CaresLinkV1NoteProviderExecutionReason;
+
+  constructor(reason: CaresLinkV1NoteProviderExecutionReason) {
+    super("Note provider execution failed");
+    this.name = "CaresLinkV1NoteProviderExecutionError";
+    this.reason = reason;
+  }
+}
+
 declare const providerDeadlineAtBrand: unique symbol;
 export type CaresLinkV1NoteProviderDeadlineAt = string &
   Readonly<{ [providerDeadlineAtBrand]: true }>;

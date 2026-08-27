@@ -60,7 +60,11 @@ describe("V1 shadow runtime boundary", () => {
     for (const relativePath of [
       "src/lib/v1/ndis-shadow-integration.server.ts",
       "src/lib/v1/ndis-shadow-repository.server.ts",
+      "src/lib/v1/communication-note-fact-parity.ts",
+      "src/lib/v1/communication-note-golden.ts",
       "src/lib/v1/native-auth-boundary.server.ts",
+      "src/lib/v1/openai-communication-note-provider.server.ts",
+      "src/lib/v1/communication-note-provider-policy.ts",
       "src/lib/v1/privacy-review-scanner.server.ts",
       "src/lib/v1/product-api-auth.server.ts",
       "src/lib/v1/product-api-route.server.ts",
@@ -70,6 +74,14 @@ describe("V1 shadow runtime boundary", () => {
     ]) {
       expect(readFileSync(join(process.cwd(), relativePath), "utf8")).toMatch(
         /^import "server-only";/,
+      );
+    }
+  });
+
+  it("keeps the Communication provider adapter out of every runtime importer", () => {
+    for (const file of walkSourceFiles("src")) {
+      expect(readFileSync(file, "utf8"), file).not.toContain(
+        "openai-communication-note-provider.server",
       );
     }
   });
