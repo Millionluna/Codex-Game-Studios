@@ -8,6 +8,7 @@ import {
   validateCaresLinkV1NoteProviderCandidate,
 } from "./note-generation-output";
 import {
+  CaresLinkV1NoteProviderExecutionError,
   createCaresLinkV1NoteProviderWorkerPolicyBinding,
   validateCaresLinkV1NoteProviderAttemptEvidence,
   validateCaresLinkV1NoteProviderPolicySnapshot,
@@ -760,8 +761,11 @@ async function runProviderWithGuards(input: Readonly<{
       onElapsed() {
         if (stopped) return;
         stopped = true;
-        controller.abort();
-        reject(new CaresLinkV1RegisteredWorkerExecutionError("PROVIDER_TIMEOUT"));
+        const error = new CaresLinkV1RegisteredWorkerExecutionError(
+          "PROVIDER_TIMEOUT",
+        );
+        reject(error);
+        controller.abort(error);
       },
     });
 
@@ -783,12 +787,11 @@ async function runProviderWithGuards(input: Readonly<{
             .catch(() => {
               if (stopped) return;
               stopped = true;
-              controller.abort();
-              reject(
-                new CaresLinkV1RegisteredWorkerExecutionError(
-                  "LEASE_EXPIRED",
-                ),
+              const error = new CaresLinkV1RegisteredWorkerExecutionError(
+                "LEASE_EXPIRED",
               );
+              reject(error);
+              controller.abort(error);
             });
         },
       });
@@ -1154,6 +1157,9 @@ function validateSettlement(
 }
 
 function normalizeFailure(error: unknown): CaresLinkV1RegisteredWorkerSettleReason {
+  if (error instanceof CaresLinkV1NoteProviderExecutionError) {
+    return error.reason;
+  }
   if (error instanceof CaresLinkV1RegisteredWorkerExecutionError) {
     return error.reason;
   }

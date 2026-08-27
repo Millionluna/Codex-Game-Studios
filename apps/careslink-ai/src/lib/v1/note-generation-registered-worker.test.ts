@@ -5,6 +5,7 @@ import { createValidCaresLinkV1CleanedFacts } from "./cleaned-facts-test-fixture
 import { stringifyCaresLinkV1CanonicalJson } from "./canonical-json";
 import type { CaresLinkV1NoteProviderCandidate } from "./note-generation-output";
 import {
+  CaresLinkV1NoteProviderExecutionError,
   createCaresLinkV1NoteProviderAttemptEvidence,
   createCaresLinkV1NoteProviderPolicySnapshot,
   type CaresLinkV1NoteProviderFinishReason,
@@ -477,6 +478,48 @@ describe("CaresLink V1 registered Note worker", () => {
     expect(harness.store.fenceAttempt).not.toHaveBeenCalled();
     expect(harness.store.commitCanonicalSuccess).not.toHaveBeenCalled();
   });
+
+  it.each([
+    ["timeout", "PROVIDER_TIMEOUT"],
+    ["heartbeat", "LEASE_EXPIRED"],
+  ] as const)(
+    "preserves the %s guard reason when abort synchronously rejects the provider",
+    async (trigger, expectedReason) => {
+      const harness = createHarness({
+        ...(trigger === "heartbeat"
+          ? {
+              heartbeat: async () => {
+                throw new Error("lease lost");
+              },
+            }
+          : {}),
+        providerGenerate: async (input) =>
+          new Promise((_resolve, reject) => {
+            input.signal.addEventListener(
+              "abort",
+              () =>
+                reject(
+                  new CaresLinkV1NoteProviderExecutionError("CANCELLED"),
+                ),
+              { once: true },
+            );
+          }),
+      });
+
+      const execution = harness.worker.runNext();
+      await vi.waitFor(() => expect(harness.provider.generate).toHaveBeenCalled());
+      harness.timer.fire(
+        trigger === "heartbeat"
+          ? harness.setup.workerPolicy.heartbeatIntervalMs
+          : harness.setup.workerPolicy.providerDeadlineMs,
+      );
+
+      await expect(execution).resolves.toMatchObject({
+        status: "RETRY_SCHEDULED",
+        reason: expectedReason,
+      });
+    },
+  );
 
   it.each([
     ["OUTPUT_LIMIT", "PROVIDER_OUTPUT_INVALID"],
