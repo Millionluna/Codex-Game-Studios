@@ -2021,6 +2021,77 @@ call, database/Points write, route, deployment, commit or push in M1g-a.
 Detailed scope is in
 `documentation/communication-note-preview-request-body-pins-m1g-a.md`.
 
+### Communication Note owner-authorization shadow contract M1g-b — 2026-08-28
+
+M1g-b literal-pins authority policy digest
+`7804c7d60bb8c686d66a4c0aed74b373023dda672f1ebfa0a8e7c8af4eb7a9d9`
+and adds a server-only Ed25519 verification contract for an external owner
+authorization. The signer key is accepted only through an explicitly injected
+external trust-registry snapshot with enforced purpose/domain/owner/tenant
+scope; a caller-supplied expected binding separately fixes the run. Statement
+digests alone cannot authenticate or self-authorize an envelope. The exact
+statement binds owner, tenant and run
+hashes, a bounded 15-minute window, at least 5 minutes remaining at durable
+claim, all M1e/M1f/M1g-a source digests, the six fixed slots, synthetic-only
+input, environment-evidence hashes and the fixed budget.
+
+The source authority tests cover a valid external Ed25519 signature and reject
+signature recomputation with only a changed SHA-256 digest, untrusted/self-
+supplied key material, cross-purpose/cross-tenant keys, source/slot/budget/time/
+key drift and content-bearing evidence. Receipt vectors keep the client request
+ID, OpenAI `x-request-id` and Responses body `response.id` pairwise distinct;
+bind every content-free reservation field and reservation time; exactly
+recompute the fixed integer-ceiling cost; validate partial ambiguous transport
+plus other outcome-specific shapes; verify a separate CaresLink Ed25519
+signature; and retain
+`providerAttestation=ABSENT` plus the explicit non-proof list.
+
+The paired migration contract must prove five private append-only ledgers,
+enabled plus forced RLS, exact role/function ACLs, empty function search paths,
+no API/service-role access, canonical statement validation, one atomic claim,
+one pre-network reservation per ordered slot and one terminal signed receipt
+per reservation. Each RPC must statically and dynamically reject every
+transaction isolation level other than `READ COMMITTED`. Runtime SQL evidence
+must additionally prove row-lock
+serialization, fresh post-lock time checks, exact response-loss replay without
+token reissue, revocation-before-claim denial, post-claim revocation blocking
+later reservations, ordered slot progression and permanent consumption of
+ambiguous transport. No external HTTP call may occur
+inside a database transaction.
+
+The exact local source gate passed 158 Vitest files / 2,163 tests, the focused
+3-file / 26-test authority gate, TypeScript, ESLint, the 64/64-page Next.js
+webpack production build, the 73-file Codex-adapter sync check and
+`git diff --check`. A fresh private-Unix-socket PostgreSQL 16.15 cluster
+clean-applied 35/35 migrations and passed the 65,918-byte rollback assertion
+(SHA-256
+`cb98ff81ed8d6211cb6ddffcf02d5fde882c60e9f5f07f09b0833c354fa3f1d7`),
+including all five `REPEATABLE READ` rejection probes, before rollback with
+zero fixture rows.
+
+A second fresh no-TCP PostgreSQL 16.15 cluster applied the exact 35-file
+manifest (SHA-256
+`4676531ac4f87ed1d7caf7e949f9663581ca1b1c7707bf2ea7f42cf3b908a986`)
+and passed three true two-backend races with observable
+`Lock/transactionid` waits. Concurrent same-authorization claim returned one
+token and one row while the loser failed `AUTHORIZATION_ALREADY_CLAIMED`.
+Revocation-first caused the waiting reservation to fail
+`AUTHORIZATION_REVOKED` with zero reservation rows. Reservation-first committed
+one dispatch authority before the waiting revocation committed, leaving the
+expected one reservation plus one revocation in timestamp order. The clusters
+used synthetic metadata only; no provider transport, TCP listener or hosted
+resource was involved, and all race-gate resources were stopped and removed.
+
+This is source/local contract evidence only. The database persists an
+authorization or receipt only after the application boundary has verified its
+signature; PostgreSQL does not independently implement or attest the external
+Ed25519 trust registry. Both readiness latches are literal `false`, both
+approved key snapshots are absent and the source has no runtime importer,
+credential, transport or caller grant. No real OpenAI request, paid spend,
+hosted Supabase mutation, retained Preview, route, worker, Points write,
+deployment or Production change is part of M1g-b. Detailed scope is in
+`documentation/communication-note-preview-owner-authorization-m1g-b.md`.
+
 ### Current live/read-only evidence
 
 - Supabase migrations, tables, RLS flags, policies, grants, function grants and aggregate row counts were checked read-only.

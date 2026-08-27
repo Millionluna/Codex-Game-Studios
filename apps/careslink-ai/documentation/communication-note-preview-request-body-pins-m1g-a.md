@@ -1,5 +1,12 @@
 # Communication Note Preview request-body pins M1g-a
 
+> Historical checkpoint: M1g-b now adds a separately default-off source
+> contract for externally trusted owner Ed25519 authorization, an atomic
+> single-use claim, per-slot reservation and CaresLink-signed internal dispatch
+> observations. Its readiness remains `false`, approved keys/callers/transport
+> are absent and `providerAttestation=ABSENT`. See
+> `communication-note-preview-owner-authorization-m1g-b.md`.
+
 ## Status
 
 M1g-a source-pins the exact JSON request-body strings used by the bounded,
@@ -109,10 +116,12 @@ for:
    schema residency limits;
 3. immediate model availability and pricing reconfirmation;
 4. a temporary key, provider-side spend ceiling and verified teardown;
-5. a durable atomic single-use approval claim bound to the body-pin bundle and
-   runner-policy digests;
-6. an authenticated dispatch/execution receipt and real, attributable human
-   semantic review.
+5. approved callers and a deployed durable implementation of M1g-b's
+   source-defined atomic single-use approval claim, bound to the body-pin
+   bundle and runner-policy digests;
+6. approved receipt-key custody and a deployed implementation of M1g-b's
+   CaresLink-signed internal dispatch observation, plus real, attributable
+   human semantic review. The internal observation is not provider attestation.
 
 Until those gates close, request-body-pin readiness, paid runner readiness and
 evaluation readiness remain `false`; every approved snapshot remains absent.

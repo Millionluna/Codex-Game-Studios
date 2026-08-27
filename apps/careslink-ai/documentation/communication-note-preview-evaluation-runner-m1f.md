@@ -6,6 +6,13 @@
 > execution authority and are not a full HTTP/TLS wire capture or external
 > owner approval. See
 > `communication-note-preview-request-body-pins-m1g-a.md`.
+>
+> M1g-b now adds the next default-off source contract: external-trust-registry
+> owner Ed25519 verification, an atomic single-use claim, per-slot reservation
+> and CaresLink-signed internal observation. It does not add approved keys,
+> callers, transport or execution; both readiness latches remain `false` and
+> `providerAttestation=ABSENT`. See
+> `communication-note-preview-owner-authorization-m1g-b.md`.
 
 ## Status
 
@@ -157,12 +164,14 @@ explicit owner authorization:
    Australia-only processing and that Structured Output schemas are system
    data outside regional-residency coverage;
 4. immediate price and model-availability reconfirmation;
-5. an atomic durable single-use approval claim bound to both the M1g-a
-   request-body pin bundle and runner-policy digests, plus key teardown
+5. approved callers and a deployed durable implementation of M1g-b's
+   source-defined single-use claim and per-slot reservation, bound to both the
+   M1g-a request-body pin bundle and runner-policy digests, plus key teardown
    evidence;
-6. a durable authenticated receipt proving the dispatched request-body digest
-   matched the authorized slot, and real, attributable human review rather than
-   the injected contract-test reviewer.
+6. approved receipt-key custody and a deployed implementation of M1g-b's
+   CaresLink-signed internal dispatch observation, plus real, attributable
+   human review rather than the injected contract-test reviewer. The internal
+   observation is explicitly not a provider attestation.
 
 Until those gates close, the externally approved body-pin snapshot, paid
 factory, approved runner policy and readiness latches remain unavailable. No

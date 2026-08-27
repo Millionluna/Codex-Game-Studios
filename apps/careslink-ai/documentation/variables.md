@@ -77,6 +77,22 @@ or runtime-enablement variable is introduced. The pin is
 `UNATTESTED_SOURCE_PIN_ONLY`, is `NOT_EXECUTION_AUTHORITY` and cannot be promoted
 through environment configuration.
 
+Communication Note M1g-b also adds no environment variable. Authority policy
+digest
+`7804c7d60bb8c686d66a4c0aed74b373023dda672f1ebfa0a8e7c8af4eb7a9d9`
+is literal-pinned in source. The approved external-owner signing-key snapshot,
+approved CaresLink receipt-signing-key snapshot and both readiness latches are
+respectively `undefined`, `undefined`, `false` and `false`. A trusted owner key,
+receipt key, claim token, database role credential, temporary OpenAI key,
+provider request/response identifier or activation switch must not be added as
+an ordinary environment fallback. The source-only verifier accepts an
+explicitly injected external trust-registry snapshot for tests/support; that
+snapshot must enforce the disjoint owner/receipt purpose and, for owner keys,
+the exact owner/tenant scope. Injection is not an approved runtime registry or
+execution authority. M1g-b
+therefore cannot be activated by setting `OPENAI_API_KEY`, `OPENAI_MODEL` or any
+existing CaresLink flag.
+
 ## Current auth, URL and feature variables
 
 | Variable | Class | Purpose | Boundary |
