@@ -52,6 +52,17 @@ Table overrides are server configuration. Production should normally use migrati
 | `NDIS_CASE_NOTE_AUTH_IP_DAILY_LIMIT` | Server configuration | current IP abuse cap; default 20 | shared-network trade-off |
 | `GUIDED_AI_RATE_LIMIT_PER_MINUTE` | Server configuration | legacy guided material burst limit; default 6 | not a Points rate |
 
+Communication Note M1e/M1f deliberately add no model, endpoint, token-budget or
+runner environment variable. The inactive synthetic-Preview contract is
+source-bound to `gpt-5.4-mini-2026-03-17`, the closed AU-storage Responses
+endpoint profile, the literal request/manifest/plan/runner digests and fixed
+budget values; `OPENAI_MODEL` and every legacy override above are rejected as
+fallbacks. The paid factories stay unavailable and accept neither an API key
+nor a network transport. The contract-test factory accepts arbitrary trusted
+test callbacks, which are not a credential or network security boundary. The
+runner has no built-in API-key lookup, approved paid snapshot, durable approval
+claim or runtime importer.
+
 ## Current auth, URL and feature variables
 
 | Variable | Class | Purpose | Boundary |

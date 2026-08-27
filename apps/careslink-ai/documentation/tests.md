@@ -1855,16 +1855,18 @@ This does not prove a live, data-bearing cross-migration upgrade. The `202608100
 
 ### Communication Note provider-evaluation source gate — 2026-08-27
 
-The first Communication-specific provider slice adds a real fixed-endpoint
-OpenAI Responses HTTPS adapter and a digest-bound evaluation policy, while
-keeping the adapter unreachable from routes and worker registries. Three deeply
+The historical M1d Communication-specific provider slice introduced a real
+fixed-endpoint OpenAI Responses HTTPS adapter and a digest-bound evaluation
+policy while keeping it unreachable from routes and worker registries. M1e has
+since removed that executable HTTPS path; current execution is limited to an
+injected non-HTTPS mock transport for contract tests. Three deeply
 frozen synthetic fixtures cover English, Simplified Chinese, Traditional
 Chinese and mixed-language inputs. Exact Arabic-number multisets, required fact
 markers, shared privacy/output checks and Communication decision-language
-refusals fail closed. The runtime adapter additionally requires a matching local
-event date/hour-minute and exact non-date Arabic-number quantity multisets in
-all three drafts; source-backed additional dates/times remain valid, while lists
-cannot introduce new numeric tokens.
+refusals fail closed. The current contract-test parser path additionally
+requires a matching local event date/hour-minute and exact non-date
+Arabic-number quantity multisets in all three drafts; source-backed additional
+dates/times remain valid, while lists cannot introduce new numeric tokens.
 Provider responses require the exact policy model and Response object, one
 completed assistant output, bounded JSON and strict candidate keys; unverified
 `EXACT` model revisions are rejected, and error bodies, note text, raw provider
@@ -1879,6 +1881,99 @@ was no OpenAI call, API-key or environment change, database/Points activity,
 route/UI, deployment, commit or push. Readiness stays compile-time `false`.
 Detailed scope and activation blockers are in
 `documentation/communication-note-provider-evaluation-m1d.md`.
+
+### Communication Note Preview-evaluation policy source gate — 2026-08-27
+
+M1e replaced the test-only model alias with the exact evaluation snapshot
+`gpt-5.4-mini-2026-03-17` and adds a separate canonical governance digest for
+the provider-policy digest, closed AU-storage Responses endpoint profile,
+explicit `reasoning:none`, synthetic-only input class, ZDR/amendment
+requirements and dated price evidence. It recorded proposed six-call/US$0.25
+ceilings and all-candidate automated plus human-semantic requirements for a
+future approved runner; it did not claim those aggregate controls were already
+enforced.
+
+The policy tests reject model aliases, arbitrary or malformed endpoint input,
+stale digests, missing/extra fields, recomputed tampered-plan digests and nested
+changes to model, endpoint, reasoning, data posture, budget, fixture set or
+checks. Literal pins cover both full fixture contents and the complete plan.
+The request builder consumes the same frozen plan, requires its provider-policy
+digest to match and obtains the future paid-call URL only through the closed
+endpoint profile. The paid factory remains unavailable and accepts no secret or
+network transport; parser/transport tests use only an injected mock with a
+non-HTTPS URL. At the M1e checkpoint, the runtime-boundary test kept the modules
+server-only and left the adapter absent from all runtime importers.
+
+The plan records Australia regional storage as supported and regional
+processing as unsupported. It separately records that the key's project region
+is not attested and that Structured Output schema system data is outside
+regional-residency coverage. ZDR, the Modified Retention amendment, owner spend
+approval, out-of-region-processing acknowledgement, temporary-key teardown and
+pricing reconfirmation remain unattested; runner budget/report binding was not
+implemented at M1e. Evaluation readiness stays `false`, the approved evaluation
+snapshot stays `undefined`, and every provider-shaped response in tests is
+mocked. No API key, environment, provider call, database/Points write, route,
+deployment, commit or push is part of this source gate. Detailed scope is in
+`documentation/communication-note-preview-evaluation-policy-m1e.md`.
+
+M1f has since closed M1e's static-request reproducibility item by
+literal-pinning the complete system prompt, Structured Output schema and static
+request semantics. The current rendered requests are separately hashed into
+the report, but there is no independent historical wire-format approval pin.
+It also implements the mock-only source runner described below; neither change
+authorizes a paid call.
+
+The final focused M1e gate passes 6 test files / 150 tests. The full local gate
+passes 152 test files / 2,081 tests, TypeScript with no emit, full lint and the
+64/64-page Next 16.2.9 webpack production build. The repository-level Codex
+adapter check passes all 73 generated files and `git diff --check` passes.
+
+### Communication Note one-shot Preview-evaluation runner source gate — 2026-08-27
+
+M1f binds the literal request-template digest, fixed six-slot manifest, revised
+plan digest, dedicated one-attempt/no-retry worker policy and one-shot runner
+policy. All six requests are rendered, hashed and token-counted before any
+provider dispatch. The maximum 10,000 input and 2,400 output tokens reserve
+20,130 micro-USD per call and 120,780 micro-USD total against the fixed
+250,000-micro-USD ceiling. Calls are serial, any failure is terminal and no
+seventh call or fallback can occur.
+
+The runner tests cover policy and digest drift, deep freezing, the unavailable
+paid factory, forged-provider rejection, complete-preflight ordering and exact
+frozen requests, exact manifest order, six success calls and 18 language
+reviews, BigInt rounding, conservative cached-token reconciliation, positive
+usage and all input/output/cached/reasoning bounds, provider and trusted-callback
+deadlines, cancellation at each asynchronous boundary, golden/schema failures,
+unique non-null provider-request-ID hashes, same-ID synchronous/concurrent/replay
+reuse, different-ID conflict, content-redacted errors, semantic report tampering
+after digest recomputation and absence of built-in environment, global-fetch,
+HTTPS and credential paths. The runtime-boundary suite permits the provider
+import only from this source-only runner and proves that no other source runtime
+imports the runner.
+
+The successful mock report is recursively frozen and contains only source
+digests, fixture IDs/ordinals, hashes, token/cost values, timestamps and pass
+flags. Raw facts, drafts, prompts, provider request IDs, run IDs, response/error
+bodies and credentials are absent. Calculated cost is explicitly an upper bound
+rather than an invoice amount. The report labels itself
+`UNATTESTED_TEST_CONTRACT_ONLY`: its recomputable digest provides internal
+integrity, not source authentication.
+
+The focused M1f gate passes 6 files / 85 tests. The complete local gate passes
+155 files / 2,126 tests, TypeScript with no emit, full lint, the 64/64-page Next
+16.2.9 webpack production build, all 73 generated Codex-adapter checks and
+`git diff --check`. All provider responses, token counts and review results are
+injected trusted test callbacks; those callbacks are arbitrary code and do not
+form a network security boundary. Paid readiness remains `false`, the approved
+runner policy is `undefined`, and the paid factory remains unavailable. An
+independently approved exact wire request, durable single-use approval claim,
+authenticated execution receipt, provider-side project spend cap and temporary
+key, real reviewer attribution, Australia project/ZDR/Modified-Retention
+attestations, processing acknowledgement and immediate price reconfirmation
+remain P1 prerequisites for any separately authorized synthetic call. No
+OpenAI call, database/Points write, route, deployment, commit or push is part of
+M1f. Detailed scope is in
+`documentation/communication-note-preview-evaluation-runner-m1f.md`.
 
 ### Current live/read-only evidence
 

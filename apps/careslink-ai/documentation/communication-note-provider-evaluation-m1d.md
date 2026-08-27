@@ -1,14 +1,24 @@
 # Communication Note provider-evaluation M1d
 
+> Historical checkpoint: the past-tense M1d state below is not the current
+> transport boundary. M1e superseded the test-only model injection and global
+> endpoint with a source-frozen evaluation snapshot and AU-storage endpoint
+> profile, removed the built-in real HTTPS execution path, and retained a
+> non-HTTPS identifier plus arbitrary trusted test callback for contract tests.
+> The callback is not a network or credential security boundary. See
+> `communication-note-preview-evaluation-policy-m1e.md`. M1e still authorizes no
+> provider call or runtime activation. M1f now adds the mock-only source runner;
+> see `communication-note-preview-evaluation-runner-m1f.md`.
+
 ## Status
 
-This batch adds the first real provider adapter for the approved V1 Note scope:
-Communication Note. It is source-only and remains unreachable from every route,
-worker registry and deployment.
+M1d introduced the first provider request/parser checkpoint for the approved V1
+Note scope: Communication Note. At that historical checkpoint, it was
+source-only and unreachable from every route, worker registry and deployment.
 
-| Boundary | Current state |
+| Boundary | Historical M1d state |
 |---|---|
-| Provider transport | Real server-only HTTPS adapter for OpenAI Responses |
+| Provider transport | Then-present server-only HTTPS adapter for OpenAI Responses; removed as an executable path by M1e |
 | Provider/model policy | Explicit evaluation candidate only; no current/default model |
 | Evaluation | Mocked-fetch contract tests and synthetic offline golden/refusal fixtures |
 | Real OpenAI calls | Zero in this batch |
@@ -23,15 +33,16 @@ a selected current model, a pricing assertion or an activation decision.
 
 ## Frozen source contract
 
-`communication-note-provider-policy.ts` fixes the provider ID plus prompt,
-golden-set and parser versions. A caller must inject an exact model ID, revision
-posture and timeout before the generic policy digest is created. This adapter
-currently accepts only `PROVIDER_NOT_EXPOSED` with a null separate revision;
-`EXACT` cannot enter evidence unless a later adapter can request and verify it.
+`communication-note-provider-policy.ts` fixed the provider ID plus prompt,
+golden-set and parser versions. At M1d, a caller had to inject an exact model ID,
+revision posture and timeout before the generic policy digest was created. That
+historical adapter accepted only `PROVIDER_NOT_EXPOSED` with a null separate
+revision; `EXACT` could not enter evidence unless a later adapter could request
+and verify it. M1e instead source-freezes the exact model snapshot and timeout.
 There is no environment lookup, endpoint override, fallback model or automatic
 retry.
 
-`openai-communication-note-provider.server.ts`:
+At the M1d checkpoint, `openai-communication-note-provider.server.ts`:
 
 - accepts only the explicit `DISPOSABLE_PREVIEW_EVALUATION_ONLY` capability;
 - sends only the Note type, source locale and validated cleaned facts to the
@@ -106,7 +117,10 @@ All blockers are deliberate and compile-time visible:
 7. `POINTS_NOT_BOUND`
 8. `PRODUCTION_ACTIVATION_NOT_AUTHORIZED`
 
-The next safe batch is an explicitly approved, disposable Preview evaluation
-using synthetic de-identified fixtures only. After that evidence is reviewed,
-model/prompt/golden/parser policy may be frozen before any payload-vault,
-registered-worker, served route, Points or UI integration is considered.
+M1e completed the following model/data-plan freeze, and M1f later implemented
+the one-shot budget/fixture/report source contract. The paid Preview factory
+still remains unavailable. Only after a durable single-use approval boundary,
+provider-side spend/key controls, real reviewer attribution and every external
+attestation exist may the owner separately authorize disposable synthetic
+Preview calls. Payload-vault, registered-worker, served route, Points and UI
+integration remain later decisions.
