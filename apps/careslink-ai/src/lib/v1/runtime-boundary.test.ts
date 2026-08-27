@@ -62,6 +62,10 @@ describe("V1 shadow runtime boundary", () => {
       "src/lib/v1/ndis-shadow-repository.server.ts",
       "src/lib/v1/communication-note-fact-parity.ts",
       "src/lib/v1/communication-note-golden.ts",
+      "src/lib/v1/communication-note-openai-request-template.ts",
+      "src/lib/v1/communication-note-preview-evaluation-manifest.ts",
+      "src/lib/v1/communication-note-preview-evaluation-policy.ts",
+      "src/lib/v1/communication-note-preview-evaluation-runner.server.ts",
       "src/lib/v1/native-auth-boundary.server.ts",
       "src/lib/v1/openai-communication-note-provider.server.ts",
       "src/lib/v1/communication-note-provider-policy.ts",
@@ -78,12 +82,29 @@ describe("V1 shadow runtime boundary", () => {
     }
   });
 
-  it("keeps the Communication provider adapter out of every runtime importer", () => {
-    for (const file of walkSourceFiles("src")) {
-      expect(readFileSync(file, "utf8"), file).not.toContain(
+  it("isolates the Communication provider adapter to the source-only evaluation runner", () => {
+    const runner = join(
+      process.cwd(),
+      "src/lib/v1/communication-note-preview-evaluation-runner.server.ts",
+    );
+    const importers = walkSourceFiles("src").filter((file) =>
+      readFileSync(file, "utf8").includes(
         "openai-communication-note-provider.server",
-      );
-    }
+      ),
+    );
+    expect(importers).toEqual([runner]);
+    expect(readFileSync(runner, "utf8")).toContain(
+      "MOCKED_CONTRACT_TEST_ONLY",
+    );
+
+    const runnerImporters = walkSourceFiles("src").filter(
+      (file) =>
+        file !== runner &&
+        readFileSync(file, "utf8").includes(
+          "communication-note-preview-evaluation-runner",
+        ),
+    );
+    expect(runnerImporters).toEqual([]);
   });
 
   it("exposes the privacy review as a physical POST-only route", () => {

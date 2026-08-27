@@ -14,6 +14,10 @@ import type { CaresLinkV1NoteProviderCandidate } from "./note-generation-output"
 
 export const CARESLINK_V1_OPENAI_RESPONSES_PROVIDER_ID =
   "openai.responses" as const;
+export const CARESLINK_V1_OPENAI_COMMUNICATION_NOTE_EVALUATION_MODEL_ID =
+  "gpt-5.4-mini-2026-03-17" as const;
+export const CARESLINK_V1_OPENAI_COMMUNICATION_NOTE_TIMEOUT_MS =
+  30_000 as const;
 export const CARESLINK_V1_COMMUNICATION_NOTE_PROMPT_TEMPLATE_VERSION =
   "prompt.communication.2026-08-27.v1" as const;
 export const CARESLINK_V1_COMMUNICATION_NOTE_GOLDEN_SET_VERSION =
@@ -21,11 +25,12 @@ export const CARESLINK_V1_COMMUNICATION_NOTE_GOLDEN_SET_VERSION =
 export const CARESLINK_V1_COMMUNICATION_NOTE_PARSER_VERSION =
   "parser.communication.responses-json.2026-08-27.v1" as const;
 export const CARESLINK_V1_COMMUNICATION_NOTE_PROVIDER_POLICY_VERSION =
-  "policy.communication.openai.preview-evaluation.v1" as const;
+  "policy.communication.openai.preview-evaluation.m1f.v3" as const;
 
 /**
- * A real adapter exists, but no model policy, worker registration, route or
- * deployment imports it. This latch must stay false until those gates close.
+ * The request/parser contract exists, but M1f exposes no paid HTTPS transport;
+ * no model policy, worker registration, route or deployment imports it. This
+ * latch must stay false until those gates close.
  */
 export const CARESLINK_V1_OPENAI_COMMUNICATION_NOTE_PROVIDER_READY =
   false as const;
@@ -42,30 +47,13 @@ export const CARESLINK_V1_OPENAI_COMMUNICATION_NOTE_ACTIVATION_BLOCKERS =
     "PRODUCTION_ACTIVATION_NOT_AUTHORIZED",
   ] as const);
 
-type CandidateInput = Readonly<{
-  capability: "DRAFT_PREVIEW_EVALUATION_ONLY";
-  modelId: string;
-  modelRevision: null;
-  modelRevisionAvailability: "PROVIDER_NOT_EXPOSED";
-  timeoutMs: number;
-}>;
-
 /**
- * Builds a digest-bound evaluation candidate without selecting a current
- * model. The caller must supply the model explicitly; there is no fallback.
+ * Builds the one digest-bound M1f evaluation candidate. The immutable model
+ * snapshot and timeout are source-frozen; there is no alias, current-model
+ * lookup, environment override or fallback.
  */
 export function createCaresLinkV1CommunicationNoteProviderPolicyCandidate(
-  input: CandidateInput,
 ): CaresLinkV1NoteProviderPolicySnapshot {
-  if (input.capability !== "DRAFT_PREVIEW_EVALUATION_ONLY") {
-    throw invalid("Communication Note provider policy is unavailable");
-  }
-  if (
-    input.modelRevision !== null ||
-    input.modelRevisionAvailability !== "PROVIDER_NOT_EXPOSED"
-  ) {
-    throw invalid("Communication Note provider model revision is unavailable");
-  }
   return createCaresLinkV1NoteProviderPolicySnapshot({
     noteType: "communication",
     serviceCode: "note.communication.generate",
@@ -73,15 +61,15 @@ export function createCaresLinkV1CommunicationNoteProviderPolicyCandidate(
     schemaVersion: CARESLINK_V1_NOTE_SCHEMA_VERSION,
     rateCatalogVersion: CARESLINK_V1_RATE_CATALOG_VERSION,
     providerId: CARESLINK_V1_OPENAI_RESPONSES_PROVIDER_ID,
-    modelId: input.modelId,
-    modelRevision: input.modelRevision,
-    modelRevisionAvailability: input.modelRevisionAvailability,
+    modelId: CARESLINK_V1_OPENAI_COMMUNICATION_NOTE_EVALUATION_MODEL_ID,
+    modelRevision: null,
+    modelRevisionAvailability: "PROVIDER_NOT_EXPOSED",
     policyVersion: CARESLINK_V1_COMMUNICATION_NOTE_PROVIDER_POLICY_VERSION,
     promptTemplateVersion:
       CARESLINK_V1_COMMUNICATION_NOTE_PROMPT_TEMPLATE_VERSION,
     goldenSetVersion: CARESLINK_V1_COMMUNICATION_NOTE_GOLDEN_SET_VERSION,
     parserVersion: CARESLINK_V1_COMMUNICATION_NOTE_PARSER_VERSION,
-    timeoutMs: input.timeoutMs,
+    timeoutMs: CARESLINK_V1_OPENAI_COMMUNICATION_NOTE_TIMEOUT_MS,
   });
 }
 
@@ -92,6 +80,8 @@ export function assertCaresLinkV1CommunicationNoteProviderPolicy(
     value.noteType !== "communication" ||
     value.serviceCode !== "note.communication.generate" ||
     value.providerId !== CARESLINK_V1_OPENAI_RESPONSES_PROVIDER_ID ||
+    value.modelId !==
+      CARESLINK_V1_OPENAI_COMMUNICATION_NOTE_EVALUATION_MODEL_ID ||
     value.modelRevision !== null ||
     value.modelRevisionAvailability !== "PROVIDER_NOT_EXPOSED" ||
     value.policyVersion !==
@@ -100,7 +90,8 @@ export function assertCaresLinkV1CommunicationNoteProviderPolicy(
       CARESLINK_V1_COMMUNICATION_NOTE_PROMPT_TEMPLATE_VERSION ||
     value.goldenSetVersion !==
       CARESLINK_V1_COMMUNICATION_NOTE_GOLDEN_SET_VERSION ||
-    value.parserVersion !== CARESLINK_V1_COMMUNICATION_NOTE_PARSER_VERSION
+    value.parserVersion !== CARESLINK_V1_COMMUNICATION_NOTE_PARSER_VERSION ||
+    value.timeoutMs !== CARESLINK_V1_OPENAI_COMMUNICATION_NOTE_TIMEOUT_MS
   ) {
     throw invalid("Communication Note provider policy does not match the adapter");
   }

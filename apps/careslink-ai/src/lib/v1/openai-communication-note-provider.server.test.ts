@@ -6,13 +6,18 @@ import {
   CARESLINK_V1_COMMUNICATION_NOTE_PARSER_VERSION,
   CARESLINK_V1_COMMUNICATION_NOTE_PROVIDER_POLICY_VERSION,
   CARESLINK_V1_COMMUNICATION_NOTE_PROMPT_TEMPLATE_VERSION,
+  CARESLINK_V1_OPENAI_COMMUNICATION_NOTE_EVALUATION_MODEL_ID,
   CARESLINK_V1_OPENAI_COMMUNICATION_NOTE_ACTIVATION_BLOCKERS,
   CARESLINK_V1_OPENAI_COMMUNICATION_NOTE_PROVIDER_READY,
   createCaresLinkV1CommunicationNoteProviderPolicyCandidate,
 } from "./communication-note-provider-policy";
 import {
+  CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_EVALUATION_PLAN,
+} from "./communication-note-preview-evaluation-policy";
+import {
   CaresLinkV1OpenAiCommunicationNoteProviderError,
   buildCaresLinkV1OpenAiCommunicationNoteResponsesRequest,
+  createCaresLinkV1OpenAiCommunicationNoteContractTestProvider,
   createCaresLinkV1OpenAiCommunicationNotePreviewProvider,
   type CaresLinkV1OpenAiCommunicationNoteFetch,
 } from "./openai-communication-note-provider.server";
@@ -74,6 +79,8 @@ describe("OpenAI Communication Note provider", () => {
       "utf8",
     );
     expect(source).not.toContain("process.env");
+    expect(source).not.toMatch(/\bfetch\s*\(/);
+    expect(source).toContain("careslink-contract-test://openai-responses");
     expect(source).not.toMatch(/DEFAULT_MODEL|CURRENT_MODEL/);
   });
 
@@ -82,18 +89,22 @@ describe("OpenAI Communication Note provider", () => {
     const facts = createValidCaresLinkV1CleanedFacts("communication");
     const request = buildCaresLinkV1OpenAiCommunicationNoteResponsesRequest({
       policySnapshot: policy,
+      evaluationPlanSnapshot:
+        CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_EVALUATION_PLAN,
       sourceLocale: "zh-Hans",
       cleanedFacts: facts,
     });
 
     expect(request).toMatchObject({
-      model: "gpt-5.4-mini",
+      model: CARESLINK_V1_OPENAI_COMMUNICATION_NOTE_EVALUATION_MODEL_ID,
       store: false,
       background: false,
+      service_tier: "default",
       truncation: "disabled",
       tools: [],
       tool_choice: "none",
       parallel_tool_calls: false,
+      reasoning: { effort: "none" },
       text: {
         format: {
           type: "json_schema",
@@ -120,6 +131,8 @@ describe("OpenAI Communication Note provider", () => {
         "max_output_tokens",
         "model",
         "parallel_tool_calls",
+        "reasoning",
+        "service_tier",
         "store",
         "text",
         "tool_choice",
@@ -175,6 +188,8 @@ describe("OpenAI Communication Note provider", () => {
     };
     const request = buildCaresLinkV1OpenAiCommunicationNoteResponsesRequest({
       policySnapshot: providerPolicy(),
+      evaluationPlanSnapshot:
+        CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_EVALUATION_PLAN,
       sourceLocale: "en",
       cleanedFacts: facts,
     });
@@ -191,7 +206,7 @@ describe("OpenAI Communication Note provider", () => {
     });
   });
 
-  it("calls Responses with only the digest-bound model and returns validated evidence", async () => {
+  it("calls only the injected non-HTTPS contract transport and returns validated evidence", async () => {
     const fetchImpl = vi.fn<CaresLinkV1OpenAiCommunicationNoteFetch>(async () =>
       response(completedPayload()),
     );
@@ -202,16 +217,16 @@ describe("OpenAI Communication Note provider", () => {
 
     expect(fetchImpl).toHaveBeenCalledTimes(1);
     const [url, init] = fetchImpl.mock.calls[0];
-    expect(url).toBe("https://api.openai.com/v1/responses");
+    expect(url).toBe("careslink-contract-test://openai-responses");
     expect(init.method).toBe("POST");
     expect(init.signal).toBe(input.signal);
     expect(init.redirect).toBe("error");
     expect(init.headers).toEqual({
-      Authorization: "Bearer test-api-key",
+      Authorization: "Bearer careslink-contract-test-not-a-secret",
       "Content-Type": "application/json",
     });
     const body = String(init.body);
-    expect(body).not.toContain("test-api-key");
+    expect(body).not.toContain("careslink-contract-test-not-a-secret");
     expect(body).not.toContain(input.workerPrivateCorrelation);
     expect(JSON.parse(body).model).toBe(input.policySnapshot.modelId);
     expect(result.candidate).toEqual(CANDIDATE);
@@ -379,6 +394,16 @@ describe("OpenAI Communication Note provider", () => {
           message(
             JSON.stringify({
               ...CANDIDATE,
+              neutralWordingChecks: Array(17).fill("reviewed"),
+            }),
+          ),
+        ],
+      }),
+      completedPayload({
+        output: [
+          message(
+            JSON.stringify({
+              ...CANDIDATE,
               englishDraft: "This records an inferred agreement.",
             }),
           ),
@@ -399,7 +424,7 @@ describe("OpenAI Communication Note provider", () => {
       response({
         id: RESPONSE_ID,
         object: "response",
-        model: "gpt-5.4-mini",
+        model: CARESLINK_V1_OPENAI_COMMUNICATION_NOTE_EVALUATION_MODEL_ID,
         status: "incomplete",
         error: null,
         incomplete_details: { reason: "max_output_tokens" },
@@ -415,7 +440,7 @@ describe("OpenAI Communication Note provider", () => {
       response({
         id: RESPONSE_ID,
         object: "response",
-        model: "gpt-5.4-mini",
+        model: CARESLINK_V1_OPENAI_COMMUNICATION_NOTE_EVALUATION_MODEL_ID,
         status: "completed",
         error: null,
         incomplete_details: null,
@@ -438,7 +463,7 @@ describe("OpenAI Communication Note provider", () => {
       response({
         id: RESPONSE_ID,
         object: "response",
-        model: "gpt-5.4-mini",
+        model: CARESLINK_V1_OPENAI_COMMUNICATION_NOTE_EVALUATION_MODEL_ID,
         status: "cancelled",
         error: null,
         incomplete_details: null,
@@ -515,11 +540,12 @@ describe("OpenAI Communication Note provider", () => {
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 
-  it("rejects empty secrets, wrong Note types and policy-version drift before fetch", async () => {
+  it("keeps paid Preview unavailable and rejects policy drift before the mock fetch", async () => {
     expect(() =>
       createCaresLinkV1OpenAiCommunicationNotePreviewProvider({
         capability: "DISPOSABLE_PREVIEW_EVALUATION_ONLY",
-        apiKey: "   ",
+        evaluationPlanSnapshot:
+          CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_EVALUATION_PLAN,
         clock: { now: () => "2026-08-27T00:00:01.000Z" },
       }),
     ).toThrow("Communication Note provider configuration is unavailable");
@@ -557,28 +583,38 @@ describe("OpenAI Communication Note provider", () => {
         policySnapshot: exactRevisionDrift,
       }),
     ).rejects.toMatchObject({ reason: "POLICY_MISMATCH" });
-    const exactRevisionInput: unknown = {
-      capability: "DRAFT_PREVIEW_EVALUATION_ONLY",
-      modelId: "gpt-5.4-mini",
-      modelRevision: "provider-revision-001",
-      modelRevisionAvailability: "EXACT",
-      timeoutMs: 30_000,
+    const aliasDrift = providerPolicyVariant({ modelId: "gpt-5.4-mini" });
+    await expect(
+      provider.generate({
+        ...providerInput(),
+        policySnapshot: aliasDrift,
+      }),
+    ).rejects.toMatchObject({ reason: "POLICY_MISMATCH" });
+
+    const tamperedEvaluationPlan = {
+      ...CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_EVALUATION_PLAN,
+      request: {
+        ...CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_EVALUATION_PLAN.request,
+        reasoningEffort: "low",
+      },
     };
     expect(() =>
-      createCaresLinkV1CommunicationNoteProviderPolicyCandidate(
-        exactRevisionInput as Parameters<
-          typeof createCaresLinkV1CommunicationNoteProviderPolicyCandidate
-        >[0],
-      ),
-    ).toThrow("Communication Note provider model revision is unavailable");
+      createCaresLinkV1OpenAiCommunicationNotePreviewProvider({
+        capability: "DISPOSABLE_PREVIEW_EVALUATION_ONLY",
+        evaluationPlanSnapshot:
+          tamperedEvaluationPlan as typeof CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_EVALUATION_PLAN,
+        clock: { now: () => "2026-08-27T00:00:01.000Z" },
+      }),
+    ).toThrow("Communication Note evaluation plan does not match M1f");
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 });
 
 function createProvider(fetchImpl: CaresLinkV1OpenAiCommunicationNoteFetch) {
-  return createCaresLinkV1OpenAiCommunicationNotePreviewProvider({
-    capability: "DISPOSABLE_PREVIEW_EVALUATION_ONLY",
-    apiKey: " test-api-key ",
+  return createCaresLinkV1OpenAiCommunicationNoteContractTestProvider({
+    capability: "MOCKED_CONTRACT_TEST_ONLY",
+    evaluationPlanSnapshot:
+      CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_EVALUATION_PLAN,
     fetchImpl,
     clock: { now: () => "2026-08-27T00:00:01.250Z" },
   });
@@ -607,13 +643,7 @@ function providerInput(overrides: Record<string, unknown> = {}) {
 }
 
 function providerPolicy(): CaresLinkV1NoteProviderPolicySnapshot {
-  return createCaresLinkV1CommunicationNoteProviderPolicyCandidate({
-    capability: "DRAFT_PREVIEW_EVALUATION_ONLY",
-    modelId: "gpt-5.4-mini",
-    modelRevision: null,
-    modelRevisionAvailability: "PROVIDER_NOT_EXPOSED",
-    timeoutMs: 30_000,
-  });
+  return createCaresLinkV1CommunicationNoteProviderPolicyCandidate();
 }
 
 function providerPolicyVariant(
@@ -670,8 +700,9 @@ function completedPayload(overrides: Record<string, unknown> = {}) {
   return {
     id: RESPONSE_ID,
     object: "response",
-    model: "gpt-5.4-mini",
+    model: CARESLINK_V1_OPENAI_COMMUNICATION_NOTE_EVALUATION_MODEL_ID,
     status: "completed",
+    service_tier: "default",
     error: null,
     incomplete_details: null,
     output: [message(text)],
