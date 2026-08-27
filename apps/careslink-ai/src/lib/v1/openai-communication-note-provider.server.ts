@@ -9,6 +9,7 @@ import {
   CARESLINK_V1_COMMUNICATION_NOTE_OPENAI_REQUEST_TEMPLATE,
   assertCaresLinkV1CommunicationNoteOpenAiResponseSchema,
 } from "./communication-note-openai-request-template";
+import { renderCaresLinkV1CommunicationNoteOpenAiRequestWire } from "./communication-note-openai-request-wire";
 import {
   CARESLINK_V1_COMMUNICATION_NOTE_APPROVED_PREVIEW_EVALUATION,
   CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_EVALUATION_READY,
@@ -16,6 +17,12 @@ import {
   validateCaresLinkV1CommunicationNotePreviewEvaluationPlan,
   type CaresLinkV1CommunicationNotePreviewEvaluationPlan,
 } from "./communication-note-preview-evaluation-policy";
+import {
+  CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_REQUEST_BODY_PIN_BUNDLE_DIGEST,
+  renderCaresLinkV1CommunicationNotePinnedPreviewRequestBody,
+  validateCaresLinkV1CommunicationNotePreviewRequestBodyPinBundle,
+  type CaresLinkV1CommunicationNotePreviewRequestBodyPinBundle,
+} from "./communication-note-preview-request-body-pin";
 import {
   buildCaresLinkV1CanonicalNoteContent,
   validateCaresLinkV1NoteProviderCandidate,
@@ -62,11 +69,56 @@ type ContractTestProviderOptions = Readonly<{
   clock: ProviderClock;
 }>;
 
+type PinnedContractTestProviderOptions = Readonly<{
+  capability: "PINNED_REQUEST_BODY_MOCKED_CONTRACT_TEST_ONLY";
+  evaluationPlanSnapshot: CaresLinkV1CommunicationNotePreviewEvaluationPlan;
+  requestBodyPinBundleSnapshot: CaresLinkV1CommunicationNotePreviewRequestBodyPinBundle;
+  fetchImpl: CaresLinkV1OpenAiCommunicationNoteFetch;
+  clock: ProviderClock;
+}>;
+
+type ProviderGenerateInput = Parameters<CaresLinkV1NoteProviderPort["generate"]>[0];
+type ProviderGenerateResult = Awaited<
+  ReturnType<CaresLinkV1NoteProviderPort["generate"]>
+>;
+
+export type CaresLinkV1OpenAiCommunicationNoteRequestBodyPinSlot = Readonly<{
+  slotIndex: number;
+  fixtureId: string;
+  runOrdinal: number;
+}>;
+
+export type CaresLinkV1OpenAiCommunicationNoteRequestBodyEvidence = Readonly<{
+  bodyPinBundleDigest: typeof CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_REQUEST_BODY_PIN_BUNDLE_DIGEST;
+  slotIndex: number;
+  fixtureId: string;
+  runOrdinal: number;
+  bodyUtf8ByteLength: number;
+  bodySha256: string;
+  semanticCanonicalSha256: string;
+}>;
+
+export type CaresLinkV1OpenAiCommunicationNotePinnedContractTestProvider =
+  Readonly<{
+    generate(
+      input: ProviderGenerateInput &
+        Readonly<{
+          requestBodyPinSlot: CaresLinkV1OpenAiCommunicationNoteRequestBodyPinSlot;
+        }>,
+    ): Promise<
+      ProviderGenerateResult &
+        Readonly<{
+          requestBodyEvidence: CaresLinkV1OpenAiCommunicationNoteRequestBodyEvidence;
+        }>
+    >;
+  }>;
+
 const CONTRACT_TEST_RESPONSES_URL =
   "careslink-contract-test://openai-responses" as const;
 const CONTRACT_TEST_AUTHORIZATION =
   "Bearer careslink-contract-test-not-a-secret" as const;
 const contractTestProviders = new WeakSet<object>();
+const pinnedContractTestProviders = new WeakSet<object>();
 
 export class CaresLinkV1OpenAiCommunicationNoteProviderError extends CaresLinkV1NoteProviderExecutionError {
   constructor(reason: CaresLinkV1NoteProviderExecutionReason) {
@@ -129,7 +181,7 @@ export function buildCaresLinkV1OpenAiCommunicationNoteResponsesRequest(input: R
 /**
  * Paid Preview construction stays fail-closed until a separate project/ZDR,
  * owner-budget and runner/report execution attestation exists. The frozen M1f
- * candidate is not an execution token.
+ * plan and M1g-a body pins are not execution tokens.
  */
 export function createCaresLinkV1OpenAiCommunicationNotePreviewProvider(
   options: PreviewProviderOptions,
@@ -194,6 +246,59 @@ export function createCaresLinkV1OpenAiCommunicationNoteContractTestProvider(
   });
 }
 
+/**
+ * Supplies the same trusted mock transport as the generic contract-test
+ * provider, but only after an independently source-pinned M1g-a request body
+ * matches the exact ordered manifest slot. The exact validated string is sent.
+ */
+export function createCaresLinkV1OpenAiCommunicationNotePinnedContractTestProvider(
+  options: PinnedContractTestProviderOptions,
+): CaresLinkV1OpenAiCommunicationNotePinnedContractTestProvider {
+  assertProviderOptionKeys(options, [
+    "capability",
+    "evaluationPlanSnapshot",
+    "requestBodyPinBundleSnapshot",
+    "fetchImpl",
+    "clock",
+  ]);
+  if (
+    options.capability !== "PINNED_REQUEST_BODY_MOCKED_CONTRACT_TEST_ONLY"
+  ) {
+    throw unavailable();
+  }
+  if (!options.clock || typeof options.clock.now !== "function") {
+    throw unavailable();
+  }
+  if (typeof options.fetchImpl !== "function") throw unavailable();
+  const evaluationPlan =
+    validateCaresLinkV1CommunicationNotePreviewEvaluationPlan(
+      options.evaluationPlanSnapshot,
+    );
+  const bodyPinBundle =
+    validateCaresLinkV1CommunicationNotePreviewRequestBodyPinBundle(
+      options.requestBodyPinBundleSnapshot,
+    );
+  if (
+    bodyPinBundle.sourceBindings.evaluationPlanDigest !==
+      evaluationPlan.evaluationPlanDigest ||
+    bodyPinBundle.sourceBindings.requestTemplateDigest !==
+      evaluationPlan.request.requestTemplateDigest ||
+    bodyPinBundle.sourceBindings.manifestDigest !==
+      evaluationPlan.acceptance.manifestDigest ||
+    bodyPinBundle.sourceBindings.goldenFixtureSetDigest !==
+      evaluationPlan.acceptance.goldenFixtureSetDigest ||
+    bodyPinBundle.applicationEnvelope.endpointUrl !==
+      evaluationPlan.request.endpointUrl
+  ) {
+    throw unavailable();
+  }
+  return createInjectedPinnedContractTestProvider({
+    evaluationPlan,
+    fetchImpl: options.fetchImpl,
+    clock: options.clock,
+  });
+}
+
 function createInjectedContractTestProvider(input: Readonly<{
   evaluationPlan: CaresLinkV1CommunicationNotePreviewEvaluationPlan;
   fetchImpl: CaresLinkV1OpenAiCommunicationNoteFetch;
@@ -203,94 +308,169 @@ function createInjectedContractTestProvider(input: Readonly<{
 
   const provider: CaresLinkV1NoteProviderPort = Object.freeze({
     async generate(input) {
-      let validated: ReturnType<typeof validateProviderInput>;
-      try {
-        validated = validateProviderInput(input);
-      } catch {
-        throw policyMismatch();
-      }
-      if (validated.signal.aborted) throw providerError("CANCELLED");
-
-      const request = buildCaresLinkV1OpenAiCommunicationNoteResponsesRequest({
-        policySnapshot: validated.policy,
-        evaluationPlanSnapshot: evaluationPlan,
-        sourceLocale: validated.sourceLocale,
-        cleanedFacts: validated.cleanedFacts,
+      return executeInjectedProviderAttempt({
+        rawInput: input,
+        evaluationPlan,
+        fetchImpl,
+        clock,
       });
-
-      let response: FetchResponse;
-      try {
-        response = await fetchImpl(CONTRACT_TEST_RESPONSES_URL, {
-          method: "POST",
-          headers: {
-            Authorization: CONTRACT_TEST_AUTHORIZATION,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(request),
-          signal: validated.signal,
-          redirect: "error",
-        });
-      } catch {
-        throw providerError(
-          validated.signal.aborted ? "CANCELLED" : "PROVIDER_TRANSIENT",
-        );
-      }
-
-      if (!response.ok) {
-        throw providerError(
-          isTransientHttpStatus(response.status)
-            ? "PROVIDER_TRANSIENT"
-            : "PROVIDER_PERMANENT",
-        );
-      }
-
-      let payload: unknown;
-      try {
-        payload = await readBoundedJson(response);
-      } catch {
-        throw providerError("PROVIDER_OUTPUT_INVALID");
-      }
-
-      const object = requireObject(payload);
-      assertCompletedResponse(object, validated.policy);
-
-      let candidate: CaresLinkV1NoteProviderCandidate;
-      try {
-        const outputText = extractSingleCompletedOutputText(object);
-        candidate = validateCaresLinkV1NoteProviderCandidate(
-          JSON.parse(outputText),
-        );
-        assertCaresLinkV1CommunicationNoteOpenAiResponseSchema(candidate);
-        assertCaresLinkV1CommunicationNoteNoInferredDecisionLanguage(candidate);
-        assertCaresLinkV1CommunicationNoteCriticalFactParity(
-          validated.cleanedFacts,
-          candidate,
-        );
-        buildCaresLinkV1CanonicalNoteContent(
-          "communication",
-          validated.cleanedFacts,
-          candidate,
-        );
-      } catch {
-        throw providerError("PROVIDER_OUTPUT_INVALID");
-      }
-
-      return {
-        candidate,
-        evidence: createAttemptEvidence({
-          object,
-          candidate,
-          finishReason: "COMPLETED",
-          policy: validated.policy,
-          workerPolicyBinding: validated.workerPolicyBinding,
-          workerPolicy: validated.workerPolicy,
-          clock,
-        }),
-      };
     },
   });
   contractTestProviders.add(provider);
   return provider;
+}
+
+function createInjectedPinnedContractTestProvider(input: Readonly<{
+  evaluationPlan: CaresLinkV1CommunicationNotePreviewEvaluationPlan;
+  fetchImpl: CaresLinkV1OpenAiCommunicationNoteFetch;
+  clock: ProviderClock;
+}>): CaresLinkV1OpenAiCommunicationNotePinnedContractTestProvider {
+  const { evaluationPlan, fetchImpl, clock } = input;
+  const provider: CaresLinkV1OpenAiCommunicationNotePinnedContractTestProvider =
+    Object.freeze({
+      async generate(input) {
+        const requestBodyPinSlot = validateRequestBodyPinSlot(
+          input.requestBodyPinSlot,
+        );
+        const result = await executeInjectedProviderAttempt({
+          rawInput: input,
+          evaluationPlan,
+          fetchImpl,
+          clock,
+          requestBodyPinSlot,
+        });
+        if (!result.requestBodyEvidence) throw policyMismatch();
+        return Object.freeze({
+          candidate: result.candidate,
+          evidence: result.evidence,
+          requestBodyEvidence: result.requestBodyEvidence,
+        });
+      },
+    });
+  pinnedContractTestProviders.add(provider);
+  return provider;
+}
+
+async function executeInjectedProviderAttempt(input: Readonly<{
+  rawInput: ProviderGenerateInput;
+  evaluationPlan: CaresLinkV1CommunicationNotePreviewEvaluationPlan;
+  fetchImpl: CaresLinkV1OpenAiCommunicationNoteFetch;
+  clock: ProviderClock;
+  requestBodyPinSlot?: CaresLinkV1OpenAiCommunicationNoteRequestBodyPinSlot;
+}>): Promise<
+  ProviderGenerateResult &
+    Readonly<{
+      requestBodyEvidence?: CaresLinkV1OpenAiCommunicationNoteRequestBodyEvidence;
+    }>
+> {
+  let validated: ReturnType<typeof validateProviderInput>;
+  try {
+    validated = validateProviderInput(input.rawInput);
+  } catch {
+    throw policyMismatch();
+  }
+  if (validated.signal.aborted) throw providerError("CANCELLED");
+
+  const request = buildCaresLinkV1OpenAiCommunicationNoteResponsesRequest({
+    policySnapshot: validated.policy,
+    evaluationPlanSnapshot: input.evaluationPlan,
+    sourceLocale: validated.sourceLocale,
+    cleanedFacts: validated.cleanedFacts,
+  });
+  let rendered: ReturnType<
+    typeof renderCaresLinkV1CommunicationNoteOpenAiRequestWire
+  >;
+  try {
+    rendered = input.requestBodyPinSlot
+      ? renderCaresLinkV1CommunicationNotePinnedPreviewRequestBody({
+          ...input.requestBodyPinSlot,
+          request,
+        })
+      : renderCaresLinkV1CommunicationNoteOpenAiRequestWire(request);
+  } catch {
+    throw policyMismatch();
+  }
+
+  let response: FetchResponse;
+  try {
+    response = await input.fetchImpl(CONTRACT_TEST_RESPONSES_URL, {
+      method: "POST",
+      headers: {
+        Authorization: CONTRACT_TEST_AUTHORIZATION,
+        "Content-Type": "application/json",
+      },
+      body: rendered.body,
+      signal: validated.signal,
+      redirect: "error",
+    });
+  } catch {
+    throw providerError(
+      validated.signal.aborted ? "CANCELLED" : "PROVIDER_TRANSIENT",
+    );
+  }
+
+  if (!response.ok) {
+    throw providerError(
+      isTransientHttpStatus(response.status)
+        ? "PROVIDER_TRANSIENT"
+        : "PROVIDER_PERMANENT",
+    );
+  }
+
+  let payload: unknown;
+  try {
+    payload = await readBoundedJson(response);
+  } catch {
+    throw providerError("PROVIDER_OUTPUT_INVALID");
+  }
+
+  const object = requireObject(payload);
+  assertCompletedResponse(object, validated.policy);
+
+  let candidate: CaresLinkV1NoteProviderCandidate;
+  try {
+    const outputText = extractSingleCompletedOutputText(object);
+    candidate = validateCaresLinkV1NoteProviderCandidate(JSON.parse(outputText));
+    assertCaresLinkV1CommunicationNoteOpenAiResponseSchema(candidate);
+    assertCaresLinkV1CommunicationNoteNoInferredDecisionLanguage(candidate);
+    assertCaresLinkV1CommunicationNoteCriticalFactParity(
+      validated.cleanedFacts,
+      candidate,
+    );
+    buildCaresLinkV1CanonicalNoteContent(
+      "communication",
+      validated.cleanedFacts,
+      candidate,
+    );
+  } catch {
+    throw providerError("PROVIDER_OUTPUT_INVALID");
+  }
+
+  const result: ProviderGenerateResult & {
+    requestBodyEvidence?: CaresLinkV1OpenAiCommunicationNoteRequestBodyEvidence;
+  } = {
+    candidate,
+    evidence: createAttemptEvidence({
+      object,
+      candidate,
+      finishReason: "COMPLETED",
+      policy: validated.policy,
+      workerPolicyBinding: validated.workerPolicyBinding,
+      workerPolicy: validated.workerPolicy,
+      clock: input.clock,
+    }),
+  };
+  if (input.requestBodyPinSlot) {
+    result.requestBodyEvidence = Object.freeze({
+      bodyPinBundleDigest:
+        CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_REQUEST_BODY_PIN_BUNDLE_DIGEST,
+      ...input.requestBodyPinSlot,
+      bodyUtf8ByteLength: rendered.bodyUtf8ByteLength,
+      bodySha256: rendered.bodySha256,
+      semanticCanonicalSha256: rendered.semanticCanonicalSha256,
+    });
+  }
+  return Object.freeze(result);
 }
 
 export function requireCaresLinkV1OpenAiCommunicationNoteContractTestProvider(
@@ -304,6 +484,41 @@ export function requireCaresLinkV1OpenAiCommunicationNoteContractTestProvider(
     throw unavailable();
   }
   return value as CaresLinkV1NoteProviderPort;
+}
+
+export function requireCaresLinkV1OpenAiCommunicationNotePinnedContractTestProvider(
+  value: unknown,
+): CaresLinkV1OpenAiCommunicationNotePinnedContractTestProvider {
+  if (
+    !value ||
+    typeof value !== "object" ||
+    !pinnedContractTestProviders.has(value as object)
+  ) {
+    throw unavailable();
+  }
+  return value as CaresLinkV1OpenAiCommunicationNotePinnedContractTestProvider;
+}
+
+function validateRequestBodyPinSlot(
+  value: unknown,
+): CaresLinkV1OpenAiCommunicationNoteRequestBodyPinSlot {
+  assertProviderOptionKeys(value, ["slotIndex", "fixtureId", "runOrdinal"]);
+  const object = value as Record<string, unknown>;
+  if (
+    !Number.isSafeInteger(object.slotIndex) ||
+    (object.slotIndex as number) < 0 ||
+    typeof object.fixtureId !== "string" ||
+    !object.fixtureId ||
+    !Number.isSafeInteger(object.runOrdinal) ||
+    (object.runOrdinal as number) < 1
+  ) {
+    throw policyMismatch();
+  }
+  return Object.freeze({
+    slotIndex: object.slotIndex as number,
+    fixtureId: object.fixtureId,
+    runOrdinal: object.runOrdinal as number,
+  });
 }
 
 function validateProviderInput(

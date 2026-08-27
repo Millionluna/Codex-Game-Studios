@@ -8,7 +8,10 @@
 > The callback is not a network or credential security boundary. See
 > `communication-note-preview-evaluation-policy-m1e.md`. M1e still authorizes no
 > provider call or runtime activation. M1f now adds the mock-only source runner;
-> see `communication-note-preview-evaluation-runner-m1f.md`.
+> see `communication-note-preview-evaluation-runner-m1f.md`. M1g-a subsequently
+> source-pins the exact `JSON.stringify` UTF-8 bodies used by that mock path,
+> without adding external approval, execution authority or a dispatch receipt;
+> see `communication-note-preview-request-body-pins-m1g-a.md`.
 
 ## Status
 

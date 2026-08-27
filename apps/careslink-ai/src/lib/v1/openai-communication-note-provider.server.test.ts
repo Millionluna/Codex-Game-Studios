@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
+import { CARESLINK_V1_COMMUNICATION_NOTE_GOLDEN_FIXTURES } from "./communication-note-golden";
 import {
   CARESLINK_V1_COMMUNICATION_NOTE_GOLDEN_SET_VERSION,
   CARESLINK_V1_COMMUNICATION_NOTE_PARSER_VERSION,
@@ -15,9 +16,14 @@ import {
   CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_EVALUATION_PLAN,
 } from "./communication-note-preview-evaluation-policy";
 import {
+  CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_REQUEST_BODY_PIN_BUNDLE,
+  CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_REQUEST_BODY_PIN_BUNDLE_DIGEST,
+} from "./communication-note-preview-request-body-pin";
+import {
   CaresLinkV1OpenAiCommunicationNoteProviderError,
   buildCaresLinkV1OpenAiCommunicationNoteResponsesRequest,
   createCaresLinkV1OpenAiCommunicationNoteContractTestProvider,
+  createCaresLinkV1OpenAiCommunicationNotePinnedContractTestProvider,
   createCaresLinkV1OpenAiCommunicationNotePreviewProvider,
   type CaresLinkV1OpenAiCommunicationNoteFetch,
 } from "./openai-communication-note-provider.server";
@@ -255,6 +261,125 @@ describe("OpenAI Communication Note provider", () => {
     expect(JSON.stringify(result.evidence)).not.toContain(
       CANDIDATE.englishDraft,
     );
+  });
+
+  it("sends the exact validated M1g-a body string once and returns content-free pin evidence", async () => {
+    const fixture = CARESLINK_V1_COMMUNICATION_NOTE_GOLDEN_FIXTURES[0];
+    const fetchImpl = vi.fn<CaresLinkV1OpenAiCommunicationNoteFetch>(
+      async () =>
+        response(
+          completedPayload({
+            output: [message(JSON.stringify(fixture.passingCandidate))],
+          }),
+        ),
+    );
+    const provider =
+      createCaresLinkV1OpenAiCommunicationNotePinnedContractTestProvider({
+        capability: "PINNED_REQUEST_BODY_MOCKED_CONTRACT_TEST_ONLY",
+        evaluationPlanSnapshot:
+          CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_EVALUATION_PLAN,
+        requestBodyPinBundleSnapshot:
+          CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_REQUEST_BODY_PIN_BUNDLE,
+        fetchImpl,
+        clock: { now: () => "2026-08-27T00:00:01.250Z" },
+      });
+
+    const result = await provider.generate({
+      ...providerInput(),
+      sourceLocale: fixture.sourceLocale,
+      cleanedFacts: fixture.cleanedFacts,
+      requestBodyPinSlot: {
+        slotIndex: 0,
+        fixtureId: fixture.id,
+        runOrdinal: 1,
+      },
+    });
+
+    const [, init] = fetchImpl.mock.calls[0];
+    expect(init.body).toBe(
+      JSON.stringify(
+        CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_REQUEST_BODY_PIN_BUNDLE.bodies[
+          0
+        ].request,
+      ),
+    );
+    expect(result.requestBodyEvidence).toEqual({
+      bodyPinBundleDigest:
+        CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_REQUEST_BODY_PIN_BUNDLE_DIGEST,
+      slotIndex: 0,
+      fixtureId: fixture.id,
+      runOrdinal: 1,
+      bodyUtf8ByteLength:
+        CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_REQUEST_BODY_PIN_BUNDLE.slots[0]
+          .bodyUtf8ByteLength,
+      bodySha256:
+        CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_REQUEST_BODY_PIN_BUNDLE.slots[0]
+          .bodySha256,
+      semanticCanonicalSha256:
+        CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_REQUEST_BODY_PIN_BUNDLE.slots[0]
+          .semanticCanonicalSha256,
+    });
+    expect(JSON.stringify(result.requestBodyEvidence)).not.toContain(
+      "careslink-contract-test-not-a-secret",
+    );
+    expect(Object.isFrozen(result.requestBodyEvidence)).toBe(true);
+  });
+
+  it("rejects M1g-a bundle or ordered-slot drift before the mock transport", async () => {
+    const fetchImpl = vi.fn<CaresLinkV1OpenAiCommunicationNoteFetch>();
+    expect(() =>
+      createCaresLinkV1OpenAiCommunicationNotePinnedContractTestProvider({
+        capability: "PINNED_REQUEST_BODY_MOCKED_CONTRACT_TEST_ONLY",
+        evaluationPlanSnapshot:
+          CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_EVALUATION_PLAN,
+        requestBodyPinBundleSnapshot: {
+          ...CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_REQUEST_BODY_PIN_BUNDLE,
+          orderedSlotCount: 7,
+        } as never,
+        fetchImpl,
+        clock: { now: () => "2026-08-27T00:00:01.250Z" },
+      }),
+    ).toThrow(/does not match M1g-a/);
+
+    const fixture = CARESLINK_V1_COMMUNICATION_NOTE_GOLDEN_FIXTURES[0];
+    const provider =
+      createCaresLinkV1OpenAiCommunicationNotePinnedContractTestProvider({
+        capability: "PINNED_REQUEST_BODY_MOCKED_CONTRACT_TEST_ONLY",
+        evaluationPlanSnapshot:
+          CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_EVALUATION_PLAN,
+        requestBodyPinBundleSnapshot:
+          CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_REQUEST_BODY_PIN_BUNDLE,
+        fetchImpl,
+        clock: { now: () => "2026-08-27T00:00:01.250Z" },
+      });
+    await expect(
+      provider.generate({
+        ...providerInput(),
+        sourceLocale: fixture.sourceLocale,
+        cleanedFacts: fixture.cleanedFacts,
+        requestBodyPinSlot: {
+          slotIndex: 1,
+          fixtureId: fixture.id,
+          runOrdinal: 1,
+        },
+      }),
+    ).rejects.toMatchObject({ reason: "POLICY_MISMATCH" });
+    await expect(
+      provider.generate({
+        ...providerInput(),
+        sourceLocale: fixture.sourceLocale,
+        cleanedFacts: {
+          ...fixture.cleanedFacts,
+          observable_facts: "Synthetic fact drift.",
+        },
+        requestBodyPinSlot: {
+          slotIndex: 0,
+          fixtureId: fixture.id,
+          runOrdinal: 1,
+        },
+      }),
+    ).rejects.toMatchObject({ reason: "POLICY_MISMATCH" });
+    expect(fetchImpl).not.toHaveBeenCalled();
   });
 
   it("accepts provider reasoning metadata only alongside one completed assistant output", async () => {

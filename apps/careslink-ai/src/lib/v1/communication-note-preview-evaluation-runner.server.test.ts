@@ -8,6 +8,10 @@ import { CARESLINK_V1_COMMUNICATION_NOTE_OPENAI_REQUEST_TEMPLATE } from "./commu
 import { CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_EVALUATION_PLAN } from "./communication-note-preview-evaluation-policy";
 import { CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_MANIFEST } from "./communication-note-preview-evaluation-manifest";
 import {
+  CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_REQUEST_BODY_PIN_BUNDLE,
+  CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_REQUEST_BODY_PIN_BUNDLE_DIGEST,
+} from "./communication-note-preview-request-body-pin";
+import {
   CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RUNNER_POLICY,
   CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RUNNER_POLICY_DIGEST,
   CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RUNNER_READY,
@@ -26,6 +30,7 @@ import { CARESLINK_V1_OPENAI_COMMUNICATION_NOTE_EVALUATION_MODEL_ID } from "./co
 import {
   buildCaresLinkV1OpenAiCommunicationNoteResponsesRequest,
   createCaresLinkV1OpenAiCommunicationNoteContractTestProvider,
+  createCaresLinkV1OpenAiCommunicationNotePinnedContractTestProvider,
   type CaresLinkV1OpenAiCommunicationNoteFetch,
 } from "./openai-communication-note-provider.server";
 
@@ -57,10 +62,24 @@ describe("Communication Note one-shot preview evaluation runner", () => {
         sameRunIdReplay: "RETURN_SAME_TERMINAL_PROMISE",
         differentRunIdReplay: "REJECT",
         approvalStorage: "NOT_IMPLEMENTED",
-        providerTransport: "MOCK_INJECTION_ONLY",
+        providerTransport: "PINNED_REQUEST_BODY_MOCK_INJECTION_ONLY",
+        requestBodyDispatch:
+          "PROVIDER_VALIDATES_THEN_SENDS_SAME_JSON_STRING_WITHOUT_RESERIALIZATION",
         injectedCallbackDeadlineMs: 5_000,
         injectedCallbacksSecurityBoundary:
           "TRUSTED_TEST_CODE_NOT_A_SECURITY_BOUNDARY",
+      },
+      requestBodyPinBundleDigest:
+        CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_REQUEST_BODY_PIN_BUNDLE_DIGEST,
+      requestBodyPin: {
+        status:
+          "SOURCE_PINNED_REVIEW_CANDIDATE_NOT_EXECUTION_AUTHORIZATION",
+        scope: "OPENAI_RESPONSES_JSON_REQUEST_BODY_ONLY",
+        transportScope: "APPLICATION_HTTP_ENVELOPE_NOT_TRANSPORT_BYTES",
+        authenticity: "UNATTESTED_SOURCE_PIN_ONLY",
+        executionAuthority: "NOT_EXECUTION_AUTHORITY",
+        externalOwnerApproval: "ABSENT",
+        dispatchAttestation: "ABSENT",
       },
       preflight: {
         inputTokenCounter: "INJECTED_MOCK_ONLY",
@@ -123,7 +142,7 @@ describe("Communication Note one-shot preview evaluation runner", () => {
           maximumCalls: 7,
         },
       }),
-    ).toThrow(/does not match M1f/);
+    ).toThrow(/does not match M1g-a/);
 
     expect(() =>
       createCaresLinkV1CommunicationNotePreviewEvaluationRunner({
@@ -171,6 +190,11 @@ describe("Communication Note one-shot preview evaluation runner", () => {
       currency: "USD",
       costNature: "CALCULATED_UPPER_BOUND_NOT_INVOICE",
       authenticity: "UNATTESTED_TEST_CONTRACT_ONLY",
+      requestBodyPinBundleDigest:
+        CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_REQUEST_BODY_PIN_BUNDLE_DIGEST,
+      requestBodyPinAuthenticity: "UNATTESTED_SOURCE_PIN_ONLY",
+      requestBodyPinExecutionAuthority: "NOT_EXECUTION_AUTHORITY",
+      requestBodyPinDispatchAttestation: "ABSENT",
     });
     expect(report.slots.map(({ fixtureId, runOrdinal }) => ({
       fixtureId,
@@ -210,8 +234,25 @@ describe("Communication Note one-shot preview evaluation runner", () => {
         sourceLocale: fixture.sourceLocale,
         cleanedFacts: fixture.cleanedFacts,
       });
-      expect(report.slots[index].renderedRequestDigest).toBe(
+      expect(report.slots[index].semanticCanonicalRequestSha256).toBe(
         canonicalDigest(request),
+      );
+      expect(report.slots[index].requestBodySha256).toBe(
+        CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_REQUEST_BODY_PIN_BUNDLE.slots[
+          index
+        ].bodySha256,
+      );
+      expect(report.slots[index].requestBodyUtf8ByteLength).toBe(
+        CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_REQUEST_BODY_PIN_BUNDLE.slots[
+          index
+        ].bodyUtf8ByteLength,
+      );
+      expect(harness.fetchImpl.mock.calls[index][1].body).toBe(
+        JSON.stringify(
+          CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_REQUEST_BODY_PIN_BUNDLE.bodies[
+            Math.floor(index / 2)
+          ].request,
+        ),
       );
     }
 
@@ -695,6 +736,27 @@ describe("Communication Note one-shot preview evaluation runner", () => {
     ).toThrow("Communication Note provider configuration is unavailable");
   });
 
+  it("rejects the older generic mock provider because it has no pinned-body evidence", () => {
+    const genericProvider =
+      createCaresLinkV1OpenAiCommunicationNoteContractTestProvider({
+        capability: "MOCKED_CONTRACT_TEST_ONLY",
+        evaluationPlanSnapshot:
+          CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_EVALUATION_PLAN,
+        fetchImpl: vi.fn(),
+        clock: { now: () => "2026-08-27T00:00:00.000Z" },
+      });
+
+    expect(() =>
+      createCaresLinkV1CommunicationNotePreviewEvaluationContractTestRunner({
+        capability: "MOCKED_CONTRACT_TEST_ONLY",
+        provider: genericProvider as never,
+        countInputTokens: vi.fn(() => 120),
+        reviewCandidate: vi.fn(async () => VALID_REVIEWS),
+        clock: { now: () => "2026-08-27T00:00:00.000Z" },
+      }),
+    ).toThrow("Communication Note provider configuration is unavailable");
+  });
+
   it("rejects a pre-aborted run without any token, provider or reviewer work", async () => {
     const harness = createHarness();
     const controller = new AbortController();
@@ -834,10 +896,12 @@ describe("Communication Note one-shot preview evaluation runner", () => {
         }),
     );
     const provider =
-      createCaresLinkV1OpenAiCommunicationNoteContractTestProvider({
-        capability: "MOCKED_CONTRACT_TEST_ONLY",
+      createCaresLinkV1OpenAiCommunicationNotePinnedContractTestProvider({
+        capability: "PINNED_REQUEST_BODY_MOCKED_CONTRACT_TEST_ONLY",
         evaluationPlanSnapshot:
           CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_EVALUATION_PLAN,
+        requestBodyPinBundleSnapshot:
+          CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_REQUEST_BODY_PIN_BUNDLE,
         fetchImpl,
         clock: { now: () => "2026-08-27T00:00:00.500Z" },
       });
@@ -878,10 +942,12 @@ describe("Communication Note one-shot preview evaluation runner", () => {
           }),
       );
       const provider =
-        createCaresLinkV1OpenAiCommunicationNoteContractTestProvider({
-          capability: "MOCKED_CONTRACT_TEST_ONLY",
+        createCaresLinkV1OpenAiCommunicationNotePinnedContractTestProvider({
+          capability: "PINNED_REQUEST_BODY_MOCKED_CONTRACT_TEST_ONLY",
           evaluationPlanSnapshot:
             CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_EVALUATION_PLAN,
+          requestBodyPinBundleSnapshot:
+            CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_REQUEST_BODY_PIN_BUNDLE,
           fetchImpl,
           clock: { now: () => "2026-08-27T00:00:00.500Z" },
         });
@@ -953,6 +1019,21 @@ describe("Communication Note one-shot preview evaluation runner", () => {
         const slots = value.slots as Array<Record<string, unknown>>;
         slots[1].providerRequestIdHash = slots[0].providerRequestIdHash;
       }),
+      tamperAndResignReport(report, (value) => {
+        const slots = value.slots as Array<Record<string, unknown>>;
+        slots[0].requestBodySha256 = "1".repeat(64);
+      }),
+      tamperAndResignReport(report, (value) => {
+        const slots = value.slots as Array<Record<string, unknown>>;
+        slots[0].requestBodyUtf8ByteLength = 1;
+      }),
+      tamperAndResignReport(report, (value) => {
+        const slots = value.slots as Array<Record<string, unknown>>;
+        slots[0].semanticCanonicalRequestSha256 = "2".repeat(64);
+      }),
+      tamperAndResignReport(report, (value) => {
+        value.requestBodyPinBundleDigest = "3".repeat(64);
+      }),
     ];
 
     for (const candidate of cases) {
@@ -993,7 +1074,7 @@ describe("Communication Note one-shot preview evaluation runner", () => {
     expect(source).not.toContain("process.env");
     expect(source).not.toMatch(/\bfetch\s*\(/);
     expect(source).not.toMatch(/https?:\/\//);
-    expect(source).not.toMatch(/api[_-]?key|authorization|bearer/i);
+    expect(source).not.toMatch(/api[_-]?key|bearer/i);
   });
 });
 
@@ -1052,10 +1133,12 @@ function createHarness(options: HarnessOptions = {}) {
     },
   );
   const provider =
-    createCaresLinkV1OpenAiCommunicationNoteContractTestProvider({
-      capability: "MOCKED_CONTRACT_TEST_ONLY",
+    createCaresLinkV1OpenAiCommunicationNotePinnedContractTestProvider({
+      capability: "PINNED_REQUEST_BODY_MOCKED_CONTRACT_TEST_ONLY",
       evaluationPlanSnapshot:
         CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_EVALUATION_PLAN,
+      requestBodyPinBundleSnapshot:
+        CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_REQUEST_BODY_PIN_BUNDLE,
       fetchImpl,
       clock: {
         now: () =>
