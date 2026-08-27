@@ -21,16 +21,23 @@ import {
   validateCaresLinkV1CommunicationNotePreviewManifest,
 } from "./communication-note-preview-evaluation-manifest";
 import { CARESLINK_V1_COMMUNICATION_NOTE_OPENAI_REQUEST_TEMPLATE_DIGEST } from "./communication-note-openai-request-template";
+import {
+  CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_REQUEST_BODY_PIN_BUNDLE,
+  CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_REQUEST_BODY_PIN_BUNDLE_DIGEST,
+  renderCaresLinkV1CommunicationNotePinnedPreviewRequestBody,
+  requireCaresLinkV1CommunicationNotePreviewRequestBodyPinSlot,
+} from "./communication-note-preview-request-body-pin";
 import { createCaresLinkV1CommunicationNoteProviderPolicyCandidate } from "./communication-note-provider-policy";
 import {
   buildCaresLinkV1OpenAiCommunicationNoteResponsesRequest,
-  requireCaresLinkV1OpenAiCommunicationNoteContractTestProvider,
+  requireCaresLinkV1OpenAiCommunicationNotePinnedContractTestProvider,
+  type CaresLinkV1OpenAiCommunicationNotePinnedContractTestProvider,
+  type CaresLinkV1OpenAiCommunicationNoteRequestBodyEvidence,
 } from "./openai-communication-note-provider.server";
 import {
   createCaresLinkV1NoteProviderCandidateDigest,
   createCaresLinkV1NoteProviderWorkerPolicyBinding,
   validateCaresLinkV1NoteProviderAttemptEvidence,
-  type CaresLinkV1NoteProviderPort,
 } from "./note-generation-provider-policy";
 import {
   createCaresLinkV1NoteGenerationWorkerPolicyDigest,
@@ -44,7 +51,7 @@ import {
 } from "./shared-contracts";
 
 export const CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RUNNER_POLICY_VERSION =
-  "runner.communication.openai.synthetic-preview.2026-08-27.v1" as const;
+  "runner.communication.openai.synthetic-preview.2026-08-27.m1g-a.v2" as const;
 
 export const CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RUNNER_READY =
   false as const;
@@ -118,8 +125,19 @@ const RUNNER_POLICY_CORE = deepFreeze({
     CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_MANIFEST_DIGEST,
   goldenFixtureSetDigest:
     CARESLINK_V1_COMMUNICATION_NOTE_GOLDEN_FIXTURE_SET_DIGEST,
+  requestBodyPinBundleDigest:
+    CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_REQUEST_BODY_PIN_BUNDLE_DIGEST,
   workerPolicyDigest:
     CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_WORKER_POLICY_DIGEST,
+  requestBodyPin: {
+    status: "SOURCE_PINNED_REVIEW_CANDIDATE_NOT_EXECUTION_AUTHORIZATION",
+    scope: "OPENAI_RESPONSES_JSON_REQUEST_BODY_ONLY",
+    transportScope: "APPLICATION_HTTP_ENVELOPE_NOT_TRANSPORT_BYTES",
+    authenticity: "UNATTESTED_SOURCE_PIN_ONLY",
+    executionAuthority: "NOT_EXECUTION_AUTHORITY",
+    externalOwnerApproval: "ABSENT",
+    dispatchAttestation: "ABSENT",
+  },
   execution: {
     ordering: "SERIAL_MANIFEST_ORDER",
     maximumCalls: 6,
@@ -128,7 +146,9 @@ const RUNNER_POLICY_CORE = deepFreeze({
     sameRunIdReplay: "RETURN_SAME_TERMINAL_PROMISE",
     differentRunIdReplay: "REJECT",
     approvalStorage: "NOT_IMPLEMENTED",
-    providerTransport: "MOCK_INJECTION_ONLY",
+    providerTransport: "PINNED_REQUEST_BODY_MOCK_INJECTION_ONLY",
+    requestBodyDispatch:
+      "PROVIDER_VALIDATES_THEN_SENDS_SAME_JSON_STRING_WITHOUT_RESERIALIZATION",
     injectedCallbackDeadlineMs: 5_000,
     injectedCallbacksSecurityBoundary:
       "TRUSTED_TEST_CODE_NOT_A_SECURITY_BOUNDARY",
@@ -166,7 +186,7 @@ export type CaresLinkV1CommunicationNotePreviewRunnerPolicy =
   typeof RUNNER_POLICY_CORE & Readonly<{ runnerPolicyDigest: string }>;
 
 export const CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RUNNER_POLICY_DIGEST =
-  "654d4e2f716618db50e377cbedb8c5168df0860e2491cd7bac90104d48119c20" as const;
+  "a604057aceed70b741d4e1ac2a0e1f9bdf5d13721955448ec083948fb8b4a7c4" as const;
 
 const computedRunnerPolicyDigest = createRunnerDigest(RUNNER_POLICY_CORE);
 if (
@@ -191,6 +211,7 @@ export const CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RUNNER_FAILURE_REASONS =
     "RUN_CONFLICT",
     "CANCELLED",
     "INPUT_TOKEN_PREFLIGHT_FAILED",
+    "REQUEST_BODY_PIN_MISMATCH",
     "BUDGET_EXCEEDED",
     "PROVIDER_FAILED",
     "PROVIDER_EVIDENCE_INVALID",
@@ -241,7 +262,7 @@ type RunnerClock = Readonly<{ now(): string }>;
 
 type ContractTestRunnerOptions = Readonly<{
   capability: "MOCKED_CONTRACT_TEST_ONLY";
-  provider: CaresLinkV1NoteProviderPort;
+  provider: CaresLinkV1OpenAiCommunicationNotePinnedContractTestProvider;
   countInputTokens(request: PreviewRequest): number | Promise<number>;
   reviewCandidate(input: Readonly<{
     fixtureId: string;
@@ -264,7 +285,9 @@ export type CaresLinkV1CommunicationNotePreviewEvaluationSlotEvidence =
     fixtureId: string;
     runOrdinal: number;
     fixtureDigest: string;
-    renderedRequestDigest: string;
+    semanticCanonicalRequestSha256: string;
+    requestBodySha256: string;
+    requestBodyUtf8ByteLength: number;
     preflightInputTokens: number;
     providerRequestIdHash: string;
     candidateDigest: string;
@@ -293,6 +316,7 @@ type EvaluationReportCore = Readonly<{
   requestTemplateDigest: typeof CARESLINK_V1_COMMUNICATION_NOTE_OPENAI_REQUEST_TEMPLATE_DIGEST;
   manifestDigest: typeof CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_MANIFEST_DIGEST;
   goldenFixtureSetDigest: typeof CARESLINK_V1_COMMUNICATION_NOTE_GOLDEN_FIXTURE_SET_DIGEST;
+  requestBodyPinBundleDigest: typeof CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_REQUEST_BODY_PIN_BUNDLE_DIGEST;
   workerPolicyDigest: typeof CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_WORKER_POLICY_DIGEST;
   runIdHash: string;
   startedAt: string;
@@ -301,6 +325,9 @@ type EvaluationReportCore = Readonly<{
   pricingVersion: "openai.gpt-5.4-mini.au.2026-08-27.v1";
   costNature: "CALCULATED_UPPER_BOUND_NOT_INVOICE";
   authenticity: "UNATTESTED_TEST_CONTRACT_ONLY";
+  requestBodyPinAuthenticity: "UNATTESTED_SOURCE_PIN_ONLY";
+  requestBodyPinExecutionAuthority: "NOT_EXECUTION_AUTHORITY";
+  requestBodyPinDispatchAttestation: "ABSENT";
   callsDispatched: 6;
   candidatesAccepted: 6;
   languageDraftReviewsPassed: 18;
@@ -396,7 +423,7 @@ export function createCaresLinkV1CommunicationNotePreviewEvaluationContractTestR
     throw unavailable();
   }
   const provider =
-    requireCaresLinkV1OpenAiCommunicationNoteContractTestProvider(
+    requireCaresLinkV1OpenAiCommunicationNotePinnedContractTestProvider(
       options.provider,
     );
   let claimedRunIdHash: string | undefined;
@@ -455,7 +482,7 @@ export function validateCaresLinkV1CommunicationNotePreviewRunnerPolicy(
     throw invalid("Communication Note preview runner policy is invalid");
   }
   if (actual !== expected) {
-    throw invalid("Communication Note preview runner policy does not match M1f");
+    throw invalid("Communication Note preview runner policy does not match M1g-a");
   }
   return CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RUNNER_POLICY;
 }
@@ -535,6 +562,7 @@ export function validateCaresLinkV1CommunicationNotePreviewEvaluationReport(
         "requestTemplateDigest",
         "manifestDigest",
         "goldenFixtureSetDigest",
+        "requestBodyPinBundleDigest",
         "workerPolicyDigest",
         "runIdHash",
         "startedAt",
@@ -543,6 +571,9 @@ export function validateCaresLinkV1CommunicationNotePreviewEvaluationReport(
         "pricingVersion",
         "costNature",
         "authenticity",
+        "requestBodyPinAuthenticity",
+        "requestBodyPinExecutionAuthority",
+        "requestBodyPinDispatchAttestation",
         "callsDispatched",
         "candidatesAccepted",
         "languageDraftReviewsPassed",
@@ -616,6 +647,8 @@ export function validateCaresLinkV1CommunicationNotePreviewEvaluationReport(
         CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_MANIFEST_DIGEST,
       goldenFixtureSetDigest:
         CARESLINK_V1_COMMUNICATION_NOTE_GOLDEN_FIXTURE_SET_DIGEST,
+      requestBodyPinBundleDigest:
+        CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_REQUEST_BODY_PIN_BUNDLE_DIGEST,
       workerPolicyDigest:
         CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_WORKER_POLICY_DIGEST,
       runIdHash,
@@ -625,6 +658,9 @@ export function validateCaresLinkV1CommunicationNotePreviewEvaluationReport(
       pricingVersion: "openai.gpt-5.4-mini.au.2026-08-27.v1",
       costNature: "CALCULATED_UPPER_BOUND_NOT_INVOICE",
       authenticity: "UNATTESTED_TEST_CONTRACT_ONLY",
+      requestBodyPinAuthenticity: "UNATTESTED_SOURCE_PIN_ONLY",
+      requestBodyPinExecutionAuthority: "NOT_EXECUTION_AUTHORITY",
+      requestBodyPinDispatchAttestation: "ABSENT",
       callsDispatched: 6,
       candidatesAccepted: 6,
       languageDraftReviewsPassed: 18,
@@ -651,7 +687,7 @@ export function validateCaresLinkV1CommunicationNotePreviewEvaluationReport(
 async function executeContractTestRun(input: Readonly<{
   runIdHash: string;
   signal: AbortSignal;
-  provider: CaresLinkV1NoteProviderPort;
+  provider: CaresLinkV1OpenAiCommunicationNotePinnedContractTestProvider;
   countInputTokens: ContractTestRunnerOptions["countInputTokens"];
   reviewCandidate: ContractTestRunnerOptions["reviewCandidate"];
   clock: RunnerClock;
@@ -666,11 +702,13 @@ async function executeContractTestRun(input: Readonly<{
     runOrdinal: number;
     fixtureDigest: string;
     request: PreviewRequest;
-    renderedRequestDigest: string;
+    semanticCanonicalRequestSha256: string;
+    requestBodySha256: string;
+    requestBodyUtf8ByteLength: number;
     preflightInputTokens: number;
   }>>;
 
-  for (const slot of manifest.slots) {
+  for (const [slotIndex, slot] of manifest.slots.entries()) {
     if (input.signal.aborted) throw runnerError("CANCELLED");
     const fixture = requireManifestFixture(slot.fixtureId);
     const request = deepFreeze(
@@ -681,7 +719,22 @@ async function executeContractTestRun(input: Readonly<{
         cleanedFacts: fixture.cleanedFacts,
       }),
     );
-    const renderedRequestDigest = canonicalDigest(request);
+    let pinnedRequestBody: ReturnType<
+      typeof renderCaresLinkV1CommunicationNotePinnedPreviewRequestBody
+    >;
+    try {
+      pinnedRequestBody =
+        renderCaresLinkV1CommunicationNotePinnedPreviewRequestBody({
+          slotIndex,
+          fixtureId: fixture.id,
+          runOrdinal: slot.runOrdinal,
+          request,
+        });
+    } catch {
+      throw runnerError("REQUEST_BODY_PIN_MISMATCH");
+    }
+    const semanticCanonicalRequestSha256 =
+      pinnedRequestBody.semanticCanonicalSha256;
     const preflightInputTokens = await awaitTrustedTestCallback({
       signal: input.signal,
       failureReason: "INPUT_TOKEN_PREFLIGHT_FAILED",
@@ -702,7 +755,9 @@ async function executeContractTestRun(input: Readonly<{
         runOrdinal: slot.runOrdinal,
         fixtureDigest: canonicalDigest(fixture),
         request,
-        renderedRequestDigest,
+        semanticCanonicalRequestSha256,
+        requestBodySha256: pinnedRequestBody.bodySha256,
+        requestBodyUtf8ByteLength: pinnedRequestBody.bodyUtf8ByteLength,
         preflightInputTokens,
       }),
     );
@@ -748,7 +803,11 @@ async function executeContractTestRun(input: Readonly<{
       });
     callsDispatched += 1;
 
-    let result: Awaited<ReturnType<CaresLinkV1NoteProviderPort["generate"]>>;
+    let result: Awaited<
+      ReturnType<
+        CaresLinkV1OpenAiCommunicationNotePinnedContractTestProvider["generate"]
+      >
+    >;
     try {
       result = await callProviderOnce({
         provider: input.provider,
@@ -765,6 +824,11 @@ async function executeContractTestRun(input: Readonly<{
             CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_WORKER_POLICY,
           signal: input.signal,
           policySnapshot: providerPolicy,
+          requestBodyPinSlot: {
+            slotIndex: index,
+            fixtureId: slot.fixtureId,
+            runOrdinal: slot.runOrdinal,
+          },
         },
       });
     } catch {
@@ -773,6 +837,15 @@ async function executeContractTestRun(input: Readonly<{
     if (callsDispatched !== index + 1) {
       throw runnerError("PROVIDER_FAILED");
     }
+
+    validateProviderRequestBodyEvidence(result.requestBodyEvidence, {
+      slotIndex: index,
+      fixtureId: slot.fixtureId,
+      runOrdinal: slot.runOrdinal,
+      bodySha256: slot.requestBodySha256,
+      bodyUtf8ByteLength: slot.requestBodyUtf8ByteLength,
+      semanticCanonicalSha256: slot.semanticCanonicalRequestSha256,
+    });
 
     const candidate = deepFreeze(result.candidate);
     let evidence: ReturnType<
@@ -871,7 +944,10 @@ async function executeContractTestRun(input: Readonly<{
         fixtureId: slot.fixtureId,
         runOrdinal: slot.runOrdinal,
         fixtureDigest: slot.fixtureDigest,
-        renderedRequestDigest: slot.renderedRequestDigest,
+        semanticCanonicalRequestSha256:
+          slot.semanticCanonicalRequestSha256,
+        requestBodySha256: slot.requestBodySha256,
+        requestBodyUtf8ByteLength: slot.requestBodyUtf8ByteLength,
         preflightInputTokens: slot.preflightInputTokens,
         providerRequestIdHash: evidence.providerRequestIdHash,
         candidateDigest: evidence.candidateDigest,
@@ -911,6 +987,8 @@ async function executeContractTestRun(input: Readonly<{
       CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_MANIFEST_DIGEST,
     goldenFixtureSetDigest:
       CARESLINK_V1_COMMUNICATION_NOTE_GOLDEN_FIXTURE_SET_DIGEST,
+    requestBodyPinBundleDigest:
+      CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_REQUEST_BODY_PIN_BUNDLE_DIGEST,
     workerPolicyDigest:
       CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_WORKER_POLICY_DIGEST,
     runIdHash: input.runIdHash,
@@ -920,6 +998,9 @@ async function executeContractTestRun(input: Readonly<{
     pricingVersion: "openai.gpt-5.4-mini.au.2026-08-27.v1",
     costNature: "CALCULATED_UPPER_BOUND_NOT_INVOICE",
     authenticity: "UNATTESTED_TEST_CONTRACT_ONLY",
+    requestBodyPinAuthenticity: "UNATTESTED_SOURCE_PIN_ONLY",
+    requestBodyPinExecutionAuthority: "NOT_EXECUTION_AUTHORITY",
+    requestBodyPinDispatchAttestation: "ABSENT",
     callsDispatched: 6,
     candidatesAccepted: 6,
     languageDraftReviewsPassed: 18,
@@ -985,9 +1066,11 @@ async function awaitTrustedTestCallback<T>(input: Readonly<{
 }
 
 async function callProviderOnce(input: Readonly<{
-  provider: CaresLinkV1NoteProviderPort;
+  provider: CaresLinkV1OpenAiCommunicationNotePinnedContractTestProvider;
   signal: AbortSignal;
-  providerInput: Parameters<CaresLinkV1NoteProviderPort["generate"]>[0];
+  providerInput: Parameters<
+    CaresLinkV1OpenAiCommunicationNotePinnedContractTestProvider["generate"]
+  >[0];
 }>) {
   const controller = new AbortController();
   let rejectControl: ((error: Error) => void) | undefined;
@@ -1022,6 +1105,48 @@ async function callProviderOnce(input: Readonly<{
     clearTimeout(timer);
     input.signal.removeEventListener("abort", abortFromCaller);
   }
+}
+
+function validateProviderRequestBodyEvidence(
+  value: unknown,
+  expected: Readonly<{
+    slotIndex: number;
+    fixtureId: string;
+    runOrdinal: number;
+    bodySha256: string;
+    bodyUtf8ByteLength: number;
+    semanticCanonicalSha256: string;
+  }>,
+): CaresLinkV1OpenAiCommunicationNoteRequestBodyEvidence {
+  if (!isPlainObject(value)) {
+    throw runnerError("PROVIDER_EVIDENCE_INVALID");
+  }
+  assertExactKeys(
+    value,
+    [
+      "bodyPinBundleDigest",
+      "slotIndex",
+      "fixtureId",
+      "runOrdinal",
+      "bodyUtf8ByteLength",
+      "bodySha256",
+      "semanticCanonicalSha256",
+    ],
+    () => runnerError("PROVIDER_EVIDENCE_INVALID"),
+  );
+  if (
+    value.bodyPinBundleDigest !==
+      CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_REQUEST_BODY_PIN_BUNDLE_DIGEST ||
+    value.slotIndex !== expected.slotIndex ||
+    value.fixtureId !== expected.fixtureId ||
+    value.runOrdinal !== expected.runOrdinal ||
+    value.bodyUtf8ByteLength !== expected.bodyUtf8ByteLength ||
+    value.bodySha256 !== expected.bodySha256 ||
+    value.semanticCanonicalSha256 !== expected.semanticCanonicalSha256
+  ) {
+    throw runnerError("PROVIDER_EVIDENCE_INVALID");
+  }
+  return value as CaresLinkV1OpenAiCommunicationNoteRequestBodyEvidence;
 }
 
 function reconcileUsage(
@@ -1121,7 +1246,9 @@ function validateSlotEvidence(
       "fixtureId",
       "runOrdinal",
       "fixtureDigest",
-      "renderedRequestDigest",
+      "semanticCanonicalRequestSha256",
+      "requestBodySha256",
+      "requestBodyUtf8ByteLength",
       "preflightInputTokens",
       "providerRequestIdHash",
       "candidateDigest",
@@ -1148,19 +1275,32 @@ function validateSlotEvidence(
   if (fixtureDigest !== canonicalDigest(fixture)) {
     throw invalid("Communication Note preview fixture digest does not match");
   }
-  const renderedRequestDigest = requireSha256(
-    object.renderedRequestDigest,
+  const semanticCanonicalRequestSha256 = requireSha256(
+    object.semanticCanonicalRequestSha256,
     "Communication Note preview request digest is invalid",
   );
-  const expectedRequest =
-    buildCaresLinkV1OpenAiCommunicationNoteResponsesRequest({
-      policySnapshot: providerPolicy,
-      evaluationPlanSnapshot: evaluationPlan,
-      sourceLocale: fixture.sourceLocale,
-      cleanedFacts: fixture.cleanedFacts,
-    });
-  if (renderedRequestDigest !== canonicalDigest(expectedRequest)) {
+  const bodyPinSlot =
+    requireCaresLinkV1CommunicationNotePreviewRequestBodyPinSlot(index);
+  if (
+    bodyPinSlot.fixtureId !== manifestSlot.fixtureId ||
+    bodyPinSlot.runOrdinal !== manifestSlot.runOrdinal ||
+    semanticCanonicalRequestSha256 !== bodyPinSlot.semanticCanonicalSha256
+  ) {
     throw invalid("Communication Note preview request digest does not match");
+  }
+  const requestBodySha256 = requireSha256(
+    object.requestBodySha256,
+    "Communication Note preview request body digest is invalid",
+  );
+  const requestBodyUtf8ByteLength = requirePositiveSafeInteger(
+    object.requestBodyUtf8ByteLength,
+    "Communication Note preview request body byte length is invalid",
+  );
+  if (
+    requestBodySha256 !== bodyPinSlot.bodySha256 ||
+    requestBodyUtf8ByteLength !== bodyPinSlot.bodyUtf8ByteLength
+  ) {
+    throw invalid("Communication Note preview request body pin does not match");
   }
   const preflightInputTokens = requirePositiveSafeInteger(
     object.preflightInputTokens,
@@ -1207,7 +1347,9 @@ function validateSlotEvidence(
     fixtureId: manifestSlot.fixtureId,
     runOrdinal: manifestSlot.runOrdinal,
     fixtureDigest,
-    renderedRequestDigest,
+    semanticCanonicalRequestSha256,
+    requestBodySha256,
+    requestBodyUtf8ByteLength,
     preflightInputTokens,
     providerRequestIdHash,
     candidateDigest,
@@ -1327,6 +1469,8 @@ function assertStaticReportFields(object: Record<string, unknown>) {
       CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_MANIFEST_DIGEST ||
     object.goldenFixtureSetDigest !==
       CARESLINK_V1_COMMUNICATION_NOTE_GOLDEN_FIXTURE_SET_DIGEST ||
+    object.requestBodyPinBundleDigest !==
+      CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_REQUEST_BODY_PIN_BUNDLE_DIGEST ||
     object.workerPolicyDigest !==
       CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_WORKER_POLICY_DIGEST ||
     object.currency !== "USD" ||
@@ -1334,6 +1478,9 @@ function assertStaticReportFields(object: Record<string, unknown>) {
       "openai.gpt-5.4-mini.au.2026-08-27.v1" ||
     object.costNature !== "CALCULATED_UPPER_BOUND_NOT_INVOICE" ||
     object.authenticity !== "UNATTESTED_TEST_CONTRACT_ONLY" ||
+    object.requestBodyPinAuthenticity !== "UNATTESTED_SOURCE_PIN_ONLY" ||
+    object.requestBodyPinExecutionAuthority !== "NOT_EXECUTION_AUTHORITY" ||
+    object.requestBodyPinDispatchAttestation !== "ABSENT" ||
     object.callsDispatched !== 6 ||
     object.candidatesAccepted !== 6 ||
     object.languageDraftReviewsPassed !== 18 ||
@@ -1355,6 +1502,40 @@ function assertStaticRunnerBindings() {
       RUNNER_POLICY_CORE.manifestDigest ||
     evaluationPlan.acceptance.goldenFixtureSetDigest !==
       RUNNER_POLICY_CORE.goldenFixtureSetDigest ||
+    CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_REQUEST_BODY_PIN_BUNDLE
+      .bodyPinBundleDigest !== RUNNER_POLICY_CORE.requestBodyPinBundleDigest ||
+    CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_REQUEST_BODY_PIN_BUNDLE.status !==
+      RUNNER_POLICY_CORE.requestBodyPin.status ||
+    CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_REQUEST_BODY_PIN_BUNDLE.scope !==
+      RUNNER_POLICY_CORE.requestBodyPin.scope ||
+    CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_REQUEST_BODY_PIN_BUNDLE
+      .transportScope !== RUNNER_POLICY_CORE.requestBodyPin.transportScope ||
+    CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_REQUEST_BODY_PIN_BUNDLE
+      .authenticity !== RUNNER_POLICY_CORE.requestBodyPin.authenticity ||
+    CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_REQUEST_BODY_PIN_BUNDLE
+      .executionAuthority !==
+      RUNNER_POLICY_CORE.requestBodyPin.executionAuthority ||
+    CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_REQUEST_BODY_PIN_BUNDLE
+      .externalOwnerApproval !==
+      RUNNER_POLICY_CORE.requestBodyPin.externalOwnerApproval ||
+    CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_REQUEST_BODY_PIN_BUNDLE
+      .dispatchAttestation !==
+      RUNNER_POLICY_CORE.requestBodyPin.dispatchAttestation ||
+    CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_REQUEST_BODY_PIN_BUNDLE
+      .sourceBindings.evaluationPlanDigest !==
+      RUNNER_POLICY_CORE.evaluationPlanDigest ||
+    CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_REQUEST_BODY_PIN_BUNDLE
+      .sourceBindings.requestTemplateDigest !==
+      RUNNER_POLICY_CORE.requestTemplateDigest ||
+    CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_REQUEST_BODY_PIN_BUNDLE
+      .sourceBindings.manifestDigest !== RUNNER_POLICY_CORE.manifestDigest ||
+    CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_REQUEST_BODY_PIN_BUNDLE
+      .sourceBindings.goldenFixtureSetDigest !==
+      RUNNER_POLICY_CORE.goldenFixtureSetDigest ||
+    CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_REQUEST_BODY_PIN_BUNDLE
+      .applicationEnvelope.endpointUrl !== evaluationPlan.request.endpointUrl ||
+    CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_REQUEST_BODY_PIN_BUNDLE
+      .orderedSlotCount !== RUNNER_POLICY_CORE.execution.maximumCalls ||
     evaluationPlan.budget.maxCalls !==
       RUNNER_POLICY_CORE.execution.maximumCalls ||
     evaluationPlan.budget.maxInputTokensPerCall !==

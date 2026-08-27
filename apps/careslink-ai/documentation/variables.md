@@ -63,6 +63,20 @@ test callbacks, which are not a credential or network security boundary. The
 runner has no built-in API-key lookup, approved paid snapshot, durable approval
 claim or runtime importer.
 
+Communication Note M1g-a likewise adds no environment variable. It source-binds
+wire version `wire.communication.openai.responses.2026-08-27.m1g-a.v1`, body-pin
+version `pin.communication.openai.synthetic-request-body.2026-08-27.m1g-a.v1`,
+bundle digest
+`90b9c42796f5d649fcadcdc0cb4c7f123f4d20c79d3c74f2e27e79fe6ec802e8`,
+runner version
+`runner.communication.openai.synthetic-preview.2026-08-27.m1g-a.v2` and runner
+digest
+`a604057aceed70b741d4e1ac2a0e1f9bdf5d13721955448ec083948fb8b4a7c4`
+in source. No API-key, signing-key, signer, external-approval, endpoint override
+or runtime-enablement variable is introduced. The pin is
+`UNATTESTED_SOURCE_PIN_ONLY`, is `NOT_EXECUTION_AUTHORITY` and cannot be promoted
+through environment configuration.
+
 ## Current auth, URL and feature variables
 
 | Variable | Class | Purpose | Boundary |

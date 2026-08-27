@@ -1959,21 +1959,67 @@ rather than an invoice amount. The report labels itself
 `UNATTESTED_TEST_CONTRACT_ONLY`: its recomputable digest provides internal
 integrity, not source authentication.
 
-The focused M1f gate passes 6 files / 85 tests. The complete local gate passes
+The focused M1f gate passed 6 files / 85 tests. The complete local gate passed
 155 files / 2,126 tests, TypeScript with no emit, full lint, the 64/64-page Next
 16.2.9 webpack production build, all 73 generated Codex-adapter checks and
-`git diff --check`. All provider responses, token counts and review results are
-injected trusted test callbacks; those callbacks are arbitrary code and do not
-form a network security boundary. Paid readiness remains `false`, the approved
-runner policy is `undefined`, and the paid factory remains unavailable. An
-independently approved exact wire request, durable single-use approval claim,
-authenticated execution receipt, provider-side project spend cap and temporary
-key, real reviewer attribution, Australia project/ZDR/Modified-Retention
-attestations, processing acknowledgement and immediate price reconfirmation
-remain P1 prerequisites for any separately authorized synthetic call. No
-OpenAI call, database/Points write, route, deployment, commit or push is part of
-M1f. Detailed scope is in
+`git diff --check`. All provider responses, token counts and review results were
+injected trusted test callbacks; those callbacks were arbitrary code and did
+not form a network security boundary. Paid readiness remained `false`, the
+approved runner policy was `undefined`, and the paid factory remained
+unavailable. At that checkpoint, an independently pinned exact JSON body,
+durable single-use approval claim, authenticated execution receipt,
+provider-side project spend cap and temporary key, real reviewer attribution,
+Australia project/ZDR/Modified-Retention attestations, processing
+acknowledgement and immediate price reconfirmation remained P1 prerequisites
+for any separately authorized synthetic call. No OpenAI call, database/Points
+write, route, deployment, commit or push was part of M1f. Detailed scope is in
 `documentation/communication-note-preview-evaluation-runner-m1f.md`.
+
+### Communication Note exact request-body pin source gate M1g-a — 2026-08-27
+
+M1g-a adds wire serializer version
+`wire.communication.openai.responses.2026-08-27.m1g-a.v1`, body-pin version
+`pin.communication.openai.synthetic-request-body.2026-08-27.m1g-a.v1` and
+literal bundle digest
+`90b9c42796f5d649fcadcdc0cb4c7f123f4d20c79d3c74f2e27e79fe6ec802e8`.
+The bundle retains six ordered manifest slots and three distinct synthetic
+request bodies. Each body is independently pinned by its raw UTF-8 SHA-256,
+exact byte length and semantic canonical digest, so raw key-order or
+serialization drift cannot hide behind semantic equality.
+
+Runner version
+`runner.communication.openai.synthetic-preview.2026-08-27.m1g-a.v2` with
+digest
+`a604057aceed70b741d4e1ac2a0e1f9bdf5d13721955448ec083948fb8b4a7c4`
+validates every source body pin before token preflight. The branded provider
+validates the selected slot again and passes the same `JSON.stringify` string,
+without reserialization, to the injected non-HTTPS mock callback. The mock
+report binds the bundle digest, raw body hashes, byte lengths and semantic
+digests. Its validator compares those report values directly with the literal
+slot pins and does not rebuild the request to manufacture its expected value.
+
+Tests cover the literal bundle and deep freeze, exact six-slot/three-body
+mapping, builder-to-literal byte equality, raw-versus-canonical drift, model,
+prompt, schema and inner-JSON mutation rejection, slot and self-resigned bundle
+tampering, exact provider mock-body dispatch, runner preflight and evidence
+binding, report tamper rejection, content redaction and the server-only importer
+allowlist. The focused M1g-a gate passed 4 files / 77 tests. The full
+`npm test` run passed 156 files / 2,143 tests; lint with
+`--max-warnings=0`, the sequential `npx next build --webpack` production build
+and subsequent `npx tsc --noEmit --incremental false` all passed. Repository
+adapter synchronization passed for 73 checked files, and `git diff --check`
+passed after the final M1g-a documentation update.
+
+This is exact application JSON request-body evidence, not a full HTTP/TLS wire
+capture. The bundle declares `UNATTESTED_SOURCE_PIN_ONLY`,
+`NOT_EXECUTION_AUTHORITY`, external owner approval `ABSENT` and dispatch
+attestation `ABSENT`. Request-body-pin and paid-runner readiness remain `false`,
+approved snapshots remain `undefined`, and the paid factory remains
+unavailable. There is no API key, signature, signer, trusted verification key,
+durable single-use approval claim, authenticated dispatch receipt, real network
+call, database/Points write, route, deployment, commit or push in M1g-a.
+Detailed scope is in
+`documentation/communication-note-preview-request-body-pins-m1g-a.md`.
 
 ### Current live/read-only evidence
 

@@ -63,8 +63,10 @@ describe("V1 shadow runtime boundary", () => {
       "src/lib/v1/communication-note-fact-parity.ts",
       "src/lib/v1/communication-note-golden.ts",
       "src/lib/v1/communication-note-openai-request-template.ts",
+      "src/lib/v1/communication-note-openai-request-wire.ts",
       "src/lib/v1/communication-note-preview-evaluation-manifest.ts",
       "src/lib/v1/communication-note-preview-evaluation-policy.ts",
+      "src/lib/v1/communication-note-preview-request-body-pin.ts",
       "src/lib/v1/communication-note-preview-evaluation-runner.server.ts",
       "src/lib/v1/native-auth-boundary.server.ts",
       "src/lib/v1/openai-communication-note-provider.server.ts",
@@ -105,6 +107,36 @@ describe("V1 shadow runtime boundary", () => {
         ),
     );
     expect(runnerImporters).toEqual([]);
+  });
+
+  it("keeps the M1g-a wire serializer and literal body pins inside the audited server-only chain", () => {
+    const provider = join(
+      process.cwd(),
+      "src/lib/v1/openai-communication-note-provider.server.ts",
+    );
+    const runner = join(
+      process.cwd(),
+      "src/lib/v1/communication-note-preview-evaluation-runner.server.ts",
+    );
+    const bodyPins = join(
+      process.cwd(),
+      "src/lib/v1/communication-note-preview-request-body-pin.ts",
+    );
+    const wireImporters = walkSourceFiles("src").filter((file) =>
+      readFileSync(file, "utf8").includes(
+        "communication-note-openai-request-wire",
+      ),
+    );
+    const bodyPinImporters = walkSourceFiles("src").filter(
+      (file) =>
+        file !== bodyPins &&
+        readFileSync(file, "utf8").includes(
+          "communication-note-preview-request-body-pin",
+        ),
+    );
+
+    expect(wireImporters).toEqual([bodyPins, provider]);
+    expect(bodyPinImporters).toEqual([runner, provider].sort());
   });
 
   it("exposes the privacy review as a physical POST-only route", () => {

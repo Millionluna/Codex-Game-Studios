@@ -1,5 +1,12 @@
 # Communication Note one-shot Preview-evaluation runner M1f
 
+> Historical checkpoint: M1g-a now adds separately literal-pinned
+> `JSON.stringify` UTF-8 request bodies and binds their evidence into the
+> source-only runner and mock report. Those pins are unattested, grant no
+> execution authority and are not a full HTTP/TLS wire capture or external
+> owner approval. See
+> `communication-note-preview-request-body-pins-m1g-a.md`.
+
 ## Status
 
 M1f implements and tests the complete source contract for one bounded,
@@ -47,18 +54,20 @@ a second prompt or schema copy. A change to the pinned template, manifest, plan
 or runner objects without a deliberate version and digest review fails at
 module load and in the focused tests.
 
-The runner also hashes each fully rendered request and binds those hashes into
-the report. That is current-run integrity evidence, not an independent
-historical approval of the builder's snake-case wire mapping or JSON
-serialization. Before any paid activation, the exact rendered wire requests
-must receive their own externally reviewed literal pin or signed approval
-record.
+The M1f runner also hashed each fully rendered request object and bound those
+semantic hashes into the report. That was current-run integrity evidence, not
+an independent historical pin of the builder's snake-case mapping or exact JSON
+serialization. M1g-a now adds source-reviewed pins for the exact
+`JSON.stringify` UTF-8 request-body strings. Those newer pins still do not cover
+full HTTP/TLS transport bytes, attest dispatch or constitute an external owner
+signature or approval.
 
 ## One-shot execution contract
 
-Before the first provider dispatch, the runner renders, deeply freezes and
-hashes all six exact requests and obtains an injected token count for every
-request. Any missing, zero, unsafe, non-integer or greater-than-10,000 count
+Before the first provider dispatch, the M1f runner rendered, deeply froze and
+hashed all six ordered request objects and obtained an injected token count for
+every request. The six slots comprised three distinct synthetic requests used
+twice each. Any missing, zero, unsafe, non-integer or greater-than-10,000 count
 terminates the run with zero provider calls. Each injected token or review
 callback has a 5-second runner-side deadline and is raced against cancellation.
 The runner also reserves the full uncached 2,400-output-token upper bound for
@@ -135,7 +144,8 @@ receipt bound to the external approval claim.
 
 ## Remaining paid-call blockers
 
-M1f closes the source runner-contract gap only. A real disposable Preview run
+M1f closed the source runner-contract gap, and M1g-a later closed only the
+source JSON request-body reproducibility gap. A real disposable Preview run
 still requires all of the following as fresh external evidence and a separate
 explicit owner authorization:
 
@@ -147,11 +157,14 @@ explicit owner authorization:
    Australia-only processing and that Structured Output schemas are system
    data outside regional-residency coverage;
 4. immediate price and model-availability reconfirmation;
-5. an atomic durable single-use approval claim, an independently pinned or
-   signed exact wire request, and key teardown evidence;
-6. a durable authenticated execution receipt and real, attributable human
-   review rather than the injected contract-test reviewer.
+5. an atomic durable single-use approval claim bound to both the M1g-a
+   request-body pin bundle and runner-policy digests, plus key teardown
+   evidence;
+6. a durable authenticated receipt proving the dispatched request-body digest
+   matched the authorized slot, and real, attributable human review rather than
+   the injected contract-test reviewer.
 
-Until those gates close, the paid factory, approved runner policy and readiness
-latch remain unavailable. No real care data is permitted in this evaluation or
-by any future authorization derived from it.
+Until those gates close, the externally approved body-pin snapshot, paid
+factory, approved runner policy and readiness latches remain unavailable. No
+real care data is permitted in this evaluation or by any future authorization
+derived from it.

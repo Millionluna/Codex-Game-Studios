@@ -67,19 +67,40 @@ requires all checks plus 18 language-review results and emits a content-free
 digest-bound report. Same-ID concurrent/replay calls reuse the same terminal
 promise and a different ID is rejected after claim.
 
+M1g-a adds source-reviewed exact JSON request-body pins without adding a paid
+transport. Wire version
+`wire.communication.openai.responses.2026-08-27.m1g-a.v1` and body-pin version
+`pin.communication.openai.synthetic-request-body.2026-08-27.m1g-a.v1` bind six
+ordered slots comprising three distinct `JSON.stringify` UTF-8 bodies. Raw
+body SHA-256, UTF-8 byte length and semantic canonical digest are checked before
+preflight and again by the branded provider. The provider passes that same
+validated string without reserialization to the injected non-HTTPS mock. The
+report validator compares the literal pins directly rather than rebuilding a
+request. Bundle digest
+`90b9c42796f5d649fcadcdc0cb4c7f123f4d20c79d3c74f2e27e79fe6ec802e8`
+is bound by runner version
+`runner.communication.openai.synthetic-preview.2026-08-27.m1g-a.v2` and runner
+digest
+`a604057aceed70b741d4e1ac2a0e1f9bdf5d13721955448ec083948fb8b4a7c4`.
+
 This remains mock contract automation only. Paid readiness is false, the
 approved runner policy is undefined and the paid factory always fails closed.
 The executable factory accepts a branded provider plus token, reviewer, clock
 and transport callbacks that are explicitly trusted test code, not a network or
 credential security boundary. No runtime module imports the runner and there
-was no provider traffic. A durable atomic single-use approval claim, exact
-wire-request approval, authenticated execution receipt, temporary project key
-and provider spend ceiling, attributable real reviewers, Australia
+was no provider traffic. The M1g-a pin covers the JSON request body and intended
+application envelope, not full HTTP/TLS transport bytes. It is explicitly
+`UNATTESTED_SOURCE_PIN_ONLY` and `NOT_EXECUTION_AUTHORITY`; external owner
+approval and dispatch attestation remain absent. A durable atomic single-use
+approval claim bound to the body-pin bundle and runner-policy digests, an
+authenticated receipt proving the dispatched body matched, a temporary project
+key and provider spend ceiling, attributable real reviewers, Australia
 project-region/ZDR/Modified-Retention evidence, processing acknowledgement and
 fresh pricing confirmation remain required before any separately authorized
 paid synthetic run. Payload-vault retention, worker registration, route,
 Points and Production authorization remain later blockers. See
-`documentation/communication-note-preview-evaluation-runner-m1f.md`.
+`documentation/communication-note-preview-evaluation-runner-m1f.md` and
+`documentation/communication-note-preview-request-body-pins-m1g-a.md`.
 
 Supabase CLI 2.115.0 has since generated source-only migration `20260823213144_harden_v1_note_generation_registration_retention.sql`. It adds `attempts_registration_digest_idx` and the named `attempts_registration_catalog_fk` from `attempts.registration_digest` to `worker_registrations.registration_digest`, with update/delete `RESTRICT`, `NOT VALID` creation and explicit validation. It creates no seed, caller grant, runtime surface or Production change. Its local gate passed 39/39 focused contracts, the full 125-file / 1,381-test suite, lint, TypeScript, the 63/63-page production build, the 73-file Codex-adapter sync check and `git diff --check`. Deleted disposable `r22` then clean-applied the current manifest 15/15 and passed the seven rollback suites; the hosted registration-retention gate is now closed without enabling any runtime automation.
 

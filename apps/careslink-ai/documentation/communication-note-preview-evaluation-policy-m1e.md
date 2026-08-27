@@ -2,8 +2,12 @@
 
 > Historical checkpoint: M1f now literal-pins the complete request template and
 > ordered manifest and implements the source-only one-shot budget/report runner.
-> The paid factory remains unavailable and no real provider call is authorized.
-> See `communication-note-preview-evaluation-runner-m1f.md`.
+> M1g-a subsequently adds exact `JSON.stringify` UTF-8 request-body pins, while
+> explicitly retaining `UNATTESTED_SOURCE_PIN_ONLY` and
+> `NOT_EXECUTION_AUTHORITY`. The paid factory remains unavailable and no real
+> provider call is authorized. See
+> `communication-note-preview-evaluation-runner-m1f.md` and
+> `communication-note-preview-request-body-pins-m1g-a.md`.
 
 ## Status
 
@@ -21,7 +25,7 @@ that historical checkpoint.
 | Input class | existing synthetic, de-identified golden fixtures only |
 | Requested retention control | Zero Data Retention |
 | AU project-region/ZDR/amendment evidence | not attested |
-| Approved runner and report binding | not implemented at M1e; source-only and unapproved at M1f |
+| Approved runner and report binding | not implemented at M1e; source-only and unapproved at M1f and its M1g-a body-pin extension |
 | Evaluation readiness | `false` |
 | Approved evaluation snapshot | `undefined` |
 | Real provider calls | zero |
@@ -125,6 +129,11 @@ and request-template bindings and a content-free report. That implementation is
 not an approved paid runner and has no durable approval claim, key or HTTPS
 transport.
 
+M1g-a later adds literal raw-body SHA-256, UTF-8 byte-length and semantic
+canonical-digest pins for the three distinct synthetic JSON bodies across the
+six ordered slots. It does not retroactively change the M1e or M1f checkpoints,
+and it supplies no external signature, execution authority or dispatch receipt.
+
 M1e required any later runner to make every candidate pass every strict schema,
 shared privacy, date/time, numeric, decision-language and refusal check. It also
 required human semantic-groundedness review for all six candidates, comprising
@@ -151,8 +160,9 @@ The source plan lists eight unmet requirements:
 
 M1e created none of that execution evidence. M1f closes item 8 only at the
 source-contract level; approval, durable single-use execution authority and the
-external attestations remain absent. It also does not clear the existing
-model, data handling, semantic groundedness, payload vault, worker registry,
-served route, Points or Production blockers. No key, environment variable,
-database row, migration, route, deployment or external provider state changes
-in either source batch.
+external attestations remain absent. M1g-a adds source request-body pins without
+upgrading that source contract to an approved runner. It also does not clear the
+existing model, data handling, semantic groundedness, payload vault, worker
+registry, served route, Points or Production blockers. No key, environment
+variable, database row, migration, route, deployment or external provider state
+changes in any of these source batches.
