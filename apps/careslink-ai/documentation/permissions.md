@@ -368,6 +368,49 @@ receipt authenticates only the CaresLink internal observation and always keeps
 `providerAttestation=ABSENT`; it does not establish billing, model execution,
 an exact provider receipt or exactly-once delivery.
 
+### Communication Note Preview custody callers M1g-c (source-only)
+
+M1g-c preserves the three M1g-b executor roles as function owners and adds four
+separate, inert caller shells. This separates ownership/table privileges from
+the future connection identities that may invoke exact definer functions:
+
+| Caller shell | Exact function bundle | Explicitly absent |
+|---|---|---|
+| `careslink_v1_preview_authorization_registration_caller` | one authorization-registration RPC | revocation, claim, reservation, receipt, table access, executor membership and login |
+| `careslink_v1_preview_authorization_revocation_caller` | one authorization-revocation RPC | registration, claim, reservation, receipt, table access, executor membership and login |
+| `careslink_v1_preview_dispatch_caller` | authorization claim plus next-slot reservation RPCs | authorization registration/revocation, receipt, table access, executor membership and login |
+| `careslink_v1_preview_receipt_caller` | one verified-receipt persistence RPC | authorization, claim, reservation, table access, executor membership and login |
+
+Every shell is `NOLOGIN`, `NOINHERIT`, `NOSUPERUSER` and `NOBYPASSRLS`. The
+migration grants only private-schema `USAGE` and exact function `EXECUTE` in the
+1/1/2/1 mapping. It grants no table, sequence, broad function or owner-role
+privilege and no `SET ROLE` path. `PUBLIC`, `anon`, `authenticated`,
+`service_role`, `authenticator` and the listed API/runtime roles remain outside
+all four shells. A PostgreSQL 16 non-superuser role creator may
+retain only the server-created ADMIN bootstrap edge with both `INHERIT` and
+`SET` false; the assertion rejects every usable or caller-to-executor/runtime
+edge around all caller and executor roles. The migration adds no custody table,
+credential row, login, seed, route or database setting.
+
+An identity HMAC supplied to an M1g statement is not PostgreSQL, Supabase Auth
+or connection authentication. It can bind a previously authenticated caller to
+expected metadata, but cannot prove `current_user`, session validity, JWT
+subject or possession of a database credential. A future live connection
+identity and its exact shell membership must be provisioned, audited, rotated
+and revoked separately; until then the shells cannot be assumed by runtime.
+
+The server-only custody contract similarly grants no authority by itself. It
+validates purpose-separated, content-free descriptors for the external owner
+verification snapshot, non-exportable receipt signer and temporary
+project-service-account credential reference. It accepts no raw private key or
+bearer value, has no runtime importer, keeps both readiness latches `false` and
+leaves the approved snapshot `undefined`. Candidate registry hashes are neither
+authenticated provenance nor a freshness/revocation proof. Its policy digest is
+`1f7a3c586155fb4246e40207136cc1e521daedf6f2d01d1f89f7beebfad66438`.
+No real key, signing operation, login-capable caller, hosted database mutation,
+provider call, deployment or Production permission is part of M1g-c. See
+`documentation/communication-note-preview-key-custody-callers-m1g-c.md`.
+
 ## Intended V1 matrix (partly codified, not available at runtime)
 
 | Target resource | Owner | Admin/support | Service/backend | Required control |

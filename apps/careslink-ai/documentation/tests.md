@@ -2092,6 +2092,74 @@ hosted Supabase mutation, retained Preview, route, worker, Points write,
 deployment or Production change is part of M1g-b. Detailed scope is in
 `documentation/communication-note-preview-owner-authorization-m1g-b.md`.
 
+### Communication Note key-custody and caller-shell source gate M1g-c — 2026-08-28
+
+M1g-c is limited to the default-off server-only
+`communication-note-preview-key-custody.server.ts` contract and an additive
+least-privilege caller migration. The expected focused source gate verifies
+three explicitly injected, purpose-separated, content-free descriptors:
+candidate metadata labelled as an external owner-verification snapshot, the
+digest of a non-exportable CaresLink receipt-signer handle and the digest of a
+temporary OpenAI project service-account credential reference. It rejects a
+future `observedAt`, non-`ACTIVE` or expired key, malformed candidate metadata,
+cross-purpose references, raw private keys, raw bearers, broad/user/Production
+credentials, unbounded project/spend/expiry claims, content-bearing evidence
+and any attempt to treat an identity HMAC as database or Auth authentication.
+It deliberately does not establish registry provenance, a maximum snapshot age
+or complete revocation evidence; those remain activation blockers.
+
+The runtime-boundary assertion scans controlled root scripts plus `src/`,
+`scripts/` and optional `supabase/functions/` trees, including TS/JS ESM/CJS
+extensions, and must keep the custody module absent from every route, component,
+product runtime, worker, queue and scheduler importer. Paid and
+application readiness must remain literal `false`; the source must perform no
+environment lookup, global network call, key creation/resolution or secret
+logging.
+
+Migration
+`20260828034704_add_communication_note_preview_custody_callers_shadow.sql`
+and rollback assertion
+`communication_note_preview_custody_callers_shadow_assertions.sql` must prove:
+
+- exactly four `NOLOGIN`, `NOINHERIT`, `NOSUPERUSER`, `NOBYPASSRLS` caller
+  shells;
+- the exact 1/1/2/1 registration/revocation/dispatch/receipt function mapping;
+- only private-schema `USAGE` and exact function `EXECUTE`, with no table,
+  sequence, broad-function, caller-to-executor/runtime, usable `INHERIT` or
+  `SET ROLE`, login, API, `service_role` or `authenticator` privilege; the only
+  tolerated role edge is PostgreSQL 16's exact creator ADMIN bootstrap shape
+  with both `INHERIT` and `SET` false;
+- preserved M1g-b executor ownership, `SECURITY DEFINER`, `search_path=''`,
+  forced-RLS/append-only posture and five-function `READ COMMITTED` behavior;
+- no custody table, credential row, seed, fixture, login-capable identity or
+  runtime activation.
+
+Local PostgreSQL evidence must clean-apply the exact current migration manifest,
+run the new assertion inside its rollback boundary, independently confirm the
+role/ACL posture and finish with zero M1g-c fixtures. No hosted database, real
+key, OpenAI control-plane action, provider request, paid spend, Vercel change,
+deployment or Production action belongs to this gate.
+
+Evidence handoff — fill only from the final exact source run:
+
+| Evidence | Final value |
+|---|---|
+| M1g-c policy version | `custody.communication.openai.synthetic-preview.2026-08-28.m1g-c.v1` |
+| M1g-c policy digest | `1f7a3c586155fb4246e40207136cc1e521daedf6f2d01d1f89f7beebfad66438` |
+| focused files / tests | 4 files / 33 tests passed |
+| full files / tests | 160 files / 2,179 tests passed |
+| TypeScript / ESLint / Next build / static pages | serial `tsc --noEmit` and full ESLint passed; Next.js 16.2.9 Webpack production build passed with 64/64 static pages. The default Turbopack entry was environment-blocked before compilation because this temporary worktree's `node_modules` is a symlink outside its filesystem root |
+| repository adapter sync / diff check | 73 adapters in sync; `git diff --check` passed |
+| PostgreSQL version and migration manifest count/digest | PostgreSQL 16.15 (Homebrew), private Unix socket and no TCP; 36/36 migrations clean-applied as ordered raw transactions. Ordered basename SHA-256 `5bb377df2075029d3bce3aaf70e303bc7441b76e9d011cee9ba202872331232e`; ordered concatenated-content SHA-256 `5a830bf901acaf9b71d3cd88ff618c80561136fcd71c08f4cf694acbe8bf74a2` |
+| migration bytes / SHA-256 | 7,005 bytes / `e6b77e76406d8db1d68ad6e8da0d9d2dd88521c713047c0415aa60d29243d432` |
+| assertion bytes / SHA-256 | 24,511 bytes / `7fa7fa9d4c9667005b36c1f72c95aaf2418131d05037b5ea347f83e0bfcf16d2` |
+| migration-contract test bytes / SHA-256 | 8,482 bytes / `d7550ecdea8fad00a1f6228fd230814f7c7dee74dc387244ce939f94bae7c918` |
+| rollback/posture/zero-fixture result | final M1g-c assertion passed both as superuser and in a rollback-only non-superuser `CREATEROLE` topology with the exact ADMIN=true/INHERIT=false/SET=false bootstrap edges; adjacent M1g-b assertion passed; temporary actor and membership edges rolled back to zero; all five M1g ledgers remained zero rows |
+| terminal local cleanup | PostgreSQL stopped; exact temporary cluster directory `/private/tmp/careslink-portal-follow-up-pg16.OxuRKMf1` removed; port 65431 closed |
+
+Detailed source boundary and remaining real-activation blockers are in
+`documentation/communication-note-preview-key-custody-callers-m1g-c.md`.
+
 ### Current live/read-only evidence
 
 - Supabase migrations, tables, RLS flags, policies, grants, function grants and aggregate row counts were checked read-only.

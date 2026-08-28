@@ -5,6 +5,7 @@ import {
   createPublicKey,
   verify as verifySignature,
 } from "node:crypto";
+import { types as nodeTypes } from "node:util";
 
 import { stringifyCaresLinkV1CanonicalJson } from "./canonical-json";
 import { CaresLinkV1ContractError } from "./shared-contracts";
@@ -405,6 +406,46 @@ export function createCaresLinkV1CommunicationNotePreviewSigningMessage(
     `${SIGNING_PREFIX}${stringifyCaresLinkV1CanonicalJson(statement)}`,
     "utf8",
   );
+}
+
+/**
+ * Test/support validation for public Ed25519 trust metadata. This accepts no
+ * private material and does not resolve a key, sign a value or grant execution
+ * authority. A production trust or custody boundary remains deliberately
+ * absent.
+ */
+export function validateTestOnlyCaresLinkV1CommunicationNotePreviewTrustedSigningKey(
+  value: unknown,
+  options: Readonly<{
+    now: string;
+    expectedPurpose:
+      | "OWNER_AUTHORIZATION"
+      | "CARESLINK_DISPATCH_RECEIPT";
+  }>,
+): CaresLinkV1CommunicationNotePreviewTrustedSigningKey {
+  try {
+    const trustedOptions = requireExactDataObject(
+      options,
+      ["now", "expectedPurpose"],
+      "Trusted signing key options are invalid",
+    );
+    if (
+      trustedOptions.expectedPurpose !== "OWNER_AUTHORIZATION" &&
+      trustedOptions.expectedPurpose !== "CARESLINK_DISPATCH_RECEIPT"
+    ) {
+      throw invalid("Trusted signing key purpose is invalid");
+    }
+    return validateTrustedKey(
+      value,
+      requireTimestamp(
+        trustedOptions.now,
+        "Trusted signing key clock is invalid",
+      ),
+      trustedOptions.expectedPurpose,
+    );
+  } catch {
+    throw invalid("Trusted signing key is invalid");
+  }
 }
 
 /**
@@ -1009,19 +1050,22 @@ function validateTrustedKey(
     | "OWNER_AUTHORIZATION"
     | "CARESLINK_DISPATCH_RECEIPT",
 ) {
-  const object = requireObject(value, "Trusted signing key is invalid");
-  assertExactKeys(object, [
-    "keyId",
-    "publicKeySpkiDerBase64",
-    "publicKeySha256",
-    "status",
-    "notBefore",
-    "expiresAt",
-    "purpose",
-    "allowedDomain",
-    "ownerSubjectHmac",
-    "tenantScopeHmac",
-  ], "Trusted signing key is invalid");
+  const object = requireExactDataObject(
+    value,
+    [
+      "keyId",
+      "publicKeySpkiDerBase64",
+      "publicKeySha256",
+      "status",
+      "notBefore",
+      "expiresAt",
+      "purpose",
+      "allowedDomain",
+      "ownerSubjectHmac",
+      "tenantScopeHmac",
+    ],
+    "Trusted signing key is invalid",
+  );
   if (
     typeof object.keyId !== "string" ||
     !IDENTIFIER_PATTERN.test(object.keyId) ||
@@ -1039,6 +1083,19 @@ function validateTrustedKey(
   );
   if (createBufferSha256(keyBytes) !== publicKeySha256) {
     throw invalid("Trusted signing key fingerprint does not match");
+  }
+  let publicKey;
+  try {
+    publicKey = createPublicKey({
+      key: keyBytes,
+      format: "der",
+      type: "spki",
+    });
+  } catch {
+    throw invalid("Trusted Ed25519 public key is invalid");
+  }
+  if (publicKey.asymmetricKeyType !== "ed25519") {
+    throw invalid("Trusted Ed25519 public key is invalid");
   }
   const notBefore = requireTimestamp(
     object.notBefore,
@@ -1192,6 +1249,51 @@ function assertExactKeys(
     actual.some((key, index) => key !== wanted[index])) {
     throw invalid(message);
   }
+}
+
+function requireExactDataObject<const Key extends string>(
+  value: unknown,
+  expected: readonly Key[],
+  message: string,
+): Record<Key, unknown> {
+  if (
+    !value ||
+    typeof value !== "object" ||
+    Array.isArray(value) ||
+    nodeTypes.isProxy(value)
+  ) {
+    throw invalid(message);
+  }
+  const prototype = Object.getPrototypeOf(value);
+  if (
+    (prototype !== Object.prototype && prototype !== null) ||
+    Object.getOwnPropertySymbols(value).length !== 0
+  ) {
+    throw invalid(message);
+  }
+  const names = Object.getOwnPropertyNames(value).sort();
+  const wanted = [...expected].sort();
+  if (
+    names.length !== wanted.length ||
+    names.some((name, index) => name !== wanted[index])
+  ) {
+    throw invalid(message);
+  }
+  const result = Object.create(null) as Record<Key, unknown>;
+  for (const key of expected) {
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    if (
+      !descriptor ||
+      !descriptor.enumerable ||
+      !("value" in descriptor) ||
+      descriptor.get !== undefined ||
+      descriptor.set !== undefined
+    ) {
+      throw invalid(message);
+    }
+    result[key] = descriptor.value;
+  }
+  return result;
 }
 
 function requireSha256(value: unknown, message: string) {

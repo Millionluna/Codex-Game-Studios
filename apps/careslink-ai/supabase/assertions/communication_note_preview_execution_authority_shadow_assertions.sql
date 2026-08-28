@@ -441,6 +441,7 @@ declare
   v_entry record;
   v_actual_arguments text;
   v_grantees text[];
+  v_expected_grantees text[];
   v_denied_role text;
 begin
   if (
@@ -465,29 +466,39 @@ begin
         (
           'persist_verified_communication_note_preview_authorization',
           'p_statement jsonb, p_signature_base64url text, p_verifier_identity_hmac text',
-          'careslink_v1_preview_authorization_executor'
+          'careslink_v1_preview_authorization_executor',
+          'careslink_v1_preview_authorization_registration_caller'
         ),
         (
           'revoke_communication_note_preview_authorization',
           'p_authorization_digest text, p_revocation_id uuid, p_reason_code text, p_evidence_sha256 text, p_verifier_identity_hmac text',
-          'careslink_v1_preview_authorization_executor'
+          'careslink_v1_preview_authorization_executor',
+          'careslink_v1_preview_authorization_revocation_caller'
         ),
         (
           'claim_communication_note_preview_authorization',
           'p_authorization_digest text, p_claim_id uuid, p_run_id_hash text, p_executor_identity_hmac text, p_authority_policy_digest text, p_request_body_pin_bundle_digest text, p_runner_policy_digest text',
-          'careslink_v1_preview_dispatch_executor'
+          'careslink_v1_preview_dispatch_executor',
+          'careslink_v1_preview_dispatch_caller'
         ),
         (
           'reserve_communication_note_preview_dispatch',
           'p_claim_id uuid, p_claim_token text, p_reservation_id uuid, p_slot_index integer, p_fixture_id text, p_run_ordinal integer, p_request_body_sha256 text, p_request_body_utf8_byte_length integer, p_semantic_canonical_request_sha256 text, p_client_request_id_hmac text',
-          'careslink_v1_preview_dispatch_executor'
+          'careslink_v1_preview_dispatch_executor',
+          'careslink_v1_preview_dispatch_caller'
         ),
         (
           'persist_verified_communication_note_preview_dispatch_receipt',
           'p_statement jsonb, p_signature_base64url text, p_verifier_identity_hmac text, p_claim_token text',
-          'careslink_v1_preview_receipt_executor'
+          'careslink_v1_preview_receipt_executor',
+          'careslink_v1_preview_receipt_caller'
         )
-    ) as expected(function_name, identity_arguments, owner_name)
+    ) as expected(
+      function_name,
+      identity_arguments,
+      owner_name,
+      caller_name
+    )
   loop
     select pg_catalog.pg_get_function_identity_arguments(procedure.oid)
     into v_actual_arguments
@@ -541,7 +552,13 @@ begin
       and procedure.proname = v_entry.function_name
       and acl.privilege_type = 'EXECUTE';
 
-    if v_grantees is distinct from array[v_entry.owner_name]::text[] then
+    select pg_catalog.array_agg(grantee_name order by grantee_name)
+    into v_expected_grantees
+    from pg_catalog.unnest(
+      array[v_entry.owner_name, v_entry.caller_name]::text[]
+    ) as expected_grantee(grantee_name);
+
+    if v_grantees is distinct from v_expected_grantees then
       raise exception 'Preview RPC execute ACL drifted: % => %',
         v_entry.function_name, v_grantees;
     end if;

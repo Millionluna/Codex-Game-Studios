@@ -22,6 +22,7 @@ import {
   CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RECEIPT_VERSION,
   createCaresLinkV1CommunicationNotePreviewSigningMessage,
   createCaresLinkV1CommunicationNotePreviewStatementDigest,
+  validateTestOnlyCaresLinkV1CommunicationNotePreviewTrustedSigningKey,
   verifyTestOnlyCaresLinkV1CommunicationNotePreviewAuthorization,
   verifyTestOnlyCaresLinkV1CommunicationNotePreviewDispatchReceipt,
   type CaresLinkV1CommunicationNotePreviewAuthorizationStatement,
@@ -55,6 +56,110 @@ describe("Communication Note M1g-b execution authority", () => {
     expect(Object.isFrozen(
       CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_AUTHORITY_POLICY,
     )).toBe(true);
+  });
+
+  it("accepts only Ed25519 SPKI metadata and masks hostile metadata errors", () => {
+    const ownerSigner = createOwnerSigner("owner-preview-2026-08");
+    const { publicKey: rsaPublicKey } = generateKeyPairSync("rsa", {
+      modulusLength: 2_048,
+    });
+    const rsaSpki = rsaPublicKey.export({ format: "der", type: "spki" });
+
+    expect(() =>
+      validateTestOnlyCaresLinkV1CommunicationNotePreviewTrustedSigningKey(
+        {
+          ...ownerSigner.trustedKey,
+          publicKeySpkiDerBase64: rsaSpki.toString("base64"),
+          publicKeySha256: createHash("sha256").update(rsaSpki).digest("hex"),
+        },
+        { now: NOW, expectedPurpose: "OWNER_AUTHORIZATION" },
+      ),
+    ).toThrowError(expect.objectContaining({
+      code: "VALIDATION_ERROR",
+      message: "Trusted signing key is invalid",
+    }));
+
+    const ownKeys = vi.fn(() => {
+      throw new Error("do-not-leak-trust-metadata");
+    });
+    const hostile = new Proxy({}, {
+      ownKeys,
+    });
+    expect(() =>
+      validateTestOnlyCaresLinkV1CommunicationNotePreviewTrustedSigningKey(
+        hostile,
+        { now: NOW, expectedPurpose: "OWNER_AUTHORIZATION" },
+      ),
+    ).toThrowError(expect.objectContaining({
+      code: "VALIDATION_ERROR",
+      message: "Trusted signing key is invalid",
+    }));
+    expect(ownKeys).not.toHaveBeenCalled();
+
+    const keyIdGetter = vi.fn(() => ownerSigner.trustedKey.keyId);
+    const accessorKey = { ...ownerSigner.trustedKey };
+    Object.defineProperty(accessorKey, "keyId", {
+      enumerable: true,
+      get: keyIdGetter,
+    });
+    expect(() =>
+      validateTestOnlyCaresLinkV1CommunicationNotePreviewTrustedSigningKey(
+        accessorKey,
+        { now: NOW, expectedPurpose: "OWNER_AUTHORIZATION" },
+      ),
+    ).toThrowError(expect.objectContaining({
+      code: "VALIDATION_ERROR",
+      message: "Trusted signing key is invalid",
+    }));
+    expect(keyIdGetter).not.toHaveBeenCalled();
+
+    const hiddenExtra = { ...ownerSigner.trustedKey };
+    Object.defineProperty(hiddenExtra, "privateKeyMaterial", {
+      enumerable: false,
+      value: "must-not-be-accepted",
+    });
+    expect(() =>
+      validateTestOnlyCaresLinkV1CommunicationNotePreviewTrustedSigningKey(
+        hiddenExtra,
+        { now: NOW, expectedPurpose: "OWNER_AUTHORIZATION" },
+      ),
+    ).toThrowError(expect.objectContaining({
+      code: "VALIDATION_ERROR",
+      message: "Trusted signing key is invalid",
+    }));
+
+    const symbolExtra = { ...ownerSigner.trustedKey };
+    Object.defineProperty(symbolExtra, Symbol("private-key-material"), {
+      enumerable: true,
+      value: "must-not-be-accepted",
+    });
+    expect(() =>
+      validateTestOnlyCaresLinkV1CommunicationNotePreviewTrustedSigningKey(
+        symbolExtra,
+        { now: NOW, expectedPurpose: "OWNER_AUTHORIZATION" },
+      ),
+    ).toThrowError(expect.objectContaining({
+      code: "VALIDATION_ERROR",
+      message: "Trusted signing key is invalid",
+    }));
+
+    const optionsGetter = vi.fn(() => NOW);
+    const accessorOptions = {
+      get now() {
+        return optionsGetter();
+      },
+      expectedPurpose: "OWNER_AUTHORIZATION" as const,
+    };
+    expect(() =>
+      validateTestOnlyCaresLinkV1CommunicationNotePreviewTrustedSigningKey(
+        ownerSigner.trustedKey,
+        accessorOptions,
+      ),
+    ).toThrowError(expect.objectContaining({
+      code: "VALIDATION_ERROR",
+      message: "Trusted signing key is invalid",
+    }));
+    expect(optionsGetter).not.toHaveBeenCalled();
   });
 
   it("verifies one exact external-owner Ed25519 authorization against an external key snapshot", () => {
