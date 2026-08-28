@@ -181,6 +181,35 @@ full tests, TypeScript, lint, a 64/64-page Webpack production build and the
 PostgreSQL 16.15 dual-role-topology rollback gate passed. See
 `documentation/communication-note-preview-key-custody-callers-m1g-c.md`.
 
+M1g-d adds only a server-only, pure `TEST_ONLY` activation-preflight validator.
+Its policy digest is
+`81ab3c3bac64f2f9205c2eb358e298d440e3735e5a9c0ed07a842058e6947e53`.
+It cross-binds the M1g-b authorization, M1g-c custody snapshot, six pairwise-
+distinct provider evidence hashes, the exact 36-migration manifest/artifact
+pins, four ordered caller-identity candidates, non-exportable receipt-key
+lifecycle/teardown evidence and the attributable 18-review plan. Evidence may
+be at most five minutes old; receipt, provider, database and review sections
+must share the exact candidate/registry observation and cannot predate the
+authorization or provider credential. A candidate may remain live for at most
+15 minutes without outliving the owner authorization. The database descriptor
+also requires one purpose/version/common-key-reference claim for distinct
+Preview and Production project-ref HMACs, and complete unprivileged caller-role
+and direct-ACL assertions. Those values remain injected candidate consistency,
+not independent control-plane or PostgreSQL-catalog attestation. Even a valid
+candidate returns `activationReady=false` with five fixed blockers. The
+existing eight readiness constants stay `false`, the existing six approved
+values stay `undefined`, and the live factory always throws.
+
+The provider credential has no asserted provider-enforced TTL:
+`operationalExpiresAt` and `teardownBy` are CaresLink operational controls only.
+The US$0.25 provider hard limit must report monthly interval and enforcing
+status; it is defence in depth, not the per-run cap
+and not a substitute for the six-slot/no-retry 250,000-micro-USD application
+ceiling. M1g-d adds no migration, environment lookup, fetch/SDK, resolver,
+database/Hosted action, route, deployment, paid call or Production capability.
+See
+`documentation/communication-note-preview-activation-preflight-m1g-d.md`.
+
 Supabase CLI 2.115.0 has since generated source-only migration `20260823213144_harden_v1_note_generation_registration_retention.sql`. It adds `attempts_registration_digest_idx` and the named `attempts_registration_catalog_fk` from `attempts.registration_digest` to `worker_registrations.registration_digest`, with update/delete `RESTRICT`, `NOT VALID` creation and explicit validation. It creates no seed, caller grant, runtime surface or Production change. Its local gate passed 39/39 focused contracts, the full 125-file / 1,381-test suite, lint, TypeScript, the 63/63-page production build, the 73-file Codex-adapter sync check and `git diff --check`. Deleted disposable `r22` then clean-applied the current manifest 15/15 and passed the seven rollback suites; the hosted registration-retention gate is now closed without enabling any runtime automation.
 
 ### PostgreSQL 16.15 local isolated gate — 2026-08-24

@@ -118,6 +118,41 @@ not represented by placeholders in `.env.example`. A caller-supplied identity
 HMAC is correlation/scope evidence and must not be treated as database or Auth
 authentication.
 
+Communication Note M1g-d also adds no environment variable. Its server-only,
+pure `TEST_ONLY` validator accepts explicitly injected content-free candidate
+evidence and cross-binds M1g-b authorization, M1g-c custody, six provider
+evidence hashes, the exact 36-entry migration manifest and six database digest
+pins, four caller-identity candidates, receipt-key lifecycle/teardown and the
+18-review plan. It performs no environment
+lookup, fetch/SDK call, secret/KMS/HMAC resolver, database connection or hosted
+operation. A valid result remains `activationReady=false`; the live factory
+always throws, the existing eight readiness constants remain `false` and the
+existing six approved values remain `undefined`.
+
+All receipt/provider/database/review observations must equal the exact
+candidate/registry timestamp and follow authorization/credential issuance.
+Database target/Production project-reference HMACs share a declared
+purpose/version/key-reference and must differ, while every caller asserts no
+superuser/role/database/replication/bypass-RLS attributes, no extra membership
+and no direct table/sequence/function privilege. These are injected candidate
+claims only, not authenticated control-plane inventory or PostgreSQL catalog
+evidence; no environment variable can upgrade them into activation authority.
+
+Its preflight version and literal policy digest are
+`preflight.communication.openai.synthetic-preview.2026-08-28.m1g-d.v1` and
+`81ab3c3bac64f2f9205c2eb358e298d440e3735e5a9c0ed07a842058e6947e53`.
+They are source-integrity bindings, not configuration or approval.
+
+The M1g-d service-account descriptor states
+`providerEnforcedExpiry=ABSENT`. Its `operationalExpiresAt` and `teardownBy`
+timestamps are CaresLink-controlled deletion deadlines, not a provider TTL and
+not authorization to resolve the credential. The US$0.25 provider hard spend
+limit requires a monthly interval and enforcing status, but remains a defence-
+in-depth control rather than the per-run cap; the separate
+six-slot, one-attempt, no-retry/no-fallback 250,000-micro-USD application limit
+still applies. No M1g-d value belongs in `.env.example`, and no ordinary
+environment variable can remove its five fixed activation blockers.
+
 ## Current auth, URL and feature variables
 
 | Variable | Class | Purpose | Boundary |

@@ -1286,3 +1286,43 @@ digests are recorded in `documentation/tests.md`; they authorize no runtime or
 external action.
 Detailed scope and activation blockers are in
 `documentation/communication-note-preview-key-custody-callers-m1g-c.md`.
+
+## 19. Communication synthetic-Preview activation preflight M1g-d — 2026-08-28
+
+M1g-d adds a server-only, pure `TEST_ONLY` evidence validator around the
+isolated M1g-b/M1g-c path. Its version and literal policy digest are
+`preflight.communication.openai.synthetic-preview.2026-08-28.m1g-d.v1` and
+`81ab3c3bac64f2f9205c2eb358e298d440e3735e5a9c0ed07a842058e6947e53`.
+It does not alter the durable Note job/attempt model, vault lifecycle,
+canonical-document transaction, worker catalog or Points design.
+
+The validator rebuilds a content-free candidate and cross-binds the verified
+owner authorization, validated custody snapshot, exact shared observation
+time, provider/project/credential evidence, receipt-key lifecycle, boundary-
+safe 36-migration manifest and four ordered caller candidates. Each caller
+asserts no elevated PostgreSQL role attributes, extra caller-shell/executor/API
+membership, direct table/sequence/function privileges, raw credential material
+or active backend. Candidate and section observations cannot be future or
+predate authorization effectiveness/provider-credential issuance, may be at
+most five minutes old and yield a candidate live for no more than 15 minutes or
+the remaining authorization window.
+
+The database section requires a fixed HMAC algorithm, purpose and version plus
+one declared common key-reference digest for distinct target and Production
+project-reference HMACs. This is internal candidate consistency only: M1g-d
+does not resolve the HMAC key or authenticate either project against an
+independent Supabase inventory/control plane. Likewise, external evidence
+digests and their shared timestamp are not recomputed from authenticated bytes
+or signed system responses. Both gaps remain covered by
+`EXTERNAL_PROVENANCE_NOT_AUTHENTICATED`; caller HMACs and posture fields do not
+prove provisioned logins or live PostgreSQL catalog/ACL state and remain
+covered by `RUNTIME_IDENTITIES_NOT_PROVISIONED`.
+
+A valid candidate still returns `activationReady=false` with five fixed
+blockers. All eight prior readiness values stay `false`, all six approved
+values stay `undefined`, and the live factory always throws. There is no new
+migration, route, worker, runtime importer, environment lookup, secret/KMS/HMAC
+resolver, provider or database connection, hosted action, paid request,
+deployment or Production change. Detailed scope is in
+`documentation/communication-note-preview-activation-preflight-m1g-d.md` and
+final local gate evidence is recorded in `documentation/tests.md`.

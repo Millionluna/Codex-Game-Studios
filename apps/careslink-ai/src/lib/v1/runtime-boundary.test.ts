@@ -70,6 +70,7 @@ describe("V1 shadow runtime boundary", () => {
       "src/lib/v1/communication-note-preview-evaluation-runner.server.ts",
       "src/lib/v1/communication-note-preview-execution-authority.server.ts",
       "src/lib/v1/communication-note-preview-key-custody.server.ts",
+      "src/lib/v1/communication-note-preview-activation-preflight.server.ts",
       "src/lib/v1/native-auth-boundary.server.ts",
       "src/lib/v1/openai-communication-note-provider.server.ts",
       "src/lib/v1/communication-note-provider-policy.ts",
@@ -154,6 +155,14 @@ describe("V1 shadow runtime boundary", () => {
       process.cwd(),
       "src/lib/v1/communication-note-preview-key-custody.server.test.ts",
     );
+    const activationPreflightModule = join(
+      process.cwd(),
+      "src/lib/v1/communication-note-preview-activation-preflight.server.ts",
+    );
+    const activationPreflightTest = join(
+      process.cwd(),
+      "src/lib/v1/communication-note-preview-activation-preflight.server.test.ts",
+    );
     const migrationContractTest = join(
       process.cwd(),
       "src/lib/v1/communication-note-preview-execution-authority-migration-contract.test.ts",
@@ -166,13 +175,15 @@ describe("V1 shadow runtime boundary", () => {
 
     expect(importers).toEqual([
       migrationContractTest,
+      activationPreflightModule,
+      activationPreflightTest,
       authorityTest,
       keyCustodyModule,
       keyCustodyTest,
     ].sort());
     expect(walkSourceFiles("src").filter((file) =>
       importPattern.test(readFileSync(file, "utf8")),
-    )).toEqual([keyCustodyModule]);
+    )).toEqual([activationPreflightModule, keyCustodyModule].sort());
   });
 
   it("quarantines M1g-c custody metadata from every controlled script and runtime importer", () => {
@@ -184,6 +195,14 @@ describe("V1 shadow runtime boundary", () => {
       process.cwd(),
       "src/lib/v1/communication-note-preview-key-custody.server.test.ts",
     );
+    const activationPreflightModule = join(
+      process.cwd(),
+      "src/lib/v1/communication-note-preview-activation-preflight.server.ts",
+    );
+    const activationPreflightTest = join(
+      process.cwd(),
+      "src/lib/v1/communication-note-preview-activation-preflight.server.test.ts",
+    );
     const importPattern =
       /(?:from\s+|import\s*\(|require\s*\()\s*["'][^"']*communication-note-preview-key-custody\.server(?:\.(?:[cm]?[jt]s|[jt]sx))?["']/;
     const importers = walkControlledScriptFiles().filter((file) =>
@@ -191,7 +210,11 @@ describe("V1 shadow runtime boundary", () => {
     );
     const source = readFileSync(custodyModule, "utf8");
 
-    expect(importers).toEqual([custodyTest]);
+    expect(importers).toEqual([
+      activationPreflightModule,
+      activationPreflightTest,
+      custodyTest,
+    ].sort());
     expect(walkSourceFiles("src/app").filter((file) =>
       importPattern.test(readFileSync(file, "utf8")),
     )).toEqual([]);
@@ -199,6 +222,38 @@ describe("V1 shadow runtime boundary", () => {
       importPattern.test(readFileSync(file, "utf8")),
     )).toEqual([]);
     expect(source).not.toMatch(/process\.env|fetch\s*\(|from\s+["']openai["']/);
+  });
+
+  it("quarantines the M1g-d activation preflight to its own test", () => {
+    const preflightModule = join(
+      process.cwd(),
+      "src/lib/v1/communication-note-preview-activation-preflight.server.ts",
+    );
+    const preflightTest = join(
+      process.cwd(),
+      "src/lib/v1/communication-note-preview-activation-preflight.server.test.ts",
+    );
+    const importPattern =
+      /(?:from\s+|import\s*\(|require\s*\()\s*["'][^"']*communication-note-preview-activation-preflight\.server(?:\.(?:[cm]?[jt]s|[jt]sx))?["']/;
+    const importers = walkControlledScriptFiles().filter((file) =>
+      importPattern.test(readFileSync(file, "utf8")),
+    );
+    const source = readFileSync(preflightModule, "utf8");
+
+    expect(importers).toEqual([preflightTest]);
+    expect(walkSourceFiles("src/app").filter((file) =>
+      importPattern.test(readFileSync(file, "utf8")),
+    )).toEqual([]);
+    expect(walkSourceFiles("src/components").filter((file) =>
+      importPattern.test(readFileSync(file, "utf8")),
+    )).toEqual([]);
+    expect(source).not.toMatch(
+      /process\.env|fetch\s*\(|from\s+["'](?:openai|@supabase\/)[^"']*["']|SUPABASE_SERVICE_ROLE_KEY|NEXT_PUBLIC_/,
+    );
+    expect(source).toContain("activationReady: false");
+    expect(source).toContain(
+      "Communication Note preview activation preflight is unavailable",
+    );
   });
 
   it("exposes the privacy review as a physical POST-only route", () => {

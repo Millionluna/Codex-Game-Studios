@@ -2160,6 +2160,53 @@ Evidence handoff — fill only from the final exact source run:
 Detailed source boundary and remaining real-activation blockers are in
 `documentation/communication-note-preview-key-custody-callers-m1g-c.md`.
 
+### Communication Note activation-preflight source gate M1g-d — 2026-08-28
+
+M1g-d adds only the server-only, pure
+`communication-note-preview-activation-preflight.server.ts` contract. Its
+validator consumes explicitly injected, content-free M1g-b authorization,
+M1g-c custody and candidate evidence. It performs no environment lookup,
+network/provider/database call, credential/key resolution, signing, hosted
+mutation or deployment. The live factory always throws; successful test-only
+validation returns `activationReady=false` with the five exact blockers. All
+eight pre-existing readiness constants remain `false` and all six approved
+values remain `undefined`.
+
+The focused gate covers literal policy/blocker pins, recursive freezing and
+rebuilding, exact 36-file boundary-safe migration manifest pins, all authority/
+custody/provider/database/caller/review constraints, shared post-issuance
+timestamps, exact five- and 15-minute boundaries, cross-purpose digest/HMAC/
+reference isolation, hostile proxies/accessors/custom arrays, bounded data-graph
+traversal, secret/content exclusion and runtime-importer quarantine. No SQL
+migration or PostgreSQL/Hosted run is required because M1g-d changes no schema.
+
+Evidence handoff:
+
+| Evidence | Final value |
+|---|---|
+| M1g-d policy version | `preflight.communication.openai.synthetic-preview.2026-08-28.m1g-d.v1` |
+| M1g-d policy digest | `81ab3c3bac64f2f9205c2eb358e298d440e3735e5a9c0ed07a842058e6947e53` |
+| focused files / tests | 4 files / 38 tests passed |
+| full files / tests | 161 files / 2,189 tests passed |
+| TypeScript / ESLint | `tsc --noEmit --pretty false` and full `eslint .` passed |
+| Next production build | Next.js 16.2.9 Webpack build passed; 64/64 static pages generated |
+| repository adapter sync / diff check | 73 adapters in sync; `git diff --check` passed |
+| migration source pins | 36 migrations; ordered-basename SHA-256 `5bb377df2075029d3bce3aaf70e303bc7441b76e9d011cee9ba202872331232e`; canonical ordered `{name, sha256, utf8ByteLength}` entries SHA-256 `97e6e7be1907ae1b43bb8698f00e4a708a2c5b95f6875fe453aa43bbf0839fad` |
+| new source bytes / SHA-256 | 46,008 bytes / `af80399ce3c78544716ad7199e7ccb9da104c42305f7272fb65b735e2f19f6dd` |
+| new focused-test bytes / SHA-256 | 46,582 bytes / `45ba9e31543168d1eaf81d91884f58ac2873cef13bda1eccfb3cae418a861f39` |
+| security review | P0/P1/P2/LOW = 0 within the strict source-only `TEST_ONLY` boundary; no product runtime importer or activation capability |
+
+The database target/Production HMACs and common key-reference digest remain
+injected candidate consistency, not independent Supabase inventory/control-
+plane attestation. External evidence digests and shared timestamps likewise are
+not authenticated bindings to canonical source bytes or trusted system
+responses. They remain explicit activation blockers under
+`EXTERNAL_PROVENANCE_NOT_AUTHENTICATED`; login/caller claims remain blocked by
+`RUNTIME_IDENTITIES_NOT_PROVISIONED`. If any future live path consumes this
+result, those two boundaries must be closed first through a separately
+authorized design and gate. Detailed scope is in
+`documentation/communication-note-preview-activation-preflight-m1g-d.md`.
+
 ### Current live/read-only evidence
 
 - Supabase migrations, tables, RLS flags, policies, grants, function grants and aggregate row counts were checked read-only.
