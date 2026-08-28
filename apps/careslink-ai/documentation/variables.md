@@ -93,6 +93,31 @@ execution authority. M1g-b
 therefore cannot be activated by setting `OPENAI_API_KEY`, `OPENAI_MODEL` or any
 existing CaresLink flag.
 
+Communication Note M1g-c adds no environment variable and does not reuse
+`OPENAI_API_KEY` for the bounded synthetic evaluation. Its server-only contract
+accepts three explicitly injected, purpose-separated references: an external
+owner-verification candidate snapshot containing only public verification
+material; a digest of an opaque non-exportable CaresLink receipt-signer custody
+reference; and a digest of a temporary, project-scoped OpenAI service-account
+API-key reference. The raw receipt private key and raw provider bearer
+credential are not valid contract values and must never be placed in a public
+variable, repository file, database row, log, DTO or evidence artifact. The
+candidate registry hashes are not an authenticated source, digest-to-bytes,
+freshness or complete-revocation proof.
+
+The M1g-c policy version
+`custody.communication.openai.synthetic-preview.2026-08-28.m1g-c.v1` and digest
+`1f7a3c586155fb4246e40207136cc1e521daedf6f2d01d1f89f7beebfad66438`
+are literal source values, not configuration. The approved custody snapshot is
+`undefined` and both readiness latches are literal `false`. The four database
+caller shells likewise require no password or URL: they are `NOLOGIN`
+privilege bundles only. A future login-capable identity,
+membership, secret-manager/KMS resolver, Preview-project binding, credential
+rotation/expiry and teardown configuration all require separate review and are
+not represented by placeholders in `.env.example`. A caller-supplied identity
+HMAC is correlation/scope evidence and must not be treated as database or Auth
+authentication.
+
 ## Current auth, URL and feature variables
 
 | Variable | Class | Purpose | Boundary |

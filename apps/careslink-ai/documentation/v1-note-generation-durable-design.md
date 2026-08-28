@@ -1210,3 +1210,79 @@ importers remain absent. The migration is Production-unapplied and has caused
 no hosted database mutation. This section therefore records a shadow source
 contract only, not a paid Preview, durable generation runtime, retained
 database capability or Production execution authority.
+
+## 18. Communication synthetic-Preview custody and callers M1g-c — 2026-08-28
+
+M1g-c extends only the isolated M1g-b evaluation path. It does not alter the
+five-Note durable job/attempt model, payload lifecycle, worker catalog, owner
+repository, canonical document write or Points design. Its policy version and
+digest are
+`custody.communication.openai.synthetic-preview.2026-08-28.m1g-c.v1` and
+`1f7a3c586155fb4246e40207136cc1e521daedf6f2d01d1f89f7beebfad66438`.
+
+The server boundary models three purpose-separated custody inputs:
+
+1. explicitly injected candidate metadata labelled as an external trust-registry
+   snapshot, containing public Ed25519 material plus bounded
+   purpose/domain/owner/tenant, candidate `ACTIVE` and key-validity metadata
+   needed to verify the M1g-b authorization; it does not prove registry
+   provenance, freshness or complete revocation;
+2. a SHA-256 reference to a non-exportable CaresLink receipt-signer handle,
+   purpose-bound to the exact internal-observation domain while withholding the
+   private key; the source validator itself performs no signing;
+3. a SHA-256 reference to one temporary, least-privilege OpenAI project
+   service-account API key, bound through project/service-account/key HMACs,
+   scope evidence, a maximum 30-minute lifetime and fixed six-call limit without
+   exposing the bearer secret.
+
+The descriptors are content-free. They may hold policy identifiers, timestamps,
+bounded status, hashes/HMACs, public fingerprints and digests of opaque managed
+handles/references, but no prompt/facts/output, raw care or project identifiers,
+private signing key, OpenAI bearer, database credential or provider response
+body. They are
+explicitly injected, not discovered from environment variables, and do not
+create or resolve a real key. Purpose separation prevents an owner-verification
+snapshot, receipt signer and provider credential from substituting for one
+another.
+
+Migration
+`20260828034704_add_communication_note_preview_custody_callers_shadow.sql`
+adds no custody table or row. It creates four `NOLOGIN`, `NOINHERIT`,
+`NOSUPERUSER`, `NOBYPASSRLS` caller shells:
+
+- `careslink_v1_preview_authorization_registration_caller` gets the single
+  authorization-registration function;
+- `careslink_v1_preview_authorization_revocation_caller` gets the single
+  authorization-revocation function;
+- `careslink_v1_preview_dispatch_caller` gets the claim and reservation
+  functions;
+- `careslink_v1_preview_receipt_caller` gets the single receipt function.
+
+That 1/1/2/1 mapping grants only private-schema `USAGE` and exact function
+`EXECUTE`. The shells receive no table/sequence access, broad function grant,
+executor-role membership, `SET ROLE` path, login or API/service-role privilege.
+The existing M1g-b executors remain function owners and retain the narrow
+forced-RLS table privileges. `READ COMMITTED`, lock-then-recheck and no-lock-
+across-transport requirements remain unchanged. PostgreSQL 16 may retain only
+its non-usable creator ADMIN bootstrap edge (`INHERIT=false`, `SET=false`);
+the assertion rejects every usable or unexpected caller/executor edge.
+
+A caller-supplied identity HMAC is a content-free binding for the expected
+statement, not proof of a PostgreSQL role, Supabase Auth session, JWT subject or
+database credential. A future live deployment must create and authenticate a
+separate login-capable identity, then grant it membership only in the required
+shell. M1g-c deliberately does neither.
+
+The TypeScript custody boundary has no route, component, worker, scheduler,
+queue or product-runtime importer. Both readiness latches remain literal
+`false`, the approved snapshot remains `undefined` and validation is
+`TEST_ONLY`. Candidate trust-registry hashes do not prove registry provenance,
+freshness or complete revocation. No real key, service account, signature,
+OpenAI call, spend,
+hosted Supabase mutation,
+retained Preview, Vercel configuration, deployment or Production change is
+part of this batch. Exact local test/build/PostgreSQL counts and artifact
+digests are recorded in `documentation/tests.md`; they authorize no runtime or
+external action.
+Detailed scope and activation blockers are in
+`documentation/communication-note-preview-key-custody-callers-m1g-c.md`.

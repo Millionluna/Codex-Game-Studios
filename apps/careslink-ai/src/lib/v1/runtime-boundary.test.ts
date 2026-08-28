@@ -1,4 +1,4 @@
-import { readFileSync, readdirSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { extname, join } from "node:path";
 import { describe, expect, it } from "vitest";
 
@@ -69,6 +69,7 @@ describe("V1 shadow runtime boundary", () => {
       "src/lib/v1/communication-note-preview-request-body-pin.ts",
       "src/lib/v1/communication-note-preview-evaluation-runner.server.ts",
       "src/lib/v1/communication-note-preview-execution-authority.server.ts",
+      "src/lib/v1/communication-note-preview-key-custody.server.ts",
       "src/lib/v1/native-auth-boundary.server.ts",
       "src/lib/v1/openai-communication-note-provider.server.ts",
       "src/lib/v1/communication-note-provider-policy.ts",
@@ -145,20 +146,59 @@ describe("V1 shadow runtime boundary", () => {
       process.cwd(),
       "src/lib/v1/communication-note-preview-execution-authority.server.test.ts",
     );
+    const keyCustodyModule = join(
+      process.cwd(),
+      "src/lib/v1/communication-note-preview-key-custody.server.ts",
+    );
+    const keyCustodyTest = join(
+      process.cwd(),
+      "src/lib/v1/communication-note-preview-key-custody.server.test.ts",
+    );
     const migrationContractTest = join(
       process.cwd(),
       "src/lib/v1/communication-note-preview-execution-authority-migration-contract.test.ts",
     );
     const importPattern =
-      /(?:from\s+|import\s*\(|require\s*\()\s*["'][^"']*communication-note-preview-execution-authority\.server["']/;
+      /(?:from\s+|import\s*\(|require\s*\()\s*["'][^"']*communication-note-preview-execution-authority\.server(?:\.(?:[cm]?[jt]s|[jt]sx))?["']/;
     const importers = walkAllScriptFiles("src").filter((file) =>
       importPattern.test(readFileSync(file, "utf8")),
     );
 
-    expect(importers).toEqual([migrationContractTest, authorityTest].sort());
+    expect(importers).toEqual([
+      migrationContractTest,
+      authorityTest,
+      keyCustodyModule,
+      keyCustodyTest,
+    ].sort());
     expect(walkSourceFiles("src").filter((file) =>
       importPattern.test(readFileSync(file, "utf8")),
+    )).toEqual([keyCustodyModule]);
+  });
+
+  it("quarantines M1g-c custody metadata from every controlled script and runtime importer", () => {
+    const custodyModule = join(
+      process.cwd(),
+      "src/lib/v1/communication-note-preview-key-custody.server.ts",
+    );
+    const custodyTest = join(
+      process.cwd(),
+      "src/lib/v1/communication-note-preview-key-custody.server.test.ts",
+    );
+    const importPattern =
+      /(?:from\s+|import\s*\(|require\s*\()\s*["'][^"']*communication-note-preview-key-custody\.server(?:\.(?:[cm]?[jt]s|[jt]sx))?["']/;
+    const importers = walkControlledScriptFiles().filter((file) =>
+      importPattern.test(readFileSync(file, "utf8")),
+    );
+    const source = readFileSync(custodyModule, "utf8");
+
+    expect(importers).toEqual([custodyTest]);
+    expect(walkSourceFiles("src/app").filter((file) =>
+      importPattern.test(readFileSync(file, "utf8")),
     )).toEqual([]);
+    expect(walkSourceFiles("src/components").filter((file) =>
+      importPattern.test(readFileSync(file, "utf8")),
+    )).toEqual([]);
+    expect(source).not.toMatch(/process\.env|fetch\s*\(|from\s+["']openai["']/);
   });
 
   it("exposes the privacy review as a physical POST-only route", () => {
@@ -189,6 +229,26 @@ function walkAllScriptFiles(relativeDirectory: string): string[] {
   return walkAbsoluteScriptFiles(join(process.cwd(), relativeDirectory));
 }
 
+function walkControlledScriptFiles(): string[] {
+  const rootFiles = readdirSync(process.cwd(), { withFileTypes: true })
+    .filter(
+      (entry) =>
+        entry.isFile() &&
+        [".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs"].includes(
+          extname(entry.name),
+        ),
+    )
+    .map((entry) => join(process.cwd(), entry.name));
+  return [
+    ...rootFiles,
+    ...["src", "scripts", "supabase/functions"].flatMap((directory) =>
+      existsSync(join(process.cwd(), directory))
+        ? walkAllScriptFiles(directory)
+        : []
+    ),
+  ].sort();
+}
+
 function walkAbsoluteSourceFiles(directory: string): string[] {
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
     const path = join(directory, entry.name);
@@ -205,7 +265,16 @@ function walkAbsoluteScriptFiles(directory: string): string[] {
     if (entry.isDirectory()) {
       return walkAbsoluteScriptFiles(path);
     }
-    return [".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"].includes(
+    return [
+      ".ts",
+      ".tsx",
+      ".mts",
+      ".cts",
+      ".js",
+      ".jsx",
+      ".mjs",
+      ".cjs",
+    ].includes(
       extname(path),
     ) ? [path] : [];
   });

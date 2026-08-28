@@ -142,6 +142,45 @@ review workflow, hosted database mutation, route, worker, deployment or
 Production activation. See
 `documentation/communication-note-preview-owner-authorization-m1g-b.md`.
 
+M1g-c adds the next source-only custody and database-caller boundary. Its
+version is
+`custody.communication.openai.synthetic-preview.2026-08-28.m1g-c.v1` and its
+policy digest is
+`1f7a3c586155fb4246e40207136cc1e521daedf6f2d01d1f89f7beebfad66438`.
+Three explicitly injected, purpose-separated descriptors represent an external
+owner-verification snapshot, a non-exportable CaresLink receipt-signer custody-
+reference digest and a temporary OpenAI project service-account credential-
+reference digest. They contain only bounded metadata, hashes/HMACs and public
+fingerprints; raw bearer credentials and private signing keys are rejected. The
+contract reads no environment variable, creates no key or service account,
+performs no signing and does not resolve a managed-secret reference. Supplied
+registry hashes remain candidate metadata rather than authenticated registry,
+freshness or revocation evidence.
+
+The source migration
+`20260828034704_add_communication_note_preview_custody_callers_shadow.sql`
+adds four dormant `NOLOGIN` roles. Authorization registration and revocation
+each have their own one-RPC shell, dispatch has one shell for the claim plus
+reservation pair, and receipt persistence has one one-RPC shell. Each shell
+gets only exact function `EXECUTE` plus private-schema `USAGE`; it gets no table
+access, executor-role membership, API/service-role privilege or login. The
+roles therefore describe least-privilege bundles but cannot run automation
+until a separately reviewed login-capable identity and membership are
+provisioned. PostgreSQL 16 may retain only a non-usable creator ADMIN bootstrap
+edge with `INHERIT=false` and `SET=false`; this does not permit execution or
+`SET ROLE`. A caller-supplied identity HMAC is a statement binding only, not
+database authentication.
+
+Both M1g-c readiness latches remain `false`, its approved custody snapshot is
+`undefined`, and no route, worker, queue, cron or product runtime imports the
+source boundary. There is no real owner/receipt key,
+OpenAI credential, provider call, spend, hosted Supabase mutation, Vercel
+configuration, deployment or Production change. Final source/local gate
+evidence is frozen in `documentation/tests.md`: 4/33 focused and 160/2,179
+full tests, TypeScript, lint, a 64/64-page Webpack production build and the
+PostgreSQL 16.15 dual-role-topology rollback gate passed. See
+`documentation/communication-note-preview-key-custody-callers-m1g-c.md`.
+
 Supabase CLI 2.115.0 has since generated source-only migration `20260823213144_harden_v1_note_generation_registration_retention.sql`. It adds `attempts_registration_digest_idx` and the named `attempts_registration_catalog_fk` from `attempts.registration_digest` to `worker_registrations.registration_digest`, with update/delete `RESTRICT`, `NOT VALID` creation and explicit validation. It creates no seed, caller grant, runtime surface or Production change. Its local gate passed 39/39 focused contracts, the full 125-file / 1,381-test suite, lint, TypeScript, the 63/63-page production build, the 73-file Codex-adapter sync check and `git diff --check`. Deleted disposable `r22` then clean-applied the current manifest 15/15 and passed the seven rollback suites; the hosted registration-retention gate is now closed without enabling any runtime automation.
 
 ### PostgreSQL 16.15 local isolated gate — 2026-08-24
