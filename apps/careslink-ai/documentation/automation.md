@@ -1,6 +1,9 @@
 # CaresLink AI Automation
 
-> Current-state automation inventory audited 2026-08-09; isolated database evidence updated 2026-08-25. No background worker, cron, payment webhook or notification automation exists in the audited application.
+> Current-state automation inventory audited 2026-08-09; source-only
+> security-contract evidence updated 2026-08-28 and isolated database evidence
+> updated 2026-08-25. No background worker, cron, payment webhook or
+> notification automation exists in the audited application.
 
 ## Current LLM automation
 
@@ -101,6 +104,43 @@ paid synthetic run. Payload-vault retention, worker registration, route,
 Points and Production authorization remain later blockers. See
 `documentation/communication-note-preview-evaluation-runner-m1f.md` and
 `documentation/communication-note-preview-request-body-pins-m1g-a.md`.
+
+M1g-b now defines the next source-only authorization and observation boundary.
+Its policy digest is
+`7804c7d60bb8c686d66a4c0aed74b373023dda672f1ebfa0a8e7c8af4eb7a9d9`.
+An external owner authorization must be Ed25519-verified against an external
+trust-registry snapshot whose purpose/domain/owner/tenant scope is enforced,
+then bind the caller-expected run, exact source pins, six ordered slots,
+synthetic-only input class, owner/tenant/run hashes, environment-evidence
+hashes, bounded lifetime and cost limits. PostgreSQL does not independently
+verify that signature; private forced-RLS ledgers persist only statements
+already verified by the application boundary.
+
+The durable sequence is one atomic authorization claim, then one reservation
+for each next slot before external transport begins. The claim token is not
+reissued after response loss, and reservation replay never reissues dispatch
+authority. Calls remain serial with one attempt
+per slot and no automatic retry; once transport starts, an unknown outcome is
+recorded as `TRANSPORT_AMBIGUOUS` and permanently consumes the slot, while
+preserving any partial status/correlation metadata without usage or cost.
+Revocation may be appended after claim and blocks later reservations. Database
+RPCs fail closed unless transaction isolation is `READ COMMITTED`, so every
+post-lock revocation/time recheck uses a fresh command snapshot. Database locks
+are held only for the short claim/reservation/receipt transactions, never
+across external network work.
+
+The receipt is a CaresLink-signed, content-free internal observation, not an
+OpenAI attestation. It keeps the client request identifier, OpenAI
+`x-request-id` and Responses `response.id` as pairwise-distinct HMACs, checks
+the full durable reservation binding and exactly recomputes fixed-price cost,
+then declares
+`providerAttestation=ABSENT`. It is explicitly not proof of an exact provider
+receipt, billing, model execution or exactly-once delivery. Both M1g-b
+readiness latches are fixed `false`; approved owner/receipt keys and caller
+grants are absent. There is no key, HTTPS transport, real call, spend, human
+review workflow, hosted database mutation, route, worker, deployment or
+Production activation. See
+`documentation/communication-note-preview-owner-authorization-m1g-b.md`.
 
 Supabase CLI 2.115.0 has since generated source-only migration `20260823213144_harden_v1_note_generation_registration_retention.sql`. It adds `attempts_registration_digest_idx` and the named `attempts_registration_catalog_fk` from `attempts.registration_digest` to `worker_registrations.registration_digest`, with update/delete `RESTRICT`, `NOT VALID` creation and explicit validation. It creates no seed, caller grant, runtime surface or Production change. Its local gate passed 39/39 focused contracts, the full 125-file / 1,381-test suite, lint, TypeScript, the 63/63-page production build, the 73-file Codex-adapter sync check and `git diff --check`. Deleted disposable `r22` then clean-applied the current manifest 15/15 and passed the seven rollback suites; the hosted registration-retention gate is now closed without enabling any runtime automation.
 

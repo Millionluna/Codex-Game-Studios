@@ -328,6 +328,46 @@ The subsequent protected App Preview used confirmed, test-only provider A/B sess
 
 Final pre-commit hardening adds a narrower legacy-NDIS lifecycle condition to the Production-unapplied owner policies: canonical document/revision/checkpoint rows projected from `generated_material_drafts` are owner-readable only while the matching owner/source row with the same creation identity exists. Source deletion therefore removes owner readability before a best-effort, service-role-only tombstone RPC runs; cleanup failure cannot expose content or change the legacy Delete response, and the service-only audit reports it as `SOURCE_DELETE_CLEANUP_PENDING`. Tombstoning binds the deleted source's `created_at`, persists the first correlation and does not write on replay; a later source with the same ID is a separate generation. Non-legacy owner policies keep their prior owner-only semantics. The then-current revisions of forward migrations `20260810072017`, `20260810072952`, `20260810073519`, `20260810073929` and `20260810080048` passed on the retained non-default branch; they backfilled a real synthetic pre-identity row, tombstoned an unidentifiable orphan, proved a historical PURGED row remains terminal, exposed a simulated missed tombstone without restoring owner access and separated a same-ID/new-generation fixture. The then-current transactional assertions passed and zero fixtures remained. Later catalog, active-provider/session and private-schema ACL hardening—including the current `20260810080048` revision—has only source/contract-test evidence and has not been re-applied. Production was not changed; the exact current migration set and assertions must pass on a new or rebuilt disposable branch before another protected route-level Preview.
 
+### Communication Note Preview owner authorization M1g-b (source-only)
+
+M1g-b is not part of the current runtime permission matrix. It defines three
+separate private execution roles, none of which is an application credential:
+
+| Shadow action | Database role | Permitted source operation | Explicitly denied |
+|---|---|---|---|
+| Persist already-verified owner authorization or revocation | `careslink_v1_preview_authorization_executor` | owns the exact definer RPCs and only their RLS-governed internal table/column privileges; no runtime caller membership | API/service-role access, broad mutation, signing-key trust decisions |
+| Claim authorization and reserve the next exact slot | `careslink_v1_preview_dispatch_executor` | owns the exact definer RPCs plus their RLS-governed lock/insert privileges and token-hash validation; no runtime caller membership | second claim, token reissue, broad mutation, out-of-order/duplicate reservation, external HTTP inside the transaction |
+| Persist an already-verified CaresLink receipt | `careslink_v1_preview_receipt_executor` | owns the exact definer RPC plus its RLS-governed lock/insert privileges; no runtime caller membership | provider attestation claims, broad mutation, receipt overwrite, prompt/facts/body/raw identifier storage |
+
+All five authorization, revocation, claim, reservation and receipt ledgers use
+enabled plus forced RLS, append-only protection and separate ownership. No
+schema usage, table privilege or function execution is granted to `PUBLIC`,
+`anon`, `authenticated` or `service_role`. Security-definer functions have a
+fixed empty search path, validate exact relationships and are owned by the
+dedicated role whose direct privileges are limited to the rows/columns required
+by that command. A future runtime caller must receive only exact function
+`EXECUTE`, never role membership or `SET ROLE`; inert-role ownership does not
+itself create a caller. Every RPC rejects non-`READ COMMITTED` transactions so
+no stale repeatable snapshot can bypass a post-lock revocation recheck.
+
+The application verifier, not PostgreSQL, resolves the external owner key from
+an external trust-registry snapshot and verifies Ed25519 before calling the
+database persistence boundary. The snapshot must carry the owner-authorization
+purpose/domain and exact owner/tenant scope; the caller also supplies the
+expected run binding. Receipt keys use a disjoint purpose. SHA-256/HMAC values
+do not grant authority. The
+database may validate the fixed canonical statement and persist verifier
+evidence, but that is not independent owner-signature verification.
+
+The authority policy digest is
+`7804c7d60bb8c686d66a4c0aed74b373023dda672f1ebfa0a8e7c8af4eb7a9d9`.
+Both readiness latches are `false`, both approved key snapshots are absent and
+there is no caller grant, environment lookup, route, worker, real provider
+transport, hosted database application or Production permission. A signed
+receipt authenticates only the CaresLink internal observation and always keeps
+`providerAttestation=ABSENT`; it does not establish billing, model execution,
+an exact provider receipt or exactly-once delivery.
+
 ## Intended V1 matrix (partly codified, not available at runtime)
 
 | Target resource | Owner | Admin/support | Service/backend | Required control |

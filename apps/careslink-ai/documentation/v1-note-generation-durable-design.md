@@ -1145,3 +1145,68 @@ This completes the source-maintenance follow-up without rewriting the deleted-
 `r5` evidence: `r5` executed the earlier bodies and proved the same underlying
 owner posture through its independent postcheck, but no fresh Hosted Preview
 has executed these enhanced exact bodies. Production has not been touched.
+
+## 17. Communication synthetic-Preview authorization ledger M1g-b — 2026-08-28
+
+M1g-b adds a separate, source-only authorization ledger for one bounded
+Communication Note provider evaluation. It does not replace or activate the
+five-Note durable job, attempt, payload-vault, worker-registration or owner
+repository described above. Its authority policy digest is
+`7804c7d60bb8c686d66a4c0aed74b373023dda672f1ebfa0a8e7c8af4eb7a9d9`.
+
+The external owner signs exact canonical JSON with Ed25519. The application
+verifier resolves the public key from an external trust-registry snapshot and
+enforces its owner-authorization purpose/domain and owner/tenant scope. A
+caller-expected binding separately fixes the run. The statement binds those
+identities, fixed six-slot M1g-a request bodies,
+M1e/M1f/M1g-a source-policy digests, evidence hashes, synthetic-only data class,
+budget and a maximum 15-minute authorization window. The database receives and
+persists only an already-verified statement and verifier evidence. It validates
+the fixed statement and recomputes digests but does not independently establish
+the trust registry or verify owner identity.
+
+The private `careslink_v1_generation` schema gains five append-only ledgers for
+authorization, revocation, claim, dispatch reservation and signed dispatch
+receipt. All enable and force RLS. Three distinct `NOLOGIN`, `NOINHERIT`,
+`NOSUPERUSER`, `NOBYPASSRLS` executor roles separate registration, dispatch and
+receipt operations; API and `service_role` callers receive no schema/table/
+function access. Security-definer functions use `search_path=''` and narrow
+operation-specific grants.
+Every authority RPC requires `READ COMMITTED`; `REPEATABLE READ` and
+`SERIALIZABLE` fail before validation or mutation so post-lock commands cannot
+reuse a stale snapshot that predates a concurrent revocation.
+
+The single-use sequence differs from the recoverable worker lease above:
+
+1. authorization persistence records an application-verified external
+   signature but grants no execution by itself;
+2. claim locks the parent authorization, fresh-checks expiry/revocation with at
+   least five minutes remaining, inserts one unique claim and returns its raw
+   token only once while storing only its SHA-256;
+3. reservation locks that claim and commits one unique next-slot intent before
+   any external network work starts; exact response-loss replay returns no new
+   dispatch authority;
+4. revocation remains appendable after claim and, serialized on the parent
+   authorization, blocks every future reservation without releasing prior
+   authority;
+5. a content-free CaresLink-signed terminal observation binds every durable
+   reservation field, uses a purpose-separated receipt key, and consumes the
+   reserved slot; only `COMPLETED` with exactly recalculated fixed-price cost
+   allows the next slot;
+6. a timeout, crash, partial response or unknown response after transport
+   starts is `TRANSPORT_AMBIGUOUS`; it may preserve observed status/correlation
+   HMACs but no usage/cost, and permanently consumes the slot with no retry.
+
+No row lock or transaction spans an HTTP request. A CaresLink receipt may bind
+pairwise-distinct HMACs of its client request ID, OpenAI's `x-request-id` and the
+Responses body `response.id`, but those identifiers are not signatures or
+idempotency guarantees. The receipt always states
+`providerAttestation=ABSENT` and disclaims proof of exact provider receipt,
+billing, model execution and exactly-once behavior.
+
+Both authority/receipt readiness latches remain literal `false`; approved
+owner and receipt keys, caller grants, credentials, transport and runtime
+importers remain absent. The migration is Production-unapplied and has caused
+no hosted database mutation. This section therefore records a shadow source
+contract only, not a paid Preview, durable generation runtime, retained
+database capability or Production execution authority.

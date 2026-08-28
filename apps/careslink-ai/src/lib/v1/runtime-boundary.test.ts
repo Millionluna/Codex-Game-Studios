@@ -68,6 +68,7 @@ describe("V1 shadow runtime boundary", () => {
       "src/lib/v1/communication-note-preview-evaluation-policy.ts",
       "src/lib/v1/communication-note-preview-request-body-pin.ts",
       "src/lib/v1/communication-note-preview-evaluation-runner.server.ts",
+      "src/lib/v1/communication-note-preview-execution-authority.server.ts",
       "src/lib/v1/native-auth-boundary.server.ts",
       "src/lib/v1/openai-communication-note-provider.server.ts",
       "src/lib/v1/communication-note-provider-policy.ts",
@@ -139,6 +140,27 @@ describe("V1 shadow runtime boundary", () => {
     expect(bodyPinImporters).toEqual([runner, provider].sort());
   });
 
+  it("keeps the M1g-b execution authority module outside every product runtime", () => {
+    const authorityTest = join(
+      process.cwd(),
+      "src/lib/v1/communication-note-preview-execution-authority.server.test.ts",
+    );
+    const migrationContractTest = join(
+      process.cwd(),
+      "src/lib/v1/communication-note-preview-execution-authority-migration-contract.test.ts",
+    );
+    const importPattern =
+      /(?:from\s+|import\s*\(|require\s*\()\s*["'][^"']*communication-note-preview-execution-authority\.server["']/;
+    const importers = walkAllScriptFiles("src").filter((file) =>
+      importPattern.test(readFileSync(file, "utf8")),
+    );
+
+    expect(importers).toEqual([migrationContractTest, authorityTest].sort());
+    expect(walkSourceFiles("src").filter((file) =>
+      importPattern.test(readFileSync(file, "utf8")),
+    )).toEqual([]);
+  });
+
   it("exposes the privacy review as a physical POST-only route", () => {
     const source = readFileSync(
       join(process.cwd(), "src/app/v1/privacy-reviews/route.ts"),
@@ -163,6 +185,10 @@ function walkSourceFiles(relativeDirectory: string): string[] {
   return walkAbsoluteSourceFiles(join(process.cwd(), relativeDirectory));
 }
 
+function walkAllScriptFiles(relativeDirectory: string): string[] {
+  return walkAbsoluteScriptFiles(join(process.cwd(), relativeDirectory));
+}
+
 function walkAbsoluteSourceFiles(directory: string): string[] {
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
     const path = join(directory, entry.name);
@@ -170,6 +196,18 @@ function walkAbsoluteSourceFiles(directory: string): string[] {
       return walkAbsoluteSourceFiles(path);
     }
     return isSourceFile(path) ? [path] : [];
+  });
+}
+
+function walkAbsoluteScriptFiles(directory: string): string[] {
+  return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const path = join(directory, entry.name);
+    if (entry.isDirectory()) {
+      return walkAbsoluteScriptFiles(path);
+    }
+    return [".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"].includes(
+      extname(path),
+    ) ? [path] : [];
   });
 }
 
