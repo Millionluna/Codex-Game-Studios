@@ -235,3 +235,11 @@ bundles. A separately approved disposable synthetic Preview run still requires:
 
 Until all blockers are closed, the bounded evaluation cannot make a paid call,
 and no real care data is permitted.
+
+## Successor M1g-e
+
+The follow-on [M1g-e reserve-before-dispatch coordinator transcript
+contract](communication-note-preview-reserve-before-dispatch-coordinator-m1g-e.md)
+revalidates the injected M1g-c custody snapshot and verifies test-only receipt
+signatures, but resolves no managed key, credential or caller identity and
+creates no runtime capability.

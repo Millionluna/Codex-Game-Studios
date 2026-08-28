@@ -223,3 +223,11 @@ A separately approved disposable synthetic Preview run still requires:
 
 Until every blocker is closed, readiness stays `false`, no real care data is
 permitted and the M1g-b artifacts remain source-only shadow evidence.
+
+## Successor M1g-e
+
+The follow-on [M1g-e reserve-before-dispatch coordinator transcript
+contract](communication-note-preview-reserve-before-dispatch-coordinator-m1g-e.md)
+validates only an injected, content-free transition transcript. It adds no
+database, transport or activation authority and does not change M1g-b's
+default-off boundary.

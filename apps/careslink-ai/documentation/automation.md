@@ -210,6 +210,53 @@ database/Hosted action, route, deployment, paid call or Production capability.
 See
 `documentation/communication-note-preview-activation-preflight-m1g-d.md`.
 
+M1g-e adds a source-only reserve-before-dispatch **transcript validator**, not
+an automation runtime. Version
+`coordinator.communication.openai.synthetic-preview.2026-08-28.m1g-e.v1` and
+policy digest
+`ea6bb5854783a322bd059abbf5c9f7d1e96828d2569e72bce8d23d4b196bf9b0`
+pin the future order: registered authorization candidate, exact six-slot runner
+preflight, then a fresh claim with at least five minutes of authorization life
+remaining. Each serial slot requires a claim/authorization/run-bound fresh
+reservation before optional transport, followed by a verified CaresLink-signed
+receipt and receipt-persistence candidate. A `COMPLETED` result may advance only
+after an explicit runner acceptance binds authorization/run/claim/reservation,
+receipt digest/signature, exact fixture/body/preflight/usage/cost, seven true
+critical checks and passed `en`/`zh-Hans`/`zh-Hant` reviews. Provider HTTP
+errors, ambiguous transport and local pre-dispatch aborts are terminal and
+cannot retry. An exact receipt-persistence replay proves only the same candidate
+record; it never re-authorizes transport.
+
+A provider-completed slot whose runner evidence, golden evaluation, human
+review or final report fails is represented by a mutually exclusive,
+parent/receipt-bound `RUNNER_SLOT_FAILED_TEST_CANDIDATE`; it is terminal and
+cannot retry or continue. This state is injected only. The existing reserve RPC
+still gates the next slot on the prior durable `COMPLETED` receipt without a
+durable runner decision, so `DURABLE_RUNNER_TERMINAL_STATE_ABSENT` remains a
+fixed blocker pending a separately reviewed database continuation gate.
+
+For `COMPLETED` and `PROVIDER_HTTP_ERROR`, receipt observation must remain within
+the policy's 30-second application-transcript candidate interval after transport
+entry. Delayed `TRANSPORT_AMBIGUOUS` remains allowed but terminal. Cross-role
+reuse is rejected across static evidence and client, transport, runner-provider,
+runner-candidate, receipt and fixture values. The runner provider-request hash
+and receipt correlation HMACs deliberately remain
+`UNATTESTED_NO_SHARED_IDENTIFIER`; neither attests the other.
+
+The validator reruns M1g-d and M1g-c validation and cryptographically verifies
+the injected Ed25519 receipt envelope, but all database event states remain
+explicitly unattested test claims. In particular, the current
+`reserve_communication_note_preview_dispatch` result does not return the
+database `reserved_at` value required by the receipt verifier. The injected
+`databaseReservedAtCandidate` therefore cannot close the durable reservation
+binding, and `DATABASE_ATTESTED_RESERVED_AT_ABSENT` remains a fixed blocker.
+The same transcript cannot supply the absent durable runner terminal state;
+`DURABLE_RUNNER_TERMINAL_STATE_ABSENT` also remains fixed.
+M1g-e executes no callback, RPC, transport or signer; reads no environment;
+adds no migration or runtime importer; and leaves coordinator, activation,
+dispatch, pre-run approval and post-run acceptance closed. See
+`documentation/communication-note-preview-reserve-before-dispatch-coordinator-m1g-e.md`.
+
 Supabase CLI 2.115.0 has since generated source-only migration `20260823213144_harden_v1_note_generation_registration_retention.sql`. It adds `attempts_registration_digest_idx` and the named `attempts_registration_catalog_fk` from `attempts.registration_digest` to `worker_registrations.registration_digest`, with update/delete `RESTRICT`, `NOT VALID` creation and explicit validation. It creates no seed, caller grant, runtime surface or Production change. Its local gate passed 39/39 focused contracts, the full 125-file / 1,381-test suite, lint, TypeScript, the 63/63-page production build, the 73-file Codex-adapter sync check and `git diff --check`. Deleted disposable `r22` then clean-applied the current manifest 15/15 and passed the seven rollback suites; the hosted registration-retention gate is now closed without enabling any runtime automation.
 
 ### PostgreSQL 16.15 local isolated gate — 2026-08-24

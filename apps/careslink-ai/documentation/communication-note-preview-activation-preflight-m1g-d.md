@@ -287,3 +287,11 @@ KMS/HSM, HMAC and credential resolvers; reviewed reserve-before-dispatch HTTPS
 transport; completed attributable human reviews; explicit final run approval;
 and verified teardown/absence evidence. Every such step requires separate
 authorization. Production and real care data remain excluded.
+
+## Successor M1g-e
+
+The follow-on [M1g-e reserve-before-dispatch coordinator transcript
+contract](communication-note-preview-reserve-before-dispatch-coordinator-m1g-e.md)
+reruns this preflight and preserves its five blockers. It validates source-only
+candidate transitions without adding callbacks, dispatch capability or
+activation authority.

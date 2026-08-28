@@ -153,6 +153,33 @@ six-slot, one-attempt, no-retry/no-fallback 250,000-micro-USD application limit
 still applies. No M1g-d value belongs in `.env.example`, and no ordinary
 environment variable can remove its five fixed activation blockers.
 
+Communication Note M1g-e also adds no environment variable or secret name.
+Its policy version
+`coordinator.communication.openai.synthetic-preview.2026-08-28.m1g-e.v1` and
+digest
+`ea6bb5854783a322bd059abbf5c9f7d1e96828d2569e72bce8d23d4b196bf9b0`
+are literal source-integrity bindings. They do not configure the registration,
+six-slot runner preflight, five-minute claim window, reservation/transport,
+receipt/persistence or runner-acceptance sequence. The only callable surface
+validates an explicitly injected, content-free test transcript. It does not
+resolve the M1g-c database identities, claim token, HMAC keys, receipt private
+key, OpenAI credential or Supabase target; it does not call a database, KMS,
+provider or transport. The live coordinator factory always throws.
+
+No environment value can create the missing durable runner decision either.
+Provider completion followed by runner failure is only a terminal injected
+candidate; the current reserve RPC still lacks a lock-aligned durable
+acceptance/failure gate. `DURABLE_RUNNER_TERMINAL_STATE_ABSENT` is therefore a
+fixed code/database-contract blocker, not configuration.
+
+No environment value may supply or infer the missing database-attested
+reservation timestamp. The current reservation RPC does not return
+`reserved_at`; a future change to that SQL result is a separately reviewed
+migration/contract batch, not configuration. M1g-e output remains
+`coordinatorReady=false`, `activationReady=false` and
+`dispatchCapability=ABSENT`, with pre-run approval and post-run acceptance
+false. Nothing from this batch belongs in `.env.example`.
+
 ## Current auth, URL and feature variables
 
 | Variable | Class | Purpose | Boundary |

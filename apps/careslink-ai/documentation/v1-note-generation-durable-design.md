@@ -1326,3 +1326,85 @@ resolver, provider or database connection, hosted action, paid request,
 deployment or Production change. Detailed scope is in
 `documentation/communication-note-preview-activation-preflight-m1g-d.md` and
 final local gate evidence is recorded in `documentation/tests.md`.
+
+## 20. Communication reserve-before-dispatch transcript M1g-e — 2026-08-28
+
+M1g-e adds no durable repository or executable transport. It freezes the next
+coordination boundary as a server-only, pure `TEST_ONLY` transcript/transition
+validator with version
+`coordinator.communication.openai.synthetic-preview.2026-08-28.m1g-e.v1` and
+policy digest
+`ea6bb5854783a322bd059abbf5c9f7d1e96828d2569e72bce8d23d4b196bf9b0`.
+The validator reruns the M1g-d preflight and M1g-c custody checks before it
+accepts any transcript state. It then cross-binds the preflight, authority,
+custody, request-pin, runner, evaluation, template, manifest, fixture, worker,
+authorization and run digests.
+
+The accepted state machine is deliberately narrower than a live coordinator:
+
+1. one authorization-registration candidate binds the registration caller;
+2. one runner-preflight candidate fixes all six exact slots, their body pins,
+   `1..10,000` input-token counts and the 20,130/120,780/250,000-micro-USD
+   projected/per-run cost bounds before a claim;
+3. one claim candidate binds the dispatch caller plus authorization/run/
+   authority/body-pin/runner parents, exposes no claim token and requires at
+   least five minutes of authorization life remaining;
+4. slot `0..5` is reserved serially with the exact M1g-b fixture, ordinal,
+   request-body SHA-256, byte length, semantic digest, one client-request HMAC,
+   one UUID, claim/authorization/run parents and attempt `1`;
+5. `LOCAL_PRE_DISPATCH_ABORTED` has no transport entry; every other outcome
+   requires the same reservation/body binding at an irreversible transport
+   entry;
+6. the existing M1g-b Ed25519 verifier authenticates the content-free CaresLink
+   receipt observation against the injected M1g-c public-key snapshot;
+7. the receipt-record candidate binds the receipt caller, digest, signature
+   hash and outcome. A first-write candidate or exact replay candidate is
+   non-dispatching;
+8. a `COMPLETED` result advances only after explicit runner acceptance binds
+   authorization/run/claim/reservation/receipt digest and signature, the exact
+   fixture/body/preflight/usage/cost evidence, all seven critical checks and
+   passed `en`/`zh-Hans`/`zh-Hant` reviews. `PROVIDER_HTTP_ERROR`,
+   `TRANSPORT_AMBIGUOUS` and `LOCAL_PRE_DISPATCH_ABORTED` consume the terminal
+   slot with no retry; six completed slots end only in
+   `TEST_TRANSCRIPT_COMPLETE_NOT_ACTIVATION_AUTHORITY`.
+9. provider completion followed by cancellation, provider-evidence, golden,
+   human-review or report failure instead records a parent/receipt-bound
+   `RUNNER_SLOT_FAILED_TEST_CANDIDATE`; acceptance and failure are mutually
+   exclusive, and failure is terminal with no retry or continuation.
+
+For `COMPLETED` and `PROVIDER_HTTP_ERROR`, the receipt observation must be no
+more than the policy's 30-second application-transcript candidate interval after
+transport entry. A delayed `TRANSPORT_AMBIGUOUS` observation remains allowed
+because it is terminal and cannot retry. The validator also rejects cross-role
+reuse across static evidence, client/transport correlation HMACs, runner
+provider hashes/candidate digests, receipt evidence and fixture digests. The
+runner provider hash and receipt OpenAI correlation HMACs have no authenticated
+shared identifier and remain `UNATTESTED_NO_SHARED_IDENTIFIER`.
+
+This verifies internal state consistency and a test receipt signature, not the
+database event claims. The existing reservation RPC returns neither its
+canonical database `reserved_at` timestamp nor a database attestation over it,
+while the receipt verifier requires that exact lower bound. M1g-e therefore
+labels `databaseReservedAtCandidate` as unattested and retains
+`DATABASE_ATTESTED_RESERVED_AT_ABSENT`. A future live path must change the
+existing reserve RPC contract in a separately reviewed migration; it must not
+guess from an application clock or add a read-after-reserve authority path.
+
+The existing reserve RPC also treats the prior durable `COMPLETED` receipt as
+sufficient for the next slot and stores no durable runner acceptance/failure.
+The transcript's runner failure is therefore only
+`ABSENT_TEST_CANDIDATE_ONLY`; `DURABLE_RUNNER_TERMINAL_STATE_ABSENT` remains a
+fixed blocker. A live path must add a lock-aligned durable runner decision or an
+equally reviewed atomic terminal-state design before continuation can be
+enabled.
+
+The validator executes no injected callback, SQL, network request, signer,
+secret resolver or environment lookup. It returns no raw claim token, request
+body, facts, generated Note, provider response, credential or receipt
+signature. The sanitized result is recursively frozen and always reports
+`UNATTESTED_INJECTED_TEST_TRANSCRIPT`, `coordinatorReady=false`,
+`activationReady=false`, `dispatchCapability=ABSENT`, absent pre-run approval
+and absent post-run evaluation acceptance. The live factory always throws; no
+route, component, worker, queue, cron, Supabase Function or product runtime may
+import it. Detailed scope is in
+`documentation/communication-note-preview-reserve-before-dispatch-coordinator-m1g-e.md`.

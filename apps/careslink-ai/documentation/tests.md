@@ -2207,6 +2207,59 @@ result, those two boundaries must be closed first through a separately
 authorized design and gate. Detailed scope is in
 `documentation/communication-note-preview-activation-preflight-m1g-d.md`.
 
+### Communication Note reserve-before-dispatch source gate M1g-e — 2026-08-28
+
+M1g-e adds only the server-only, pure
+`communication-note-preview-reserve-before-dispatch-coordinator.server.ts`
+contract. It consumes explicitly injected, content-free evidence and uses the
+real M1g-b authorization/receipt, M1g-c custody and M1g-d preflight validators;
+it does not add an executable coordinator. No callback, environment lookup,
+database/RPC operation, network/provider call, key or credential resolution,
+hosted mutation, deployment or Production change belongs to this gate. The live
+factory always throws and every readiness/approval latch stays closed.
+
+The focused source gate covers:
+
+- the literal final policy digest and fixed blocked reasons;
+- registration → exact six-slot runner preflight → fresh parent-bound claim
+  with at least five authorization minutes remaining → serial reservation →
+  optional transport → Ed25519 receipt verification/persistence ordering;
+- mandatory `RUNNER_SLOT_ACCEPTED_TEST_CANDIDATE` before continuation from a
+  `COMPLETED` receipt, including authorization/run/claim/reservation/receipt
+  digest and signature bindings, exact fixture/body/preflight/usage/cost,
+  seven true critical checks and passed `en`/`zh-Hans`/`zh-Hant` reviews;
+- mutually exclusive, parent/receipt-bound
+  `RUNNER_SLOT_FAILED_TEST_CANDIDATE` after provider completion, with terminal
+  no-retry/no-continuation behavior and the fixed missing-durable-state blocker;
+- terminal no-retry behavior for provider HTTP error, transport ambiguity and
+  local pre-dispatch abort, plus the exact-only non-dispatching receipt replay;
+- the 30-second application-transcript candidate interval for `COMPLETED` and
+  `PROVIDER_HTTP_ERROR`, while delayed `TRANSPORT_AMBIGUOUS` stays allowed but
+  terminal;
+- cross-role purpose separation across static evidence, client/transport/
+  runner-provider/runner-candidate/receipt/fixture values and the explicit
+  `UNATTESTED_NO_SHARED_IDENTIFIER` relationship between the runner provider
+  hash and receipt correlation HMACs;
+- bounded plain-data traversal, fixed sanitized failures, recursively frozen
+  content-free output and runtime-importer quarantine.
+
+Evidence handoff for the final exact local source revision:
+
+| Evidence | Current source-focused value |
+|---|---|
+| M1g-e policy version | `coordinator.communication.openai.synthetic-preview.2026-08-28.m1g-e.v1` |
+| M1g-e policy digest | `ea6bb5854783a322bd059abbf5c9f7d1e96828d2569e72bce8d23d4b196bf9b0` |
+| focused implementation coverage | 7 files / 108 tests passed across M1g-a body pins, M1g-b authority/receipt, M1g-c custody, M1g-d preflight, M1f runner, M1g-e coordinator and runtime quarantine; the narrower final coordinator/quarantine rerun also passed 2 files / 26 tests |
+| full files / tests | 162 files / 2,206 tests passed; the suite emitted only the pre-existing unrelated React `act(...)` warnings |
+| TypeScript / ESLint / Next build / adapter sync / diff check | `tsc --noEmit` passed; ESLint `--quiet` passed; Next 16.2.9 Webpack production build passed with 64/64 pages; 73 adapter files were in sync; `git diff --check` passed |
+| coordinator source artifact | 62,274 bytes; SHA-256 `528c2af6f1568304e2d8cf96937a5b9a46e73e6f7ecec4f0954f303a8fc39544` |
+| coordinator test artifact | 60,201 bytes; SHA-256 `913a110b43f13b39484f358909ae744547073396823320c6d82ca9b1fe089ea3` |
+| SQL / Hosted Supabase evidence | not applicable to this source-only batch; no migration or hosted action |
+| security review | independent final code and security re-audits found no remaining actionable P0/P1/P2/LOW findings; the durable runner terminal state and database-attested `reservedAt` remain explicit blockers, not closed claims |
+
+Detailed evidence boundaries and remaining activation blockers are in
+`documentation/communication-note-preview-reserve-before-dispatch-coordinator-m1g-e.md`.
+
 ### Current live/read-only evidence
 
 - Supabase migrations, tables, RLS flags, policies, grants, function grants and aggregate row counts were checked read-only.
