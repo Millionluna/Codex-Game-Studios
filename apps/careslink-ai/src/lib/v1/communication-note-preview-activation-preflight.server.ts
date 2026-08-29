@@ -16,10 +16,14 @@ import {
   validateTestOnlyCaresLinkV1CommunicationNotePreviewKeyCustodySnapshot,
   type CaresLinkV1CommunicationNotePreviewKeyCustodySnapshot,
 } from "./communication-note-preview-key-custody.server";
+import {
+  CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RUNNER_TERMINAL_POLICY_DIGEST,
+  CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RUNNER_TERMINAL_POLICY_VERSION,
+} from "./communication-note-preview-runner-terminal-policy.server";
 import { CaresLinkV1ContractError } from "./shared-contracts";
 
 export const CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_ACTIVATION_PREFLIGHT_VERSION =
-  "preflight.communication.openai.synthetic-preview.2026-08-28.m1g-d.v1" as const;
+  "preflight.communication.openai.synthetic-preview.2026-08-29.m1g-d.v2" as const;
 
 const SHA256_PATTERN = /^[a-f0-9]{64}$/;
 const MAXIMUM_EVIDENCE_AGE_MS = 5 * 60 * 1_000;
@@ -47,11 +51,11 @@ export type CaresLinkV1CommunicationNotePreviewActivationBlockedReason =
 
 export const CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_DATABASE_EVIDENCE_PINS =
   deepFreeze({
-    migrationCount: 36,
+    migrationCount: 37,
     orderedMigrationBasenamesSha256:
-      "5bb377df2075029d3bce3aaf70e303bc7441b76e9d011cee9ba202872331232e",
+      "d9cf6c02336c94fd7878b87a28b83063d3d1777a197cbdbfe97299e51efb8953",
     orderedMigrationEntriesSha256:
-      "97e6e7be1907ae1b43bb8698f00e4a708a2c5b95f6875fe453aa43bbf0839fad",
+      "a85ed5cc2f12e7c3b8cf29e837b5153dddc2c797559065c6731731bbab396a16",
     authorityMigrationSha256:
       "94f83498ea04053e7238a95bb9be0bb8a38ad0a76fa0e751390419800da51f7f",
     custodyMigrationSha256:
@@ -60,6 +64,10 @@ export const CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_DATABASE_EVIDENCE_PINS =
       "9b1e0088e7e39b81e248815e8ce6e939f29220830feda2d177ffd230892b39db",
     custodyAssertionSha256:
       "7fa7fa9d4c9667005b36c1f72c95aaf2418131d05037b5ea347f83e0bfcf16d2",
+    runnerTerminalMigrationSha256:
+      "4341cdacb90e45eea428edfc57df29379ca211900e161844016daad190f7b9c5",
+    runnerTerminalAssertionSha256:
+      "ca4e34eb11927eb55e2115f859f132493f3549ed4b8713c4c7d1be3e80483832",
   } as const);
 
 const ACTIVATION_PREFLIGHT_POLICY_CORE = deepFreeze({
@@ -77,6 +85,10 @@ const ACTIVATION_PREFLIGHT_POLICY_CORE = deepFreeze({
       CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_AUTHORITY_POLICY_DIGEST,
     keyCustodyPolicyDigest:
       CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_KEY_CUSTODY_POLICY_DIGEST,
+    runnerTerminalPolicyVersion:
+      CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RUNNER_TERMINAL_POLICY_VERSION,
+    runnerTerminalPolicyDigest:
+      CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RUNNER_TERMINAL_POLICY_DIGEST,
     authoritySourceBindings:
       CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_AUTHORITY_SOURCE_BINDINGS,
     databaseEvidencePins:
@@ -116,6 +128,11 @@ const ACTIVATION_PREFLIGHT_POLICY_CORE = deepFreeze({
     privilegedRoleAttributes: false,
     directObjectPrivileges: false,
     additionalCallerShellMemberships: false,
+    runnerTerminalContract: "SOURCE_ONLY_DEFAULT_OFF",
+    runnerTerminalExecutorRole:
+      "careslink_v1_preview_runner_terminal_executor",
+    runnerTerminalCallerPresent: false,
+    runnerTerminalRuntimeExecute: false,
     zeroFixtureRows: true,
     zeroActiveBackendsBeforeRun: true,
   },
@@ -134,7 +151,7 @@ export type CaresLinkV1CommunicationNotePreviewActivationPreflightPolicy =
     Readonly<{ policyDigest: string }>;
 
 export const CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_ACTIVATION_PREFLIGHT_POLICY_DIGEST =
-  "81ab3c3bac64f2f9205c2eb358e298d440e3735e5a9c0ed07a842058e6947e53" as const;
+  "791a4d893afd4e490ab0164a8f604589bcf8015d25e5723b4df210f8c0b44f67" as const;
 
 if (
   createCanonicalSha256(ACTIVATION_PREFLIGHT_POLICY_CORE) !==
@@ -269,13 +286,20 @@ export type CaresLinkV1CommunicationNotePreviewActivationPreflightCandidate =
       persistent: false;
       withData: false;
       productionExcluded: true;
-      migrationCount: 36;
+      migrationCount: 37;
       orderedMigrationBasenamesSha256: string;
       orderedMigrationEntriesSha256: string;
       authorityMigrationSha256: string;
       custodyMigrationSha256: string;
       authorityAssertionSha256: string;
       custodyAssertionSha256: string;
+      runnerTerminalMigrationSha256: string;
+      runnerTerminalAssertionSha256: string;
+      runnerTerminalContract: "SOURCE_ONLY_DEFAULT_OFF";
+      runnerTerminalExecutorRole:
+        "careslink_v1_preview_runner_terminal_executor";
+      runnerTerminalCallerPresent: false;
+      runnerTerminalRuntimeExecute: false;
       apiRoleExecute: false;
       fixtureRowCount: 0;
       callerBindings: readonly CandidateCallerBinding[];
@@ -860,6 +884,12 @@ function validateDatabase(
     "custodyMigrationSha256",
     "authorityAssertionSha256",
     "custodyAssertionSha256",
+    "runnerTerminalMigrationSha256",
+    "runnerTerminalAssertionSha256",
+    "runnerTerminalContract",
+    "runnerTerminalExecutorRole",
+    "runnerTerminalCallerPresent",
+    "runnerTerminalRuntimeExecute",
     "apiRoleExecute",
     "fixtureRowCount",
     "callerBindings",
@@ -884,7 +914,12 @@ function validateDatabase(
       CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_DATABASE_EVIDENCE_PINS
         .migrationCount ||
     object.apiRoleExecute !== false ||
-    object.fixtureRowCount !== 0
+    object.fixtureRowCount !== 0 ||
+    object.runnerTerminalContract !== "SOURCE_ONLY_DEFAULT_OFF" ||
+    object.runnerTerminalExecutorRole !==
+      "careslink_v1_preview_runner_terminal_executor" ||
+    object.runnerTerminalCallerPresent !== false ||
+    object.runnerTerminalRuntimeExecute !== false
   ) {
     throw unavailable();
   }
@@ -927,7 +962,7 @@ function validateDatabase(
     persistent: false as const,
     withData: false as const,
     productionExcluded: true as const,
-    migrationCount: 36 as const,
+    migrationCount: 37 as const,
     orderedMigrationBasenamesSha256: requireEvidencePin(
       object.orderedMigrationBasenamesSha256,
       "orderedMigrationBasenamesSha256",
@@ -952,6 +987,19 @@ function validateDatabase(
       object.custodyAssertionSha256,
       "custodyAssertionSha256",
     ),
+    runnerTerminalMigrationSha256: requireEvidencePin(
+      object.runnerTerminalMigrationSha256,
+      "runnerTerminalMigrationSha256",
+    ),
+    runnerTerminalAssertionSha256: requireEvidencePin(
+      object.runnerTerminalAssertionSha256,
+      "runnerTerminalAssertionSha256",
+    ),
+    runnerTerminalContract: "SOURCE_ONLY_DEFAULT_OFF" as const,
+    runnerTerminalExecutorRole:
+      "careslink_v1_preview_runner_terminal_executor" as const,
+    runnerTerminalCallerPresent: false as const,
+    runnerTerminalRuntimeExecute: false as const,
     apiRoleExecute: false as const,
     fixtureRowCount: 0 as const,
     callerBindings,
@@ -1167,6 +1215,8 @@ function validatePurposeSeparation(input: Readonly<{
     input.database.custodyMigrationSha256,
     input.database.authorityAssertionSha256,
     input.database.custodyAssertionSha256,
+    input.database.runnerTerminalMigrationSha256,
+    input.database.runnerTerminalAssertionSha256,
     ...input.database.callerBindings.map(
       (caller) => caller.loginIdentityHmac,
     ),

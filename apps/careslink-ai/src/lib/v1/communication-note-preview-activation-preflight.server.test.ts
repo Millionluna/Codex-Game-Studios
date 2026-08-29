@@ -70,12 +70,12 @@ describe("Communication Note M1g-d activation preflight", () => {
     expect(
       CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_ACTIVATION_PREFLIGHT_VERSION,
     ).toBe(
-      "preflight.communication.openai.synthetic-preview.2026-08-28.m1g-d.v1",
+      "preflight.communication.openai.synthetic-preview.2026-08-29.m1g-d.v2",
     );
     expect(
       CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_ACTIVATION_PREFLIGHT_POLICY_DIGEST,
     ).toBe(
-      "81ab3c3bac64f2f9205c2eb358e298d440e3735e5a9c0ed07a842058e6947e53",
+      "791a4d893afd4e490ab0164a8f604589bcf8015d25e5723b4df210f8c0b44f67",
     );
     expect(
       CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_ACTIVATION_PREFLIGHT_POLICY,
@@ -104,6 +104,11 @@ describe("Communication Note M1g-d activation preflight", () => {
         privilegedRoleAttributes: false,
         directObjectPrivileges: false,
         additionalCallerShellMemberships: false,
+        runnerTerminalContract: "SOURCE_ONLY_DEFAULT_OFF",
+        runnerTerminalExecutorRole:
+          "careslink_v1_preview_runner_terminal_executor",
+        runnerTerminalCallerPresent: false,
+        runnerTerminalRuntimeExecute: false,
       },
     });
     expect(Object.isFrozen(
@@ -215,7 +220,7 @@ describe("Communication Note M1g-d activation preflight", () => {
     }
   });
 
-  it("pins the exact 36-migration manifest and four M1g-b/M1g-c database artifacts", () => {
+  it("pins the exact 37-migration manifest and six M1g-b/M1g-c/M1g-f database artifacts", () => {
     const migrationsDirectory = join(process.cwd(), "supabase/migrations");
     const migrationNames = readdirSync(migrationsDirectory)
       .filter((name) => name.endsWith(".sql"))
@@ -261,6 +266,16 @@ describe("Communication Note M1g-d activation preflight", () => {
         "supabase/assertions/communication_note_preview_custody_callers_shadow_assertions.sql",
         CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_DATABASE_EVIDENCE_PINS
           .custodyAssertionSha256,
+      ],
+      [
+        "supabase/migrations/20260828235426_harden_communication_note_preview_reservation_runner_terminal_shadow.sql",
+        CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_DATABASE_EVIDENCE_PINS
+          .runnerTerminalMigrationSha256,
+      ],
+      [
+        "supabase/assertions/communication_note_preview_runner_terminal_shadow_assertions.sql",
+        CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_DATABASE_EVIDENCE_PINS
+          .runnerTerminalAssertionSha256,
       ],
     ] as const) {
       expect(sha256(readFileSync(join(process.cwd(), relativePath), "utf8")))
@@ -440,7 +455,7 @@ describe("Communication Note M1g-d activation preflight", () => {
         candidate.database.productionExcluded = false;
       },
       (candidate) => {
-        (candidate.database as { migrationCount: number }).migrationCount = 35;
+        (candidate.database as { migrationCount: number }).migrationCount = 36;
       },
       (candidate) => {
         candidate.database.fixtureRowCount = 1;
@@ -479,6 +494,36 @@ describe("Communication Note M1g-d activation preflight", () => {
         (
           candidate.database as { custodyAssertionSha256: string }
         ).custodyAssertionSha256 = hex("f");
+      },
+      (candidate) => {
+        (
+          candidate.database as { runnerTerminalMigrationSha256: string }
+        ).runnerTerminalMigrationSha256 = hex("f");
+      },
+      (candidate) => {
+        (
+          candidate.database as { runnerTerminalAssertionSha256: string }
+        ).runnerTerminalAssertionSha256 = hex("f");
+      },
+      (candidate) => {
+        (
+          candidate.database as { runnerTerminalContract: string }
+        ).runnerTerminalContract = "ACTIVE";
+      },
+      (candidate) => {
+        (
+          candidate.database as { runnerTerminalExecutorRole: string }
+        ).runnerTerminalExecutorRole = "other_role";
+      },
+      (candidate) => {
+        (
+          candidate.database as { runnerTerminalCallerPresent: boolean }
+        ).runnerTerminalCallerPresent = true;
+      },
+      (candidate) => {
+        (
+          candidate.database as { runnerTerminalRuntimeExecute: boolean }
+        ).runnerTerminalRuntimeExecute = true;
       },
       (candidate) => {
         candidate.database.callerBindings[0].loginIdentityHmac = hex("f");
@@ -1081,6 +1126,11 @@ function createCandidate(
       withData: false,
       productionExcluded: true,
       ...CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_DATABASE_EVIDENCE_PINS,
+      runnerTerminalContract: "SOURCE_ONLY_DEFAULT_OFF",
+      runnerTerminalExecutorRole:
+        "careslink_v1_preview_runner_terminal_executor",
+      runnerTerminalCallerPresent: false,
+      runnerTerminalRuntimeExecute: false,
       apiRoleExecute: false,
       fixtureRowCount: 0,
       callerBindings:

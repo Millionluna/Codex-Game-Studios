@@ -28,10 +28,14 @@ import {
   validateTestOnlyCaresLinkV1CommunicationNotePreviewKeyCustodySnapshot,
   type CaresLinkV1CommunicationNotePreviewKeyCustodySnapshot,
 } from "./communication-note-preview-key-custody.server";
+import {
+  CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RUNNER_TERMINAL_POLICY_DIGEST,
+  CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RUNNER_TERMINAL_POLICY_VERSION,
+} from "./communication-note-preview-runner-terminal-policy.server";
 import { CaresLinkV1ContractError } from "./shared-contracts";
 
 export const CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_COORDINATOR_VERSION =
-  "coordinator.communication.openai.synthetic-preview.2026-08-28.m1g-e.v1" as const;
+  "coordinator.communication.openai.synthetic-preview.2026-08-29.m1g-e.v2" as const;
 
 const SHA256_PATTERN = /^[a-f0-9]{64}$/;
 const UUID_PATTERN =
@@ -76,6 +80,16 @@ const COORDINATOR_POLICY_CORE = deepFreeze({
   dispatchCapability: "ABSENT",
   preRunDispatchApproved: false,
   postRunEvaluationAccepted: false,
+  databaseContract: {
+    reservationResultReservedAt:
+      "PRESENT_SOURCE_ONLY_NOT_RUNTIME_EVIDENCE",
+    runnerTerminalLedger:
+      "PRESENT_SOURCE_ONLY_NO_RUNTIME_CALLER",
+    runnerTerminalPolicyVersion:
+      CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RUNNER_TERMINAL_POLICY_VERSION,
+    runnerTerminalPolicyDigest:
+      CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RUNNER_TERMINAL_POLICY_DIGEST,
+  },
   sourceBindings: {
     activationPreflightPolicyDigest:
       CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_ACTIVATION_PREFLIGHT_POLICY_DIGEST,
@@ -94,7 +108,8 @@ const COORDINATOR_POLICY_CORE = deepFreeze({
     transportLatch: "ENTERED_IS_IRREVERSIBLE",
     receipt: "SIGNATURE_VERIFIED_THEN_DURABLY_RECORDED",
     receiptPersistenceReplay: "EXACT_ONLY_NEVER_DISPATCH_AUTHORITY",
-    continuation: "ONLY_RECORDED_COMPLETED_RECEIPT",
+    continuation:
+      "ONLY_RECORDED_COMPLETED_RECEIPT_AND_DURABLE_ACCEPTED_RUNNER_TERMINAL",
     runnerContinuation:
       "ONLY_AFTER_RUN_RECEIPT_BOUND_SLOT_EVIDENCE_AND_THREE_LANGUAGE_REVIEWS",
     runnerFailure:
@@ -139,7 +154,7 @@ const COORDINATOR_POLICY_CORE = deepFreeze({
     wireBytesAuthority: "ABSENT",
     claimToken: "PROHIBITED_FROM_TRANSCRIPT",
     databaseReservedAt:
-      "CANDIDATE_ONLY_CURRENT_RPC_RESULT_DOES_NOT_RETURN_RESERVED_AT",
+      "CANDIDATE_ONLY_RUNTIME_RPC_RESULT_NOT_OBTAINED",
     receiptSignature:
       "CRYPTOGRAPHICALLY_VERIFIED_AGAINST_TEST_ONLY_CUSTODY_SNAPSHOT",
     runnerProviderCorrelation:
@@ -179,7 +194,7 @@ export type CaresLinkV1CommunicationNotePreviewCoordinatorPolicy =
   typeof COORDINATOR_POLICY_CORE & Readonly<{ policyDigest: string }>;
 
 export const CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_COORDINATOR_POLICY_DIGEST =
-  "ea6bb5854783a322bd059abbf5c9f7d1e96828d2569e72bce8d23d4b196bf9b0" as const;
+  "4649f620bc60425d5ca40d308d167110befd4a29c772e9877ddbeac5eaaa3531" as const;
 
 if (
   createCanonicalSha256(COORDINATOR_POLICY_CORE) !==

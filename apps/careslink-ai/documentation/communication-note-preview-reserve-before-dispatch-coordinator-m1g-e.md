@@ -10,12 +10,12 @@ runnable coordinator and creates no execution capability.
 
 | Boundary | M1g-e state |
 |---|---|
-| Coordinator version | `coordinator.communication.openai.synthetic-preview.2026-08-28.m1g-e.v1` |
-| Coordinator policy digest | `ea6bb5854783a322bd059abbf5c9f7d1e96828d2569e72bce8d23d4b196bf9b0` |
+| Coordinator version | `coordinator.communication.openai.synthetic-preview.2026-08-29.m1g-e.v2` |
+| Coordinator policy digest | `4649f620bc60425d5ca40d308d167110befd4a29c772e9877ddbeac5eaaa3531` |
 | Capability | `TEST_ONLY_TRANSCRIPT_VALIDATION` |
 | Input | explicitly injected plain-data transcript plus M1g-d candidate, already-verified M1g-b authorization, validated M1g-c custody snapshot and caller-supplied `now` |
 | Output authenticity | `UNATTESTED_INJECTED_TEST_TRANSCRIPT` |
-| Database evidence | candidate labels only; no database attestation or RPC call |
+| Database source contract / runtime evidence | M1g-f reserve-result and runner-terminal structures are present in source; no trusted database result, terminal row or RPC call is supplied to this validator |
 | Receipt check | CaresLink Ed25519 dispatch-observation signature verified against the injected `TEST_ONLY` custody snapshot |
 | Provider attestation / wire-byte authority | `ABSENT` / `ABSENT` |
 | Coordinator / activation readiness | `false` / `false` |
@@ -166,14 +166,15 @@ golden-evaluation failure, human-review failure or final report failure. It is
 terminal and `noRetry=true`; it cannot coexist with runner
 acceptance or precede another slot.
 
-This only makes the unsafe phase explicit. The existing M1g-b reserve RPC
-authorizes the next slot from a prior durable `COMPLETED` receipt and has no
-durable runner-accepted/runner-failed state. The injected failure candidate is
-therefore labelled `ABSENT_TEST_CANDIDATE_ONLY`, and
-`DURABLE_RUNNER_TERMINAL_STATE_ABSENT` remains a fixed blocker. Before any live
-activation, a separately reviewed database contract must gate continuation on
-durable runner acceptance or provide an equally strong atomic terminal-state
-design. Transcript ordering cannot substitute for that database lock boundary.
+M1g-f now defines a private, forced-RLS, append-only runner-terminal ledger and
+replaces the reserve RPC so a later slot requires a durable `ACCEPTED` terminal;
+`FAILED` permanently consumes the run. The terminal executor has no runtime
+caller or membership, however, and this validator still receives only an
+injected candidate rather than a trusted RPC result. The injected failure
+candidate therefore remains labelled `ABSENT_TEST_CANDIDATE_ONLY`, and
+`DURABLE_RUNNER_TERMINAL_STATE_ABSENT` remains a runtime-evidence blocker.
+Transcript ordering cannot substitute for the database lock boundary or prove
+that a terminal row exists.
 
 ## Receipt verification and evidence limits
 
@@ -201,21 +202,23 @@ signature or envelope. It also contains no claim token, request body, prompt,
 cleaned facts, generated Note, provider response, raw API key, private key,
 bearer credential or raw external identifier.
 
-## `databaseReservedAt` remains a blocking gap
+## `databaseReservedAt` remains a runtime-evidence gap
 
-M1g-b's current `reserve_communication_note_preview_dispatch` RPC does not
-return the database-written `reserved_at` value. M1g-e therefore accepts only a
-`databaseReservedAtCandidate`, marks the reservation and persistence evidence
-`UNATTESTED_TEST_ONLY`, and labels the receipt's database binding
+M1g-f's source migration now makes
+`reserve_communication_note_preview_dispatch` return the database-written
+`reserved_at` value on both fresh insert and exact replay; replay still grants
+no dispatch authority. M1g-e has no database port and therefore still accepts
+only a `databaseReservedAtCandidate`, marks the reservation and persistence
+evidence `UNATTESTED_TEST_ONLY`, and labels the receipt's database binding
 `CANDIDATE_TIMESTAMP_NOT_DURABLY_ATTESTED`.
 
 The timestamp is range- and order-checked and supplies a lower bound for the
 receipt observation time, but it is neither a signed receipt field nor proof of
 the durable database row. `DATABASE_ATTESTED_RESERVED_AT_ABSENT` consequently
-remains a fixed coordinator blocker. Closing it requires a separately reviewed
-change to the existing reserve RPC result plus corresponding runtime evidence;
-this batch does not alter an RPC or create a migration. A read-after-reserve
-lookup must not be introduced as a substitute dispatch authority.
+remains a fixed coordinator blocker until a separately reviewed runtime invokes
+the new reserve result and supplies that trusted value without relabelling an
+injected timestamp. A read-after-reserve lookup must not be introduced as a
+substitute dispatch authority.
 
 The transcript also contains no authenticated revocation observation. Its
 ordered timestamps and exact `now` value are validation-clock consistency
@@ -245,7 +248,7 @@ and approval latches also remain unchanged. The live factory always throws.
 
 M1g-e exposes no callback or runtime port and performs no:
 
-- authorization registration, durable claim, reservation or receipt write;
+- authorization registration, durable claim, reservation, receipt or runner-terminal write;
 - Supabase client construction, SQL execution, migration, role/grant change or
   Hosted Supabase mutation;
 - environment lookup, credential or managed-key resolution, receipt signing,
@@ -274,8 +277,8 @@ The maintained source gate must prove:
   reservation/receipt evidence, exact fixture/body/preflight/usage/cost, all
   seven critical checks and the three ordered locale reviews;
 - terminal provider-completed runner failure with mutually exclusive
-  acceptance/failure fields, plus the still-absent durable runner terminal
-  gate;
+  acceptance/failure fields, plus the source-present but runtime-unobserved
+  durable runner-terminal gate;
 - cross-role purpose separation across static evidence, client/transport/
   provider correlation, runner candidates, receipts and fixture digests;
 - explicit `UNATTESTED_NO_SHARED_IDENTIFIER` between the runner provider hash
@@ -304,7 +307,15 @@ prospective validation counts.
 A future separately approved, disposable synthetic Preview run still needs
 authenticated external provenance; provisioned purpose-scoped runtime
 identities and credential/key resolvers; a database-attested reservation time;
-a database-enforced runner acceptance/failure continuation gate; a reviewed
-executable reserve-before-dispatch transport; completed attributable human
-review; explicit final run approval; and verified teardown/absence evidence.
+a fifth purpose-scoped terminal caller plus authenticated runtime port for the
+source-defined database runner acceptance/failure gate; a reviewed executable
+reserve-before-dispatch transport; completed attributable human review;
+explicit final run approval; and verified teardown/absence evidence.
 Production and real care data remain excluded.
+
+## Successor source boundary
+
+The source-only database continuation contract is specified in
+[`communication-note-preview-durable-runner-terminal-m1g-f.md`](./communication-note-preview-durable-runner-terminal-m1g-f.md).
+It does not make this transcript validator executable and does not satisfy either
+runtime-evidence blocker.

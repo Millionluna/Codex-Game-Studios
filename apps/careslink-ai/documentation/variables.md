@@ -139,8 +139,8 @@ claims only, not authenticated control-plane inventory or PostgreSQL catalog
 evidence; no environment variable can upgrade them into activation authority.
 
 Its preflight version and literal policy digest are
-`preflight.communication.openai.synthetic-preview.2026-08-28.m1g-d.v1` and
-`81ab3c3bac64f2f9205c2eb358e298d440e3735e5a9c0ed07a842058e6947e53`.
+`preflight.communication.openai.synthetic-preview.2026-08-29.m1g-d.v2` and
+`791a4d893afd4e490ab0164a8f604589bcf8015d25e5723b4df210f8c0b44f67`.
 They are source-integrity bindings, not configuration or approval.
 
 The M1g-d service-account descriptor states
@@ -155,9 +155,9 @@ environment variable can remove its five fixed activation blockers.
 
 Communication Note M1g-e also adds no environment variable or secret name.
 Its policy version
-`coordinator.communication.openai.synthetic-preview.2026-08-28.m1g-e.v1` and
+`coordinator.communication.openai.synthetic-preview.2026-08-29.m1g-e.v2` and
 digest
-`ea6bb5854783a322bd059abbf5c9f7d1e96828d2569e72bce8d23d4b196bf9b0`
+`4649f620bc60425d5ca40d308d167110befd4a29c772e9877ddbeac5eaaa3531`
 are literal source-integrity bindings. They do not configure the registration,
 six-slot runner preflight, five-minute claim window, reservation/transport,
 receipt/persistence or runner-acceptance sequence. The only callable surface
@@ -166,16 +166,20 @@ resolve the M1g-c database identities, claim token, HMAC keys, receipt private
 key, OpenAI credential or Supabase target; it does not call a database, KMS,
 provider or transport. The live coordinator factory always throws.
 
-No environment value can create the missing durable runner decision either.
-Provider completion followed by runner failure is only a terminal injected
-candidate; the current reserve RPC still lacks a lock-aligned durable
-acceptance/failure gate. `DURABLE_RUNNER_TERMINAL_STATE_ABSENT` is therefore a
-fixed code/database-contract blocker, not configuration.
+Communication Note M1g-f likewise adds no environment variable or secret name.
+Its terminal policy version
+`policy.communication.openai.synthetic-preview.runner-terminal.2026-08-29.m1g-f.v1`
+and digest
+`4f38d9ea27e9673138350ecdbc294e14e200cd09247f07244433a51cb62f6f5a`
+bind a source-only database contract. The terminal executor has no fifth caller,
+login, credential, membership or runtime execute authority. No environment
+value can manufacture those missing custody/runtime boundaries or a trusted
+terminal row; `DURABLE_RUNNER_TERMINAL_STATE_ABSENT` remains a runtime-evidence
+blocker, not configuration.
 
-No environment value may supply or infer the missing database-attested
-reservation timestamp. The current reservation RPC does not return
-`reserved_at`; a future change to that SQL result is a separately reviewed
-migration/contract batch, not configuration. M1g-e output remains
+No environment value may supply or infer a database-attested reservation
+timestamp. The M1g-f source migration returns the stored `reserved_at`, but no
+trusted runtime invokes that result or supplies it to M1g-e. M1g-e output remains
 `coordinatorReady=false`, `activationReady=false` and
 `dispatchCapability=ABSENT`, with pre-run approval and post-run acceptance
 false. Nothing from this batch belongs in `.env.example`.

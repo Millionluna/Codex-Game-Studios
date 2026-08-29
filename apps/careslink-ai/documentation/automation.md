@@ -183,10 +183,10 @@ PostgreSQL 16.15 dual-role-topology rollback gate passed. See
 
 M1g-d adds only a server-only, pure `TEST_ONLY` activation-preflight validator.
 Its policy digest is
-`81ab3c3bac64f2f9205c2eb358e298d440e3735e5a9c0ed07a842058e6947e53`.
+`791a4d893afd4e490ab0164a8f604589bcf8015d25e5723b4df210f8c0b44f67`.
 It cross-binds the M1g-b authorization, M1g-c custody snapshot, six pairwise-
-distinct provider evidence hashes, the exact 36-migration manifest/artifact
-pins, four ordered caller-identity candidates, non-exportable receipt-key
+distinct provider evidence hashes, the exact 37-migration manifest and six
+artifact pins, four ordered caller-identity candidates, non-exportable receipt-key
 lifecycle/teardown evidence and the attributable 18-review plan. Evidence may
 be at most five minutes old; receipt, provider, database and review sections
 must share the exact candidate/registry observation and cannot predate the
@@ -212,9 +212,9 @@ See
 
 M1g-e adds a source-only reserve-before-dispatch **transcript validator**, not
 an automation runtime. Version
-`coordinator.communication.openai.synthetic-preview.2026-08-28.m1g-e.v1` and
+`coordinator.communication.openai.synthetic-preview.2026-08-29.m1g-e.v2` and
 policy digest
-`ea6bb5854783a322bd059abbf5c9f7d1e96828d2569e72bce8d23d4b196bf9b0`
+`4649f620bc60425d5ca40d308d167110befd4a29c772e9877ddbeac5eaaa3531`
 pin the future order: registered authorization candidate, exact six-slot runner
 preflight, then a fresh claim with at least five minutes of authorization life
 remaining. Each serial slot requires a claim/authorization/run-bound fresh
@@ -230,10 +230,10 @@ record; it never re-authorizes transport.
 A provider-completed slot whose runner evidence, golden evaluation, human
 review or final report fails is represented by a mutually exclusive,
 parent/receipt-bound `RUNNER_SLOT_FAILED_TEST_CANDIDATE`; it is terminal and
-cannot retry or continue. This state is injected only. The existing reserve RPC
-still gates the next slot on the prior durable `COMPLETED` receipt without a
-durable runner decision, so `DURABLE_RUNNER_TERMINAL_STATE_ABSENT` remains a
-fixed blocker pending a separately reviewed database continuation gate.
+cannot retry or continue. M1g-f now defines the source-only durable terminal
+ledger and requires `COMPLETED + ACCEPTED` before a later reservation, but its
+executor has no runtime caller. The transcript state is still injected only, so
+`DURABLE_RUNNER_TERMINAL_STATE_ABSENT` remains a fixed runtime-evidence blocker.
 
 For `COMPLETED` and `PROVIDER_HTTP_ERROR`, receipt observation must remain within
 the policy's 30-second application-transcript candidate interval after transport
@@ -245,17 +245,23 @@ and receipt correlation HMACs deliberately remain
 
 The validator reruns M1g-d and M1g-c validation and cryptographically verifies
 the injected Ed25519 receipt envelope, but all database event states remain
-explicitly unattested test claims. In particular, the current
-`reserve_communication_note_preview_dispatch` result does not return the
-database `reserved_at` value required by the receipt verifier. The injected
-`databaseReservedAtCandidate` therefore cannot close the durable reservation
-binding, and `DATABASE_ATTESTED_RESERVED_AT_ABSENT` remains a fixed blocker.
+explicitly unattested test claims. M1g-f makes
+`reserve_communication_note_preview_dispatch` return the database `reserved_at`
+value, but M1g-e has no runtime database port and never observes that result.
+The injected `databaseReservedAtCandidate` therefore cannot close the durable
+reservation binding, and `DATABASE_ATTESTED_RESERVED_AT_ABSENT` remains fixed.
 The same transcript cannot supply the absent durable runner terminal state;
 `DURABLE_RUNNER_TERMINAL_STATE_ABSENT` also remains fixed.
 M1g-e executes no callback, RPC, transport or signer; reads no environment;
 adds no migration or runtime importer; and leaves coordinator, activation,
 dispatch, pre-run approval and post-run acceptance closed. See
 `documentation/communication-note-preview-reserve-before-dispatch-coordinator-m1g-e.md`.
+
+M1g-f adds only a CLI-generated private-schema migration, rollback assertion
+and source policy. It creates no scheduled worker, queue, cron, Edge Function,
+login identity or automatic retry. Without a fifth purpose-scoped caller and
+reviewed runtime adapter, its terminal RPC cannot be reached by product code.
+See `documentation/communication-note-preview-durable-runner-terminal-m1g-f.md`.
 
 Supabase CLI 2.115.0 has since generated source-only migration `20260823213144_harden_v1_note_generation_registration_retention.sql`. It adds `attempts_registration_digest_idx` and the named `attempts_registration_catalog_fk` from `attempts.registration_digest` to `worker_registrations.registration_digest`, with update/delete `RESTRICT`, `NOT VALID` creation and explicit validation. It creates no seed, caller grant, runtime surface or Production change. Its local gate passed 39/39 focused contracts, the full 125-file / 1,381-test suite, lint, TypeScript, the 63/63-page production build, the 73-file Codex-adapter sync check and `git diff --check`. Deleted disposable `r22` then clean-applied the current manifest 15/15 and passed the seven rollback suites; the hosted registration-retention gate is now closed without enabling any runtime automation.
 

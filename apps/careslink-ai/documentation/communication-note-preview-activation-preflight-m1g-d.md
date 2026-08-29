@@ -10,14 +10,15 @@ the paid evaluation executable.
 
 | Boundary | M1g-d state |
 |---|---|
-| Preflight version | `preflight.communication.openai.synthetic-preview.2026-08-28.m1g-d.v1` |
-| Preflight policy digest | `81ab3c3bac64f2f9205c2eb358e298d440e3735e5a9c0ed07a842058e6947e53` |
+| Preflight version | `preflight.communication.openai.synthetic-preview.2026-08-29.m1g-d.v2` |
+| Preflight policy digest | `791a4d893afd4e490ab0164a8f604589bcf8015d25e5723b4df210f8c0b44f67` |
 | Capability | `TEST_ONLY_CANDIDATE_VALIDATION` |
 | Input | explicitly injected, content-free candidate plus already-verified M1g-b authorization and validated M1g-c custody snapshot |
 | Observation consistency and freshness | candidate, owner-registry, receipt-custody, provider, database and human-review observations share one exact timestamp; it cannot be future, must be no earlier than authorization issuance/effectiveness or provider-credential issuance, and may be at most 5 minutes old |
 | Candidate lifetime | at most 15 minutes and never beyond the owner authorization expiry |
 | Provider evidence | six pairwise-distinct SHA-256 bindings for region, retention, Modified Retention, processing acknowledgement, model/pricing and monthly hard spend limit |
-| Database evidence | exact, boundary-safe 36-migration manifest; four M1g-b/M1g-c migration/assertion artifact pins; candidate-only common-domain HMAC metadata for Preview/Production project references |
+| Database evidence | exact, boundary-safe 37-migration manifest; six M1g-b/M1g-c/M1g-f migration/assertion artifact pins; candidate-only common-domain HMAC metadata for Preview/Production project references |
+| M1g-f terminal boundary | source-only/default-off terminal executor and ledger are pinned; no fifth caller, runtime execute grant or terminal evidence is claimed |
 | Caller candidates | four ordered login-identity candidates, each bound to exactly one M1g-c caller shell and its 1/1/2/1 RPC mapping, with complete unprivileged-role/direct-ACL assertions |
 | Receipt-key lifecycle | non-exportable active candidate plus access-log, rotation/revocation and teardown-plan evidence digests |
 | Human review | 18 attributable reviews planned; results not started and final run approval absent |
@@ -104,17 +105,20 @@ attestation.
 
 ### Exact database manifest and caller candidates
 
-M1g-d adds no migration. It pins the previously tested source artifacts:
+M1g-d v2 does not execute a migration. It pins the complete source manifest,
+including the new default-off M1g-f artifact:
 
 | Database evidence | Exact pin |
 |---|---|
-| Migration count | `36` |
-| Ordered migration basenames | `5bb377df2075029d3bce3aaf70e303bc7441b76e9d011cee9ba202872331232e` |
-| Canonical ordered migration entries (`name`, UTF-8 byte length, per-file SHA-256) | `97e6e7be1907ae1b43bb8698f00e4a708a2c5b95f6875fe453aa43bbf0839fad` |
+| Migration count | `37` |
+| Ordered migration basenames | `d9cf6c02336c94fd7878b87a28b83063d3d1777a197cbdbfe97299e51efb8953` |
+| Canonical ordered migration entries (`name`, UTF-8 byte length, per-file SHA-256) | `a85ed5cc2f12e7c3b8cf29e837b5153dddc2c797559065c6731731bbab396a16` |
 | M1g-b authority migration | `94f83498ea04053e7238a95bb9be0bb8a38ad0a76fa0e751390419800da51f7f` |
 | M1g-c custody-caller migration | `e6b77e76406d8db1d68ad6e8da0d9d2dd88521c713047c0415aa60d29243d432` |
 | M1g-b authority assertion | `9b1e0088e7e39b81e248815e8ce6e939f29220830feda2d177ffd230892b39db` |
 | M1g-c custody-caller assertion | `7fa7fa9d4c9667005b36c1f72c95aaf2418131d05037b5ea347f83e0bfcf16d2` |
+| M1g-f runner-terminal migration | `4341cdacb90e45eea428edfc57df29379ca211900e161844016daad190f7b9c5` |
+| M1g-f runner-terminal assertion | `ca4e34eb11927eb55e2115f859f132493f3549ed4b8713c4c7d1be3e80483832` |
 
 The target candidate must state that it is disposable, non-default,
 non-persistent, `withData=false`, non-Production, has zero fixture rows and has
@@ -123,6 +127,13 @@ zero active backends before the run. It also states one fixed
 target-project and Production-project reference HMACs; the two HMAC values must
 differ and the database HMAC key reference must be purpose-separated from the
 caller/provider HMAC domains. API roles receive no execution authority.
+
+The M1g-f candidate fields also state that the terminal contract is
+`SOURCE_ONLY_DEFAULT_OFF`, its executor is
+`careslink_v1_preview_runner_terminal_executor`, a fifth terminal caller is
+absent and no runtime execute authority exists. The four existing M1g-c caller
+candidates and their 1/1/2/1 mapping remain exact; a later custody/runtime batch
+must add any fifth caller and update the evidence atomically.
 
 All project-reference HMAC values and the common-key reference are supplied by
 the candidate. The validator neither resolves that key nor recomputes either
@@ -266,7 +277,7 @@ The maintained source gate must prove:
   lifetime and owner-authorization expiry confinement;
 - six pairwise-distinct provider evidence bindings and the separate monthly
   defence-in-depth versus per-run budget semantics;
-- all six boundary-safe database pins, the 36-migration count, the candidate-
+- all eight boundary-safe database pins, the 37-migration count, the candidate-
   only project-reference HMAC domain claim, the four ordered caller candidates,
   their full unprivileged/direct-ACL posture and zero-data/non-Production claim;
 - KMS lifecycle/teardown and attributable human-review plan bindings without

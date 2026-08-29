@@ -69,6 +69,10 @@ import {
   validateTestOnlyCaresLinkV1CommunicationNotePreviewCoordinatorTranscript,
 } from "./communication-note-preview-reserve-before-dispatch-coordinator.server";
 import {
+  CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RUNNER_TERMINAL_POLICY_DIGEST,
+  CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RUNNER_TERMINAL_POLICY_VERSION,
+} from "./communication-note-preview-runner-terminal-policy.server";
+import {
   CARESLINK_V1_COMMUNICATION_NOTE_EXTERNALLY_APPROVED_REQUEST_BODY_PIN,
   CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_REQUEST_BODY_PIN_READY,
 } from "./communication-note-preview-request-body-pin";
@@ -80,12 +84,12 @@ const PREFLIGHT_OBSERVED_AT = "2026-08-28T01:59:00.000Z";
 describe("Communication Note M1g-e reserve-before-dispatch coordinator transcript", () => {
   it("literal-pins a source-only policy and preserves every existing readiness and approval latch", () => {
     expect(CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_COORDINATOR_VERSION).toBe(
-      "coordinator.communication.openai.synthetic-preview.2026-08-28.m1g-e.v1",
+      "coordinator.communication.openai.synthetic-preview.2026-08-29.m1g-e.v2",
     );
     expect(
       CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_COORDINATOR_POLICY_DIGEST,
     ).toBe(
-      "ea6bb5854783a322bd059abbf5c9f7d1e96828d2569e72bce8d23d4b196bf9b0",
+      "4649f620bc60425d5ca40d308d167110befd4a29c772e9877ddbeac5eaaa3531",
     );
     expect(
       CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_COORDINATOR_POLICY,
@@ -97,8 +101,20 @@ describe("Communication Note M1g-e reserve-before-dispatch coordinator transcrip
       dispatchCapability: "ABSENT",
       preRunDispatchApproved: false,
       postRunEvaluationAccepted: false,
+      databaseContract: {
+        reservationResultReservedAt:
+          "PRESENT_SOURCE_ONLY_NOT_RUNTIME_EVIDENCE",
+        runnerTerminalLedger:
+          "PRESENT_SOURCE_ONLY_NO_RUNTIME_CALLER",
+        runnerTerminalPolicyVersion:
+          CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RUNNER_TERMINAL_POLICY_VERSION,
+        runnerTerminalPolicyDigest:
+          CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RUNNER_TERMINAL_POLICY_DIGEST,
+      },
       stateMachine: {
         ordering: "SERIAL_SLOT_INDEX_ASCENDING",
+        continuation:
+          "ONLY_RECORDED_COMPLETED_RECEIPT_AND_DURABLE_ACCEPTED_RUNNER_TERMINAL",
         automaticRetry: false,
         maximumAttemptsPerSlot: 1,
         maximumSlots: 6,
@@ -111,7 +127,7 @@ describe("Communication Note M1g-e reserve-before-dispatch coordinator transcrip
         wireBytesAuthority: "ABSENT",
         claimToken: "PROHIBITED_FROM_TRANSCRIPT",
         databaseReservedAt:
-          "CANDIDATE_ONLY_CURRENT_RPC_RESULT_DOES_NOT_RETURN_RESERVED_AT",
+          "CANDIDATE_ONLY_RUNTIME_RPC_RESULT_NOT_OBTAINED",
       },
       runnerAcceptance: {
         reportStatus: "PASS",
@@ -1408,6 +1424,11 @@ function createPreflightCandidate(
       withData: false,
       productionExcluded: true,
       ...CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_DATABASE_EVIDENCE_PINS,
+      runnerTerminalContract: "SOURCE_ONLY_DEFAULT_OFF",
+      runnerTerminalExecutorRole:
+        "careslink_v1_preview_runner_terminal_executor",
+      runnerTerminalCallerPresent: false,
+      runnerTerminalRuntimeExecute: false,
       apiRoleExecute: false,
       fixtureRowCount: 0,
       callerBindings:

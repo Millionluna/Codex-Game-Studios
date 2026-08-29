@@ -72,6 +72,7 @@ describe("V1 shadow runtime boundary", () => {
       "src/lib/v1/communication-note-preview-key-custody.server.ts",
       "src/lib/v1/communication-note-preview-activation-preflight.server.ts",
       "src/lib/v1/communication-note-preview-reserve-before-dispatch-coordinator.server.ts",
+      "src/lib/v1/communication-note-preview-runner-terminal-policy.server.ts",
       "src/lib/v1/native-auth-boundary.server.ts",
       "src/lib/v1/openai-communication-note-provider.server.ts",
       "src/lib/v1/communication-note-provider-policy.ts",
@@ -324,6 +325,54 @@ describe("V1 shadow runtime boundary", () => {
     expect(source).toContain('dispatchCapability: "ABSENT"');
     expect(source).toContain(
       "Communication Note preview reserve-before-dispatch coordinator is unavailable",
+    );
+  });
+
+  it("quarantines the M1g-f runner terminal policy to source tests and contracts", () => {
+    const policyModule = join(
+      process.cwd(),
+      "src/lib/v1/communication-note-preview-runner-terminal-policy.server.ts",
+    );
+    const policyTest = join(
+      process.cwd(),
+      "src/lib/v1/communication-note-preview-runner-terminal-policy.server.test.ts",
+    );
+    const importPattern =
+      /(?:from\s+|import\s*\(|require\s*\()\s*["'][^"']*communication-note-preview-runner-terminal-policy\.server(?:\.(?:[cm]?[jt]s|[jt]sx))?["']/;
+    const importers = walkControlledScriptFiles().filter((file) =>
+      importPattern.test(readFileSync(file, "utf8")),
+    );
+    const source = readFileSync(policyModule, "utf8");
+
+    expect(importers).toEqual([
+      join(
+        process.cwd(),
+        "src/lib/v1/communication-note-preview-activation-preflight.server.ts",
+      ),
+      join(
+        process.cwd(),
+        "src/lib/v1/communication-note-preview-reserve-before-dispatch-coordinator.server.ts",
+      ),
+      join(
+        process.cwd(),
+        "src/lib/v1/communication-note-preview-reserve-before-dispatch-coordinator.server.test.ts",
+      ),
+      policyTest,
+    ].sort());
+    expect(walkSourceFiles("src/app").filter((file) =>
+      importPattern.test(readFileSync(file, "utf8")),
+    )).toEqual([]);
+    expect(walkSourceFiles("src/components").filter((file) =>
+      importPattern.test(readFileSync(file, "utf8")),
+    )).toEqual([]);
+    expect(source).not.toMatch(
+      /process\.env|fetch\s*\(|from\s+["'](?:openai|@supabase\/|node:(?:http|https|net|tls))[^"']*["']|SUPABASE_SERVICE_ROLE_KEY|NEXT_PUBLIC_/,
+    );
+    expect(source).toContain(
+      "SOURCE_CONTRACT_ONLY_NO_RUNTIME_CALLER",
+    );
+    expect(source).toContain(
+      "Communication Note preview runner terminal persistence is unavailable",
     );
   });
 

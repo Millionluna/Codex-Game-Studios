@@ -1287,19 +1287,20 @@ external action.
 Detailed scope and activation blockers are in
 `documentation/communication-note-preview-key-custody-callers-m1g-c.md`.
 
-## 19. Communication synthetic-Preview activation preflight M1g-d — 2026-08-28
+## 19. Communication synthetic-Preview activation preflight M1g-d — 2026-08-29
 
 M1g-d adds a server-only, pure `TEST_ONLY` evidence validator around the
 isolated M1g-b/M1g-c path. Its version and literal policy digest are
-`preflight.communication.openai.synthetic-preview.2026-08-28.m1g-d.v1` and
-`81ab3c3bac64f2f9205c2eb358e298d440e3735e5a9c0ed07a842058e6947e53`.
+`preflight.communication.openai.synthetic-preview.2026-08-29.m1g-d.v2` and
+`791a4d893afd4e490ab0164a8f604589bcf8015d25e5723b4df210f8c0b44f67`.
 It does not alter the durable Note job/attempt model, vault lifecycle,
 canonical-document transaction, worker catalog or Points design.
 
 The validator rebuilds a content-free candidate and cross-binds the verified
 owner authorization, validated custody snapshot, exact shared observation
 time, provider/project/credential evidence, receipt-key lifecycle, boundary-
-safe 36-migration manifest and four ordered caller candidates. Each caller
+safe 37-migration manifest, six artifact pins and four ordered caller
+candidates. Each caller
 asserts no elevated PostgreSQL role attributes, extra caller-shell/executor/API
 membership, direct table/sequence/function privileges, raw credential material
 or active backend. Candidate and section observations cannot be future or
@@ -1327,14 +1328,14 @@ deployment or Production change. Detailed scope is in
 `documentation/communication-note-preview-activation-preflight-m1g-d.md` and
 final local gate evidence is recorded in `documentation/tests.md`.
 
-## 20. Communication reserve-before-dispatch transcript M1g-e — 2026-08-28
+## 20. Communication reserve-before-dispatch transcript M1g-e — 2026-08-29
 
 M1g-e adds no durable repository or executable transport. It freezes the next
 coordination boundary as a server-only, pure `TEST_ONLY` transcript/transition
 validator with version
-`coordinator.communication.openai.synthetic-preview.2026-08-28.m1g-e.v1` and
+`coordinator.communication.openai.synthetic-preview.2026-08-29.m1g-e.v2` and
 policy digest
-`ea6bb5854783a322bd059abbf5c9f7d1e96828d2569e72bce8d23d4b196bf9b0`.
+`4649f620bc60425d5ca40d308d167110befd4a29c772e9877ddbeac5eaaa3531`.
 The validator reruns the M1g-d preflight and M1g-c custody checks before it
 accepts any transcript state. It then cross-binds the preflight, authority,
 custody, request-pin, runner, evaluation, template, manifest, fixture, worker,
@@ -1382,21 +1383,22 @@ runner provider hash and receipt OpenAI correlation HMACs have no authenticated
 shared identifier and remain `UNATTESTED_NO_SHARED_IDENTIFIER`.
 
 This verifies internal state consistency and a test receipt signature, not the
-database event claims. The existing reservation RPC returns neither its
-canonical database `reserved_at` timestamp nor a database attestation over it,
-while the receipt verifier requires that exact lower bound. M1g-e therefore
-labels `databaseReservedAtCandidate` as unattested and retains
-`DATABASE_ATTESTED_RESERVED_AT_ABSENT`. A future live path must change the
-existing reserve RPC contract in a separately reviewed migration; it must not
-guess from an application clock or add a read-after-reserve authority path.
+database event claims. M1g-f changes the source reserve result to return its
+canonical database `reserved_at` timestamp on fresh insert and exact replay,
+but M1g-e still has no trusted database port and never observes that value. It
+therefore labels `databaseReservedAtCandidate` as unattested and retains
+`DATABASE_ATTESTED_RESERVED_AT_ABSENT`. A future live path must consume the
+source-defined result directly; it must not guess from an application clock or
+add a read-after-reserve authority path.
 
-The existing reserve RPC also treats the prior durable `COMPLETED` receipt as
-sufficient for the next slot and stores no durable runner acceptance/failure.
-The transcript's runner failure is therefore only
-`ABSENT_TEST_CANDIDATE_ONLY`; `DURABLE_RUNNER_TERMINAL_STATE_ABSENT` remains a
-fixed blocker. A live path must add a lock-aligned durable runner decision or an
-equally reviewed atomic terminal-state design before continuation can be
-enabled.
+M1g-f also adds a private forced-RLS, append-only terminal ledger and changes
+the reserve source contract so every earlier slot needs `COMPLETED + ACCEPTED`;
+a `FAILED` terminal permanently consumes the run. The terminal executor has no
+fifth caller or runtime execute grant, so the transcript's runner decision is
+still `ABSENT_TEST_CANDIDATE_ONLY` and
+`DURABLE_RUNNER_TERMINAL_STATE_ABSENT` remains a runtime-evidence blocker. A
+live path must first add the independently reviewed caller, custody decision and
+authenticated adapter without weakening this lock-aligned continuation gate.
 
 The validator executes no injected callback, SQL, network request, signer,
 secret resolver or environment lookup. It returns no raw claim token, request
@@ -1408,3 +1410,33 @@ and absent post-run evaluation acceptance. The live factory always throws; no
 route, component, worker, queue, cron, Supabase Function or product runtime may
 import it. Detailed scope is in
 `documentation/communication-note-preview-reserve-before-dispatch-coordinator-m1g-e.md`.
+
+## 21. Communication durable runner terminal M1g-f — 2026-08-29
+
+M1g-f supplies the source-only database boundary that M1g-e could previously
+describe only as injected state. A CLI-generated migration requires the five
+existing Preview execution ledgers to be locked and empty, then adds a private
+forced-RLS append-only terminal ledger and a separate
+`careslink_v1_preview_runner_terminal_executor`. The executor is `NOLOGIN`,
+`NOINHERIT` and `NOBYPASSRLS`; no fifth caller or runtime execute edge exists.
+
+The reserve result now exposes its database-written UTC-millisecond
+`reservedAt` on a fresh insertion and on an exact response-loss replay; only
+the fresh result grants dispatch authority. Before any later slot, every prior
+slot must have an immutable `COMPLETED` receipt and `ACCEPTED` terminal. Missing
+terminal state remains pending without authority, while `FAILED` permanently
+consumes the run. The terminal RPC binds the receipt/reservation/claim/
+authorization chain, exact request-body pins and receipt usage/cost, plus the
+caller-supplied runner candidate/provider identifiers, seven checks, three
+ordered locale reviews and purpose-separated digest/HMAC values. It does not
+independently attest the truth of those caller-supplied runner fields.
+
+The terminal policy version is
+`policy.communication.openai.synthetic-preview.runner-terminal.2026-08-29.m1g-f.v1`
+with digest
+`4f38d9ea27e9673138350ecdbc294e14e200cd09247f07244433a51cb62f6f5a`.
+It is not runtime authority. Any later activation must first choose and review
+an independent signed-terminal envelope or an authenticated terminal adapter as
+the trust root, then atomically add the fifth caller, custody evidence and
+runtime port. Detailed scope is in
+`documentation/communication-note-preview-durable-runner-terminal-m1g-f.md`.
