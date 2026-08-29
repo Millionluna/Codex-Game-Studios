@@ -317,6 +317,21 @@ six-key usage mismatch. No provider transport, model call, paid model spend,
 deployment, retained identity or automatic action occurred. See
 `documentation/communication-note-preview-hosted-runner-terminal-identity-m1g-h.md`.
 
+M1g-i closes that source/local contract mismatch without activating any
+automation. The signed terminal continues to carry nine exact usage keys; the
+replacement database function removes only the three reconciliation labels
+for exact comparison with the receipt ledger's six facts. It does not add a
+worker, queue, cron, Edge Function, retry, provider transport, connection
+factory or runtime importer. Migration 39 adds no role or row and restores the
+pre-existing caller/executor ACL after its transaction-local DDL step.
+
+Local PostgreSQL 16.15 passed 39/39 migrations and all fixed stages A01–A18;
+the source/static gate passed 171 files / 2,296 tests and the 64/64-page Webpack
+build. PostgreSQL 17/Hosted and the one-time signed `ACCEPTED` runtime flow were
+not run. Activation, dispatch and live resolver readiness remain false/absent.
+See
+`documentation/communication-note-preview-terminal-accepted-usage-m1g-i.md`.
+
 Supabase CLI 2.115.0 has since generated source-only migration `20260823213144_harden_v1_note_generation_registration_retention.sql`. It adds `attempts_registration_digest_idx` and the named `attempts_registration_catalog_fk` from `attempts.registration_digest` to `worker_registrations.registration_digest`, with update/delete `RESTRICT`, `NOT VALID` creation and explicit validation. It creates no seed, caller grant, runtime surface or Production change. Its local gate passed 39/39 focused contracts, the full 125-file / 1,381-test suite, lint, TypeScript, the 63/63-page production build, the 73-file Codex-adapter sync check and `git diff --check`. Deleted disposable `r22` then clean-applied the current manifest 15/15 and passed the seven rollback suites; the hosted registration-retention gate is now closed without enabling any runtime automation.
 
 ### PostgreSQL 16.15 local isolated gate — 2026-08-24

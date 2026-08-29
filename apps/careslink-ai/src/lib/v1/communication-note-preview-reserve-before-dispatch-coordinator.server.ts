@@ -35,7 +35,7 @@ import {
 import { CaresLinkV1ContractError } from "./shared-contracts";
 
 export const CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_COORDINATOR_VERSION =
-  "coordinator.communication.openai.synthetic-preview.2026-08-29.m1g-g.v3" as const;
+  "coordinator.communication.openai.synthetic-preview.2026-08-29.m1g-i.v4" as const;
 
 const SHA256_PATTERN = /^[a-f0-9]{64}$/;
 const UUID_PATTERN =
@@ -197,7 +197,7 @@ export type CaresLinkV1CommunicationNotePreviewCoordinatorPolicy =
   typeof COORDINATOR_POLICY_CORE & Readonly<{ policyDigest: string }>;
 
 export const CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_COORDINATOR_POLICY_DIGEST =
-  "f6609c2f357b5fda92ae5aa1b459dfb1e32b7893c3e8436e0e94a8ffa2bbe675" as const;
+  "6a26e2104ebd8cecc55c638cdb2d9ec15b097630e90c0e19573addaa76fc5b2a" as const;
 
 if (
   createCanonicalSha256(COORDINATOR_POLICY_CORE) !==

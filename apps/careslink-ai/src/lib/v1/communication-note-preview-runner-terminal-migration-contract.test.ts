@@ -14,6 +14,13 @@ const signedMigration = readFileSync(
   "utf8",
 );
 const signedNormalized = normalizeSql(signedMigration);
+const acceptedUsageMigrationPath =
+  "supabase/migrations/20260829041316_align_communication_note_preview_terminal_accepted_usage.sql";
+const acceptedUsageMigration = readFileSync(
+  join(process.cwd(), acceptedUsageMigrationPath),
+  "utf8",
+);
+const acceptedUsageNormalized = normalizeSql(acceptedUsageMigration);
 const assertion = normalizeSql(
   readFileSync(
     join(
@@ -496,6 +503,114 @@ describe("Communication Note M1g-g signed terminal caller migration contract", (
   });
 });
 
+describe("Communication Note M1g-i ACCEPTED usage alignment migration contract", () => {
+  it("keeps every temporary DDL capability inside one explicit transaction", () => {
+    expect(acceptedUsageNormalized.startsWith("begin;")).toBe(true);
+    expect(acceptedUsageNormalized.endsWith("commit;")).toBe(true);
+    expect(acceptedUsageNormalized.match(/\bbegin;/g)).toHaveLength(1);
+    expect(acceptedUsageNormalized.match(/\bcommit;/g)).toHaveLength(1);
+    expect(
+      acceptedUsageNormalized.indexOf(
+        "grant careslink_v1_generation_owner to current_user",
+      ),
+    ).toBeGreaterThan(acceptedUsageNormalized.indexOf("begin;"));
+    expect(
+      acceptedUsageNormalized.indexOf(
+        "revoke careslink_v1_generation_owner from current_user",
+      ),
+    ).toBeLessThan(acceptedUsageNormalized.lastIndexOf("commit;"));
+  });
+
+  it("replaces only the signed terminal RPC and restores the exact ACL", () => {
+    expect(acceptedUsageNormalized).toContain(
+      "create or replace function careslink_v1_generation.persist_verified_communication_note_preview_runner_terminal( p_statement jsonb, p_signature_base64url text, p_verifier_identity_hmac text )",
+    );
+    expect(acceptedUsageMigration).not.toMatch(/^\s*create role\s+/gim);
+    expect(acceptedUsageMigration).not.toMatch(/^\s*(?:create|alter|drop) table\s+/gim);
+    expect(acceptedUsageNormalized).toContain(
+      "grant careslink_v1_preview_runner_terminal_executor to current_user with admin false, inherit false, set true granted by current_user;",
+    );
+    expect(acceptedUsageNormalized).toContain(
+      "grant careslink_v1_generation_owner to current_user with admin false, inherit false, set true granted by current_user;",
+    );
+    expect(acceptedUsageNormalized).toContain(
+      "grant create on schema careslink_v1_generation to careslink_v1_preview_runner_terminal_executor;",
+    );
+    expect(acceptedUsageNormalized).toContain(
+      "revoke create on schema careslink_v1_generation from careslink_v1_preview_runner_terminal_executor;",
+    );
+    expect(acceptedUsageNormalized).toContain(
+      "revoke careslink_v1_preview_runner_terminal_executor from current_user granted by current_user;",
+    );
+    expect(acceptedUsageNormalized).toContain(
+      "revoke careslink_v1_generation_owner from current_user granted by current_user;",
+    );
+    const grant = acceptedUsageStatement(
+      "grant execute on function careslink_v1_generation.persist_verified_communication_note_preview_runner_terminal(",
+    );
+    expect(grant).toContain("careslink_v1_preview_runner_terminal_executor");
+    expect(grant).toContain("careslink_v1_preview_runner_terminal_caller");
+    for (const role of [
+      "public",
+      "anon",
+      "authenticated",
+      "service_role",
+      "careslink_v1_preview_receipt_executor",
+      "careslink_v1_preview_receipt_caller",
+      "careslink_v1_preview_dispatch_caller",
+    ]) {
+      expect(
+        acceptedUsageStatement(
+          "revoke all on function careslink_v1_generation.persist_verified_communication_note_preview_runner_terminal(",
+        ),
+      ).toContain(role);
+    }
+  });
+
+  it("requires exact nine-key usage and binds a six-fact receipt projection", () => {
+    const body = acceptedUsageFunctionBody(
+      "persist_verified_communication_note_preview_runner_terminal",
+    );
+    for (const key of [
+      "cachedinputtokens",
+      "cachedinputtokensreconciliation",
+      "inputtokens",
+      "outputtokens",
+      "reasoningtokens",
+      "reasoningtokensreconciliation",
+      "source",
+      "totaltokens",
+      "totaltokensreconciliation",
+    ]) {
+      expect(body).toContain(`'${key}'`);
+    }
+    expect(body).toContain("'reported','calculated'");
+    expect(body).toContain("'reported','assumed_zero'");
+    expect(body).toContain("'reported','unavailable'");
+    expect(body).toContain("<> 'assumed_zero'");
+    expect(body).toContain("= 'unavailable'");
+    expect(body).toContain(
+      "(p_statement->'usage') - array[ 'totaltokensreconciliation', 'cachedinputtokensreconciliation', 'reasoningtokensreconciliation' ]::text[]",
+    );
+    expect(body).toContain(") is distinct from v_receipt.usage");
+    expect(body).not.toContain(
+      "p_statement->'usage' is distinct from v_receipt.usage",
+    );
+    expect(body).toContain("v_receipt.outcome <> 'completed'");
+    expect(body).toContain("runner_terminal_binding_invalid");
+    expect(body).toContain("v_existing.statement is not distinct from p_statement");
+  });
+
+  it("adds no runtime, API, credential, network or activation surface", () => {
+    expect(acceptedUsageMigration).not.toMatch(
+      /(?:https?:\/\/|process\.env|service_role\s+to|\bpassword\b|\blogin\b)/i,
+    );
+    expect(acceptedUsageMigration).not.toMatch(
+      /grant\s+execute[\s\S]{0,240}\b(?:anon|authenticated|service_role)\b/i,
+    );
+  });
+});
+
 function normalizeSql(value: string) {
   return value.replace(/--[^\n]*/g, " ").replace(/\s+/g, " ").trim().toLowerCase();
 }
@@ -524,6 +639,22 @@ function signedFunctionBody(name: string) {
   return signedNormalized.slice(start, end + 3);
 }
 
+function acceptedUsageFunctionBody(name: string) {
+  const start = acceptedUsageNormalized.indexOf(
+    `create or replace function careslink_v1_generation.${name}`,
+  );
+  expect(
+    start,
+    `${name} is missing from ACCEPTED usage migration`,
+  ).toBeGreaterThanOrEqual(0);
+  const end = acceptedUsageNormalized.indexOf("$$;", start);
+  expect(
+    end,
+    `${name} terminator is missing from ACCEPTED usage migration`,
+  ).toBeGreaterThan(start);
+  return acceptedUsageNormalized.slice(start, end + 3);
+}
+
 function statement(prefix: string) {
   const normalizedPrefix = normalizeSql(prefix);
   const start = normalized.lastIndexOf(normalizedPrefix);
@@ -540,6 +671,17 @@ function signedStatement(prefix: string) {
   );
   const end = signedNormalized.indexOf(";", start);
   return signedNormalized.slice(start, end + 1);
+}
+
+function acceptedUsageStatement(prefix: string) {
+  const normalizedPrefix = normalizeSql(prefix);
+  const start = acceptedUsageNormalized.lastIndexOf(normalizedPrefix);
+  expect(
+    start,
+    `${prefix} is missing from ACCEPTED usage migration`,
+  ).toBeGreaterThanOrEqual(0);
+  const end = acceptedUsageNormalized.indexOf(";", start);
+  return acceptedUsageNormalized.slice(start, end + 1);
 }
 
 function block(startText: string, endText: string) {

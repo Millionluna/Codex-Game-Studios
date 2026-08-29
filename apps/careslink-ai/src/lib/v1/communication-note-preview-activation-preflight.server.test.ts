@@ -65,17 +65,17 @@ vi.mock("server-only", () => ({}));
 
 const NOW = "2026-08-28T02:00:00.000Z";
 
-describe("Communication Note M1g-g activation preflight", () => {
+describe("Communication Note M1g-i activation preflight", () => {
   it("literal-pins a source-only policy while preserving all existing readiness and approval latches", () => {
     expect(
       CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_ACTIVATION_PREFLIGHT_VERSION,
     ).toBe(
-      "preflight.communication.openai.synthetic-preview.2026-08-29.m1g-g.v3",
+      "preflight.communication.openai.synthetic-preview.2026-08-29.m1g-i.v4",
     );
     expect(
       CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_ACTIVATION_PREFLIGHT_POLICY_DIGEST,
     ).toBe(
-      "491481513a67198cba91babc3c172fc1f326f9ee7bdd883b3d1208c639bdaf73",
+      "a97241fafb4392b3a192be05842b619fc659b0e3026ce7f2cf37410ac2c8c22c",
     );
     expect(
       CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_ACTIVATION_PREFLIGHT_POLICY,
@@ -225,7 +225,7 @@ describe("Communication Note M1g-g activation preflight", () => {
     }
   });
 
-  it("pins the exact 38-migration manifest and seven M1g-b/M1g-c/M1g-f/M1g-g database artifacts", () => {
+  it("pins the exact 39-migration manifest and eight M1g-b through M1g-i database artifacts", () => {
     const migrationsDirectory = join(process.cwd(), "supabase/migrations");
     const migrationNames = readdirSync(migrationsDirectory)
       .filter((name) => name.endsWith(".sql"))
@@ -281,6 +281,11 @@ describe("Communication Note M1g-g activation preflight", () => {
         "supabase/migrations/20260829011323_add_communication_note_preview_signed_terminal_caller_shadow.sql",
         CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_DATABASE_EVIDENCE_PINS
           .signedRunnerTerminalMigrationSha256,
+      ],
+      [
+        "supabase/migrations/20260829041316_align_communication_note_preview_terminal_accepted_usage.sql",
+        CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_DATABASE_EVIDENCE_PINS
+          .runnerTerminalAcceptedUsageMigrationSha256,
       ],
       [
         "supabase/assertions/communication_note_preview_runner_terminal_shadow_assertions.sql",
@@ -523,6 +528,13 @@ describe("Communication Note M1g-g activation preflight", () => {
         (
           candidate.database as { signedRunnerTerminalMigrationSha256: string }
         ).signedRunnerTerminalMigrationSha256 = hex("f");
+      },
+      (candidate) => {
+        (
+          candidate.database as {
+            runnerTerminalAcceptedUsageMigrationSha256: string;
+          }
+        ).runnerTerminalAcceptedUsageMigrationSha256 = hex("f");
       },
       (candidate) => {
         (

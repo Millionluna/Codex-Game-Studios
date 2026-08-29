@@ -1,14 +1,18 @@
+import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
 import {
   COMMUNICATION_NOTE_PREVIEW_SCHEMA_ROLLBACK_ASSERTION_ERROR_CODES as ERRORS,
   COMMUNICATION_NOTE_PREVIEW_SCHEMA_ROLLBACK_ASSERTION_POLICY as POLICY,
+  COMMUNICATION_NOTE_PREVIEW_SCHEMA_ROLLBACK_ASSERTION_STAGE_CODES as STAGES,
   CommunicationNotePreviewSchemaRollbackAssertionError,
   assertCommunicationNotePreviewAssertionTls,
   connectCommunicationNotePreviewAssertionAdmin,
+  formatCommunicationNotePreviewSchemaRollbackAssertionFailure,
   loadCommunicationNotePreviewRollbackAssertions,
   normalizeCommunicationNotePreviewRollbackAssertionSql,
   readCommunicationNotePreviewPinnedCa,
@@ -22,6 +26,26 @@ const RUNNER_URL = new URL(
   "./communication-note-preview-schema-rollback-assertions.mjs",
   import.meta.url,
 );
+const EXPECTED_ASSERTION_STAGE_MAPPING = Object.freeze([
+  ["A01", "communication_note_preview_custody_callers_shadow_assertions.sql"],
+  ["A02", "communication_note_preview_execution_authority_shadow_assertions.sql"],
+  ["A03", "communication_note_preview_runner_terminal_shadow_assertions.sql"],
+  ["A04", "v1_note_generation_durable_foundation_assertions.sql"],
+  ["A05", "v1_note_generation_owner_runtime_rpc_shadow_assertions.sql"],
+  ["A06", "v1_note_generation_registration_retirement_shadow_assertions.sql"],
+  ["A07", "v1_note_generation_worker_rpc_shadow_assertions.sql"],
+  ["A08", "migration_entry_role_restore_assertions.sql"],
+  ["A09", "portal_referral_assignment_runtime_assertions.sql"],
+  ["A10", "portal_referral_follow_up_runtime_assertions.sql"],
+  ["A11", "portal_referral_intake_runtime_assertions.sql"],
+  ["A12", "portal_referral_provider_response_runtime_assertions.sql"],
+  ["A13", "portal_referral_source_detail_runtime_assertions.sql"],
+  ["A14", "portal_referral_workflow_foundation_assertions.sql"],
+  ["A15", "v1_mobile_sync_shadow_assertions.sql"],
+  ["A16", "v1_ndis_shadow_integration_assertions.sql"],
+  ["A17", "v1_privacy_review_shadow_assertions.sql"],
+  ["A18", "v1_shadow_contract_assertions.sql"],
+]);
 
 function candidates() {
   return Object.freeze({
@@ -80,6 +104,7 @@ function rollbackBundleWithMigrationEntryRole() {
     manifestSha256: POLICY.manifestSha256,
     scripts: Object.freeze(Array.from({ length: 18 }, (_, index) =>
       Object.freeze({
+        stage: STAGES.assertions[index],
         sql: `ASSERTION_SCRIPT_${index}`,
         migrationEntryRole: index === 7,
       }))),
@@ -261,7 +286,12 @@ function createAssertionCommitLossClient({ reconnectFails = false } = {}) {
   return { FakeClient, instances, reconnectEvents, state };
 }
 
-function createAssertionCleanupReconnectSuccessClient() {
+function createAssertionCleanupReconnectSuccessClient({
+  assertionFailureIndex = null,
+  rollbackFailure = false,
+  transportConnectionFailure = false,
+  transportTimeoutFailure = false,
+} = {}) {
   const state = {
     transportPresent: false,
     actorPresent: false,
@@ -292,7 +322,17 @@ function createAssertionCleanupReconnectSuccessClient() {
       return this;
     }
 
-    async connect() {}
+    async connect() {
+      if (transportConnectionFailure && this.isTransport) {
+        throw Object.assign(
+          new Error(`${SECRET}: transport driver message`),
+          {
+            code: "28P01",
+            branchJson: `{\"password\":\"${SECRET}\"}`,
+          },
+        );
+      }
+    }
 
     async end() {}
 
@@ -303,6 +343,37 @@ function createAssertionCleanupReconnectSuccessClient() {
         throw Object.assign(new Error("fixed damaged admin"), {
           code: "ECONNRESET",
         });
+      }
+
+      if (
+        transportTimeoutFailure &&
+        this.isTransport &&
+        normalized === "set statement_timeout = '120s'"
+      ) {
+        throw Object.assign(
+          new Error(`${SECRET}: transport timeout driver message`),
+          { code: "57014" },
+        );
+      }
+
+      if (
+        assertionFailureIndex !== null &&
+        sql === `ASSERTION_SCRIPT_${assertionFailureIndex}`
+      ) {
+        throw Object.assign(
+          new Error(`${SECRET}: assertion driver message`),
+          {
+            code: "XX000",
+            path: "/private/assertion/path-never-output.sql",
+            query: sql,
+          },
+        );
+      }
+      if (rollbackFailure && normalized === "rollback") {
+        throw Object.assign(
+          new Error(`${SECRET}: rollback driver message`),
+          { code: "08006" },
+        );
       }
 
       if (this.instanceIndex === 2) {
@@ -455,15 +526,53 @@ function expectFixedCode(operation, code) {
   throw new Error(`Expected ${code}`);
 }
 
+function runAssertionsWithClient(Client) {
+  return runCommunicationNotePreviewSchemaRollbackAssertions({
+    Client,
+    connectionCandidates: candidates(),
+    sslRootCertificate: CA,
+    expectedBranchRef: BRANCH_REF,
+    expectedPostgresMajor: 17,
+    assertionBundle: rollbackBundleWithMigrationEntryRole(),
+    roleNonce: "0123456789abcdef",
+    rolePassword: "r".repeat(43),
+  });
+}
+
+async function captureFailure(promise) {
+  try {
+    await promise;
+  } catch (error) {
+    return error;
+  }
+  throw new Error("Expected assertion runner failure");
+}
+
 describe("Communication Note Preview schema rollback assertion runner", () => {
   it("pins the exact 18-file rollback manifest", async () => {
-    const bundle = await loadCommunicationNotePreviewRollbackAssertions();
+    const loadedBasenames = [];
+    const bundle = await loadCommunicationNotePreviewRollbackAssertions(
+      async (url, encoding) => {
+        loadedBasenames.push(fileURLToPath(url).split("/").at(-1));
+        return readFile(url, encoding);
+      },
+    );
     expect(bundle).toMatchObject({
       fileCount: 18,
       manifestSha256:
-        "163ddd40e68f8c2accc8904c4b7165c6630ba8fdad58b54a674d4f27908273f1",
+        "36c0f94448d4a53a19f94540f5d6685c3678ad29019e42b6b0b7b97fdc41d833",
     });
     expect(bundle.scripts).toHaveLength(18);
+    expect(STAGES).toEqual({
+      runner: "R00",
+      assertions: EXPECTED_ASSERTION_STAGE_MAPPING.map(([stage]) => stage),
+    });
+    expect(
+      bundle.scripts.map((script, index) => [
+        script.stage,
+        loadedBasenames[index],
+      ]),
+    ).toEqual(EXPECTED_ASSERTION_STAGE_MAPPING);
     expect(
       bundle.scripts.filter((script) => script.migrationEntryRole),
     ).toHaveLength(1);
@@ -495,6 +604,7 @@ describe("Communication Note Preview schema rollback assertion runner", () => {
     await expect(
       loadCommunicationNotePreviewRollbackAssertions(driftingReader),
     ).rejects.toMatchObject({
+      stage: "A01",
       code: ERRORS.manifestFailed,
       message: ERRORS.manifestFailed,
     });
@@ -636,10 +746,10 @@ describe("Communication Note Preview schema rollback assertion runner", () => {
   it("keeps the CLI contract and successful stdout evidence minimal", async () => {
     const source = await readFile(RUNNER_URL, "utf8");
     expect(POLICY).toEqual({
-      version: "2026-08-29.preview-schema-rollback-assertions.1",
+      version: "2026-08-29.preview-schema-rollback-assertions.2",
       fileCount: 18,
       manifestSha256:
-        "163ddd40e68f8c2accc8904c4b7165c6630ba8fdad58b54a674d4f27908273f1",
+        "36c0f94448d4a53a19f94540f5d6685c3678ad29019e42b6b0b7b97fdc41d833",
       applicationName: "careslink-preview-schema-rollback-assertions",
       transportRolePrefix: "careslink_m1gh_assert_transport_",
       actorRolePrefix: "careslink_m1gh_assert_actor_",
@@ -658,6 +768,150 @@ describe("Communication Note Preview schema rollback assertion runner", () => {
         "unsafe-driver-detail",
       ).message,
     ).toBe(ERRORS.internalFailed);
+    const poisoned = new CommunicationNotePreviewSchemaRollbackAssertionError(
+      ERRORS.assertionFailed,
+      "A01",
+    );
+    poisoned.code = SECRET;
+    poisoned.stage = SECRET;
+    expect(
+      formatCommunicationNotePreviewSchemaRollbackAssertionFailure(poisoned),
+    ).toBe(
+      `{"stage":"R00","errorType":"${ERRORS.internalFailed}"}`,
+    );
+    expect(
+      JSON.stringify({
+        fileCount: 18,
+        manifestSha256: POLICY.manifestSha256,
+        passedCount: 18,
+      }),
+    ).toBe(
+      `{"fileCount":18,"manifestSha256":"${POLICY.manifestSha256}","passedCount":18}`,
+    );
+  });
+
+  it("emits exactly one fixed runner-stage JSON line without input disclosure", () => {
+    const cli = spawnSync(
+      process.execPath,
+      [
+        fileURLToPath(RUNNER_URL),
+        `--expected-branch-ref=${BRANCH_REF}`,
+        "--expected-pg-major=17",
+        `--ssl-root-cert-path=/private/${SECRET}.pem`,
+        `--expected-ssl-root-cert-sha256=${"0".repeat(64)}`,
+      ],
+      {
+        encoding: "utf8",
+        env: { PATH: process.env.PATH ?? "" },
+        input: JSON.stringify({ branchJson: SECRET }),
+      },
+    );
+    expect(cli.status).toBe(1);
+    expect(cli.signal).toBeNull();
+    expect(cli.stdout).toBe("");
+    expect(cli.stderr).toBe(
+      '{"stage":"R00","errorType":"RUNNER_TERMINAL_IDENTITY_BRANCH_JSON_INVALID"}\n',
+    );
+    expect(cli.stderr.trim().split("\n")).toHaveLength(1);
+    for (const forbidden of [
+      SECRET,
+      "/private/",
+      "branchJson",
+      "password",
+      "SQLSTATE",
+    ]) {
+      expect(cli.stderr).not.toContain(forbidden);
+    }
+  });
+
+  it("binds A08 transport, timeout, and SQL failures to one safe stage", async () => {
+    const transport = createAssertionCleanupReconnectSuccessClient({
+      transportConnectionFailure: true,
+    });
+    const transportFailure = await captureFailure(
+      runAssertionsWithClient(transport.FakeClient),
+    );
+    expect(transportFailure).toMatchObject({
+      stage: "A08",
+      code: ERRORS.roleConnectionFailed,
+      message: ERRORS.roleConnectionFailed,
+    });
+
+    const timeout = createAssertionCleanupReconnectSuccessClient({
+      transportTimeoutFailure: true,
+    });
+    const timeoutFailure = await captureFailure(
+      runAssertionsWithClient(timeout.FakeClient),
+    );
+    expect(timeoutFailure).toMatchObject({
+      stage: "A08",
+      code: ERRORS.targetFailed,
+      message: ERRORS.targetFailed,
+    });
+
+    const assertion = createAssertionCleanupReconnectSuccessClient({
+      assertionFailureIndex: 7,
+    });
+    const assertionFailure = await captureFailure(
+      runAssertionsWithClient(assertion.FakeClient),
+    );
+    expect(assertionFailure).toMatchObject({
+      stage: "A08",
+      code: ERRORS.assertionFailed,
+      message: ERRORS.assertionFailed,
+    });
+
+    expect(
+      formatCommunicationNotePreviewSchemaRollbackAssertionFailure(
+        transportFailure,
+      ),
+    ).toBe(
+      `{"stage":"A08","errorType":"${ERRORS.roleConnectionFailed}"}`,
+    );
+    expect(
+      formatCommunicationNotePreviewSchemaRollbackAssertionFailure(
+        timeoutFailure,
+      ),
+    ).toBe(`{"stage":"A08","errorType":"${ERRORS.targetFailed}"}`);
+    const renderedAssertion =
+      formatCommunicationNotePreviewSchemaRollbackAssertionFailure(
+        assertionFailure,
+      );
+    expect(renderedAssertion).toBe(
+      `{"stage":"A08","errorType":"${ERRORS.assertionFailed}"}`,
+    );
+    for (const forbidden of [
+      SECRET,
+      "XX000",
+      "28P01",
+      "57014",
+      "ASSERTION_SCRIPT_7",
+      "/private/assertion/",
+      "branchJson",
+      "driver message",
+    ]) {
+      expect(renderedAssertion).not.toContain(forbidden);
+    }
+  });
+
+  it("keeps rollback failure precedence within the fixed assertion stage", async () => {
+    const fake = createAssertionCleanupReconnectSuccessClient({
+      assertionFailureIndex: 2,
+      rollbackFailure: true,
+    });
+    const failure = await captureFailure(
+      runAssertionsWithClient(fake.FakeClient),
+    );
+    expect(failure).toMatchObject({
+      stage: "A03",
+      code: ERRORS.rollbackFailed,
+      message: ERRORS.rollbackFailed,
+    });
+    expect(
+      formatCommunicationNotePreviewSchemaRollbackAssertionFailure(failure),
+    ).toBe(
+      `{"stage":"A03","errorType":"${ERRORS.rollbackFailed}"}`,
+    );
   });
 
   it("reconnects once to remove roles committed before the setup response was lost", async () => {
@@ -674,6 +928,7 @@ describe("Communication Note Preview schema rollback assertion runner", () => {
         rolePassword: "r".repeat(43),
       }),
     ).rejects.toMatchObject({
+      stage: "A08",
       code: ERRORS.roleSetupFailed,
       message: ERRORS.roleSetupFailed,
     });
@@ -732,7 +987,7 @@ describe("Communication Note Preview schema rollback assertion runner", () => {
 
   it("returns only the fixed cleanup code when the one reconnect cannot clean up", async () => {
     const fake = createAssertionCommitLossClient({ reconnectFails: true });
-    await expect(
+    const failure = await captureFailure(
       runCommunicationNotePreviewSchemaRollbackAssertions({
         Client: fake.FakeClient,
         connectionCandidates: candidates(),
@@ -743,10 +998,17 @@ describe("Communication Note Preview schema rollback assertion runner", () => {
         roleNonce: "0123456789abcdef",
         rolePassword: "r".repeat(43),
       }),
-    ).rejects.toMatchObject({
+    );
+    expect(failure).toMatchObject({
+      stage: "A08",
       code: ERRORS.roleCleanupFailed,
       message: ERRORS.roleCleanupFailed,
     });
+    expect(
+      formatCommunicationNotePreviewSchemaRollbackAssertionFailure(failure),
+    ).toBe(
+      `{"stage":"A08","errorType":"${ERRORS.roleCleanupFailed}"}`,
+    );
     expect(fake.instances).toHaveLength(2);
     expect(fake.state.transportPresent).toBe(true);
     expect(fake.state.actorPresent).toBe(true);

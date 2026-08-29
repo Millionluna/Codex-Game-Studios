@@ -457,7 +457,15 @@ begin
     or v_definition !~* 'HUMAN_SEMANTIC_GROUNDEDNESS'
     or v_definition !~* 'UNATTESTED_NO_SHARED_IDENTIFIER'
     or v_definition !~* 'receiptSignatureSha256'
-    or v_definition !~* 'p_statement->''usage'' is distinct from v_receipt.usage'
+    or v_definition !~* 'totalTokensReconciliation'
+    or v_definition !~* 'cachedInputTokensReconciliation'
+    or v_definition !~* 'reasoningTokensReconciliation'
+    or v_definition !~* '-[[:space:]]*array\['
+    or v_definition !~* 'is distinct from v_receipt.usage'
+    or v_definition ~* (
+      'p_statement->''usage''[[:space:]]+' ||
+      'is distinct from v_receipt.usage'
+    )
   then
     raise exception 'M1g-g signed terminal RPC contract drifted';
   end if;
@@ -743,7 +751,11 @@ begin
     'preflightInputTokens',120,
     'providerRequestIdHash',repeat('0',63)||'c',
     'candidateDigest',repeat('0',63)||'d',
-    'usage',s.receipt_usage,'calculatedCostUpperBoundMicroUsd',s.receipt_cost,
+    'usage',s.receipt_usage || jsonb_build_object(
+      'totalTokensReconciliation','REPORTED',
+      'cachedInputTokensReconciliation','REPORTED',
+      'reasoningTokensReconciliation','REPORTED'
+    ),'calculatedCostUpperBoundMicroUsd',s.receipt_cost,
     'criticalChecks',jsonb_build_object('STRICT_SCHEMA',true,'SHARED_OUTPUT_PRIVACY',true,'DATE_TIME_PARITY',true,'NUMERIC_PARITY',true,'DECISION_LANGUAGE',true,'REFUSAL_ABSENT',true,'HUMAN_SEMANTIC_GROUNDEDNESS',true),
     'humanReviews',jsonb_build_array(jsonb_build_object('locale','en','passed',true),jsonb_build_object('locale','zh-Hans','passed',true),jsonb_build_object('locale','zh-Hant','passed',true)),
     'receiptProviderCorrelation','UNATTESTED_NO_SHARED_IDENTIFIER',
@@ -784,7 +796,82 @@ begin
     raise exception 'string-as-number terminal evidence did not fail validation: %',m;
   end if;
 
-  bad := jsonb_set(st,'{usage,inputTokens}',to_jsonb(121),false);
+  bad := jsonb_set(st,'{usage}',s.receipt_usage,false);
+  rejected:=false; begin
+    perform careslink_v1_generation.persist_verified_communication_note_preview_runner_terminal(
+      bad,repeat('E',86),repeat('0',63)||'a');
+    raise exception 'ASSERTION_EXPECTED_REJECTION';
+  exception when others then get stacked diagnostics m=message_text; rejected:=m<>'ASSERTION_EXPECTED_REJECTION'; end;
+  if not rejected or m is distinct from 'VALIDATION_ERROR' then
+    raise exception 'six-key terminal usage did not fail validation: %',m;
+  end if;
+
+  bad := jsonb_set(
+    st,'{usage}',(st->'usage') - 'totalTokensReconciliation',false
+  );
+  rejected:=false; begin
+    perform careslink_v1_generation.persist_verified_communication_note_preview_runner_terminal(
+      bad,repeat('E',86),repeat('0',63)||'a');
+    raise exception 'ASSERTION_EXPECTED_REJECTION';
+  exception when others then get stacked diagnostics m=message_text; rejected:=m<>'ASSERTION_EXPECTED_REJECTION'; end;
+  if not rejected or m is distinct from 'VALIDATION_ERROR' then
+    raise exception 'missing usage reconciliation did not fail validation: %',m;
+  end if;
+
+  bad := jsonb_set(
+    st,'{usage}',(st->'usage') || jsonb_build_object('unexpected',true),false
+  );
+  rejected:=false; begin
+    perform careslink_v1_generation.persist_verified_communication_note_preview_runner_terminal(
+      bad,repeat('E',86),repeat('0',63)||'a');
+    raise exception 'ASSERTION_EXPECTED_REJECTION';
+  exception when others then get stacked diagnostics m=message_text; rejected:=m<>'ASSERTION_EXPECTED_REJECTION'; end;
+  if not rejected or m is distinct from 'VALIDATION_ERROR' then
+    raise exception 'extra terminal usage key did not fail validation: %',m;
+  end if;
+
+  bad := jsonb_set(
+    st,'{usage,totalTokensReconciliation}',to_jsonb('ASSUMED'::text),false
+  );
+  rejected:=false; begin
+    perform careslink_v1_generation.persist_verified_communication_note_preview_runner_terminal(
+      bad,repeat('E',86),repeat('0',63)||'a');
+    raise exception 'ASSERTION_EXPECTED_REJECTION';
+  exception when others then get stacked diagnostics m=message_text; rejected:=m<>'ASSERTION_EXPECTED_REJECTION'; end;
+  if not rejected or m is distinct from 'VALIDATION_ERROR' then
+    raise exception 'invalid usage reconciliation did not fail validation: %',m;
+  end if;
+
+  bad := jsonb_set(
+    st,'{usage,cachedInputTokensReconciliation}',
+    to_jsonb('ASSUMED_ZERO'::text),false
+  );
+  rejected:=false; begin
+    perform careslink_v1_generation.persist_verified_communication_note_preview_runner_terminal(
+      bad,repeat('E',86),repeat('0',63)||'a');
+    raise exception 'ASSERTION_EXPECTED_REJECTION';
+  exception when others then get stacked diagnostics m=message_text; rejected:=m<>'ASSERTION_EXPECTED_REJECTION'; end;
+  if not rejected or m is distinct from 'VALIDATION_ERROR' then
+    raise exception 'assumed-zero cached usage did not fail validation: %',m;
+  end if;
+
+  bad := jsonb_set(
+    st,'{usage,reasoningTokensReconciliation}',
+    to_jsonb('UNAVAILABLE'::text),false
+  );
+  rejected:=false; begin
+    perform careslink_v1_generation.persist_verified_communication_note_preview_runner_terminal(
+      bad,repeat('E',86),repeat('0',63)||'a');
+    raise exception 'ASSERTION_EXPECTED_REJECTION';
+  exception when others then get stacked diagnostics m=message_text; rejected:=m<>'ASSERTION_EXPECTED_REJECTION'; end;
+  if not rejected or m is distinct from 'VALIDATION_ERROR' then
+    raise exception 'unavailable reasoning usage did not fail validation: %',m;
+  end if;
+
+  bad := jsonb_set(
+    jsonb_set(st,'{usage,inputTokens}',to_jsonb(121),false),
+    '{usage,totalTokens}',to_jsonb(201),false
+  );
   rejected:=false; begin
     perform careslink_v1_generation.persist_verified_communication_note_preview_runner_terminal(
       bad,repeat('E',86),repeat('0',63)||'a');
@@ -852,7 +939,12 @@ begin
     'requestBodySha256','98d37d028c742a2e05d079a38e0d6b27fb1fe91a71d397a4bdc9ed607af45213',
     'requestBodyUtf8ByteLength',2522,'semanticCanonicalRequestSha256','f404c8f239c20b49a40836a371e928dd6241e95dca598ae8661193443c7c6a68',
     'receiptSignatureSha256',s.receipt_signature_sha256,'fixtureDigest',repeat('8',64),'preflightInputTokens',120,
-    'providerRequestIdHash',repeat('9',64),'candidateDigest',repeat('a',64),'usage',s.receipt_usage,
+    'providerRequestIdHash',repeat('9',64),'candidateDigest',repeat('a',64),
+    'usage',s.receipt_usage || jsonb_build_object(
+      'totalTokensReconciliation','REPORTED',
+      'cachedInputTokensReconciliation','REPORTED',
+      'reasoningTokensReconciliation','REPORTED'
+    ),
     'calculatedCostUpperBoundMicroUsd',s.receipt_cost,
     'criticalChecks',jsonb_build_object('STRICT_SCHEMA',true,'SHARED_OUTPUT_PRIVACY',true,'DATE_TIME_PARITY',true,'NUMERIC_PARITY',true,'DECISION_LANGUAGE',true,'REFUSAL_ABSENT',true,'HUMAN_SEMANTIC_GROUNDEDNESS',true),
     'humanReviews',jsonb_build_array(jsonb_build_object('locale','en','passed',true),jsonb_build_object('locale','zh-Hans','passed',true),jsonb_build_object('locale','zh-Hant','passed',true)),
@@ -887,6 +979,13 @@ begin
     or t.signer_public_key_sha256 is distinct from repeat('0',63)||'9'
     or t.authenticity is distinct from 'EXTERNAL_RUNNER_TERMINAL_ED25519_VERIFIED'
     or t.verifier_method is distinct from 'APPLICATION_ED25519_TERMINAL_TRUST_REGISTRY'
+    or t.statement->'usage' is distinct from (
+      s.receipt_usage || jsonb_build_object(
+        'totalTokensReconciliation','REPORTED',
+        'cachedInputTokensReconciliation','REPORTED',
+        'reasoningTokensReconciliation','REPORTED'
+      )
+    )
   then
     raise exception 'signed terminal evidence was not stored exactly';
   end if;

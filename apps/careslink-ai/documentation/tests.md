@@ -2437,6 +2437,36 @@ confirmation and authorization after a fixed, content-free per-file diagnostic
 and PostgreSQL 17 regression close the rollback failure. No provider/model call,
 real data, deployment, Production write, push, merge or activation occurred.
 
+### Communication Note terminal ACCEPTED usage alignment gate M1g-i — 2026-08-29
+
+M1g-i is an additive successor to the historical M1g-h gate. Migration 38 and
+the failed Hosted M1g-h record remain unchanged. New migration
+`20260829041316_align_communication_note_preview_terminal_accepted_usage.sql`
+keeps the exact nine-key signed terminal usage and compares an exact six-fact
+projection with the durable receipt.
+
+| Gate | Result |
+|---|---|
+| migration identity | 39 migrations; ordered basenames `2bd2f029c86e1f4231b9a3bee7ee8681cb086dcd29eaaaceff21efcc1fec1fda`; ordered entries `f488c36ea517b20881a08f365fc58287e053d60e629afff920ff7658cefca1d1` |
+| migration 39 | 26,255 bytes; SHA-256 `a97cfe86203500e3bb083c6fb7f5516974e6418cf7a0d3e1ca652a13f190422e`; one explicit transaction contains every temporary DDL capability and its revocation |
+| terminal assertion / rollback manifest | A03 SHA-256 `5324e0cdd9b97e8804385950c59c89b1b80e4c4215fd24b0ecf9e85c97a4c9bd`; fixed-stage 18-file manifest `36c0f94448d4a53a19f94540f5d6685c3678ad29019e42b6b0b7b97fdc41d833` |
+| ACCEPTED vectors | exact nine-key positive, exact replay and six-fact receipt projection passed; six-key source, missing/extra/invalid reconciliation, inconsistent `ASSUMED_ZERO`/`UNAVAILABLE` and receipt drift failed closed |
+| local database | disposable PostgreSQL 16.15 applied 39/39 and passed A01–A18; final summary was `{"postgres":"16.15 (Homebrew)","migrations":39,"rollbackAssertions":18,"terminalRoles":2}`; those two were the expected schema caller/executor, zero temporary assertion roles remained, and the cluster was removed |
+| application/static | 171 files / 2,296 tests; TypeScript; zero-warning ESLint; 73 adapter files; `git diff --check`; Next.js 16.2.9 Webpack build with 64/64 pages |
+| PostgreSQL 17 / Hosted | not run; no no-network PostgreSQL 17 runtime was locally available, and no new disposable Preview was authorized |
+
+The rollback runner now assigns `R00` to runner preflight and `A01`–`A18` to
+the fixed files. Every failure is one content-free JSON object with only
+`stage` and `errorType`; SQL, filenames, SQLSTATE, credentials, driver detail
+and branch metadata are excluded, and rollback failure retains priority.
+
+This closes the diagnosed source/local usage mismatch only. Hosted PostgreSQL
+17 rollback evidence, the one-time Hosted identity plus source-valid signed
+`ACCEPTED` E2E, live custody/credential resolvers and final activation approval
+remain open. Readiness remains false and no cloud write, model call, real data,
+deployment or Production change occurred. See the
+[M1g-i handoff](communication-note-preview-terminal-accepted-usage-m1g-i.md).
+
 ### Current live/read-only evidence
 
 - Supabase migrations, tables, RLS flags, policies, grants, function grants and aggregate row counts were checked read-only.

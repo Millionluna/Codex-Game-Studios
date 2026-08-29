@@ -247,6 +247,19 @@ cannot manufacture an approved trust registry, custody provenance, signing key,
 database identity or passing Hosted gate. Detailed boundaries are in
 `documentation/communication-note-preview-hosted-runner-terminal-identity-m1g-h.md`.
 
+Communication Note M1g-i adds no environment variable, secret name or
+`.env.example` entry. Its migration and fixed-stage rollback diagnostics change
+only the source/database contract and test evidence. The preflight version
+`preflight.communication.openai.synthetic-preview.2026-08-29.m1g-i.v4` with
+digest `a97241fafb4392b3a192be05842b619fc659b0e3026ce7f2cf37410ac2c8c22c`
+and coordinator version
+`coordinator.communication.openai.synthetic-preview.2026-08-29.m1g-i.v4` with
+digest `6a26e2104ebd8cecc55c638cdb2d9ec15b097630e90c0e19573addaa76fc5b2a`
+are source-integrity pins, not runtime configuration or approval. No
+environment value can replace the still-absent live trust/custody and caller
+credential resolvers. Readiness remains `false` and approved values remain
+`undefined`.
+
 ## Current auth, URL and feature variables
 
 | Variable | Class | Purpose | Boundary |

@@ -10,7 +10,7 @@ import {
 } from "./communication-note-preview-runner-terminal-identity-policy.mjs";
 
 const ASSERTION_MANIFEST_SHA256 =
-  "163ddd40e68f8c2accc8904c4b7165c6630ba8fdad58b54a674d4f27908273f1";
+  "36c0f94448d4a53a19f94540f5d6685c3678ad29019e42b6b0b7b97fdc41d833";
 const ASSERTION_APPLICATION_NAME =
   "careslink-preview-schema-rollback-assertions";
 const ASSERTION_TRANSPORT_ROLE_PREFIX =
@@ -18,6 +18,27 @@ const ASSERTION_TRANSPORT_ROLE_PREFIX =
 const ASSERTION_ACTOR_ROLE_PREFIX = "careslink_m1gh_assert_actor_";
 const ASSERTION_NONCE_PATTERN = /^[a-f0-9]{16}$/;
 const MAXIMUM_ASSERTION_BYTES = 2 * 1_024 * 1_024;
+const RUNNER_FAILURE_STAGE = "R00";
+const ASSERTION_STAGE_CODES = Object.freeze([
+  "A01",
+  "A02",
+  "A03",
+  "A04",
+  "A05",
+  "A06",
+  "A07",
+  "A08",
+  "A09",
+  "A10",
+  "A11",
+  "A12",
+  "A13",
+  "A14",
+  "A15",
+  "A16",
+  "A17",
+  "A18",
+]);
 const DIRECT_UNREACHABLE_CODES = new Set([
   "ECONNREFUSED",
   "EHOSTUNREACH",
@@ -28,83 +49,107 @@ const CLIENT_BACKGROUND_STATES = new WeakMap();
 
 const ASSERTION_MANIFEST = Object.freeze([
   Object.freeze({
+    stage: "A01",
     path: "supabase/assertions/communication_note_preview_custody_callers_shadow_assertions.sql",
     sha256: "7fa7fa9d4c9667005b36c1f72c95aaf2418131d05037b5ea347f83e0bfcf16d2",
   }),
   Object.freeze({
+    stage: "A02",
     path: "supabase/assertions/communication_note_preview_execution_authority_shadow_assertions.sql",
     sha256: "9b1e0088e7e39b81e248815e8ce6e939f29220830feda2d177ffd230892b39db",
   }),
   Object.freeze({
+    stage: "A03",
     path: "supabase/assertions/communication_note_preview_runner_terminal_shadow_assertions.sql",
-    sha256: "f8e8307718e3bdf0835b93cdac075279ae4f5ba3dbab287af46e1280ce587ad5",
+    sha256: "5324e0cdd9b97e8804385950c59c89b1b80e4c4215fd24b0ecf9e85c97a4c9bd",
   }),
   Object.freeze({
+    stage: "A04",
     path: "supabase/assertions/v1_note_generation_durable_foundation_assertions.sql",
     sha256: "b0c6b177ef012998fb6959e1499e360f668809ff61ad3d54d2731af7c8c9290e",
   }),
   Object.freeze({
+    stage: "A05",
     path: "supabase/assertions/v1_note_generation_owner_runtime_rpc_shadow_assertions.sql",
-    sha256: "065550a45b1b68a38c536d27a2a54a87cb73bae03567b05eda095a92b1448ef3",
+    sha256: "b699e5967fd487656dc34c398b61c464396b26d40d48fc1bfbe8c53f3c423a3b",
   }),
   Object.freeze({
+    stage: "A06",
     path: "supabase/assertions/v1_note_generation_registration_retirement_shadow_assertions.sql",
     sha256: "301da01ebbca2f4165579113c559c7a2e624919d703cb4c9b43b8bf2232ceb13",
   }),
   Object.freeze({
+    stage: "A07",
     path: "supabase/assertions/v1_note_generation_worker_rpc_shadow_assertions.sql",
-    sha256: "f44fd0dd2f2f7a32672d3c0603b48a67c466d6bfcc7441d36de8dd36a8901aa3",
+    sha256: "cbba8ad819cad206a4f94340e37ff1b593ee7944d01e5b7496fc13a9cc3748b0",
   }),
   Object.freeze({
+    stage: "A08",
     path: "supabase/tests/migration_entry_role_restore_assertions.sql",
     sha256: "6c1b4baa3dfc2e93932bf68deca470d0fe18f2c60213ddb78a78db7b178e5fd1",
     migrationEntryRole: true,
   }),
   Object.freeze({
+    stage: "A09",
     path: "supabase/tests/portal_referral_assignment_runtime_assertions.sql",
     sha256: "569c6f50899df1754be1cc4971328b3dfae4a766871941b83b4603bc867bcd9c",
   }),
   Object.freeze({
+    stage: "A10",
     path: "supabase/tests/portal_referral_follow_up_runtime_assertions.sql",
     sha256: "c68a71dd018d9e417a51e252dc6fb10a5c3e2a2687297705cee0da334bd7588e",
   }),
   Object.freeze({
+    stage: "A11",
     path: "supabase/tests/portal_referral_intake_runtime_assertions.sql",
     sha256: "0f991ec9962842d98f034e065b108a3914e19cc6ce4398673ee80b2b3513812b",
   }),
   Object.freeze({
+    stage: "A12",
     path: "supabase/tests/portal_referral_provider_response_runtime_assertions.sql",
     sha256: "b939a5f0e3e3536b4b245f48acc5d801b1ad64361ff89a2560e08065bc571f0c",
   }),
   Object.freeze({
+    stage: "A13",
     path: "supabase/tests/portal_referral_source_detail_runtime_assertions.sql",
     sha256: "2dc91eb69814a778d82a392d41c2d4aadc84a102b8df870a24db4bb41842dd98",
   }),
   Object.freeze({
+    stage: "A14",
     path: "supabase/tests/portal_referral_workflow_foundation_assertions.sql",
     sha256: "de4d4807981071bd70a18714c93bb90f2fea0cd5c29c814c22365598e1a1eabd",
   }),
   Object.freeze({
+    stage: "A15",
     path: "supabase/tests/v1_mobile_sync_shadow_assertions.sql",
     sha256: "a543edac38264d812a8949d756bebbc7fb0d7efac1cdd5d8c91cbc3d674ab577",
   }),
   Object.freeze({
+    stage: "A16",
     path: "supabase/tests/v1_ndis_shadow_integration_assertions.sql",
     sha256: "e620fdb066692bbfa3b998b7686cfc60cd307886b77d68a545b853975e7d3f14",
   }),
   Object.freeze({
+    stage: "A17",
     path: "supabase/tests/v1_privacy_review_shadow_assertions.sql",
     sha256: "84711b01bcd72a7a11a2bc573f8cbd63aecfc2986ca273dc24bb894754cd5bd3",
   }),
   Object.freeze({
+    stage: "A18",
     path: "supabase/tests/v1_shadow_contract_assertions.sql",
     sha256: "93dd91eac00a6a24c1fa1c7c4ec3bf03fb2508ab8c7bf8bab9f4c17a04f5b9cf",
   }),
 ]);
 
+export const COMMUNICATION_NOTE_PREVIEW_SCHEMA_ROLLBACK_ASSERTION_STAGE_CODES =
+  Object.freeze({
+    runner: RUNNER_FAILURE_STAGE,
+    assertions: ASSERTION_STAGE_CODES,
+  });
+
 export const COMMUNICATION_NOTE_PREVIEW_SCHEMA_ROLLBACK_ASSERTION_POLICY =
   Object.freeze({
-    version: "2026-08-29.preview-schema-rollback-assertions.1",
+    version: "2026-08-29.preview-schema-rollback-assertions.2",
     fileCount: ASSERTION_MANIFEST.length,
     manifestSha256: ASSERTION_MANIFEST_SHA256,
     applicationName: ASSERTION_APPLICATION_NAME,
@@ -136,25 +181,72 @@ const FIXED_ERROR_CODES = new Set(
     COMMUNICATION_NOTE_PREVIEW_SCHEMA_ROLLBACK_ASSERTION_ERROR_CODES,
   ),
 );
+const FIXED_IDENTITY_ERROR_CODES = new Set(Object.values(IDENTITY_ERRORS));
+const FIXED_FAILURE_STAGES = new Set([
+  RUNNER_FAILURE_STAGE,
+  ...ASSERTION_STAGE_CODES,
+]);
 
 export class CommunicationNotePreviewSchemaRollbackAssertionError extends Error {
-  constructor(code) {
+  constructor(code, stage = RUNNER_FAILURE_STAGE) {
     const fixedCode = FIXED_ERROR_CODES.has(code)
       ? code
       : COMMUNICATION_NOTE_PREVIEW_SCHEMA_ROLLBACK_ASSERTION_ERROR_CODES
           .internalFailed;
+    const fixedStage = FIXED_FAILURE_STAGES.has(stage)
+      ? stage
+      : RUNNER_FAILURE_STAGE;
     super(fixedCode);
     this.name = "CommunicationNotePreviewSchemaRollbackAssertionError";
     this.code = fixedCode;
+    this.stage = fixedStage;
   }
 }
 
-function fail(code) {
-  throw new CommunicationNotePreviewSchemaRollbackAssertionError(code);
+function fail(code, stage) {
+  throw new CommunicationNotePreviewSchemaRollbackAssertionError(code, stage);
 }
 
-function assert(condition, code) {
-  if (!condition) fail(code);
+function assert(condition, code, stage) {
+  if (!condition) fail(code, stage);
+}
+
+function errorAtAssertionStage(error, stage) {
+  const errorCode = safeOwnErrorCode(error);
+  return new CommunicationNotePreviewSchemaRollbackAssertionError(
+    error instanceof CommunicationNotePreviewSchemaRollbackAssertionError &&
+        FIXED_ERROR_CODES.has(errorCode)
+      ? errorCode
+      : COMMUNICATION_NOTE_PREVIEW_SCHEMA_ROLLBACK_ASSERTION_ERROR_CODES
+          .internalFailed,
+    stage,
+  );
+}
+
+export function formatCommunicationNotePreviewSchemaRollbackAssertionFailure(
+  error,
+) {
+  let stage = RUNNER_FAILURE_STAGE;
+  let errorType =
+    COMMUNICATION_NOTE_PREVIEW_SCHEMA_ROLLBACK_ASSERTION_ERROR_CODES
+      .internalFailed;
+  if (error instanceof CommunicationNotePreviewSchemaRollbackAssertionError) {
+    const errorStage = safeOwnErrorStage(error);
+    const errorCode = safeOwnErrorCode(error);
+    stage = FIXED_FAILURE_STAGES.has(errorStage)
+      ? errorStage
+      : RUNNER_FAILURE_STAGE;
+    errorType = FIXED_ERROR_CODES.has(errorCode)
+      ? errorCode
+      : COMMUNICATION_NOTE_PREVIEW_SCHEMA_ROLLBACK_ASSERTION_ERROR_CODES
+          .internalFailed;
+  } else if (
+    error instanceof CommunicationNotePreviewRunnerTerminalIdentityPolicyError
+  ) {
+    const errorCode = safeOwnErrorCode(error);
+    if (FIXED_IDENTITY_ERROR_CODES.has(errorCode)) errorType = errorCode;
+  }
+  return JSON.stringify({ stage, errorType });
 }
 
 function sha256(value) {
@@ -168,6 +260,15 @@ function basename(path) {
 function safeOwnErrorCode(error) {
   if (!error || typeof error !== "object") return "";
   const descriptor = Object.getOwnPropertyDescriptor(error, "code");
+  return descriptor && "value" in descriptor &&
+      typeof descriptor.value === "string"
+    ? descriptor.value
+    : "";
+}
+
+function safeOwnErrorStage(error) {
+  if (!error || typeof error !== "object") return "";
+  const descriptor = Object.getOwnPropertyDescriptor(error, "stage");
   return descriptor && "value" in descriptor &&
       typeof descriptor.value === "string"
     ? descriptor.value
@@ -242,7 +343,13 @@ export async function loadCommunicationNotePreviewRollbackAssertions(
   }
   const scripts = [];
   const manifestLines = [];
-  for (const entry of ASSERTION_MANIFEST) {
+  for (const [index, entry] of ASSERTION_MANIFEST.entries()) {
+    if (entry.stage !== ASSERTION_STAGE_CODES[index]) {
+      fail(
+        COMMUNICATION_NOTE_PREVIEW_SCHEMA_ROLLBACK_ASSERTION_ERROR_CODES
+          .manifestFailed,
+      );
+    }
     let raw;
     try {
       raw = await fileReader(
@@ -253,17 +360,26 @@ export async function loadCommunicationNotePreviewRollbackAssertions(
       fail(
         COMMUNICATION_NOTE_PREVIEW_SCHEMA_ROLLBACK_ASSERTION_ERROR_CODES
           .manifestFailed,
+        entry.stage,
       );
     }
     if (typeof raw !== "string" || sha256(raw) !== entry.sha256) {
       fail(
         COMMUNICATION_NOTE_PREVIEW_SCHEMA_ROLLBACK_ASSERTION_ERROR_CODES
           .manifestFailed,
+        entry.stage,
       );
     }
     manifestLines.push(`${basename(entry.path)}\t${entry.sha256}\n`);
+    let sql;
+    try {
+      sql = normalizeCommunicationNotePreviewRollbackAssertionSql(raw);
+    } catch (error) {
+      throw errorAtAssertionStage(error, entry.stage);
+    }
     scripts.push(Object.freeze({
-      sql: normalizeCommunicationNotePreviewRollbackAssertionSql(raw),
+      stage: entry.stage,
+      sql,
       migrationEntryRole: entry.migrationEntryRole === true,
     }));
   }
@@ -1127,7 +1243,10 @@ export async function runCommunicationNotePreviewSchemaRollbackAssertions({
     assertionBundle.fileCount !== 18 ||
     assertionBundle.manifestSha256 !== ASSERTION_MANIFEST_SHA256 ||
     !Array.isArray(assertionBundle.scripts) ||
-    assertionBundle.scripts.length !== 18
+    assertionBundle.scripts.length !== 18 ||
+    assertionBundle.scripts.some(
+      (script, index) => script?.stage !== ASSERTION_STAGE_CODES[index],
+    )
   ) {
     fail(
       COMMUNICATION_NOTE_PREVIEW_SCHEMA_ROLLBACK_ASSERTION_ERROR_CODES
@@ -1166,24 +1285,28 @@ export async function runCommunicationNotePreviewSchemaRollbackAssertions({
     const membershipBefore = await readMembershipSnapshot(admin);
 
     for (const script of assertionBundle.scripts) {
-      if (script.migrationEntryRole) {
-        admin = await runMigrationEntryRoleAssertion({
-          Client,
-          admin,
-          connectionCandidates,
-          candidate: connected.candidate,
-          sslRootCertificate,
-          expectedBranchRef,
-          expectedPostgresMajor,
-          sql: script.sql,
-          nonce: roleNonce,
-          password: rolePassword,
-        });
-      } else {
-        await runRollbackAssertion(admin, script.sql, {
-          currentUser,
-          sessionUser,
-        });
+      try {
+        if (script.migrationEntryRole) {
+          admin = await runMigrationEntryRoleAssertion({
+            Client,
+            admin,
+            connectionCandidates,
+            candidate: connected.candidate,
+            sslRootCertificate,
+            expectedBranchRef,
+            expectedPostgresMajor,
+            sql: script.sql,
+            nonce: roleNonce,
+            password: rolePassword,
+          });
+        } else {
+          await runRollbackAssertion(admin, script.sql, {
+            currentUser,
+            sessionUser,
+          });
+        }
+      } catch (error) {
+        throw errorAtAssertionStage(error, script.stage);
       }
       passedCount += 1;
     }
@@ -1287,13 +1410,9 @@ async function main() {
 
 if (import.meta.url === `file://${process.argv[1]}`) {
   main().catch((error) => {
-    const code =
-      error instanceof CommunicationNotePreviewSchemaRollbackAssertionError ||
-      error instanceof CommunicationNotePreviewRunnerTerminalIdentityPolicyError
-        ? error.code
-        : COMMUNICATION_NOTE_PREVIEW_SCHEMA_ROLLBACK_ASSERTION_ERROR_CODES
-            .internalFailed;
-    process.stderr.write(`${code}\n`);
+    process.stderr.write(
+      `${formatCommunicationNotePreviewSchemaRollbackAssertionFailure(error)}\n`,
+    );
     process.exitCode = 1;
   });
 }

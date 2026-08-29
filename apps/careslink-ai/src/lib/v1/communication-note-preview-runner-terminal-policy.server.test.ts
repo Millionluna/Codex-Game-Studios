@@ -133,6 +133,27 @@ describe("Communication Note M1g-g signed runner terminal policy", () => {
     expect(Object.isFrozen(verified.statement.usage)).toBe(true);
   });
 
+  it("rejects a re-signed ACCEPTED statement with receipt-only six-key usage", () => {
+    const fixture = createFixture();
+    const usage = fixture.statement.usage;
+    if (!usage) throw new Error("accepted fixture expected");
+    const statement = {
+      ...fixture.statement,
+      usage: {
+        source: usage.source,
+        inputTokens: usage.inputTokens,
+        outputTokens: usage.outputTokens,
+        totalTokens: usage.totalTokens,
+        cachedInputTokens: usage.cachedInputTokens,
+        reasoningTokens: usage.reasoningTokens,
+      },
+    };
+    expectInvalid(
+      signEnvelope(statement, fixture.privateKey),
+      fixture.trustedKey,
+    );
+  });
+
   it("accepts the exact FAILED null-evidence shape", () => {
     const fixture = createFixture("FAILED");
     expect(

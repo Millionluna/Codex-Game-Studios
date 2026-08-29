@@ -486,6 +486,25 @@ not grant a persistent Hosted identity or runtime permission. Readiness remains
 provider/model or real-data permission was added. Detailed evidence is in
 `documentation/communication-note-preview-hosted-runner-terminal-identity-m1g-h.md`.
 
+### Communication Note Preview terminal ACCEPTED usage alignment M1g-i (source/local only)
+
+M1g-i does not widen the M1g-g/M1g-h permission surface. The existing
+`careslink_v1_preview_runner_terminal_caller` retains only private-schema
+`USAGE` and exact execution of
+`persist_verified_communication_note_preview_runner_terminal(jsonb,text,text)`.
+The isolated executor remains the function owner; no API/service role, LOGIN,
+table privilege, broad function grant or caller-to-executor membership is
+added.
+
+Migration 39 temporarily gives the migration actor SET-only access to the
+generation owner and terminal executor, and gives the executor schema `CREATE`
+only long enough to replace its function. It revokes the schema privilege and
+both memberships before completion, then reasserts the exact function ACL.
+Local PostgreSQL 16.15 proved this final posture across 39/39 migrations and
+18/18 rollback assertions. PostgreSQL 17/Hosted identity and signed `ACCEPTED`
+E2E remain unproved, so no persistent identity or runtime permission may be
+inferred. Readiness and approval remain closed.
+
 ## Intended V1 matrix (partly codified, not available at runtime)
 
 | Target resource | Owner | Admin/support | Service/backend | Required control |
