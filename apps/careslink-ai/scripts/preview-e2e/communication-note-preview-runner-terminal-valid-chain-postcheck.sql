@@ -16,6 +16,8 @@ declare
     'careslink_v1_preview_runner_terminal_caller'
   );
   v_terminal careslink_v1_generation.communication_note_preview_runner_terminals%rowtype;
+  v_reservation careslink_v1_generation.communication_note_preview_dispatch_reservations%rowtype;
+  v_receipt careslink_v1_generation.communication_note_preview_dispatch_receipts%rowtype;
 begin
   if current_user <> 'postgres'
     or session_user <> 'postgres'
@@ -89,8 +91,16 @@ begin
   select terminal.* into strict v_terminal
   from careslink_v1_generation.communication_note_preview_runner_terminals
     as terminal;
-  if v_terminal.terminal_state is distinct from 'FAILED'
-    or v_terminal.failure_reason is distinct from 'CANCELLED'
+  select reservation.* into strict v_reservation
+  from careslink_v1_generation.communication_note_preview_dispatch_reservations
+    as reservation
+  where reservation.reservation_id = v_terminal.reservation_id;
+  select receipt.* into strict v_receipt
+  from careslink_v1_generation.communication_note_preview_dispatch_receipts
+    as receipt
+  where receipt.receipt_digest = v_terminal.receipt_digest;
+  if v_terminal.terminal_state is distinct from 'ACCEPTED'
+    or v_terminal.failure_reason is not null
     or v_terminal.authenticity is distinct from
       'EXTERNAL_RUNNER_TERMINAL_ED25519_VERIFIED'
     or v_terminal.verifier_method is distinct from
@@ -99,13 +109,68 @@ begin
     or v_terminal.signature_sha256 !~ '^[a-f0-9]{64}$'
     or v_terminal.signer_key_id_hash !~ '^[a-f0-9]{64}$'
     or v_terminal.signer_public_key_sha256 !~ '^[a-f0-9]{64}$'
-    or v_terminal.statement->>'state' is distinct from 'FAILED'
-    or v_terminal.statement->>'failureReason' is distinct from 'CANCELLED'
-    or v_terminal.statement->'usage' is distinct from 'null'::pg_catalog.jsonb
+    or v_terminal.statement->>'state' is distinct from 'ACCEPTED'
+    or v_terminal.statement->'failureReason' is distinct from
+      'null'::pg_catalog.jsonb
+    or v_terminal.statement->'usage' is distinct from
+      pg_catalog.jsonb_build_object(
+        'source', 'PROVIDER',
+        'inputTokens', 120,
+        'outputTokens', 80,
+        'totalTokens', 200,
+        'totalTokensReconciliation', 'REPORTED',
+        'cachedInputTokens', 20,
+        'cachedInputTokensReconciliation', 'REPORTED',
+        'reasoningTokens', 10,
+        'reasoningTokensReconciliation', 'REPORTED'
+      )
+    or (select pg_catalog.count(*) from pg_catalog.jsonb_object_keys(
+      v_terminal.statement->'usage'
+    )) <> 9
+    or (
+      (v_terminal.statement->'usage') - array[
+        'totalTokensReconciliation',
+        'cachedInputTokensReconciliation',
+        'reasoningTokensReconciliation'
+      ]::pg_catalog.text[]
+    ) is distinct from v_receipt.usage
     or v_terminal.statement->'criticalChecks' is distinct from
-      'null'::pg_catalog.jsonb
+      pg_catalog.jsonb_build_object(
+        'STRICT_SCHEMA', true,
+        'SHARED_OUTPUT_PRIVACY', true,
+        'DATE_TIME_PARITY', true,
+        'NUMERIC_PARITY', true,
+        'DECISION_LANGUAGE', true,
+        'REFUSAL_ABSENT', true,
+        'HUMAN_SEMANTIC_GROUNDEDNESS', true
+      )
     or v_terminal.statement->'humanReviews' is distinct from
-      'null'::pg_catalog.jsonb
+      pg_catalog.jsonb_build_array(
+        pg_catalog.jsonb_build_object('locale', 'en', 'passed', true),
+        pg_catalog.jsonb_build_object('locale', 'zh-Hans', 'passed', true),
+        pg_catalog.jsonb_build_object('locale', 'zh-Hant', 'passed', true)
+      )
+    or v_terminal.statement->>'receiptProviderCorrelation' is distinct from
+      'UNATTESTED_NO_SHARED_IDENTIFIER'
+    or v_terminal.statement->>'requestBodySha256' is distinct from
+      '98d37d028c742a2e05d079a38e0d6b27fb1fe91a71d397a4bdc9ed607af45213'
+    or v_terminal.statement->>'requestBodySha256' is distinct from
+      v_reservation.request_body_sha256
+    or v_terminal.statement->>'requestBodyUtf8ByteLength' is distinct from
+      '2522'
+    or (v_terminal.statement->>'requestBodyUtf8ByteLength')::pg_catalog.int4
+      is distinct from v_reservation.request_body_utf8_byte_length
+    or v_terminal.statement->>'semanticCanonicalRequestSha256' is distinct from
+      'f404c8f239c20b49a40836a371e928dd6241e95dca598ae8661193443c7c6a68'
+    or v_terminal.statement->>'semanticCanonicalRequestSha256' is distinct from
+      v_reservation.semantic_canonical_request_sha256
+    or v_terminal.statement->>'receiptSignatureSha256' is distinct from
+      v_receipt.signature_sha256
+    or v_terminal.statement->>'preflightInputTokens' is distinct from '128'
+    or v_terminal.statement->>'calculatedCostUpperBoundMicroUsd' is distinct
+      from '481'
+    or v_terminal.statement->'calculatedCostUpperBoundMicroUsd' is distinct
+      from pg_catalog.to_jsonb(v_receipt.calculated_cost_upper_bound_micro_usd)
     or not v_terminal.no_retry
     or not v_terminal.shadow_only
   then
@@ -207,7 +272,7 @@ begin
   begin
     update careslink_v1_generation.communication_note_preview_runner_terminals
     set recorded_at = recorded_at
-    where terminal_state = 'FAILED';
+    where terminal_state = 'ACCEPTED';
     raise exception 'RUNNER_TERMINAL_VALID_EXPECTED_APPEND_ONLY_REJECTION';
   exception when others then
     get stacked diagnostics v_message = message_text;

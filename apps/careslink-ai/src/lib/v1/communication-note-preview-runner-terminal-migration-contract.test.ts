@@ -571,6 +571,14 @@ describe("Communication Note M1g-i ACCEPTED usage alignment migration contract",
     const body = acceptedUsageFunctionBody(
       "persist_verified_communication_note_preview_runner_terminal",
     );
+    expect(
+      acceptedUsageMigration.match(
+        /pg_catalog\.array_agg\(\s*key\s+order\s+by\s+key\s+collate\s+"C"\s*\)/g,
+      ),
+    ).toHaveLength(2);
+    expect(acceptedUsageMigration).not.toMatch(
+      /pg_catalog\.array_agg\(\s*key\s+order\s+by\s+key\s*\)/,
+    );
     for (const key of [
       "cachedinputtokens",
       "cachedinputtokensreconciliation",

@@ -451,6 +451,7 @@ describe("V1 shadow runtime boundary", () => {
         process.cwd(),
         "src/lib/v1/communication-note-preview-reserve-before-dispatch-coordinator.server.test.ts",
       ),
+      hostedLiveTest,
       postgresModule,
       postgresTest,
       signedRuntimeModule,

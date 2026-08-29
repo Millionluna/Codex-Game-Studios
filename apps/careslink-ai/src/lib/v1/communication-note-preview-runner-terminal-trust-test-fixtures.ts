@@ -291,6 +291,94 @@ export function createM1ghFailedRunnerTerminalEnvelope(
   };
 }
 
+export function createM1giAcceptedRunnerTerminalEnvelope(
+  fixture: ReturnType<typeof createM1ghRunnerTerminalTrustFixture>,
+  options: Readonly<{
+    claimId?: string;
+    reservationId?: string;
+    receiptDigest?: string;
+    slotIndex?: number;
+    fixtureId?: string;
+    runOrdinal?: number;
+    observedAt?: string;
+    candidateDigest?: string;
+    totalTokensReconciliation?: "REPORTED" | "CALCULATED";
+    requestBodySha256?: string;
+    requestBodyUtf8ByteLength?: number;
+    semanticCanonicalRequestSha256?: string;
+    receiptSignatureSha256?: string;
+    receiptUsage?: Readonly<{
+      source: "PROVIDER";
+      inputTokens: number;
+      outputTokens: number;
+      totalTokens: number;
+      cachedInputTokens: number;
+      reasoningTokens: number;
+    }>;
+    calculatedCostUpperBoundMicroUsd?: number;
+  }> = {},
+) {
+  const failed = createM1ghFailedRunnerTerminalEnvelope(fixture, options);
+  const statement = {
+    ...failed.statement,
+    state: "ACCEPTED" as const,
+    failureReason: null,
+    requestBodySha256: options.requestBodySha256 ??
+      "98d37d028c742a2e05d079a38e0d6b27fb1fe91a71d397a4bdc9ed607af45213",
+    requestBodyUtf8ByteLength: options.requestBodyUtf8ByteLength ?? 2522,
+    semanticCanonicalRequestSha256:
+      options.semanticCanonicalRequestSha256 ??
+        "f404c8f239c20b49a40836a371e928dd6241e95dca598ae8661193443c7c6a68",
+    receiptSignatureSha256:
+      options.receiptSignatureSha256 ?? sha256("C".repeat(86)),
+    fixtureDigest: sha256("m1g-i-accepted-fixture"),
+    preflightInputTokens: 128,
+    providerRequestIdHash: sha256("m1g-i-provider-request-id"),
+    candidateDigest:
+      options.candidateDigest ?? sha256("m1g-i-accepted-candidate"),
+    usage: {
+      source: options.receiptUsage?.source ?? ("PROVIDER" as const),
+      inputTokens: options.receiptUsage?.inputTokens ?? 120,
+      outputTokens: options.receiptUsage?.outputTokens ?? 80,
+      totalTokens: options.receiptUsage?.totalTokens ?? 200,
+      totalTokensReconciliation:
+        options.totalTokensReconciliation ?? ("REPORTED" as const),
+      cachedInputTokens: options.receiptUsage?.cachedInputTokens ?? 20,
+      cachedInputTokensReconciliation: "REPORTED" as const,
+      reasoningTokens: options.receiptUsage?.reasoningTokens ?? 10,
+      reasoningTokensReconciliation: "REPORTED" as const,
+    },
+    calculatedCostUpperBoundMicroUsd:
+      options.calculatedCostUpperBoundMicroUsd ?? 481,
+    criticalChecks: {
+      STRICT_SCHEMA: true as const,
+      SHARED_OUTPUT_PRIVACY: true as const,
+      DATE_TIME_PARITY: true as const,
+      NUMERIC_PARITY: true as const,
+      DECISION_LANGUAGE: true as const,
+      REFUSAL_ABSENT: true as const,
+      HUMAN_SEMANTIC_GROUNDEDNESS: true as const,
+    },
+    humanReviews: [
+      { locale: "en" as const, passed: true as const },
+      { locale: "zh-Hans" as const, passed: true as const },
+      { locale: "zh-Hant" as const, passed: true as const },
+    ],
+    receiptProviderCorrelation:
+      "UNATTESTED_NO_SHARED_IDENTIFIER" as const,
+  };
+  return {
+    statement,
+    signature: sign(
+      null,
+      createCaresLinkV1CommunicationNotePreviewRunnerTerminalSigningMessage(
+        statement,
+      ),
+      fixture.runnerTerminalSigner.privateKey,
+    ).toString("base64url"),
+  };
+}
+
 function createAuthorizationStatement(
   trustedKey: CaresLinkV1CommunicationNotePreviewTrustedSigningKey,
   now: string,

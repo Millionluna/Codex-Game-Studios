@@ -55,7 +55,7 @@ export const CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_DATABASE_EVIDENCE_PINS =
     orderedMigrationBasenamesSha256:
       "2bd2f029c86e1f4231b9a3bee7ee8681cb086dcd29eaaaceff21efcc1fec1fda",
     orderedMigrationEntriesSha256:
-      "f488c36ea517b20881a08f365fc58287e053d60e629afff920ff7658cefca1d1",
+      "75d78f30eb2fdc105890308a142d9cf7a0cadcbfda6f2900c06bff64699efb7c",
     authorityMigrationSha256:
       "94f83498ea04053e7238a95bb9be0bb8a38ad0a76fa0e751390419800da51f7f",
     custodyMigrationSha256:
@@ -69,9 +69,9 @@ export const CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_DATABASE_EVIDENCE_PINS =
     signedRunnerTerminalMigrationSha256:
       "b095785331c848d02cabc417eb3131fe2f9328564abef6fc0dd35bccd2980c5a",
     runnerTerminalAcceptedUsageMigrationSha256:
-      "a97cfe86203500e3bb083c6fb7f5516974e6418cf7a0d3e1ca652a13f190422e",
+      "3d2cc53df3cf17ea21a4f93aaf673f8e911fcc9a35b5309cf7c633c6802e448e",
     runnerTerminalAssertionSha256:
-      "5324e0cdd9b97e8804385950c59c89b1b80e4c4215fd24b0ecf9e85c97a4c9bd",
+      "addcc0524c5ae1a20ab0797ae5d005cff846105da61b4100d0db2a60c9e5c1e6",
   } as const);
 
 const ACTIVATION_PREFLIGHT_POLICY_CORE = deepFreeze({
@@ -159,7 +159,7 @@ export type CaresLinkV1CommunicationNotePreviewActivationPreflightPolicy =
     Readonly<{ policyDigest: string }>;
 
 export const CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_ACTIVATION_PREFLIGHT_POLICY_DIGEST =
-  "a97241fafb4392b3a192be05842b619fc659b0e3026ce7f2cf37410ac2c8c22c" as const;
+  "59a71d4e8668f16cbb0007cfa13bca595b4767cc4842a0d0bb69be0708e9a4ae" as const;
 
 if (
   createCanonicalSha256(ACTIVATION_PREFLIGHT_POLICY_CORE) !==

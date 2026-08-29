@@ -10,7 +10,7 @@ import {
 } from "./communication-note-preview-runner-terminal-identity-policy.mjs";
 
 const ASSERTION_MANIFEST_SHA256 =
-  "36c0f94448d4a53a19f94540f5d6685c3678ad29019e42b6b0b7b97fdc41d833";
+  "f200ccd7da5fce6c14d6b532cf205f22e2f21b934824cc9027f061e48b610034";
 const ASSERTION_APPLICATION_NAME =
   "careslink-preview-schema-rollback-assertions";
 const ASSERTION_TRANSPORT_ROLE_PREFIX =
@@ -61,7 +61,7 @@ const ASSERTION_MANIFEST = Object.freeze([
   Object.freeze({
     stage: "A03",
     path: "supabase/assertions/communication_note_preview_runner_terminal_shadow_assertions.sql",
-    sha256: "5324e0cdd9b97e8804385950c59c89b1b80e4c4215fd24b0ecf9e85c97a4c9bd",
+    sha256: "addcc0524c5ae1a20ab0797ae5d005cff846105da61b4100d0db2a60c9e5c1e6",
   }),
   Object.freeze({
     stage: "A04",
@@ -149,7 +149,7 @@ export const COMMUNICATION_NOTE_PREVIEW_SCHEMA_ROLLBACK_ASSERTION_STAGE_CODES =
 
 export const COMMUNICATION_NOTE_PREVIEW_SCHEMA_ROLLBACK_ASSERTION_POLICY =
   Object.freeze({
-    version: "2026-08-29.preview-schema-rollback-assertions.2",
+    version: "2026-08-29.preview-schema-rollback-assertions.4",
     fileCount: ASSERTION_MANIFEST.length,
     manifestSha256: ASSERTION_MANIFEST_SHA256,
     applicationName: ASSERTION_APPLICATION_NAME,
@@ -186,9 +186,11 @@ const FIXED_FAILURE_STAGES = new Set([
   RUNNER_FAILURE_STAGE,
   ...ASSERTION_STAGE_CODES,
 ]);
+const FIXED_ASSERTION_DETAIL_PATTERN =
+  /^D(?:00[1-9]|0[1-9][0-9]|[1-9][0-9]{2})[AVPU]?$/;
 
 export class CommunicationNotePreviewSchemaRollbackAssertionError extends Error {
-  constructor(code, stage = RUNNER_FAILURE_STAGE) {
+  constructor(code, stage = RUNNER_FAILURE_STAGE, detail = "") {
     const fixedCode = FIXED_ERROR_CODES.has(code)
       ? code
       : COMMUNICATION_NOTE_PREVIEW_SCHEMA_ROLLBACK_ASSERTION_ERROR_CODES
@@ -200,11 +202,18 @@ export class CommunicationNotePreviewSchemaRollbackAssertionError extends Error 
     this.name = "CommunicationNotePreviewSchemaRollbackAssertionError";
     this.code = fixedCode;
     this.stage = fixedStage;
+    if (FIXED_ASSERTION_DETAIL_PATTERN.test(detail)) {
+      this.detail = detail;
+    }
   }
 }
 
-function fail(code, stage) {
-  throw new CommunicationNotePreviewSchemaRollbackAssertionError(code, stage);
+function fail(code, stage, detail) {
+  throw new CommunicationNotePreviewSchemaRollbackAssertionError(
+    code,
+    stage,
+    detail,
+  );
 }
 
 function assert(condition, code, stage) {
@@ -220,6 +229,7 @@ function errorAtAssertionStage(error, stage) {
       : COMMUNICATION_NOTE_PREVIEW_SCHEMA_ROLLBACK_ASSERTION_ERROR_CODES
           .internalFailed,
     stage,
+    safeOwnErrorDetail(error),
   );
 }
 
@@ -230,6 +240,7 @@ export function formatCommunicationNotePreviewSchemaRollbackAssertionFailure(
   let errorType =
     COMMUNICATION_NOTE_PREVIEW_SCHEMA_ROLLBACK_ASSERTION_ERROR_CODES
       .internalFailed;
+  let detail = "";
   if (error instanceof CommunicationNotePreviewSchemaRollbackAssertionError) {
     const errorStage = safeOwnErrorStage(error);
     const errorCode = safeOwnErrorCode(error);
@@ -240,13 +251,21 @@ export function formatCommunicationNotePreviewSchemaRollbackAssertionFailure(
       ? errorCode
       : COMMUNICATION_NOTE_PREVIEW_SCHEMA_ROLLBACK_ASSERTION_ERROR_CODES
           .internalFailed;
+    const errorDetail = safeOwnErrorDetail(error);
+    detail = FIXED_ASSERTION_DETAIL_PATTERN.test(errorDetail)
+      ? errorDetail
+      : "";
   } else if (
     error instanceof CommunicationNotePreviewRunnerTerminalIdentityPolicyError
   ) {
     const errorCode = safeOwnErrorCode(error);
     if (FIXED_IDENTITY_ERROR_CODES.has(errorCode)) errorType = errorCode;
   }
-  return JSON.stringify({ stage, errorType });
+  return JSON.stringify({
+    stage,
+    errorType,
+    ...(detail ? { detail } : {}),
+  });
 }
 
 function sha256(value) {
@@ -273,6 +292,83 @@ function safeOwnErrorStage(error) {
       typeof descriptor.value === "string"
     ? descriptor.value
     : "";
+}
+
+function safeOwnErrorDetail(error) {
+  if (!error || typeof error !== "object") return "";
+  const descriptor = Object.getOwnPropertyDescriptor(error, "detail");
+  return descriptor && "value" in descriptor &&
+      typeof descriptor.value === "string"
+    ? descriptor.value
+    : "";
+}
+
+function safeOwnErrorMessage(error) {
+  if (!error || typeof error !== "object") return "";
+  const descriptor = Object.getOwnPropertyDescriptor(error, "message");
+  return descriptor && "value" in descriptor &&
+      typeof descriptor.value === "string"
+    ? descriptor.value
+    : "";
+}
+
+function extractAssertionDiagnosticPrefixes(raw) {
+  const prefixes = [];
+  const pattern = /\braise\s+exception\s+'((?:''|[^'])*)'/giu;
+  for (const match of raw.matchAll(pattern)) {
+    const template = match[1].replaceAll("''", "'");
+    const placeholder = template.indexOf("%");
+    const prefix = placeholder === -1
+      ? template
+      : template.slice(0, placeholder);
+    if (
+      prefix.length >= 8 &&
+      !prefixes.includes(prefix) &&
+      prefixes.length < 999
+    ) {
+      prefixes.push(prefix);
+    }
+  }
+  return Object.freeze(prefixes);
+}
+
+export function classifyCommunicationNotePreviewRollbackAssertionMessage(
+  error,
+  diagnosticPrefixes,
+) {
+  if (
+    !Array.isArray(diagnosticPrefixes) ||
+    diagnosticPrefixes.length > 999 ||
+    diagnosticPrefixes.some((prefix) =>
+      typeof prefix !== "string" || prefix.length < 8
+    )
+  ) {
+    return "";
+  }
+  const message = safeOwnErrorMessage(error);
+  if (!message) return "";
+  let index = diagnosticPrefixes.findIndex((prefix) => message === prefix);
+  if (index === -1) {
+    let longestPrefixLength = -1;
+    for (const [candidateIndex, prefix] of diagnosticPrefixes.entries()) {
+      if (
+        message.startsWith(prefix) &&
+        prefix.length > longestPrefixLength
+      ) {
+        index = candidateIndex;
+        longestPrefixLength = prefix.length;
+      }
+    }
+  }
+  if (index === -1) return "";
+  const base = `D${String(index + 1).padStart(3, "0")}`;
+  const prefix = diagnosticPrefixes[index];
+  if (message === prefix) return base;
+  const suffix = message.slice(prefix.length);
+  if (suffix === "ASSERTION_EXPECTED_REJECTION") return `${base}A`;
+  if (suffix === "VALIDATION_ERROR") return `${base}V`;
+  if (suffix.startsWith("permission denied for ")) return `${base}P`;
+  return `${base}U`;
 }
 
 async function closeQuietly(client) {
@@ -380,6 +476,7 @@ export async function loadCommunicationNotePreviewRollbackAssertions(
     scripts.push(Object.freeze({
       stage: entry.stage,
       sql,
+      diagnosticPrefixes: extractAssertionDiagnosticPrefixes(raw),
       migrationEntryRole: entry.migrationEntryRole === true,
     }));
   }
@@ -675,14 +772,26 @@ async function readMembershipSnapshot(client) {
   return JSON.stringify(result.rows);
 }
 
-async function runRollbackAssertion(client, sql, identity) {
+async function runRollbackAssertion(
+  client,
+  sql,
+  identity,
+  diagnosticPrefixes,
+) {
   try {
     await client.query(sql);
-  } catch {
+  } catch (error) {
+    const detail =
+      classifyCommunicationNotePreviewRollbackAssertionMessage(
+        error,
+        diagnosticPrefixes,
+      );
     await rollbackAfterFailure(client);
     fail(
       COMMUNICATION_NOTE_PREVIEW_SCHEMA_ROLLBACK_ASSERTION_ERROR_CODES
         .assertionFailed,
+      undefined,
+      detail,
     );
   }
   let result;
@@ -1300,10 +1409,12 @@ export async function runCommunicationNotePreviewSchemaRollbackAssertions({
             password: rolePassword,
           });
         } else {
-          await runRollbackAssertion(admin, script.sql, {
-            currentUser,
-            sessionUser,
-          });
+          await runRollbackAssertion(
+            admin,
+            script.sql,
+            { currentUser, sessionUser },
+            script.diagnosticPrefixes ?? [],
+          );
         }
       } catch (error) {
         throw errorAtAssertionStage(error, script.stage);

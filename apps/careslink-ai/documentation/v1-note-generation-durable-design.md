@@ -1594,20 +1594,25 @@ Communication Note tables without treating their `statement` and `usage`
 columns as registered-worker payload leakage. The exact 39-migration manifest,
 new migration, A03 terminal assertion and 18-file rollback manifest are bound
 by SHA-256; derived preflight/coordinator policy digests are
-`a97241fafb4392b3a192be05842b619fc659b0e3026ce7f2cf37410ac2c8c22c`
+`59a71d4e8668f16cbb0007cfa13bca595b4767cc4842a0d0bb69be0708e9a4ae`
 and
-`6a26e2104ebd8cecc55c638cdb2d9ec15b097630e90c0e19573addaa76fc5b2a`.
+`02268069d8290059988bf96d488828b0b12dec912810972b97c790629fa848af`.
 
 A disposable local PostgreSQL 16.15 cluster applied 39/39 migrations and
 passed all 18 rollback assertions, including a source-valid nine-key
 `ACCEPTED` insert, exact replay, receipt projection and reconciliation/drift
-negative vectors. The application gate passed 171 files / 2,296 tests,
+negative vectors. The application gate passed 172 files / 2,315 tests,
 TypeScript, zero-warning ESLint, 73 adapter files, diff checks and the 64/64-page
 Webpack production build. The temporary cluster and roles were removed.
 
-PostgreSQL 17/Hosted, the one-time Hosted LOGIN and signed `ACCEPTED` E2E were
-not run. Live trust/custody and credential resolvers plus final approval remain
-absent; readiness is still false and approved values are undefined. No cloud,
-provider/model, real-data, deployment or Production action is part of M1g-i.
+Deleted no-data Hosted PostgreSQL 17 r20 subsequently applied 39/39 in one
+transaction, passed A01–A18 and completed the actual temporary-LOGIN signed
+`ACCEPTED`, exact replay and conflict gate. Independent postcheck found the
+expected `[1,0,1,1,1,1]` durable chain and zero temporary LOGINs/sessions. r20
+was deleted and three listings left only healthy Production. Live
+trust/custody and credential resolvers, provider/model evaluation, human review
+and final approval remain absent; readiness is still false and approved values
+are undefined. No provider/model, real-data, deployment or Production write is
+part of M1g-i.
 Full evidence is in
 `documentation/communication-note-preview-terminal-accepted-usage-m1g-i.md`.

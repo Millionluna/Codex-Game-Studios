@@ -11,6 +11,7 @@ import {
   COMMUNICATION_NOTE_PREVIEW_SCHEMA_ROLLBACK_ASSERTION_STAGE_CODES as STAGES,
   CommunicationNotePreviewSchemaRollbackAssertionError,
   assertCommunicationNotePreviewAssertionTls,
+  classifyCommunicationNotePreviewRollbackAssertionMessage,
   connectCommunicationNotePreviewAssertionAdmin,
   formatCommunicationNotePreviewSchemaRollbackAssertionFailure,
   loadCommunicationNotePreviewRollbackAssertions,
@@ -560,7 +561,7 @@ describe("Communication Note Preview schema rollback assertion runner", () => {
     expect(bundle).toMatchObject({
       fileCount: 18,
       manifestSha256:
-        "36c0f94448d4a53a19f94540f5d6685c3678ad29019e42b6b0b7b97fdc41d833",
+        "f200ccd7da5fce6c14d6b532cf205f22e2f21b934824cc9027f061e48b610034",
     });
     expect(bundle.scripts).toHaveLength(18);
     expect(STAGES).toEqual({
@@ -576,6 +577,54 @@ describe("Communication Note Preview schema rollback assertion runner", () => {
     expect(
       bundle.scripts.filter((script) => script.migrationEntryRole),
     ).toHaveLength(1);
+    expect(bundle.scripts[2].diagnosticPrefixes.length).toBeGreaterThan(30);
+    expect(bundle.scripts[2].diagnosticPrefixes[47]).toBe(
+      "receipt evidence drift did not fail binding: ",
+    );
+    expect(bundle.scripts[2].sql).toContain(
+      "st,'{usage,cachedInputTokens}',to_jsonb(21),false",
+    );
+    expect(bundle.scripts[2].sql).not.toContain(
+      "'{usage,inputTokens}',to_jsonb(121)",
+    );
+    expect(classifyCommunicationNotePreviewRollbackAssertionMessage(
+      new Error("M1g-f assertions require PostgreSQL 16+"),
+      bundle.scripts[2].diagnosticPrefixes,
+    )).toBe("D001");
+    expect(classifyCommunicationNotePreviewRollbackAssertionMessage(
+      new Error(SECRET),
+      bundle.scripts[2].diagnosticPrefixes,
+    )).toBe("");
+    const keyReusePrefix =
+      "authorization signing key reuse was accepted: ";
+    expect(classifyCommunicationNotePreviewRollbackAssertionMessage(
+      new Error(`${keyReusePrefix}ASSERTION_EXPECTED_REJECTION`),
+      bundle.scripts[2].diagnosticPrefixes,
+    )).toBe("D040A");
+    expect(classifyCommunicationNotePreviewRollbackAssertionMessage(
+      new Error(`${keyReusePrefix}VALIDATION_ERROR`),
+      bundle.scripts[2].diagnosticPrefixes,
+    )).toBe("D040V");
+    expect(classifyCommunicationNotePreviewRollbackAssertionMessage(
+      new Error(`${keyReusePrefix}permission denied for relation ledger`),
+      bundle.scripts[2].diagnosticPrefixes,
+    )).toBe("D040P");
+    expect(classifyCommunicationNotePreviewRollbackAssertionMessage(
+      new Error(`${keyReusePrefix}${SECRET}`),
+      bundle.scripts[2].diagnosticPrefixes,
+    )).toBe("D040U");
+    const overlappingPrefixes = [
+      "shared assertion failed",
+      "shared assertion failed: ",
+    ];
+    expect(classifyCommunicationNotePreviewRollbackAssertionMessage(
+      new Error(overlappingPrefixes[1]),
+      overlappingPrefixes,
+    )).toBe("D002");
+    expect(classifyCommunicationNotePreviewRollbackAssertionMessage(
+      new Error(`${overlappingPrefixes[1]}VALIDATION_ERROR`),
+      overlappingPrefixes,
+    )).toBe("D002V");
     for (const script of bundle.scripts) {
       expect(script.sql).not.toMatch(/^\s*\\/m);
       const lines = script.sql
@@ -746,10 +795,10 @@ describe("Communication Note Preview schema rollback assertion runner", () => {
   it("keeps the CLI contract and successful stdout evidence minimal", async () => {
     const source = await readFile(RUNNER_URL, "utf8");
     expect(POLICY).toEqual({
-      version: "2026-08-29.preview-schema-rollback-assertions.2",
+      version: "2026-08-29.preview-schema-rollback-assertions.4",
       fileCount: 18,
       manifestSha256:
-        "36c0f94448d4a53a19f94540f5d6685c3678ad29019e42b6b0b7b97fdc41d833",
+        "f200ccd7da5fce6c14d6b532cf205f22e2f21b934824cc9027f061e48b610034",
       applicationName: "careslink-preview-schema-rollback-assertions",
       transportRolePrefix: "careslink_m1gh_assert_transport_",
       actorRolePrefix: "careslink_m1gh_assert_actor_",
@@ -774,10 +823,22 @@ describe("Communication Note Preview schema rollback assertion runner", () => {
     );
     poisoned.code = SECRET;
     poisoned.stage = SECRET;
+    poisoned.detail = SECRET;
     expect(
       formatCommunicationNotePreviewSchemaRollbackAssertionFailure(poisoned),
     ).toBe(
       `{"stage":"R00","errorType":"${ERRORS.internalFailed}"}`,
+    );
+    expect(
+      formatCommunicationNotePreviewSchemaRollbackAssertionFailure(
+        new CommunicationNotePreviewSchemaRollbackAssertionError(
+          ERRORS.assertionFailed,
+          "A03",
+          "D040A",
+        ),
+      ),
+    ).toBe(
+      `{"stage":"A03","errorType":"${ERRORS.assertionFailed}","detail":"D040A"}`,
     );
     expect(
       JSON.stringify({

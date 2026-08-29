@@ -18,11 +18,15 @@ import {
   createCommunicationNotePreviewDatabaseConnectionConfig,
 } from "./communication-note-preview-runner-terminal-identity.mjs";
 
-const ENABLE_ENV = "CARESLINK_V1_M1GH_HOSTED_LIVE_ENABLED";
-const CONFIG_FD_ENV = "CARESLINK_V1_M1GH_HOSTED_LIVE_CONFIG_FD";
+const ENABLE_ENV = "CARESLINK_V1_M1GI_HOSTED_LIVE_ENABLED";
+const CONFIG_FD_ENV = "CARESLINK_V1_M1GI_HOSTED_LIVE_CONFIG_FD";
+const STATUS_FD_ENV = "CARESLINK_V1_M1GI_HOSTED_LIVE_STATUS_FD";
 const CONFIG_FD = 3;
+const STATUS_FD = 4;
 const CHILD_TIMEOUT_MS = 75_000;
 const CHILD_KILL_GRACE_MS = 2_000;
+const CHILD_STATUS_MAXIMUM_BYTES = 512;
+const HOSTED_CHILD_SUCCESS = "RUNNER_TERMINAL_HOSTED_LIVE_PASSED";
 const VALID_RUNTIME_APPLICATION_NAME =
   "careslink-preview-runner-terminal-valid-e2e";
 const DIRECT_UNREACHABLE_CODES = new Set([
@@ -33,6 +37,65 @@ const DIRECT_UNREACHABLE_CODES = new Set([
 ]);
 const ROLE_PATTERN =
   /^careslink_v1_preview_runner_terminal_runtime_[a-f0-9]{16}$/;
+
+const HOSTED_CHILD_FIXED_FAILURE_CODES = new Set([
+  "RUNNER_TERMINAL_HOSTED_LIVE_BACKGROUND_CLIENT_ERROR",
+  "RUNNER_TERMINAL_HOSTED_LIVE_ADMIN_CONNECTION_FAILED",
+  "RUNNER_TERMINAL_HOSTED_LIVE_CALLER_IDENTITY_FAILED",
+  "RUNNER_TERMINAL_HOSTED_LIVE_CATALOG_FAILED",
+  "RUNNER_TERMINAL_HOSTED_LIVE_CLOSE_FAILED",
+  "RUNNER_TERMINAL_HOSTED_LIVE_CONFIG_INVALID",
+  "RUNNER_TERMINAL_HOSTED_LIVE_CONFIG_PIPE_INVALID",
+  "RUNNER_TERMINAL_HOSTED_LIVE_CONFLICT_FAILED",
+  "RUNNER_TERMINAL_HOSTED_LIVE_CONNECTION_FAILED",
+  "RUNNER_TERMINAL_HOSTED_LIVE_DRAIN_FAILED",
+  "RUNNER_TERMINAL_HOSTED_LIVE_DRIVER_INVALID",
+  "RUNNER_TERMINAL_HOSTED_LIVE_FAILED",
+  "RUNNER_TERMINAL_HOSTED_LIVE_FIRST_PERSIST_FAILED",
+  "RUNNER_TERMINAL_HOSTED_LIVE_INPUT_FAILED",
+  "RUNNER_TERMINAL_HOSTED_LIVE_MANAGEMENT_APPLICATION_RESTORE_FAILED",
+  "RUNNER_TERMINAL_HOSTED_LIVE_MANAGEMENT_TARGET_FAILED",
+  "RUNNER_TERMINAL_HOSTED_LIVE_NEW_LOGIN_DENIAL_FAILED",
+  "RUNNER_TERMINAL_HOSTED_LIVE_POSTCHECK_FAILED",
+  "RUNNER_TERMINAL_HOSTED_LIVE_POSTCHECK_SQL_POLICY_FAILED",
+  "RUNNER_TERMINAL_HOSTED_LIVE_POSTGRES_MAJOR_FAILED",
+  "RUNNER_TERMINAL_HOSTED_LIVE_QUERY_CONTRACT_FAILED",
+  "RUNNER_TERMINAL_HOSTED_LIVE_QUERY_PORT_FAILED",
+  "RUNNER_TERMINAL_HOSTED_LIVE_QUERY_RESULT_FAILED",
+  "RUNNER_TERMINAL_HOSTED_LIVE_QUIESCE_FAILED",
+  "RUNNER_TERMINAL_HOSTED_LIVE_QUIESCE_SQL_POLICY_FAILED",
+  "RUNNER_TERMINAL_HOSTED_LIVE_REPLAY_FAILED",
+  "RUNNER_TERMINAL_HOSTED_LIVE_REPLAY_PERSIST_FAILED",
+  "RUNNER_TERMINAL_HOSTED_LIVE_RUNTIME_CONNECTION_FAILED",
+  "RUNNER_TERMINAL_HOSTED_LIVE_RUNTIME_IDENTITY_FAILED",
+  "RUNNER_TERMINAL_HOSTED_LIVE_RUNTIME_ROLE_FAILED",
+  "RUNNER_TERMINAL_HOSTED_LIVE_SETUP_FAILED",
+  "RUNNER_TERMINAL_HOSTED_LIVE_SETUP_SQL_POLICY_FAILED",
+  "RUNNER_TERMINAL_HOSTED_LIVE_TEST_FAILED",
+  "RUNNER_TERMINAL_HOSTED_LIVE_TLS_INVALID",
+  "RUNNER_TERMINAL_IDENTITY_QUIESCE_MANAGEMENT_UNSAFE",
+  "RUNNER_TERMINAL_IDENTITY_QUIESCE_POSTCHECK_FAILED",
+  "RUNNER_TERMINAL_VALID_EXPECTED_APPEND_ONLY_REJECTION",
+  "RUNNER_TERMINAL_VALID_POSTCHECK_APPEND_ONLY_FAILED",
+  "RUNNER_TERMINAL_VALID_POSTCHECK_CLEANUP_FAILED",
+  "RUNNER_TERMINAL_VALID_POSTCHECK_LEDGER_COUNTS_FAILED",
+  "RUNNER_TERMINAL_VALID_POSTCHECK_MANAGEMENT_UNSAFE",
+  "RUNNER_TERMINAL_VALID_POSTCHECK_PROBE_BASELINE_DRIFT",
+  "RUNNER_TERMINAL_VALID_POSTCHECK_PROBE_CLEANUP_FAILED",
+  "RUNNER_TERMINAL_VALID_POSTCHECK_RUNTIME_UNSAFE",
+  "RUNNER_TERMINAL_VALID_POSTCHECK_TERMINAL_FAILED",
+  "RUNNER_TERMINAL_VALID_POSTCHECK_TRIGGER_DRIFT",
+  "RUNNER_TERMINAL_VALID_SETUP_AUTHORIZATION_FAILED",
+  "RUNNER_TERMINAL_VALID_SETUP_DISPATCH_FAILED",
+  "RUNNER_TERMINAL_VALID_SETUP_FIXTURE_UNSAFE",
+  "RUNNER_TERMINAL_VALID_SETUP_LEDGER_NOT_EMPTY",
+  "RUNNER_TERMINAL_VALID_SETUP_MANAGEMENT_MEMBERSHIP_DRIFT",
+  "RUNNER_TERMINAL_VALID_SETUP_MANAGEMENT_UNSAFE",
+  "RUNNER_TERMINAL_VALID_SETUP_POSTCHECK_FAILED",
+  "RUNNER_TERMINAL_VALID_SETUP_RECEIPT_FAILED",
+  "RUNNER_TERMINAL_VALID_SETUP_RPC_DRIFT",
+  "RUNNER_TERMINAL_VALID_SETUP_RUNTIME_UNSAFE",
+]);
 
 const FIXED_ERRORS = new Set([
   "RUNNER_TERMINAL_VALID_ARGUMENT_INVALID",
@@ -48,6 +111,7 @@ const FIXED_ERRORS = new Set([
   "RUNNER_TERMINAL_VALID_CLEANUP_FAILED",
   "RUNNER_TERMINAL_VALID_POSTCHECK_FAILED",
   "RUNNER_TERMINAL_VALID_INTERNAL_FAILED",
+  ...HOSTED_CHILD_FIXED_FAILURE_CODES,
 ]);
 
 const FAILURE_CLEANUP_SQL = `
@@ -329,7 +393,47 @@ export function createCommunicationNotePreviewRunnerTerminalHostedChildEnvironme
   }
   environment[ENABLE_ENV] = "1";
   environment[CONFIG_FD_ENV] = String(CONFIG_FD);
+  environment[STATUS_FD_ENV] = String(STATUS_FD);
   return Object.freeze(environment);
+}
+
+export function createCommunicationNotePreviewRunnerTerminalValidEvidence() {
+  return Object.freeze({
+    ok: true,
+    terminalState: "ACCEPTED",
+    failureReason: null,
+    continuationEligible: true,
+    firstCreated: true,
+    exactReplayCreated: false,
+    validConflictRejected: true,
+    conflictCode: "IDEMPOTENCY_CONFLICT",
+    sourceTrustCompositionVerified: true,
+    actualRuntimeLoginQueryVerified: true,
+    finalLedgerCounts: [1, 0, 1, 1, 1, 1],
+    temporaryRuntimeLoginDropped: true,
+    credentialTransport: "anonymous_fd_pipe_process_memory_only",
+    acceptedNineKeyUsageVerified: true,
+    receiptSixFactProjectionVerified: true,
+  });
+}
+
+export function parseCommunicationNotePreviewRunnerTerminalHostedChildStatus(
+  value,
+) {
+  if (
+    typeof value !== "string" ||
+    Buffer.byteLength(value, "utf8") > CHILD_STATUS_MAXIMUM_BYTES
+  ) {
+    return "RUNNER_TERMINAL_VALID_CHILD_FAILED";
+  }
+  if (!value.endsWith("\n")) {
+    return "RUNNER_TERMINAL_VALID_CHILD_FAILED";
+  }
+  const code = value.slice(0, -1);
+  if (code === HOSTED_CHILD_SUCCESS) return code;
+  return HOSTED_CHILD_FIXED_FAILURE_CODES.has(code)
+    ? code
+    : "RUNNER_TERMINAL_VALID_CHILD_FAILED";
 }
 
 async function runHostedChild(pipeConfig, baseEnvironment = process.env) {
@@ -354,7 +458,6 @@ async function runHostedChild(pipeConfig, baseEnvironment = process.env) {
       liveTest,
       "--pool=threads",
       "--maxWorkers=1",
-      "--minWorkers=1",
       "--reporter=dot",
     ],
     {
@@ -363,21 +466,43 @@ async function runHostedChild(pipeConfig, baseEnvironment = process.env) {
         baseEnvironment,
       ),
       shell: false,
-      stdio: ["ignore", "ignore", "ignore", "pipe"],
+      stdio: ["ignore", "ignore", "ignore", "pipe", "pipe"],
     },
   );
   const configPipe = child.stdio[CONFIG_FD];
-  if (!configPipe || typeof configPipe.end !== "function") {
+  const statusPipe = child.stdio[STATUS_FD];
+  if (
+    !configPipe ||
+    typeof configPipe.end !== "function" ||
+    !statusPipe ||
+    typeof statusPipe.on !== "function"
+  ) {
     child.kill("SIGTERM");
     fail("RUNNER_TERMINAL_VALID_CHILD_PIPE_FAILED");
   }
   let pipeFailed = false;
+  let statusBytes = 0;
+  let statusOverflow = false;
+  const statusChunks = [];
   configPipe.on("error", () => {
     pipeFailed = true;
   });
+  statusPipe.on("error", () => {
+    pipeFailed = true;
+  });
+  statusPipe.on("data", (chunk) => {
+    const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+    statusBytes += buffer.length;
+    if (statusBytes > CHILD_STATUS_MAXIMUM_BYTES) {
+      statusOverflow = true;
+      statusChunks.length = 0;
+      return;
+    }
+    if (!statusOverflow) statusChunks.push(buffer);
+  });
   const exit = new Promise((resolve, reject) => {
     child.once("error", reject);
-    child.once("exit", (code, signal) => resolve({ code, signal }));
+    child.once("close", (code, signal) => resolve({ code, signal }));
   });
   let timedOut = false;
   let killTimer;
@@ -399,7 +524,22 @@ async function runHostedChild(pipeConfig, baseEnvironment = process.env) {
   clearTimeout(timeout);
   if (killTimer) clearTimeout(killTimer);
   if (pipeFailed) fail("RUNNER_TERMINAL_VALID_CHILD_PIPE_FAILED");
-  if (timedOut || result.code !== 0 || result.signal !== null) {
+  const childStatus = statusOverflow
+    ? "RUNNER_TERMINAL_VALID_CHILD_FAILED"
+    : parseCommunicationNotePreviewRunnerTerminalHostedChildStatus(
+      Buffer.concat(statusChunks, statusBytes).toString("utf8"),
+    );
+  if (timedOut || result.signal !== null) {
+    fail("RUNNER_TERMINAL_VALID_CHILD_FAILED");
+  }
+  if (result.code !== 0) {
+    fail(
+      childStatus === HOSTED_CHILD_SUCCESS
+        ? "RUNNER_TERMINAL_VALID_CHILD_FAILED"
+        : childStatus,
+    );
+  }
+  if (childStatus !== HOSTED_CHILD_SUCCESS) {
     fail("RUNNER_TERMINAL_VALID_CHILD_FAILED");
   }
 }
@@ -660,21 +800,9 @@ async function main() {
   if (cleanupFailure) throw cleanupFailure;
   if (primaryFailure) throw primaryFailure;
   if (!childPassed) fail("RUNNER_TERMINAL_VALID_CHILD_FAILED");
-  process.stdout.write(`${JSON.stringify(Object.freeze({
-    ok: true,
-    terminalState: "FAILED",
-    failureReason: "CANCELLED",
-    firstCreated: true,
-    exactReplayCreated: false,
-    validConflictRejected: true,
-    conflictCode: "IDEMPOTENCY_CONFLICT",
-    sourceTrustCompositionVerified: true,
-    actualRuntimeLoginQueryVerified: true,
-    finalLedgerCounts: [1, 0, 1, 1, 1, 1],
-    temporaryRuntimeLoginDropped: true,
-    credentialTransport: "anonymous_fd_pipe_process_memory_only",
-    acceptedPathBlockedByUsageContractMismatch: true,
-  }))}\n`);
+  process.stdout.write(`${JSON.stringify(
+    createCommunicationNotePreviewRunnerTerminalValidEvidence(),
+  )}\n`);
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

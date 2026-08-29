@@ -10,23 +10,24 @@ projects only the six provider receipt facts before performing the exact
 receipt comparison. Migration 38 is retained byte-for-byte as historical
 evidence.
 
-This is source and local PostgreSQL evidence only. It does not activate a
-runtime identity, credential resolver, provider transport, model call,
-deployment or Production database change.
+This now includes source, local PostgreSQL 16.15 and deleted disposable Hosted
+PostgreSQL 17 evidence. It does not activate a retained runtime identity,
+credential resolver, provider transport, model call, deployment or Production
+database change.
 
 | Boundary | M1g-i result |
 |---|---|
 | Migration count | 39 |
 | Ordered migration basenames SHA-256 | `2bd2f029c86e1f4231b9a3bee7ee8681cb086dcd29eaaaceff21efcc1fec1fda` |
-| Ordered migration entries SHA-256 | `f488c36ea517b20881a08f365fc58287e053d60e629afff920ff7658cefca1d1` |
-| Additive migration | 26,255 bytes; SHA-256 `a97cfe86203500e3bb083c6fb7f5516974e6418cf7a0d3e1ca652a13f190422e` |
-| Runner-terminal assertion | 48,576 bytes; SHA-256 `5324e0cdd9b97e8804385950c59c89b1b80e4c4215fd24b0ecf9e85c97a4c9bd` |
+| Ordered migration entries SHA-256 | `75d78f30eb2fdc105890308a142d9cf7a0cadcbfda6f2900c06bff64699efb7c` |
+| Additive migration | 26,279 bytes; SHA-256 `3d2cc53df3cf17ea21a4f93aaf673f8e911fcc9a35b5309cf7c633c6802e448e`; exact statement and usage key-set checks use explicit `C` collation |
+| Runner-terminal assertion | 48,566 bytes; SHA-256 `addcc0524c5ae1a20ab0797ae5d005cff846105da61b4100d0db2a60c9e5c1e6` |
 | Adjacent A05 / A07 assertions | SHA-256 `b699e5967fd487656dc34c398b61c464396b26d40d48fc1bfbe8c53f3c423a3b` / `cbba8ad819cad206a4f94340e37ff1b593ee7944d01e5b7496fc13a9cc3748b0` |
-| 18-file rollback policy | `2026-08-29.preview-schema-rollback-assertions.2`; manifest SHA-256 `36c0f94448d4a53a19f94540f5d6685c3678ad29019e42b6b0b7b97fdc41d833` |
-| Activation preflight | `preflight.communication.openai.synthetic-preview.2026-08-29.m1g-i.v4`; digest `a97241fafb4392b3a192be05842b619fc659b0e3026ce7f2cf37410ac2c8c22c` |
-| Coordinator | `coordinator.communication.openai.synthetic-preview.2026-08-29.m1g-i.v4`; digest `6a26e2104ebd8cecc55c638cdb2d9ec15b097630e90c0e19573addaa76fc5b2a` |
+| 18-file rollback policy | `2026-08-29.preview-schema-rollback-assertions.4`; manifest SHA-256 `f200ccd7da5fce6c14d6b532cf205f22e2f21b934824cc9027f061e48b610034` |
+| Activation preflight | `preflight.communication.openai.synthetic-preview.2026-08-29.m1g-i.v4`; digest `59a71d4e8668f16cbb0007cfa13bca595b4767cc4842a0d0bb69be0708e9a4ae` |
+| Coordinator | `coordinator.communication.openai.synthetic-preview.2026-08-29.m1g-i.v4`; digest `02268069d8290059988bf96d488828b0b12dec912810972b97c790629fa848af` |
 | Local database gate | PostgreSQL 16.15; 39/39 migrations and 18/18 rollback assertions passed; the two expected schema terminal roles existed, zero temporary assertion roles remained, and the disposable cluster was removed |
-| PostgreSQL 17 / Hosted gate | not run; no no-network PostgreSQL 17 runtime was available locally |
+| PostgreSQL 17 / Hosted gate | deleted no-data r20 applied 39/39, passed A01–A18 and completed the signed `ACCEPTED` temporary-LOGIN E2E; exact replay and conflict behavior passed; the LOGIN and all sessions were removed |
 | Activation | denied; readiness remains `false` and approved values remain `undefined` |
 
 ## Usage contract
@@ -59,9 +60,11 @@ would otherwise autocommit individual statements.
 
 The rollback runner now binds the 18 files to fixed stages `A01` through `A18`;
 runner preflight uses `R00`. Failures emit one content-free JSON line containing
-only `stage` and `errorType`. Transport, timeout, SQL, setup and cleanup paths
-cannot expose filenames, SQL, SQLSTATE, credentials, branch metadata or driver
-details. Rollback failure keeps priority over the originating assertion error.
+`stage` and `errorType`; a matched fixed diagnostic may additionally include an
+allowlisted `detail` (`Dxxx`, optionally suffixed by `A`, `V`, `P` or `U`).
+Transport, timeout, SQL, setup and cleanup paths cannot expose filenames, SQL,
+SQLSTATE, credentials, branch metadata or driver details. Rollback failure keeps
+priority over the originating assertion error.
 
 The current 39-migration schema also required adjacent assertion maintenance:
 
@@ -74,7 +77,7 @@ The current 39-migration schema also required adjacent assertion maintenance:
 
 ## Verification and remaining blockers
 
-The final local source gate passed 171 test files / 2,296 tests, TypeScript,
+The final local source gate passed 172 test files / 2,315 tests, TypeScript,
 zero-warning ESLint, the 73-file adapter synchronization check,
 `git diff --check` and the Next.js 16.2.9 Webpack production build with 64/64
 pages. A private Unix-socket-only PostgreSQL 16.15 cluster then applied all 39
@@ -83,16 +86,32 @@ compatibility functions and temporary migration/assertion roles existed only
 inside the disposable cluster; cleanup stopped the server and removed the
 cluster.
 
-Three release blockers remain:
+The PostgreSQL 17 and synthetic signed-terminal blockers are closed. The
+Hosted sequence was:
 
-- rerun the exact 39-migration / 18-assertion chain on PostgreSQL 17 or a newly
-  authorized disposable Hosted Preview;
-- prove the source-valid signed `ACCEPTED` path through the Hosted one-time
-  identity and terminal persistence flow;
-- supply separately reviewed live trust/custody and caller-credential
-  resolvers, then obtain final activation approval.
+- r19 applied 39/39 and passed A01–A18. Its valid-chain child exited before
+  test collection because Vitest 4.1.9 does not support the supplied
+  `--minWorkers` option. The option was removed, a real nested-Vitest smoke
+  test was added, and a 512-byte fd4 channel now carries only one allowlisted
+  content-free status while stdout/stderr and raw database errors stay hidden.
+- r20 applied the exact 39-entry manifest in one transaction and passed all 18
+  rollback assertions on PostgreSQL 17. Its real temporary LOGIN then wrote one
+  signed nine-key `ACCEPTED` terminal, returned exact replay without a second
+  row, rejected a source-valid reconciliation conflict as
+  `IDEMPOTENCY_CONFLICT`, and proved the exact six-fact receipt projection.
+- Independent postcheck found migration 39 last, ledger counts
+  `[1,0,1,1,1,1]`, one nine-key `ACCEPTED` terminal and zero temporary LOGINs
+  or sessions. Security advisors returned 21 INFO / 20 WARN and performance
+  advisors 105 INFO / 24 WARN, with no `ERROR`; these are project-wide
+  [Database Linter](https://supabase.com/docs/guides/database/database-linter)
+  results, and the security advisor had no finding in either Communication
+  private schema.
+- r19 and r20 were deleted. Three independent listings after each deletion
+  showed only healthy default Production.
 
-A new Hosted attempt requires fresh cost confirmation and explicit
-authorization. M1g-i performed no cloud write, Preview creation, provider/model
+Remaining release work is live trust/custody and caller-credential resolution,
+separately authorized provider/model evaluation plus human review, final
+activation approval and deployment verification. Readiness therefore remains
+`false`. M1g-i used only disposable Preview writes and made no provider/model
 call, paid model spend, real-care-data access, push, merge, deployment or
-Production change.
+Production write.

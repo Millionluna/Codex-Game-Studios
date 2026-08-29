@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 
 import { describe, expect, it, vi } from "vitest";
@@ -15,15 +15,21 @@ import {
   runTestOnlyCaresLinkV1CommunicationNotePreviewRunnerTerminalHostedQuiesce,
 } from "./communication-note-preview-runner-terminal-hosted-live.server";
 import {
-  createM1ghFailedRunnerTerminalEnvelope,
+  createM1giAcceptedRunnerTerminalEnvelope,
   createM1ghRunnerTerminalTrustFixture,
 } from "./communication-note-preview-runner-terminal-trust-test-fixtures";
+import {
+  verifyTestOnlyCaresLinkV1CommunicationNotePreviewSignedRunnerTerminal,
+} from "./communication-note-preview-runner-terminal-policy.server";
 
 vi.mock("server-only", () => ({}));
 
-const ENABLE_ENV = "CARESLINK_V1_M1GH_HOSTED_LIVE_ENABLED";
-const CONFIG_FD_ENV = "CARESLINK_V1_M1GH_HOSTED_LIVE_CONFIG_FD";
+const ENABLE_ENV = "CARESLINK_V1_M1GI_HOSTED_LIVE_ENABLED";
+const CONFIG_FD_ENV = "CARESLINK_V1_M1GI_HOSTED_LIVE_CONFIG_FD";
+const STATUS_FD_ENV = "CARESLINK_V1_M1GI_HOSTED_LIVE_STATUS_FD";
 const HOSTED_CONFIG_FD = 3;
+const HOSTED_STATUS_FD = 4;
+const HOSTED_CHILD_SUCCESS = "RUNNER_TERMINAL_HOSTED_LIVE_PASSED";
 const HOSTED_CONFIG_MAXIMUM_BYTES = 65_536;
 const PRODUCTION_PROJECT_REF = "adocsnwnslxhxcjgbyee";
 const PROJECT_REF_PATTERN = /^[a-z0-9]{20}$/;
@@ -129,26 +135,77 @@ describe("Communication Note signed runner-terminal disposable Hosted live gate"
       terminalWriteReservedForRuntime: true,
       exactPreDeleteCountsLocked: true,
       appendOnlyProofLocked: true,
+      acceptedUsageProjectionLocked: true,
       temporaryLoginOnlyCleanup: true,
     });
   });
 
-  it("builds a DB-clock-bound signed FAILED fixture without enabling ACCEPTED", () => {
+  it("builds a DB-clock-bound signed ACCEPTED fixture with exact nine-key usage", () => {
     const now = new Date().toISOString();
     const fixture = createM1ghRunnerTerminalTrustFixture({ now });
-    const envelope = createM1ghFailedRunnerTerminalEnvelope(fixture, {
+    const envelope = createM1giAcceptedRunnerTerminalEnvelope(fixture, {
       observedAt: now,
-      failureReason: "CANCELLED",
     });
     expect(envelope.statement).toMatchObject({
-      state: "FAILED",
-      failureReason: "CANCELLED",
-      usage: null,
-      criticalChecks: null,
-      humanReviews: null,
+      state: "ACCEPTED",
+      failureReason: null,
+      usage: {
+        source: "PROVIDER",
+        inputTokens: 120,
+        outputTokens: 80,
+        totalTokens: 200,
+        totalTokensReconciliation: "REPORTED",
+        cachedInputTokens: 20,
+        cachedInputTokensReconciliation: "REPORTED",
+        reasoningTokens: 10,
+        reasoningTokensReconciliation: "REPORTED",
+      },
       observedAt: now,
     });
+    expect(Object.keys(envelope.statement.usage)).toHaveLength(9);
     expect(envelope.signature).toMatch(/^[A-Za-z0-9_-]{86}$/);
+  });
+
+  it("verifies both signed reconciliation variants while locking their six receipt facts", () => {
+    const now = new Date().toISOString();
+    const fixture = createM1ghRunnerTerminalTrustFixture({ now });
+    const accepted = createM1giAcceptedRunnerTerminalEnvelope(fixture, {
+      observedAt: now,
+    });
+    const conflict = createM1giAcceptedRunnerTerminalEnvelope(fixture, {
+      observedAt: now,
+      totalTokensReconciliation: "CALCULATED",
+    });
+    const verify = (envelope: typeof accepted) =>
+      verifyTestOnlyCaresLinkV1CommunicationNotePreviewSignedRunnerTerminal(
+        envelope,
+        {
+          trustedKeySnapshot: fixture.runnerTerminalSigner.trustedKey,
+          now,
+        },
+      );
+    const verifiedAccepted = verify(accepted);
+    const verifiedConflict = verify(conflict);
+    const acceptedUsage = verifiedAccepted.statement.usage;
+    const conflictUsage = verifiedConflict.statement.usage;
+    if (
+      !acceptedUsage ||
+      !conflictUsage ||
+      acceptedUsage.reasoningTokens === null ||
+      conflictUsage.reasoningTokens === null
+    ) {
+      throw new Error("accepted usage expected");
+    }
+    expect(receiptUsageProjection(acceptedUsage)).toEqual(
+      receiptUsageProjection(conflictUsage),
+    );
+    expect(verifiedAccepted.runnerTerminalDigest).not.toBe(
+      verifiedConflict.runnerTerminalDigest,
+    );
+    expect(acceptedUsage.totalTokensReconciliation)
+      .toBe("REPORTED");
+    expect(conflictUsage.totalTokensReconciliation)
+      .toBe("CALCULATED");
   });
 
   it("uses split connection fields so URI parameters cannot override the pinned CA", () => {
@@ -159,16 +216,84 @@ describe("Communication Note signed runner-terminal disposable Hosted live gate"
     expect(source).toContain("password: config.runtimeDatabasePassword");
   });
 
+  it("preserves an allowlisted SQL assertion stage and folds arbitrary text", async () => {
+    const fixed = "RUNNER_TERMINAL_VALID_SETUP_RECEIPT_FAILED";
+    const createAdmin = (error: Error) => Object.freeze({
+      async query(sql: string) {
+        if (sql === setupSql) throw error;
+        if (sql.includes("clock_timestamp")) {
+          return Object.freeze({
+            rowCount: 1,
+            rows: Object.freeze([Object.freeze({
+              database_now: "2026-08-29T12:00:00.000Z",
+              current_user: "postgres",
+              session_user: "postgres",
+              database_name: "postgres",
+              postgres_major: 17,
+            })]),
+          });
+        }
+        return Object.freeze({ rowCount: 0, rows: Object.freeze([]) });
+      },
+    });
+    const runtimeQueryPort = Object.freeze({
+      async query() {
+        return Object.freeze({ rowCount: 0, rows: Object.freeze([]) });
+      },
+    });
+    const invoke = (error: Error) =>
+      runTestOnlyCaresLinkV1CommunicationNotePreviewRunnerTerminalHostedLiveGate(
+        {
+          adminQueryPort: createAdmin(error),
+          runtimeQueryPort,
+          runtimeRole:
+            "careslink_v1_preview_runner_terminal_runtime_0123456789abcdef",
+          expectedPostgresMajor: 17,
+          setupSql,
+        },
+      );
+    await expect(invoke(new Error(fixed))).rejects.toThrowError(fixed);
+    await expect(invoke(new Error("untrusted database text"))).rejects
+      .toThrowError("RUNNER_TERMINAL_HOSTED_LIVE_SETUP_FAILED");
+  });
+
   if (hostedEnvironment.enabled === "1") {
     it(
       "persists, replays and conflicts through a real temporary Preview LOGIN",
       { timeout: 60_000 },
       async () => {
-        await runHostedLiveTest();
+        try {
+          await runHostedLiveTest();
+          writeHostedChildStatus(HOSTED_CHILD_SUCCESS);
+        } catch (error) {
+          const code = error instanceof HostedLiveTestError
+            ? error.message
+            : "RUNNER_TERMINAL_HOSTED_LIVE_TEST_FAILED";
+          writeHostedChildStatus(code);
+          throw error;
+        }
       },
     );
   }
 });
+
+function receiptUsageProjection(usage: Readonly<{
+  source: string;
+  inputTokens: number;
+  outputTokens: number;
+  totalTokens: number;
+  cachedInputTokens: number;
+  reasoningTokens: number | null;
+}>) {
+  return {
+    source: usage.source,
+    inputTokens: usage.inputTokens,
+    outputTokens: usage.outputTokens,
+    totalTokens: usage.totalTokens,
+    cachedInputTokens: usage.cachedInputTokens,
+    reasoningTokens: usage.reasoningTokens,
+  };
+}
 
 async function runHostedLiveTest() {
   const config = requireHostedConfig(hostedEnvironment);
@@ -220,9 +345,15 @@ async function runHostedLiveTest() {
     backgroundError = true;
   });
   try {
-    await connect(admin);
+    await connect(
+      admin,
+      "RUNNER_TERMINAL_HOSTED_LIVE_ADMIN_CONNECTION_FAILED",
+    );
     adminConnected = true;
-    await connect(runtime);
+    await connect(
+      runtime,
+      "RUNNER_TERMINAL_HOSTED_LIVE_RUNTIME_CONNECTION_FAILED",
+    );
     runtimeConnected = true;
     const evidence =
       await runTestOnlyCaresLinkV1CommunicationNotePreviewRunnerTerminalHostedLiveGate(
@@ -236,8 +367,9 @@ async function runHostedLiveTest() {
       );
     expect(evidence).toMatchObject({
       ok: true,
-      terminalState: "FAILED",
-      failureReason: "CANCELLED",
+      terminalState: "ACCEPTED",
+      failureReason: null,
+      continuationEligible: true,
       firstCreated: true,
       exactReplayCreated: false,
       validConflictRejected: true,
@@ -245,7 +377,8 @@ async function runHostedLiveTest() {
       sourceTrustCompositionVerified: true,
       actualRuntimeLoginQueryVerified: true,
       finalExpectedLedgerCounts: [1, 0, 1, 1, 1, 1],
-      acceptedPathBlockedByUsageContractMismatch: true,
+      acceptedNineKeyUsageVerified: true,
+      receiptSixFactProjectionVerified: true,
     });
     await runTestOnlyCaresLinkV1CommunicationNotePreviewRunnerTerminalHostedQuiesce(
       {
@@ -286,6 +419,8 @@ async function runHostedLiveTest() {
     }
   } catch (error) {
     if (error instanceof HostedLiveTestError) throw error;
+    const hostedLiveCode = safeHostedLiveGateErrorCode(error);
+    if (hostedLiveCode) throw new HostedLiveTestError(hostedLiveCode);
     throw new HostedLiveTestError("RUNNER_TERMINAL_HOSTED_LIVE_TEST_FAILED");
   } finally {
     if (runtimeConnected) await closeQuietly(runtime);
@@ -309,6 +444,11 @@ function readHostedPipeConfig(): HostedEnvironment {
   const enabled = process.env[ENABLE_ENV];
   if (enabled !== "1") return Object.freeze({ enabled });
   if (process.env[CONFIG_FD_ENV] !== String(HOSTED_CONFIG_FD)) {
+    throw new HostedLiveTestError(
+      "RUNNER_TERMINAL_HOSTED_LIVE_CONFIG_PIPE_INVALID",
+    );
+  }
+  if (process.env[STATUS_FD_ENV] !== String(HOSTED_STATUS_FD)) {
     throw new HostedLiveTestError(
       "RUNNER_TERMINAL_HOSTED_LIVE_CONFIG_PIPE_INVALID",
     );
@@ -357,6 +497,14 @@ function readHostedPipeConfig(): HostedEnvironment {
     enabled: "1",
     ...(parsed as Omit<HostedEnvironment, "enabled">),
   });
+}
+
+function writeHostedChildStatus(value: string) {
+  const code = value === HOSTED_CHILD_SUCCESS ||
+      /^RUNNER_TERMINAL_(?:HOSTED_LIVE|IDENTITY|VALID)_[A-Z_]+$/.test(value)
+    ? value
+    : "RUNNER_TERMINAL_HOSTED_LIVE_TEST_FAILED";
+  writeFileSync(HOSTED_STATUS_FD, `${code}\n`, { encoding: "utf8" });
 }
 
 function requireHostedConfig(value: HostedEnvironment) {
@@ -445,7 +593,7 @@ function loadPgClient(): PgClientConstructor {
   }
 }
 
-async function connect(client: PgClient) {
+async function connect(client: PgClient, failureCode: string) {
   try {
     await client.connect();
     const stream = client.connection?.stream;
@@ -457,9 +605,7 @@ async function connect(client: PgClient) {
       throw new TypeError("TLS_NOT_VERIFIED");
     }
   } catch {
-    throw new HostedLiveTestError(
-      "RUNNER_TERMINAL_HOSTED_LIVE_CONNECTION_FAILED",
-    );
+    throw new HostedLiveTestError(failureCode);
   }
 }
 
@@ -509,6 +655,19 @@ function safeErrorCode(value: unknown) {
     typeof descriptor.value === "string"
     ? descriptor.value
     : "";
+}
+
+function safeHostedLiveGateErrorCode(value: unknown) {
+  if (
+    !(value instanceof Error) ||
+    value.name !== "CaresLinkV1RunnerTerminalHostedLiveError" ||
+    !/^RUNNER_TERMINAL_(?:HOSTED_LIVE|IDENTITY|VALID)_[A-Z_]+$/.test(
+      value.message,
+    )
+  ) {
+    return "";
+  }
+  return value.message;
 }
 
 function requireText(value: unknown) {

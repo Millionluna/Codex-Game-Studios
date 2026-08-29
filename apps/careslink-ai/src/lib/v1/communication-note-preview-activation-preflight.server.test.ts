@@ -75,7 +75,7 @@ describe("Communication Note M1g-i activation preflight", () => {
     expect(
       CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_ACTIVATION_PREFLIGHT_POLICY_DIGEST,
     ).toBe(
-      "a97241fafb4392b3a192be05842b619fc659b0e3026ce7f2cf37410ac2c8c22c",
+      "59a71d4e8668f16cbb0007cfa13bca595b4767cc4842a0d0bb69be0708e9a4ae",
     );
     expect(
       CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_ACTIVATION_PREFLIGHT_POLICY,

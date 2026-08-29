@@ -2447,24 +2447,31 @@ projection with the durable receipt.
 
 | Gate | Result |
 |---|---|
-| migration identity | 39 migrations; ordered basenames `2bd2f029c86e1f4231b9a3bee7ee8681cb086dcd29eaaaceff21efcc1fec1fda`; ordered entries `f488c36ea517b20881a08f365fc58287e053d60e629afff920ff7658cefca1d1` |
-| migration 39 | 26,255 bytes; SHA-256 `a97cfe86203500e3bb083c6fb7f5516974e6418cf7a0d3e1ca652a13f190422e`; one explicit transaction contains every temporary DDL capability and its revocation |
-| terminal assertion / rollback manifest | A03 SHA-256 `5324e0cdd9b97e8804385950c59c89b1b80e4c4215fd24b0ecf9e85c97a4c9bd`; fixed-stage 18-file manifest `36c0f94448d4a53a19f94540f5d6685c3678ad29019e42b6b0b7b97fdc41d833` |
+| migration identity | 39 migrations; ordered basenames `2bd2f029c86e1f4231b9a3bee7ee8681cb086dcd29eaaaceff21efcc1fec1fda`; ordered entries `75d78f30eb2fdc105890308a142d9cf7a0cadcbfda6f2900c06bff64699efb7c` |
+| migration 39 | 26,279 bytes; SHA-256 `3d2cc53df3cf17ea21a4f93aaf673f8e911fcc9a35b5309cf7c633c6802e448e`; one explicit transaction contains every temporary DDL capability and its revocation; exact JSON key-set comparisons use explicit `C` collation |
+| terminal assertion / rollback manifest | A03 SHA-256 `addcc0524c5ae1a20ab0797ae5d005cff846105da61b4100d0db2a60c9e5c1e6`; fixed-stage 18-file manifest `f200ccd7da5fce6c14d6b532cf205f22e2f21b934824cc9027f061e48b610034` |
 | ACCEPTED vectors | exact nine-key positive, exact replay and six-fact receipt projection passed; six-key source, missing/extra/invalid reconciliation, inconsistent `ASSUMED_ZERO`/`UNAVAILABLE` and receipt drift failed closed |
 | local database | disposable PostgreSQL 16.15 applied 39/39 and passed A01–A18; final summary was `{"postgres":"16.15 (Homebrew)","migrations":39,"rollbackAssertions":18,"terminalRoles":2}`; those two were the expected schema caller/executor, zero temporary assertion roles remained, and the cluster was removed |
-| application/static | 171 files / 2,296 tests; TypeScript; zero-warning ESLint; 73 adapter files; `git diff --check`; Next.js 16.2.9 Webpack build with 64/64 pages |
-| PostgreSQL 17 / Hosted | not run; no no-network PostgreSQL 17 runtime was locally available, and no new disposable Preview was authorized |
+| application/static | 172 files / 2,315 tests; TypeScript; zero-warning ESLint; 73 adapter files; `git diff --check`; Next.js 16.2.9 Webpack build with 64/64 pages |
+| PostgreSQL 17 / Hosted | deleted no-data r20 applied 39/39 in one transaction, passed A01–A18, completed the actual temporary-LOGIN signed `ACCEPTED` path, exact replay and `IDEMPOTENCY_CONFLICT`, and independently verified `[1,0,1,1,1,1]` ledgers with zero temporary LOGINs/sessions |
 
 The rollback runner now assigns `R00` to runner preflight and `A01`–`A18` to
-the fixed files. Every failure is one content-free JSON object with only
-`stage` and `errorType`; SQL, filenames, SQLSTATE, credentials, driver detail
-and branch metadata are excluded, and rollback failure retains priority.
+the fixed files. Every failure is one content-free JSON object with `stage` and
+`errorType`; a matched fixed diagnostic may also include allowlisted `detail`
+(`Dxxx`, optionally suffixed by `A`, `V`, `P` or `U`). SQL, filenames, SQLSTATE,
+credentials, driver detail and branch metadata are excluded, and rollback
+failure retains priority.
 
-This closes the diagnosed source/local usage mismatch only. Hosted PostgreSQL
-17 rollback evidence, the one-time Hosted identity plus source-valid signed
-`ACCEPTED` E2E, live custody/credential resolvers and final activation approval
-remain open. Readiness remains false and no cloud write, model call, real data,
-deployment or Production change occurred. See the
+This closes the source/local usage mismatch, Hosted PostgreSQL 17 rollback gate
+and the one-time Hosted identity plus source-valid signed `ACCEPTED` E2E. r19
+first proved 39/39 plus 18/18 but exposed an unsupported Vitest
+`--minWorkers` option before live test collection; a real child-process smoke
+test and bounded allowlisted fd4 status protocol now prevent recurrence. r20
+then passed the full chain. Both Previews were deleted and three listings after
+each deletion showed only healthy Production. Live custody/credential
+resolvers, provider/model evaluation, human review and final activation
+approval remain open. Readiness remains false; no model call, real data,
+deployment or Production write occurred. See the
 [M1g-i handoff](communication-note-preview-terminal-accepted-usage-m1g-i.md).
 
 ### Current live/read-only evidence

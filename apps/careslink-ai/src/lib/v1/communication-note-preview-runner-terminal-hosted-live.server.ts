@@ -11,7 +11,7 @@ import {
   createTestOnlyCaresLinkV1CommunicationNotePreviewSignedRunnerTerminalRuntimePort,
 } from "./communication-note-preview-signed-runner-terminal-runtime-port.server";
 import {
-  createM1ghFailedRunnerTerminalEnvelope,
+  createM1giAcceptedRunnerTerminalEnvelope,
   createM1ghRunnerTerminalTrustFixture,
 } from "./communication-note-preview-runner-terminal-trust-test-fixtures";
 import { CaresLinkV1ContractError } from "./shared-contracts";
@@ -59,7 +59,13 @@ const CHAIN_CATALOG_SQL = `select
   reservation_record.slot_index,
   reservation_record.fixture_id,
   reservation_record.run_ordinal,
-  receipt_record.receipt_digest
+  reservation_record.request_body_sha256,
+  reservation_record.request_body_utf8_byte_length,
+  reservation_record.semantic_canonical_request_sha256,
+  receipt_record.receipt_digest,
+  receipt_record.signature_sha256 as receipt_signature_sha256,
+  receipt_record.usage as receipt_usage,
+  receipt_record.calculated_cost_upper_bound_micro_usd
 from careslink_v1_generation.communication_note_preview_authorizations
   as authorization_record
 join careslink_v1_generation.communication_note_preview_claims as claim_record
@@ -121,8 +127,9 @@ export type CaresLinkV1CommunicationNotePreviewRunnerTerminalHostedLiveQueryPort
 export type CaresLinkV1CommunicationNotePreviewRunnerTerminalHostedLiveEvidence =
   Readonly<{
     ok: true;
-    terminalState: "FAILED";
-    failureReason: "CANCELLED";
+    terminalState: "ACCEPTED";
+    failureReason: null;
+    continuationEligible: true;
     firstCreated: true;
     exactReplayCreated: false;
     validConflictRejected: true;
@@ -130,7 +137,8 @@ export type CaresLinkV1CommunicationNotePreviewRunnerTerminalHostedLiveEvidence 
     sourceTrustCompositionVerified: true;
     actualRuntimeLoginQueryVerified: true;
     finalExpectedLedgerCounts: readonly [1, 0, 1, 1, 1, 1];
-    acceptedPathBlockedByUsageContractMismatch: true;
+    acceptedNineKeyUsageVerified: true;
+    receiptSixFactProjectionVerified: true;
   }>;
 
 export async function runTestOnlyCaresLinkV1CommunicationNotePreviewRunnerTerminalHostedLiveGate(
@@ -253,21 +261,38 @@ export async function runTestOnlyCaresLinkV1CommunicationNotePreviewRunnerTermin
       fixtureId: catalog.fixtureId,
       runOrdinal: catalog.runOrdinal,
       observedAt: catalog.databaseNow,
+      requestBodySha256: catalog.requestBodySha256,
+      requestBodyUtf8ByteLength: catalog.requestBodyUtf8ByteLength,
+      semanticCanonicalRequestSha256:
+        catalog.semanticCanonicalRequestSha256,
+      receiptSignatureSha256: catalog.receiptSignatureSha256,
+      receiptUsage: catalog.receiptUsage,
+      calculatedCostUpperBoundMicroUsd:
+        catalog.calculatedCostUpperBoundMicroUsd,
     });
-    const envelope = createM1ghFailedRunnerTerminalEnvelope(fixture, {
+    const envelope = createM1giAcceptedRunnerTerminalEnvelope(fixture, {
       ...binding,
-      failureReason: "CANCELLED",
     });
-    const first = await runtimePort.persist(envelope);
-    const replay = await runtimePort.persist(envelope);
+    let first;
+    let replay;
+    try {
+      first = await runtimePort.persist(envelope);
+    } catch {
+      throw failed("RUNNER_TERMINAL_HOSTED_LIVE_FIRST_PERSIST_FAILED");
+    }
+    try {
+      replay = await runtimePort.persist(envelope);
+    } catch {
+      throw failed("RUNNER_TERMINAL_HOSTED_LIVE_REPLAY_PERSIST_FAILED");
+    }
     if (
       first.created !== true ||
-      first.state !== "FAILED" ||
-      first.continuationEligible !== false ||
+      first.state !== "ACCEPTED" ||
+      first.continuationEligible !== true ||
       first.status !== "RUNNER_TERMINAL_RECORDED" ||
       replay.created !== false ||
-      replay.state !== "FAILED" ||
-      replay.continuationEligible !== false ||
+      replay.state !== "ACCEPTED" ||
+      replay.continuationEligible !== true ||
       replay.status !== "ALREADY_RECORDED" ||
       replay.runnerTerminalDigest !== first.runnerTerminalDigest ||
       replay.recordedAt !== first.recordedAt
@@ -275,9 +300,9 @@ export async function runTestOnlyCaresLinkV1CommunicationNotePreviewRunnerTermin
       throw failed("RUNNER_TERMINAL_HOSTED_LIVE_REPLAY_FAILED");
     }
 
-    const conflict = createM1ghFailedRunnerTerminalEnvelope(fixture, {
+    const conflict = createM1giAcceptedRunnerTerminalEnvelope(fixture, {
       ...binding,
-      failureReason: "REPORT_INVALID",
+      totalTokensReconciliation: "CALCULATED",
     });
     let conflictRejected = false;
     try {
@@ -293,8 +318,9 @@ export async function runTestOnlyCaresLinkV1CommunicationNotePreviewRunnerTermin
 
     return Object.freeze({
       ok: true as const,
-      terminalState: "FAILED" as const,
-      failureReason: "CANCELLED" as const,
+      terminalState: "ACCEPTED" as const,
+      failureReason: null,
+      continuationEligible: true as const,
       firstCreated: true as const,
       exactReplayCreated: false as const,
       validConflictRejected: true as const,
@@ -304,7 +330,8 @@ export async function runTestOnlyCaresLinkV1CommunicationNotePreviewRunnerTermin
       finalExpectedLedgerCounts: Object.freeze([
         1, 0, 1, 1, 1, 1,
       ] as const),
-      acceptedPathBlockedByUsageContractMismatch: true as const,
+      acceptedNineKeyUsageVerified: true as const,
+      receiptSixFactProjectionVerified: true as const,
     });
   } catch (error) {
     if (isHostedLiveError(error)) throw error;
@@ -497,6 +524,10 @@ export function assertCaresLinkV1CommunicationNotePreviewRunnerTerminalHostedSql
     appendOnlyProofLocked: postcheck.includes(
       "IMMUTABLE_PREVIEW_EXECUTION_AUTHORITY_LEDGER",
     ),
+    acceptedUsageProjectionLocked:
+      postcheck.includes("totalTokensReconciliation") &&
+      postcheck.includes("reasoningTokensReconciliation") &&
+      postcheck.includes("v_receipt.usage"),
     temporaryLoginOnlyCleanup: true as const,
   });
 }
@@ -551,7 +582,7 @@ async function runScriptTransaction(
     await queryPort.query(script);
     await queryPort.query("commit");
     transactionOpen = false;
-  } catch {
+  } catch (error) {
     if (transactionOpen) {
       try {
         await queryPort.query("rollback");
@@ -559,8 +590,23 @@ async function runScriptTransaction(
         // Only the fixed gate error is externally observable.
       }
     }
+    const assertionCode = safeHostedSqlAssertionCode(error);
+    if (assertionCode) throw failed(assertionCode);
     throw failed(failureCode);
   }
+}
+
+function safeHostedSqlAssertionCode(value: unknown) {
+  if (!(value instanceof Error)) return "";
+  const code = value.message;
+  if (
+    !/^(?:RUNNER_TERMINAL_VALID_(?:EXPECTED_APPEND_ONLY_REJECTION|POSTCHECK_(?:APPEND_ONLY_FAILED|CLEANUP_FAILED|LEDGER_COUNTS_FAILED|MANAGEMENT_UNSAFE|PROBE_BASELINE_DRIFT|PROBE_CLEANUP_FAILED|RUNTIME_UNSAFE|TERMINAL_FAILED|TRIGGER_DRIFT)|SETUP_(?:AUTHORIZATION_FAILED|DISPATCH_FAILED|FIXTURE_UNSAFE|LEDGER_NOT_EMPTY|MANAGEMENT_MEMBERSHIP_DRIFT|MANAGEMENT_UNSAFE|POSTCHECK_FAILED|RECEIPT_FAILED|RPC_DRIFT|RUNTIME_UNSAFE))|RUNNER_TERMINAL_IDENTITY_QUIESCE_(?:MANAGEMENT_UNSAFE|POSTCHECK_FAILED))$/.test(
+      code,
+    )
+  ) {
+    return "";
+  }
+  return code;
 }
 
 function parseManagementClock(value: unknown, expectedPostgresMajor: 16 | 17) {
@@ -594,7 +640,15 @@ function parseChainCatalog(
     !SHA256_PATTERN.test(String(row.receipt_digest)) ||
     row.slot_index !== 0 ||
     row.fixture_id !== "communication.en.phone-duration.v1" ||
-    row.run_ordinal !== 1
+    row.run_ordinal !== 1 ||
+    row.request_body_sha256 !==
+      "98d37d028c742a2e05d079a38e0d6b27fb1fe91a71d397a4bdc9ed607af45213" ||
+    row.request_body_utf8_byte_length !== 2522 ||
+    row.semantic_canonical_request_sha256 !==
+      "f404c8f239c20b49a40836a371e928dd6241e95dca598ae8661193443c7c6a68" ||
+    !SHA256_PATTERN.test(String(row.receipt_signature_sha256)) ||
+    row.calculated_cost_upper_bound_micro_usd !== 481 ||
+    !isExactReceiptUsage(row.receipt_usage)
   ) {
     throw failed("RUNNER_TERMINAL_HOSTED_LIVE_CATALOG_FAILED");
   }
@@ -606,7 +660,58 @@ function parseChainCatalog(
     slotIndex: 0 as const,
     fixtureId: "communication.en.phone-duration.v1" as const,
     runOrdinal: 1 as const,
+    requestBodySha256: row.request_body_sha256 as string,
+    requestBodyUtf8ByteLength: 2522 as const,
+    semanticCanonicalRequestSha256:
+      row.semantic_canonical_request_sha256 as string,
+    receiptSignatureSha256: row.receipt_signature_sha256 as string,
+    receiptUsage: Object.freeze({
+      source: "PROVIDER" as const,
+      inputTokens: 120,
+      outputTokens: 80,
+      totalTokens: 200,
+      cachedInputTokens: 20,
+      reasoningTokens: 10,
+    }),
+    calculatedCostUpperBoundMicroUsd: 481 as const,
   });
+}
+
+function isExactReceiptUsage(value: unknown) {
+  if (
+    !value ||
+    typeof value !== "object" ||
+    Array.isArray(value) ||
+    nodeTypes.isProxy(value) ||
+    (Object.getPrototypeOf(value) !== Object.prototype &&
+      Object.getPrototypeOf(value) !== null) ||
+    Object.getOwnPropertySymbols(value).length !== 0
+  ) {
+    return false;
+  }
+  const expectedKeys = [
+    "cachedInputTokens",
+    "inputTokens",
+    "outputTokens",
+    "reasoningTokens",
+    "source",
+    "totalTokens",
+  ].sort();
+  const keys = Object.getOwnPropertyNames(value).sort();
+  if (keys.join("\n") !== expectedKeys.join("\n")) return false;
+  const usage = value as Record<string, unknown>;
+  for (const key of expectedKeys) {
+    const descriptor = Object.getOwnPropertyDescriptor(usage, key);
+    if (!descriptor || !descriptor.enumerable || !("value" in descriptor)) {
+      return false;
+    }
+  }
+  return usage.source === "PROVIDER" &&
+    usage.inputTokens === 120 &&
+    usage.outputTokens === 80 &&
+    usage.totalTokens === 200 &&
+    usage.cachedInputTokens === 20 &&
+    usage.reasoningTokens === 10;
 }
 
 function singleDataRow(value: unknown): Record<string, unknown> {

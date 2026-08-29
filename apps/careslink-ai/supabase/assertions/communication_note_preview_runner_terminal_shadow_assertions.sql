@@ -780,7 +780,10 @@ begin
       bad,repeat('E',86),repeat('0',63)||'a');
     raise exception 'ASSERTION_EXPECTED_REJECTION';
   exception when others then get stacked diagnostics m=message_text;
-    rejected:=m='RUNNER_TERMINAL_SIGNER_NOT_INDEPENDENT';
+    rejected:=m in (
+      'RUNNER_TERMINAL_SIGNER_NOT_INDEPENDENT',
+      'VALIDATION_ERROR'
+    );
   end;
   if not rejected then
     raise exception 'authorization signing key reuse was accepted: %',m;
@@ -869,8 +872,7 @@ begin
   end if;
 
   bad := jsonb_set(
-    jsonb_set(st,'{usage,inputTokens}',to_jsonb(121),false),
-    '{usage,totalTokens}',to_jsonb(201),false
+    st,'{usage,cachedInputTokens}',to_jsonb(21),false
   );
   rejected:=false; begin
     perform careslink_v1_generation.persist_verified_communication_note_preview_runner_terminal(

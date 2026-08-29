@@ -56,7 +56,7 @@ begin
     or pg_catalog.jsonb_typeof(p_statement) <> 'object'
     or not coalesce(p_signature_base64url ~ '^[A-Za-z0-9_-]{86}$', false)
     or not coalesce(p_verifier_identity_hmac ~ '^[a-f0-9]{64}$', false)
-    or (select pg_catalog.array_agg(key order by key)
+    or (select pg_catalog.array_agg(key order by key collate "C")
         from pg_catalog.jsonb_object_keys(p_statement) as keys(key)) is distinct from
       array[
         'authorityPolicyDigest','authorizationDigest',
@@ -146,7 +146,7 @@ begin
         and (p_statement->>'preflightInputTokens')::integer between 1 and 10000
         and case
           when pg_catalog.jsonb_typeof(p_statement->'usage') = 'object' then
-            (select pg_catalog.array_agg(key order by key)
+            (select pg_catalog.array_agg(key order by key collate "C")
              from pg_catalog.jsonb_object_keys(
                p_statement->'usage'
              ) as usage_keys(key)) is not distinct from
