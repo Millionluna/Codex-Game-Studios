@@ -221,6 +221,32 @@ and
 they are source-integrity bindings, not configuration or approval. No Hosted,
 provider/model, deployment or Production capability is introduced.
 
+Communication Note M1g-h adds no persistent environment variable, secret name
+or `.env.example` entry. Its disposable-Preview commands take four explicit
+CLI-only assertions: the expected Preview ref, expected PostgreSQL major, an
+absolute CA path and the expected CA SHA-256. For the recorded attempt those
+were `hspkccjobyqmoomiidjp`, `17`,
+`/Users/milliohusky/Downloads/prod-ca-2021.crt` and
+`700723581420dd1ac98fd7e9ac529f0ef210eadcaf87fc868a3ad7d114c2f3b7`.
+They are invocation evidence, not product configuration, approval or a secret
+resolver.
+
+Bounded Supabase branch JSON enters through stdin only. Credential-bearing
+child configuration enters through an anonymous fd3 pipe and process memory,
+and the one-test worker receives a strict environment allowlist. Ambient `PG*`
+values, `NODE_TLS_REJECT_UNAUTHORIZED=0`, Production/mismatched refs and
+unverified CA bytes fail closed. The random database password exists only in
+memory and belongs to a short-lived role that the harness is designed to set
+`NOLOGIN`, drain, revoke and drop.
+
+The Hosted sequence stopped before creating that role and the whole no-data
+Preview was deleted. No branch JSON, URL, password or certificate body was
+written to an environment file or evidence document. Registry/composition
+statuses remain test-only, readiness remains `false`, and an environment value
+cannot manufacture an approved trust registry, custody provenance, signing key,
+database identity or passing Hosted gate. Detailed boundaries are in
+`documentation/communication-note-preview-hosted-runner-terminal-identity-m1g-h.md`.
+
 ## Current auth, URL and feature variables
 
 | Variable | Class | Purpose | Boundary |

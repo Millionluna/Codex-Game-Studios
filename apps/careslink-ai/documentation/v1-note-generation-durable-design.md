@@ -1519,3 +1519,59 @@ remain absent. M1g-g creates no product route, worker, queue, cron, Supabase
 Function, provider/model call, Hosted application, deployment or Production
 change. Detailed scope is in
 `documentation/communication-note-preview-signed-runner-terminal-port-m1g-g.md`.
+
+## 23. Communication runner-terminal trust composition and disposable Hosted identity M1g-h — 2026-08-29
+
+M1g-h is the additive successor to M1g-g. It does not change the signed
+statement or database schema. Instead, it makes the missing source composition
+explicit: a test-only external registry candidate is validated against the
+M1g-c custody and M1g-g terminal-policy digests, then combined with the exact
+fifth caller into one private branded record. Only that composition may derive
+the signed verifier, runtime persistence boundary and exact PostgreSQL port.
+Private `WeakMap` records keep the trusted signing snapshot and caller input out
+of public evidence. Cross-composition terminals and ports, stale/future
+observations, raw key/caller substitution and non-exact RPC identities fail
+closed.
+
+The public registry and composition states deliberately say
+`TEST_ONLY_VALIDATED_NOT_APPROVED` and `TEST_ONLY_COMPOSED_NOT_APPROVED`. They
+prove validation by this module, not external registry authenticity, revocation
+freshness, live KMS custody or owner approval. The corresponding readiness is
+literal `false`; approved registry, composition, runtime and PostgreSQL values
+remain `undefined`.
+
+The disposable database identity design creates a random ten-minute
+`NOINHERIT`, connection-limit-1 LOGIN only after exact non-Production branch,
+PostgreSQL-major and pinned-CA checks. Its sole usable edge is SET-only
+membership into the existing fifth `NOLOGIN` caller, with
+`ADMIN=false`/`INHERIT=false`/`SET=true`. The login has no direct object or
+executor privilege. Cleanup applies `NOLOGIN`, rejects reconnect, closes or
+drains the exact sessions, revokes the edge and drops the role. Branch metadata
+and credentials are bounded to stdin, anonymous fd3 and memory rather than
+persistent environment variables or files.
+
+The local PostgreSQL 16.15 gate applied all 38 migrations and proved the
+source-valid signed `FAILED`/`CANCELLED` terminal path end to end: a fresh row,
+write-free exact replay, altered valid-signature conflict, append-only
+enforcement, final ledger counts `1/0/1/1/1/1` and role deletion. It did not
+prove `ACCEPTED`: the source statement has nine usage keys but migration 38
+requires exact equality with the stored receipt's six-key usage object. That
+schema/source mismatch remains a release blocker.
+
+The authorized Hosted attempt used disposable, non-default, non-persistent,
+no-data Preview `hspkccjobyqmoomiidjp`. Supabase CLI 2.115 first failed
+migration 37 because its statement-by-statement executor placed `LOCK TABLE`
+outside a transaction. Temporary outer transaction wrappers produced the exact
+38-version history and were then removed from source; branch operation metadata
+retained `MIGRATIONS_FAILED` while the Preview remained `ACTIVE_HEALTHY`.
+
+The 18-file rollback manifest
+`163ddd40e68f8c2accc8904c4b7165c6630ba8fdad58b54a674d4f27908273f1`
+then returned `SCHEMA_ROLLBACK_ASSERTION_FAILED`. The no-write one-time identity
+probe and signed runtime-to-Hosted-PostgreSQL terminal gate were not run. The
+Preview was deleted, three later listings showed it absent, and only healthy
+default Production `adocsnwnslxhxcjgbyee` remained. Thus M1g-h supplies useful
+source/local evidence and a safe Hosted failure/teardown record, but no passing
+Hosted E2E, product runtime activation, provider/model call, real care data,
+deployment or Production change. Full evidence and advisor links are in
+`documentation/communication-note-preview-hosted-runner-terminal-identity-m1g-h.md`.

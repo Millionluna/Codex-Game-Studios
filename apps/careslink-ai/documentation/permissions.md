@@ -457,6 +457,35 @@ custody digests are respectively
 and
 `f537dc64e3c57a34b6db6d0d1c871c38a70bcb51c4d071e625b026f840a309ca`.
 
+### Communication Note Preview runner-terminal trust composition and disposable identity M1g-h (test-only)
+
+M1g-h source-cross-binds the terminal verifier, runtime port and exact
+PostgreSQL port to one branded custody/trust composition. The registry status
+is `TEST_ONLY_VALIDATED_NOT_APPROVED`; the composition status is
+`TEST_ONLY_COMPOSED_NOT_APPROVED`. Raw signing keys, caller records and database
+credentials cannot be substituted for the branded objects. This is a local
+validation boundary, not approval or authenticated external provenance.
+
+The disposable identity policy permits a random, ten-minute, connection-limit-1
+LOGIN only on an exact non-Production Preview. The role is `NOINHERIT` and may
+receive exactly one membership into
+`careslink_v1_preview_runner_terminal_caller` with `ADMIN=false`,
+`INHERIT=false` and `SET=true`. It receives no direct schema, table, sequence,
+executor, API/service-role or other RPC privilege. Teardown first applies
+`NOLOGIN`, rejects new connections, closes or drains the exact sessions, then
+revokes the membership and drops the LOGIN.
+
+The authorized Hosted run stopped at the earlier 18-file rollback gate with
+`SCHEMA_ROLLBACK_ASSERTION_FAILED`, so that one-time LOGIN was not created and
+no Hosted caller assumption or signed terminal write is claimed. The entire
+no-data Preview was deleted; three subsequent listings left only the healthy
+default Production branch. Local PostgreSQL 16.15 did prove the same identity
+shape and source-valid signed `FAILED`/`CANCELLED` path, but local evidence does
+not grant a persistent Hosted identity or runtime permission. Readiness remains
+`false`, approved values remain `undefined`, and no Production, deployment,
+provider/model or real-data permission was added. Detailed evidence is in
+`documentation/communication-note-preview-hosted-runner-terminal-identity-m1g-h.md`.
+
 ## Intended V1 matrix (partly codified, not available at runtime)
 
 | Target resource | Owner | Admin/support | Service/backend | Required control |

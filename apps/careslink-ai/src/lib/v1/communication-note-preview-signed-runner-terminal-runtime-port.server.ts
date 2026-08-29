@@ -3,15 +3,18 @@ import "server-only";
 import { types as nodeTypes } from "node:util";
 
 import {
-  type CaresLinkV1CommunicationNotePreviewRunnerTerminalTrustedSigningKey,
   type CaresLinkV1VerifiedCommunicationNotePreviewRunnerTerminal,
-  verifyTestOnlyCaresLinkV1CommunicationNotePreviewSignedRunnerTerminal,
 } from "./communication-note-preview-runner-terminal-policy.server";
 import {
   CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RUNNER_TERMINAL_CALLER_ROLE,
   CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RUNNER_TERMINAL_DATABASE_PURPOSE,
+  requireTestOnlyCaresLinkV1CommunicationNotePreviewRunnerTerminalPostgresPort,
   type CaresLinkV1CommunicationNotePreviewRunnerTerminalAuthenticatedDatabasePort,
 } from "./communication-note-preview-runner-terminal-postgres.server";
+import {
+  requireTestOnlyCaresLinkV1CommunicationNotePreviewRunnerTerminalTrustComposition,
+  verifyTestOnlyCaresLinkV1CommunicationNotePreviewRunnerTerminalWithTrustComposition,
+} from "./communication-note-preview-runner-terminal-trust-composition.server";
 import { CaresLinkV1ContractError } from "./shared-contracts";
 
 export {
@@ -54,17 +57,23 @@ export function createTestOnlyCaresLinkV1CommunicationNotePreviewSignedRunnerTer
 ): CaresLinkV1CommunicationNotePreviewSignedRunnerTerminalRuntimePort {
   const options = exactDataRecord(value, [
     "capability",
-    "trustedSigningKeySnapshot",
+    "trustComposition",
     "databasePort",
     "clock",
   ]);
   if (options.capability !== "TEST_ONLY_SIGNED_RUNNER_TERMINAL_RUNTIME_PORT") {
     throw unavailable();
   }
-  const databasePort = validateDatabasePort(options.databasePort);
+  const trustComposition =
+    requireTestOnlyCaresLinkV1CommunicationNotePreviewRunnerTerminalTrustComposition(
+      options.trustComposition,
+    );
+  const databasePort =
+    requireTestOnlyCaresLinkV1CommunicationNotePreviewRunnerTerminalPostgresPort(
+      options.databasePort,
+      trustComposition,
+    );
   const clock = validateClock(options.clock);
-  const trustedSigningKeySnapshot =
-    options.trustedSigningKeySnapshot as CaresLinkV1CommunicationNotePreviewRunnerTerminalTrustedSigningKey;
 
   return Object.freeze({
     purpose:
@@ -77,9 +86,10 @@ export function createTestOnlyCaresLinkV1CommunicationNotePreviewSignedRunnerTer
         throw unavailable();
       }
       const verified =
-        verifyTestOnlyCaresLinkV1CommunicationNotePreviewSignedRunnerTerminal(
+        verifyTestOnlyCaresLinkV1CommunicationNotePreviewRunnerTerminalWithTrustComposition(
+          trustComposition,
           envelope,
-          { trustedKeySnapshot: trustedSigningKeySnapshot, now },
+          now,
         );
       let rawResult: unknown;
       try {
@@ -126,32 +136,6 @@ function safeErrorCode(value: unknown) {
   return descriptor && "value" in descriptor && typeof descriptor.value === "string"
     ? descriptor.value
     : "";
-}
-
-function validateDatabasePort(value: unknown) {
-  const object = exactDataRecord(value, [
-    "purpose",
-    "callerRole",
-    "persistVerifiedRunnerTerminal",
-  ]);
-  if (
-    object.purpose !==
-      CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RUNNER_TERMINAL_DATABASE_PURPOSE ||
-    object.callerRole !==
-      CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RUNNER_TERMINAL_CALLER_ROLE ||
-    typeof object.persistVerifiedRunnerTerminal !== "function"
-  ) {
-    throw unavailable();
-  }
-  return Object.freeze({
-    purpose:
-      CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RUNNER_TERMINAL_DATABASE_PURPOSE,
-    callerRole:
-      CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RUNNER_TERMINAL_CALLER_ROLE,
-    persistVerifiedRunnerTerminal: object.persistVerifiedRunnerTerminal as (
-      verified: CaresLinkV1VerifiedCommunicationNotePreviewRunnerTerminal,
-    ) => PromiseLike<unknown>,
-  });
 }
 
 function validateClock(value: unknown) {

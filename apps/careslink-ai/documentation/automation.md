@@ -298,6 +298,25 @@ No Hosted Supabase action, real provider/model call, deployment or Production
 change occurred. See
 `documentation/communication-note-preview-signed-runner-terminal-port-m1g-g.md`.
 
+M1g-h composes those source ports with a content-free, branded test registry
+and a disposable-Preview identity harness. It is test orchestration, not a
+worker, queue, cron, retry loop or product automation. Registry and composition
+statuses remain `TEST_ONLY_VALIDATED_NOT_APPROVED` and
+`TEST_ONLY_COMPOSED_NOT_APPROVED`; live readiness stays `false` and all
+approved values stay absent.
+
+The local PostgreSQL 16.15 harness proved a source-valid signed
+`FAILED`/`CANCELLED` terminal, fresh insert, write-free exact replay, altered
+valid-signature conflict and final six-ledger counts `1/0/1/1/1/1`. The
+corresponding Hosted run did not reach that terminal path: its preceding
+18-file rollback bundle returned `SCHEMA_ROLLBACK_ASSERTION_FAILED`, so the
+one-time LOGIN, no-write identity probe and signed runtime-to-PostgreSQL gate
+were skipped. The no-data Preview was deleted and Production remained healthy.
+`ACCEPTED` is still blocked by the source nine-key versus stored receipt
+six-key usage mismatch. No provider transport, model call, paid model spend,
+deployment, retained identity or automatic action occurred. See
+`documentation/communication-note-preview-hosted-runner-terminal-identity-m1g-h.md`.
+
 Supabase CLI 2.115.0 has since generated source-only migration `20260823213144_harden_v1_note_generation_registration_retention.sql`. It adds `attempts_registration_digest_idx` and the named `attempts_registration_catalog_fk` from `attempts.registration_digest` to `worker_registrations.registration_digest`, with update/delete `RESTRICT`, `NOT VALID` creation and explicit validation. It creates no seed, caller grant, runtime surface or Production change. Its local gate passed 39/39 focused contracts, the full 125-file / 1,381-test suite, lint, TypeScript, the 63/63-page production build, the 73-file Codex-adapter sync check and `git diff --check`. Deleted disposable `r22` then clean-applied the current manifest 15/15 and passed the seven rollback suites; the hosted registration-retention gate is now closed without enabling any runtime automation.
 
 ### PostgreSQL 16.15 local isolated gate — 2026-08-24

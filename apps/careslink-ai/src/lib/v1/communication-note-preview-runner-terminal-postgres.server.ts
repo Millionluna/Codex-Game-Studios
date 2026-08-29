@@ -8,6 +8,12 @@ import {
   isTestOnlyCaresLinkV1VerifiedCommunicationNotePreviewRunnerTerminal,
   type CaresLinkV1VerifiedCommunicationNotePreviewRunnerTerminal,
 } from "./communication-note-preview-runner-terminal-policy.server";
+import {
+  requireTestOnlyCaresLinkV1CommunicationNotePreviewRunnerTerminalTrustComposition,
+  requireTestOnlyCaresLinkV1CommunicationNotePreviewRunnerTerminalVerifiedForTrustComposition,
+  resolveTestOnlyCaresLinkV1CommunicationNotePreviewRunnerTerminalCallerIdentity,
+  type CaresLinkV1CommunicationNotePreviewRunnerTerminalTrustComposition,
+} from "./communication-note-preview-runner-terminal-trust-composition.server";
 import { CaresLinkV1ContractError } from "./shared-contracts";
 
 export const CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RUNNER_TERMINAL_POSTGRES_READY =
@@ -77,29 +83,49 @@ export const CARESLINK_V1_COMMUNICATION_NOTE_APPROVED_RUNNER_TERMINAL_POSTGRES_P
     | CaresLinkV1CommunicationNotePreviewRunnerTerminalAuthenticatedDatabasePort
     | undefined;
 
+const AUTHENTICATED_DATABASE_PORTS = new WeakMap<
+  object,
+  CaresLinkV1CommunicationNotePreviewRunnerTerminalTrustComposition
+>();
+
 export function createTestOnlyCaresLinkV1CommunicationNotePreviewRunnerTerminalPostgresPort(
   value: unknown,
 ): CaresLinkV1CommunicationNotePreviewRunnerTerminalAuthenticatedDatabasePort {
   const options = exactDataRecord(value, [
     "capability",
-    "callerIdentity",
+    "trustComposition",
     "queryPort",
   ]);
   if (options.capability !== "TEST_ONLY_RUNNER_TERMINAL_POSTGRES_PORT") {
     throw unavailable();
   }
-  const callerIdentity = validateCallerIdentity(options.callerIdentity);
+  const trustComposition =
+    requireTestOnlyCaresLinkV1CommunicationNotePreviewRunnerTerminalTrustComposition(
+      options.trustComposition,
+    );
+  const callerIdentity = validateCallerIdentity(
+    resolveTestOnlyCaresLinkV1CommunicationNotePreviewRunnerTerminalCallerIdentity(
+      trustComposition,
+    ),
+  );
   const queryPortObject = exactDataRecord(options.queryPort, ["query"]);
   if (typeof queryPortObject.query !== "function") throw unavailable();
   const query = queryPortObject.query as CaresLinkV1CommunicationNotePreviewRunnerTerminalPostgresQueryPort["query"];
 
-  return Object.freeze({
+  const port = Object.freeze({
     purpose:
       CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RUNNER_TERMINAL_DATABASE_PURPOSE,
     callerRole:
       CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RUNNER_TERMINAL_CALLER_ROLE,
-    async persistVerifiedRunnerTerminal(verified) {
-      const terminal = validateVerifiedTerminal(verified);
+    async persistVerifiedRunnerTerminal(
+      verified: CaresLinkV1VerifiedCommunicationNotePreviewRunnerTerminal,
+    ) {
+      const terminal = validateVerifiedTerminal(
+        requireTestOnlyCaresLinkV1CommunicationNotePreviewRunnerTerminalVerifiedForTrustComposition(
+          verified,
+          trustComposition,
+        ),
+      );
       let rawResult: unknown;
       try {
         rawResult = await query(
@@ -116,6 +142,24 @@ export function createTestOnlyCaresLinkV1CommunicationNotePreviewRunnerTerminalP
       return row.data;
     },
   });
+  AUTHENTICATED_DATABASE_PORTS.set(port, trustComposition);
+  return port;
+}
+
+export function requireTestOnlyCaresLinkV1CommunicationNotePreviewRunnerTerminalPostgresPort(
+  value: unknown,
+  trustComposition: unknown,
+): CaresLinkV1CommunicationNotePreviewRunnerTerminalAuthenticatedDatabasePort {
+  const requiredComposition =
+    requireTestOnlyCaresLinkV1CommunicationNotePreviewRunnerTerminalTrustComposition(
+      trustComposition,
+    );
+  if (!value || typeof value !== "object" || nodeTypes.isProxy(value)) {
+    throw unavailable();
+  }
+  const boundComposition = AUTHENTICATED_DATABASE_PORTS.get(value);
+  if (boundComposition !== requiredComposition) throw unavailable();
+  return value as CaresLinkV1CommunicationNotePreviewRunnerTerminalAuthenticatedDatabasePort;
 }
 
 function validateCallerIdentity(

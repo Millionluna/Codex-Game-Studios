@@ -1,15 +1,8 @@
-import { createHash, generateKeyPairSync, sign as signEd25519 } from "node:crypto";
 import { readFileSync } from "node:fs";
 
 import { describe, expect, it, vi } from "vitest";
 
 import {
-  CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RUNNER_TERMINAL_DOMAIN,
-  CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RUNNER_TERMINAL_POLICY_DIGEST,
-  CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RUNNER_TERMINAL_POLICY_VERSION,
-  CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RUNNER_TERMINAL_SIGNING_PURPOSE,
-  CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RUNNER_TERMINAL_STATEMENT_VERSION,
-  createCaresLinkV1CommunicationNotePreviewRunnerTerminalSigningMessage,
   verifyTestOnlyCaresLinkV1CommunicationNotePreviewSignedRunnerTerminal,
 } from "./communication-note-preview-runner-terminal-policy.server";
 import {
@@ -22,18 +15,27 @@ import {
   CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RUNNER_TERMINAL_POSTGRES_SQL,
   createTestOnlyCaresLinkV1CommunicationNotePreviewRunnerTerminalPostgresPort,
 } from "./communication-note-preview-runner-terminal-postgres.server";
+import {
+  verifyTestOnlyCaresLinkV1CommunicationNotePreviewRunnerTerminalWithTrustComposition,
+} from "./communication-note-preview-runner-terminal-trust-composition.server";
+import {
+  createM1ghFailedRunnerTerminalEnvelope,
+  createM1ghRunnerTerminalTrustFixture,
+  M1GH_TEST_NOW,
+} from "./communication-note-preview-runner-terminal-trust-test-fixtures";
 
 vi.mock("server-only", () => ({}));
 
-const NOW = "2026-08-29T01:00:00.000Z";
-const VERIFIER_IDENTITY_HMAC = sha("runner-terminal-postgres-verifier");
+const NOW = M1GH_TEST_NOW;
+const VERIFIER_IDENTITY_HMAC = "e".repeat(64);
 
 describe("Communication Note runner-terminal Postgres adapter", () => {
   it("uses one fixed SQL statement and injects its verifier identity binding", async () => {
-    const verified = createVerifiedFixture();
+    const fixture = createM1ghRunnerTerminalTrustFixture();
+    const verified = createVerifiedFixture(fixture);
     const data = Object.freeze({ opaque: "database-envelope" });
     const query = vi.fn(async () => ({ rows: [{ data }] }));
-    const port = createPort(query);
+    const port = createPort(query, fixture.trustComposition);
     await expect(port.persistVerifiedRunnerTerminal(verified)).resolves.toBe(data);
     expect(query).toHaveBeenCalledWith(
       CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RUNNER_TERMINAL_POSTGRES_SQL,
@@ -61,15 +63,26 @@ describe("Communication Note runner-terminal Postgres adapter", () => {
   });
 
   it("requires the unforgeable identity of a policy-verified terminal", async () => {
-    const verified = createVerifiedFixture();
+    const fixture = createM1ghRunnerTerminalTrustFixture();
+    const verified = createVerifiedFixture(fixture);
     const query = vi.fn();
-    const port = createPort(query);
+    const port = createPort(query, fixture.trustComposition);
     const forged = { ...verified };
     await expect(
       (port.persistVerifiedRunnerTerminal as (value: unknown) => PromiseLike<unknown>)(
         forged,
       ),
     ).rejects.toMatchObject({ code: "PRODUCT_API_DISABLED" });
+    const directlyVerified =
+      verifyTestOnlyCaresLinkV1CommunicationNotePreviewSignedRunnerTerminal(
+        createM1ghFailedRunnerTerminalEnvelope(fixture),
+        {
+          trustedKeySnapshot: fixture.runnerTerminalSigner.trustedKey,
+          now: NOW,
+        },
+      );
+    await expect(port.persistVerifiedRunnerTerminal(directlyVerified)).rejects
+      .toMatchObject({ code: "PRODUCT_API_DISABLED" });
     expect(query).not.toHaveBeenCalled();
   });
 
@@ -80,23 +93,29 @@ describe("Communication Note runner-terminal Postgres adapter", () => {
     [{ code: "P0001", message: "VALIDATION_ERROR" }, "VALIDATION_ERROR"],
     [{ code: "XX000", message: "database-secret" }, "PRODUCT_API_DISABLED"],
   ] as const)("maps database failures to fixed product errors", async (failure, code) => {
-    const verified = createVerifiedFixture();
+    const fixture = createM1ghRunnerTerminalTrustFixture();
+    const verified = createVerifiedFixture(fixture);
     const query = vi.fn(async () => {
       throw Object.assign(new Error(failure.message), failure);
     });
-    const rejection = createPort(query).persistVerifiedRunnerTerminal(verified);
+    const rejection = createPort(query, fixture.trustComposition)
+      .persistVerifiedRunnerTerminal(verified);
     await expect(rejection).rejects.toMatchObject({ code });
     await expect(rejection).rejects.not.toThrow(/secret/i);
   });
 
   it("rejects proxied/accessor-backed row envelopes without invoking traps", async () => {
-    const verified = createVerifiedFixture();
+    const fixture = createM1ghRunnerTerminalTrustFixture();
+    const verified = createVerifiedFixture(fixture);
     const proxyTrap = vi.fn(() => {
       throw new Error("proxy secret");
     });
     const proxyRows = new Proxy([{ data: {} }], { get: proxyTrap });
     await expect(
-      createPort(vi.fn(async () => ({ rows: proxyRows })))
+      createPort(
+        vi.fn(async () => ({ rows: proxyRows })),
+        fixture.trustComposition,
+      )
         .persistVerifiedRunnerTerminal(verified),
     ).rejects.toMatchObject({ code: "PRODUCT_API_DISABLED" });
     expect(proxyTrap).not.toHaveBeenCalled();
@@ -108,20 +127,27 @@ describe("Communication Note runner-terminal Postgres adapter", () => {
       },
     });
     await expect(
-      createPort(vi.fn(async () => ({ rows: [accessor] })))
+      createPort(
+        vi.fn(async () => ({ rows: [accessor] })),
+        fixture.trustComposition,
+      )
         .persistVerifiedRunnerTerminal(verified),
     ).rejects.toMatchObject({ code: "PRODUCT_API_DISABLED" });
   });
 
   it("sanitizes thrown proxies and keeps the adapter source-only/default-off", async () => {
-    const verified = createVerifiedFixture();
+    const fixture = createM1ghRunnerTerminalTrustFixture();
+    const verified = createVerifiedFixture(fixture);
     const thrownProxy = new Proxy({}, {
       get: () => {
         throw new Error("proxy error secret");
       },
     });
     await expect(
-      createPort(vi.fn(async () => { throw thrownProxy; }))
+      createPort(
+        vi.fn(async () => { throw thrownProxy; }),
+        fixture.trustComposition,
+      )
         .persistVerifiedRunnerTerminal(verified),
     ).rejects.toMatchObject({ code: "PRODUCT_API_DISABLED" });
     expect(CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RUNNER_TERMINAL_POSTGRES_READY)
@@ -145,10 +171,11 @@ describe("Communication Note runner-terminal Postgres adapter", () => {
   });
 
   it("rejects expanded connection/factory inputs", () => {
+    const fixture = createM1ghRunnerTerminalTrustFixture();
     expect(() =>
       createTestOnlyCaresLinkV1CommunicationNotePreviewRunnerTerminalPostgresPort({
         capability: "TEST_ONLY_RUNNER_TERMINAL_POSTGRES_PORT",
-        callerIdentity: createCallerIdentity(),
+        trustComposition: fixture.trustComposition,
         queryPort: { query: vi.fn() },
         connectionString: "postgres://forbidden",
       }),
@@ -156,31 +183,27 @@ describe("Communication Note runner-terminal Postgres adapter", () => {
     expect(() =>
       createTestOnlyCaresLinkV1CommunicationNotePreviewRunnerTerminalPostgresPort({
         capability: "TEST_ONLY_RUNNER_TERMINAL_POSTGRES_PORT",
-        callerIdentity: {
-          ...createCallerIdentity(),
-          purpose:
-            CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RUNNER_TERMINAL_SIGNING_PURPOSE,
-        },
+        callerIdentity: createCallerIdentity(),
         queryPort: { query: vi.fn() },
       }),
     ).toThrowError(expect.objectContaining({ code: "PRODUCT_API_DISABLED" }));
     expect(() =>
       createTestOnlyCaresLinkV1CommunicationNotePreviewRunnerTerminalPostgresPort({
         capability: "TEST_ONLY_RUNNER_TERMINAL_POSTGRES_PORT",
-        callerIdentity: {
-          ...createCallerIdentity(),
-          credentialReferenceSha256: VERIFIER_IDENTITY_HMAC,
-        },
+        trustComposition: { ...fixture.trustComposition },
         queryPort: { query: vi.fn() },
       }),
     ).toThrowError(expect.objectContaining({ code: "PRODUCT_API_DISABLED" }));
   });
 });
 
-function createPort(query: (...args: never[]) => PromiseLike<unknown>) {
+function createPort(
+  query: (...args: never[]) => PromiseLike<unknown>,
+  trustComposition: unknown,
+) {
   return createTestOnlyCaresLinkV1CommunicationNotePreviewRunnerTerminalPostgresPort({
     capability: "TEST_ONLY_RUNNER_TERMINAL_POSTGRES_PORT",
-    callerIdentity: createCallerIdentity(),
+    trustComposition,
     queryPort: { query },
   });
 }
@@ -194,7 +217,7 @@ function createCallerIdentity() {
       "persist_verified_communication_note_preview_runner_terminal",
     ] as const,
     identityHmac: VERIFIER_IDENTITY_HMAC,
-    credentialReferenceSha256: sha("runner-terminal-credential-reference"),
+    credentialReferenceSha256: "5".repeat(64),
     databaseLogin: false as const,
     executorMembershipEnabled: false as const,
     rawCredentialMaterialPresent: false as const,
@@ -202,80 +225,12 @@ function createCallerIdentity() {
   };
 }
 
-function createVerifiedFixture() {
-  const { privateKey, publicKey } = generateKeyPairSync("ed25519");
-  const publicKeyDer = publicKey.export({ type: "spki", format: "der" });
-  const keyId = "runner-terminal-key:postgres-test";
-  const trustedKey = {
-    keyId,
-    publicKeySpkiDerBase64: publicKeyDer.toString("base64"),
-    publicKeySha256: createHash("sha256").update(publicKeyDer).digest("hex"),
-    status: "ACTIVE" as const,
-    notBefore: "2026-08-28T00:00:00.000Z",
-    expiresAt: "2026-08-30T00:00:00.000Z",
-    purpose:
-      CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RUNNER_TERMINAL_SIGNING_PURPOSE,
-    allowedDomain:
-      CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RUNNER_TERMINAL_DOMAIN,
-  };
-  const statement = {
-    authorityPolicyDigest:
-      "7804c7d60bb8c686d66a4c0aed74b373023dda672f1ebfa0a8e7c8af4eb7a9d9",
-    authorizationDigest: sha("postgres-authorization"),
-    calculatedCostUpperBoundMicroUsd: null,
-    candidateDigest: null,
-    claimId: "11111111-1111-4111-8111-111111111111",
-    criticalChecks: null,
-    domain: CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RUNNER_TERMINAL_DOMAIN,
-    failureReason: "CANCELLED",
-    fixtureDigest: null,
-    fixtureId: "communication-postgres-1",
-    humanReviews: null,
-    noRetry: true,
-    observedAt: "2026-08-29T00:59:59.000Z",
-    preflightInputTokens: null,
-    providerRequestIdHash: null,
-    receiptDigest: sha("postgres-receipt"),
-    receiptProviderCorrelation: null,
-    receiptSignatureSha256: null,
-    requestBodySha256: null,
-    requestBodyUtf8ByteLength: null,
-    reservationId: "22222222-2222-4222-8222-222222222222",
-    runIdHash: sha("postgres-run-id"),
-    runOrdinal: 1,
-    runnerPolicyDigest:
-      "a604057aceed70b741d4e1ac2a0e1f9bdf5d13721955448ec083948fb8b4a7c4",
-    semanticCanonicalRequestSha256: null,
-    signerKeyIdHash: sha(keyId),
-    signerPublicKeySha256: trustedKey.publicKeySha256,
-    signingPurpose:
-      CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RUNNER_TERMINAL_SIGNING_PURPOSE,
-    slotIndex: 1,
-    state: "FAILED",
-    terminalPolicyDigest:
-      CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RUNNER_TERMINAL_POLICY_DIGEST,
-    terminalPolicyVersion:
-      CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RUNNER_TERMINAL_POLICY_VERSION,
-    usage: null,
-    version:
-      CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RUNNER_TERMINAL_STATEMENT_VERSION,
-  };
-  const envelope = {
-    statement,
-    signature: signEd25519(
-      null,
-      createCaresLinkV1CommunicationNotePreviewRunnerTerminalSigningMessage(
-        statement,
-      ),
-      privateKey,
-    ).toString("base64url"),
-  };
-  return verifyTestOnlyCaresLinkV1CommunicationNotePreviewSignedRunnerTerminal(
-    envelope,
-    { trustedKeySnapshot: trustedKey, now: NOW },
+function createVerifiedFixture(
+  fixture: ReturnType<typeof createM1ghRunnerTerminalTrustFixture>,
+) {
+  return verifyTestOnlyCaresLinkV1CommunicationNotePreviewRunnerTerminalWithTrustComposition(
+    fixture.trustComposition,
+    createM1ghFailedRunnerTerminalEnvelope(fixture),
+    NOW,
   );
-}
-
-function sha(value: string) {
-  return createHash("sha256").update(value, "utf8").digest("hex");
 }

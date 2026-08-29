@@ -2384,6 +2384,59 @@ or real care data.
 Detailed boundaries are in
 `documentation/communication-note-preview-signed-runner-terminal-port-m1g-g.md`.
 
+### Communication Note runner-terminal trust composition and disposable Hosted identity gate M1g-h — 2026-08-29
+
+M1g-h adds source-level custody/trust composition, exact-composition runtime and
+PostgreSQL port brands, a one-time LOGIN lifecycle and three disposable-Preview
+harnesses. The source and local database evidence passed. The Hosted sequence
+failed closed at its first rollback-assertion gate, so the later Hosted identity
+and signed terminal gates were not attempted and activation remains denied.
+
+| Evidence | Final value |
+|---|---|
+| registry/composition | `TEST_ONLY_VALIDATED_NOT_APPROVED` / `TEST_ONLY_COMPOSED_NOT_APPROVED`; readiness `false`; approved values `undefined` |
+| focused Preview harness tests | 10 files / 140 tests passed |
+| focused trust/runtime tests | 5 files / 37 tests passed |
+| cleanup/recovery regression | 2 files / 22 tests passed, including four commit-response-loss cases, one quiesce-proof false-success denial and one reconnected-session reconfiguration/target-revalidation continuation |
+| complete final Vitest gate | 171 files / 2,288 tests passed |
+| static/build gates | TypeScript, targeted zero-warning ESLint, Node syntax and `git diff --check` passed; Next.js webpack build passed 64/64 pages |
+| local database gate | disposable PostgreSQL 16.15 applied 38/38; signed `FAILED`/`CANCELLED`, fresh=true, replay=false, altered signed conflict, append-only, final `1/0/1/1/1/1`, role drop and cluster deletion passed |
+| Hosted Preview | `careslink-note-terminal-m1g-h-r1-20260829`; id `64b9d356-91b8-44ed-a9b6-f3f11717e2bc`; ref `hspkccjobyqmoomiidjp`; parent Production `adocsnwnslxhxcjgbyee`; non-default, non-persistent, `with_data=false`, PostgreSQL 17 target |
+| confirmed rate | US$0.01344/hour; no exact invoice or accrued total inferred |
+| pinned TLS | CA `/Users/milliohusky/Downloads/prod-ca-2021.crt`; SHA-256 `700723581420dd1ac98fd7e9ac529f0ef210eadcaf87fc868a3ad7d114c2f3b7` |
+| rollback bundle | 18 files; manifest SHA-256 `163ddd40e68f8c2accc8904c4b7165c6630ba8fdad58b54a674d4f27908273f1`; Hosted result `SCHEMA_ROLLBACK_ASSERTION_FAILED`, not 18/18 |
+| Hosted identity/terminal | not run after the preceding fixed failure; no Hosted LOGIN, terminal row, replay/conflict or role-drop success is claimed |
+| teardown | branch delete returned success; three later listings showed the id/ref absent and only default Production `ACTIVE_HEALTHY` |
+
+Supabase CLI 2.115 initially executed migration 37 without the transaction
+block required by its `LOCK TABLE` statement and returned `LOCK TABLE can only
+be used in transaction blocks`. Sending migrations 37 and 38 to this exact
+Preview with temporary explicit outer transaction wrappers produced the exact
+38-version history through `20260829011323`; repository migration bytes were
+then restored unchanged. Branch metadata retained the earlier
+`MIGRATIONS_FAILED` operation status while the Preview reported
+`ACTIVE_HEALTHY`. This is evidence of version history, not a native clean apply.
+The generic assertion code proves only that one of the 18 hash-verified SQL
+requests returned an error and the immediate rollback request succeeded. It
+intentionally discards SQL/driver detail, cannot distinguish a SQL assertion
+from timeout, connection or protocol failure, cannot identify a file or passed
+count, and does not prove the final ledger/role/membership postchecks.
+
+Pre-deletion advisors returned 41 security findings (21 INFO RLS-without-policy,
+20 WARN authenticated SECURITY DEFINER execution) and 184 performance findings
+(72 unindexed foreign keys, 24 RLS init-plan, 87 unused indexes and one absolute
+Auth connection strategy; 160 INFO and 24 WARN). They are project-wide findings,
+not an M1g-h-only delta. Relevant remediation is documented in the
+[M1g-h handoff](communication-note-preview-hosted-runner-terminal-identity-m1g-h.md).
+
+The local signed failure result cannot substitute for the absent Hosted result.
+The source `ACCEPTED` statement also carries nine usage keys while migration 38
+requires equality with the stored six-key receipt usage, so `ACCEPTED` remains
+unproved. A new Hosted attempt needs a fresh disposable Preview, cost
+confirmation and authorization after a fixed, content-free per-file diagnostic
+and PostgreSQL 17 regression close the rollback failure. No provider/model call,
+real data, deployment, Production write, push, merge or activation occurred.
+
 ### Current live/read-only evidence
 
 - Supabase migrations, tables, RLS flags, policies, grants, function grants and aggregate row counts were checked read-only.
