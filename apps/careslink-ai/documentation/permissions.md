@@ -411,7 +411,7 @@ No real key, signing operation, login-capable caller, hosted database mutation,
 provider call, deployment or Production permission is part of M1g-c. See
 `documentation/communication-note-preview-key-custody-callers-m1g-c.md`.
 
-### Communication Note Preview signed terminal caller M1g-g (source-only)
+### Communication Note Preview signed terminal caller M1g-g (historical source-only checkpoint)
 
 M1g-g adds the fifth purpose-scoped caller that M1g-f deliberately left
 absent. Historical M1g-f evidence remains accurate for that revision; the new
@@ -457,7 +457,7 @@ custody digests are respectively
 and
 `f537dc64e3c57a34b6db6d0d1c871c38a70bcb51c4d071e625b026f840a309ca`.
 
-### Communication Note Preview runner-terminal trust composition and disposable identity M1g-h (test-only)
+### Communication Note Preview runner-terminal trust composition and disposable identity M1g-h (historical test-only checkpoint)
 
 M1g-h source-cross-binds the terminal verifier, runtime port and exact
 PostgreSQL port to one branded custody/trust composition. The registry status
@@ -475,7 +475,7 @@ executor, API/service-role or other RPC privilege. Teardown first applies
 `NOLOGIN`, rejects new connections, closes or drains the exact sessions, then
 revokes the membership and drops the LOGIN.
 
-The authorized Hosted run stopped at the earlier 18-file rollback gate with
+The original M1g-h authorized Hosted run stopped at the earlier 18-file rollback gate with
 `SCHEMA_ROLLBACK_ASSERTION_FAILED`, so that one-time LOGIN was not created and
 no Hosted caller assumption or signed terminal write is claimed. The entire
 no-data Preview was deleted; three subsequent listings left only the healthy
@@ -486,7 +486,7 @@ not grant a persistent Hosted identity or runtime permission. Readiness remains
 provider/model or real-data permission was added. Detailed evidence is in
 `documentation/communication-note-preview-hosted-runner-terminal-identity-m1g-h.md`.
 
-### Communication Note Preview terminal ACCEPTED usage alignment M1g-i (source/local only)
+### Communication Note Preview terminal ACCEPTED usage alignment M1g-i (current source/local; prior Hosted separately attributed)
 
 M1g-i does not widen the M1g-g/M1g-h permission surface. The existing
 `careslink_v1_preview_runner_terminal_caller` retains only private-schema
@@ -496,14 +496,52 @@ The isolated executor remains the function owner; no API/service role, LOGIN,
 table privilege, broad function grant or caller-to-executor membership is
 added.
 
-Migration 39 temporarily gives the migration actor SET-only access to the
-generation owner and terminal executor, and gives the executor schema `CREATE`
-only long enough to replace its function. It revokes the schema privilege and
-both memberships before completion, then reasserts the exact function ACL.
-Local PostgreSQL 16.15 proved this final posture across 39/39 migrations and
-18/18 rollback assertions. PostgreSQL 17/Hosted identity and signed `ACCEPTED`
-E2E remain unproved, so no persistent identity or runtime permission may be
-inferred. Readiness and approval remain closed.
+Migrations 37 and 38 now keep their grants, locks and cleanup inside explicit
+repository transactions, with SHA-256 values
+`09e69476de4b5b1b925a281f2943ef541e289aab6bef60ad92aace14d0c6d432`
+and
+`4c13bf50d7866a4b948475b598bb1c103fb625e59824be98c4e272c659da283f`.
+Migration 39 remains
+`3d2cc53df3cf17ea21a4f93aaf673f8e911fcc9a35b5309cf7c633c6802e448e`.
+The current ordered migration entries SHA-256 is
+`a0ad14e88a2c10400c4d2e86ee8ca4c67768ee094f8002687dd33c333c045fa2`;
+transactional policy `2026-08-29.preview-transactional-migrations.6` binds
+manifest
+`60314eb32f7ac26027862e30b27e60460cf4d17d49061126f4366b08a0cbd3a2`
+and strips only 19 known explicit wrappers in memory for its single outer
+transaction.
+
+Identity policy `2026-08-29.preview-runner-terminal-identity.2` adds a mandatory
+canonical `metadata` plus projected `credentials` envelope before the
+destructive reset runner can read the CA or connect. It cross-binds the expected
+ref, metadata/credential refs, direct host and pooler user and requires exact
+`with_data=false`, `is_default=false`, `persistent=false` and
+`status=ACTIVE_HEALTHY` values plus the source-pinned Production
+`parent_project_ref`. A default/rotated Production ref, another parent,
+persistent branch, `with_data=true` branch or unhealthy branch receives no
+database permission. Preflight/coordinator versions
+`preflight.communication.openai.synthetic-preview.2026-08-29.m1g-i.v5` and
+`coordinator.communication.openai.synthetic-preview.2026-08-29.m1g-i.v5` bind
+digests
+`0e2582040995753efe95baa071fee4e0b58fa105c79db8bfa673abd66e2d01a1`
+and
+`1f93fa2c0ba207a28cb706d922acc10bba8305f16c83c7973c70ae4d7ac7e5c2`.
+
+The current focused source gate passed 5 files / 79 tests plus targeted lint,
+Node syntax and diff checks. The complete current source gate then passed 172
+files / 2,321 tests, TypeScript, zero-warning ESLint, the 73-file adapter sync
+check and the 64/64-page Webpack build. Fresh isolated PostgreSQL 16.15 passed
+39/39; migrations 37 and 38 deliberately succeeded statement by statement
+without an ad hoc outer wrapper, A03 passed, and the final posture had zero
+terminal rows and zero residual `SET` membership edges. The earlier 172
+files / 2,315 tests and deleted r20 Hosted evidence belong only to artifact set
+`4e84823`. That r20 run did create the temporary one-time LOGIN, complete signed
+`ACCEPTED`/replay/conflict, and remove the LOGIN and sessions; it cannot be
+attributed to the current transaction hashes, policy `.6`, identity policy `.2`
+or v5 bindings. Exact-current Hosted/native-CLI proof requires a separately
+authorized fresh disposable Preview. No persistent identity, broader grant,
+runtime permission or Production authority may be inferred; readiness and
+approval remain closed.
 
 ## Intended V1 matrix (partly codified, not available at runtime)
 

@@ -1,4 +1,6 @@
+import { spawnSync } from "node:child_process";
 import { readFile } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
@@ -16,12 +18,17 @@ import {
   validateCommunicationNotePreviewMigrationHistory,
 } from "./communication-note-preview-transactional-migrations-policy.mjs";
 
+const RUNNER_PATH = fileURLToPath(new URL(
+  "./communication-note-preview-transactional-migrations.mjs",
+  import.meta.url,
+));
+
 describe("Communication Note Preview transactional migration policy", () => {
-  it("pins all 39 repository migrations and removes only 17 known wrappers in memory", async () => {
+  it("pins all 39 repository migrations and removes only 19 known wrappers in memory", async () => {
     const bundle = await loadPinnedCommunicationNotePreviewMigrations();
     expect(bundle).toMatchObject({
       manifestSha256: POLICY.manifestSha256,
-      outerTransactionCount: 17,
+      outerTransactionCount: 19,
     });
     expect(bundle.migrations).toHaveLength(39);
     expect(bundle.migrations.at(-1)).toMatchObject({
@@ -39,8 +46,24 @@ describe("Communication Note Preview transactional migration policy", () => {
     const lockMigration = bundle.migrations.find((migration) =>
       migration.version === "20260828235426"
     );
-    expect(lockMigration.outerTransactionRemoved).toBe(false);
+    expect(lockMigration.outerTransactionRemoved).toBe(true);
+    expect(lockMigration.statements[0]).toMatch(/\bbegin$/i);
+    expect(lockMigration.statements.at(-1)).toMatch(/^commit$/i);
+    expect(lockMigration.executionSql.trim().toLowerCase()).not.toMatch(
+      /^begin\b|\bcommit;$/,
+    );
     expect(lockMigration.executionSql).toMatch(/lock\s+table/i);
+
+    const signedMigration = bundle.migrations.find((migration) =>
+      migration.version === "20260829011323"
+    );
+    expect(signedMigration.outerTransactionRemoved).toBe(true);
+    expect(signedMigration.statements[0]).toMatch(/\bbegin$/i);
+    expect(signedMigration.statements.at(-1)).toMatch(/^commit$/i);
+    expect(signedMigration.executionSql.trim().toLowerCase()).not.toMatch(
+      /^begin\b|\bcommit;$/,
+    );
+    expect(signedMigration.executionSql).toMatch(/lock\s+table/i);
   });
 
   it("matches the CLI statement boundary contract for quotes, comments, dollar bodies and parentheses", () => {
@@ -173,6 +196,54 @@ describe("Communication Note Preview transactional migration policy", () => {
       expect(() => parseTransactionalMigrationArguments(denied))
         .toThrowError("TRANSACTIONAL_MIGRATION_ARGUMENT_INVALID");
     }
+  });
+
+  it("rejects non-disposable control-plane metadata before reading the CA or connecting", () => {
+    const branchRef = "abcdefghijklmnopqrst";
+    const secret = "sentinel-reset-password-never-output";
+    const input = JSON.stringify({
+      metadata: {
+        ref: branchRef,
+        parent_project_ref: POLICY.productionProjectRef,
+        is_default: false,
+        persistent: true,
+        with_data: false,
+        status: "ACTIVE_HEALTHY",
+      },
+      credentials: {
+        REF: branchRef,
+        STATUS: "ACTIVE_HEALTHY",
+        POSTGRES_URL_NON_POOLING:
+          `postgresql://postgres:${secret}@db.${branchRef}.supabase.co:5432/postgres?sslmode=require`,
+        POSTGRES_URL:
+          `postgresql://postgres.${branchRef}:${secret}@aws-0-ap-southeast-2.pooler.supabase.com:6543/postgres?connect_timeout=10`,
+      },
+    });
+    const env = Object.fromEntries(
+      Object.entries(process.env).filter(
+        ([key]) => !/^PG[A-Z0-9_]*$/.test(key) &&
+          key !== "NODE_TLS_REJECT_UNAUTHORIZED",
+      ),
+    );
+    const result = spawnSync(
+      process.execPath,
+      [
+        RUNNER_PATH,
+        `--expected-branch-ref=${branchRef}`,
+        "--expected-pg-major=17",
+        "--ssl-root-cert-path=/private/does-not-exist-ca.pem",
+        `--expected-ssl-root-cert-sha256=${"a".repeat(64)}`,
+        `--authorized-disposable-preview-reset=${POLICY.disposablePreviewBaselineHistorySha256}`,
+      ],
+      { input, encoding: "utf8", env },
+    );
+    expect(result.status).toBe(1);
+    expect(result.stdout).toBe("");
+    expect(JSON.parse(result.stderr)).toEqual({
+      stage: "M00",
+      errorType: "RUNNER_TERMINAL_IDENTITY_BRANCH_NOT_DISPOSABLE",
+    });
+    expect(`${result.stdout}${result.stderr}`).not.toContain(secret);
   });
 });
 

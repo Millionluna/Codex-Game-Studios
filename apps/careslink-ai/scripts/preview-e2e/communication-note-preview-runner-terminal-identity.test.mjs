@@ -10,6 +10,7 @@ import {
   assertCommunicationNotePreviewRunnerTerminalIdentitySqlPolicy,
   createCommunicationNotePreviewRuntimeRoleName,
   extractCommunicationNotePreviewBranchDatabaseTarget,
+  extractCommunicationNoteDisposablePreviewResetDatabaseTarget,
   parseCommunicationNotePreviewRunnerTerminalIdentityArguments,
 } from "./communication-note-preview-runner-terminal-identity-policy.mjs";
 import {
@@ -47,6 +48,29 @@ function branchJson(overrides = {}) {
     POSTGRES_URL:
       `postgresql://postgres.${BRANCH_REF}:${SECRET}@aws-0-ap-southeast-2.pooler.supabase.com:6543/postgres?connect_timeout=10`,
     ...overrides,
+  })}\n`;
+}
+
+function disposableResetJson({ metadata = {}, credentials = {} } = {}) {
+  return `${JSON.stringify({
+    metadata: {
+      ref: BRANCH_REF,
+      parent_project_ref: POLICY.productionProjectRef,
+      is_default: false,
+      persistent: false,
+      with_data: false,
+      status: "ACTIVE_HEALTHY",
+      ...metadata,
+    },
+    credentials: {
+      REF: BRANCH_REF,
+      STATUS: "ACTIVE_HEALTHY",
+      POSTGRES_URL_NON_POOLING:
+        `postgresql://postgres:${SECRET}@db.${BRANCH_REF}.supabase.co:5432/postgres?sslmode=require`,
+      POSTGRES_URL:
+        `postgresql://postgres.${BRANCH_REF}:${SECRET}@aws-0-ap-southeast-2.pooler.supabase.com:6543/postgres?connect_timeout=10`,
+      ...credentials,
+    },
   })}\n`;
 }
 
@@ -338,6 +362,104 @@ describe("Communication Note Preview runner-terminal identity policy", () => {
         expectedBranchRef: BRANCH_REF,
       }).descriptor.projectRef,
     ).toBe(BRANCH_REF);
+  });
+
+  it("cross-binds a canonical data-less disposable Preview envelope before exposing credentials", () => {
+    const target =
+      extractCommunicationNoteDisposablePreviewResetDatabaseTarget(
+        disposableResetJson(),
+        { expectedBranchRef: BRANCH_REF },
+      );
+    expect(target.descriptor).toMatchObject({
+      projectRef: BRANCH_REF,
+      controlPlaneMetadata:
+        "DATALESS_NONDEFAULT_NONPERSISTENT_PREVIEW_CROSS_BOUND",
+      parentProjectRefPinned: true,
+    });
+    expect(JSON.stringify(target)).not.toContain(SECRET);
+    expect(target.takeAdminConnectionCandidates().direct.password).toBe(
+      SECRET,
+    );
+    expectPolicyCode(
+      () => target.takeAdminConnectionCandidates(),
+      ERRORS.credentialMissing,
+    );
+  });
+
+  it("rejects malformed or incomplete destructive reset envelopes", () => {
+    const base = JSON.parse(disposableResetJson());
+    for (const key of [
+      "ref",
+      "parent_project_ref",
+      "is_default",
+      "persistent",
+      "with_data",
+      "status",
+    ]) {
+      const candidate = structuredClone(base);
+      delete candidate.metadata[key];
+      expectPolicyCode(
+        () => extractCommunicationNoteDisposablePreviewResetDatabaseTarget(
+          JSON.stringify(candidate),
+          { expectedBranchRef: BRANCH_REF },
+        ),
+        ERRORS.branchShapeInvalid,
+      );
+    }
+    for (const key of ["REF", "STATUS"]) {
+      const candidate = structuredClone(base);
+      delete candidate.credentials[key];
+      expectPolicyCode(
+        () => extractCommunicationNoteDisposablePreviewResetDatabaseTarget(
+          JSON.stringify(candidate),
+          { expectedBranchRef: BRANCH_REF },
+        ),
+        ERRORS.branchShapeInvalid,
+      );
+    }
+    for (const candidate of [
+      { ...base, extra: true },
+      { ...base, metadata: { ...base.metadata, extra: true } },
+      { ...base, credentials: { ...base.credentials, extra: true } },
+      { ...base, metadata: { ...base.metadata, persistent: "false" } },
+    ]) {
+      expectPolicyCode(
+        () => extractCommunicationNoteDisposablePreviewResetDatabaseTarget(
+          JSON.stringify(candidate),
+          { expectedBranchRef: BRANCH_REF },
+        ),
+        ERRORS.branchShapeInvalid,
+      );
+    }
+  });
+
+  it("rejects default, persistent, data-bearing, unhealthy and cross-project reset targets", () => {
+    const otherRef = "bcdefghijklmnopqrstu";
+    const cases = [
+      [disposableResetJson({ metadata: { is_default: true } }), ERRORS.productionDenied],
+      [disposableResetJson({ metadata: { persistent: true } }), ERRORS.branchNotDisposable],
+      [disposableResetJson({ metadata: { with_data: true } }), ERRORS.branchNotDisposable],
+      [
+        disposableResetJson({
+          metadata: { parent_project_ref: otherRef },
+        }),
+        ERRORS.branchParentMismatch,
+      ],
+      [disposableResetJson({ metadata: { status: "ACTIVE" } }), ERRORS.branchNotReady],
+      [disposableResetJson({ metadata: { status: "RUNNING" } }), ERRORS.branchNotReady],
+      [disposableResetJson({ metadata: { status: "MIGRATIONS_FAILED" } }), ERRORS.branchNotReady],
+      [disposableResetJson({ credentials: { STATUS: "ACTIVE" } }), ERRORS.branchNotReady],
+      [disposableResetJson({ credentials: { REF: otherRef } }), ERRORS.branchMismatch],
+    ];
+    for (const [input, code] of cases) {
+      expectPolicyCode(
+        () => extractCommunicationNoteDisposablePreviewResetDatabaseTarget(
+          input,
+          { expectedBranchRef: BRANCH_REF },
+        ),
+        code,
+      );
+    }
   });
 
   it("rejects parent Production, mismatched, pooled, weak and expanded targets", () => {

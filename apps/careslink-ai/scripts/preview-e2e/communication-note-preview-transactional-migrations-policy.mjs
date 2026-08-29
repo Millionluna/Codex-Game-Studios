@@ -7,11 +7,11 @@ const NON_TRANSACTIONAL_SQL_PATTERN = /^(?:create\s+(?:unique\s+)?index\s+concur
 
 export const COMMUNICATION_NOTE_PREVIEW_TRANSACTIONAL_MIGRATION_POLICY =
   Object.freeze({
-    version: "2026-08-29.preview-transactional-migrations.5",
+    version: "2026-08-29.preview-transactional-migrations.6",
     productionProjectRef: "adocsnwnslxhxcjgbyee",
     expectedCliVersion: "2.115.0",
     manifestSha256:
-      "883770e0b0a61db648cdc87eda1e5b8c13fb18871ed454e73e709270a2110c4e",
+      "60314eb32f7ac26027862e30b27e60460cf4d17d49061126f4366b08a0cbd3a2",
     migrationCount: 39,
     disposablePreviewBaselineMigrationCount: 19,
     disposablePreviewBaselineHistorySha256:
@@ -212,8 +212,8 @@ export const COMMUNICATION_NOTE_PREVIEW_TRANSACTIONAL_MIGRATION_MANIFEST =
     ["20260826090841_add_portal_referral_follow_up_runtime.sql", "cb904d048827ff16603b19a1116f33529cba134471fe1555cfd0ea858d6fb99e"],
     ["20260827142156_add_communication_note_preview_execution_authority_shadow.sql", "94f83498ea04053e7238a95bb9be0bb8a38ad0a76fa0e751390419800da51f7f"],
     ["20260828034704_add_communication_note_preview_custody_callers_shadow.sql", "e6b77e76406d8db1d68ad6e8da0d9d2dd88521c713047c0415aa60d29243d432"],
-    ["20260828235426_harden_communication_note_preview_reservation_runner_terminal_shadow.sql", "4341cdacb90e45eea428edfc57df29379ca211900e161844016daad190f7b9c5"],
-    ["20260829011323_add_communication_note_preview_signed_terminal_caller_shadow.sql", "b095785331c848d02cabc417eb3131fe2f9328564abef6fc0dd35bccd2980c5a"],
+    ["20260828235426_harden_communication_note_preview_reservation_runner_terminal_shadow.sql", "09e69476de4b5b1b925a281f2943ef541e289aab6bef60ad92aace14d0c6d432"],
+    ["20260829011323_add_communication_note_preview_signed_terminal_caller_shadow.sql", "4c13bf50d7866a4b948475b598bb1c103fb625e59824be98c4e272c659da283f"],
     ["20260829041316_align_communication_note_preview_terminal_accepted_usage.sql", "3d2cc53df3cf17ea21a4f93aaf673f8e911fcc9a35b5309cf7c633c6802e448e"],
   ].map(([basename, sha256]) => Object.freeze({ basename, sha256 })));
 
@@ -234,6 +234,8 @@ const OUTER_TRANSACTION_MIGRATIONS = new Set([
   "20260825120908_add_portal_referral_assignment_runtime.sql",
   "20260825153340_add_portal_referral_provider_response_runtime.sql",
   "20260826090841_add_portal_referral_follow_up_runtime.sql",
+  "20260828235426_harden_communication_note_preview_reservation_runner_terminal_shadow.sql",
+  "20260829011323_add_communication_note_preview_signed_terminal_caller_shadow.sql",
   "20260829041316_align_communication_note_preview_terminal_accepted_usage.sql",
 ]);
 

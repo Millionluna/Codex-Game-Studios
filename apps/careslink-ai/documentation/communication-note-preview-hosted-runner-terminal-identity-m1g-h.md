@@ -97,6 +97,11 @@ Per the stop rule, the no-write identity probe and positive signed
 runtime-to-PostgreSQL flow were skipped. No Hosted terminal ledger success,
 replay result, altered-envelope conflict or temporary-role cleanup is claimed.
 
+This remains the historical M1g-h failure record. Current M1g-i source later
+made the outer transactions part of migrations 37 and 38 themselves; that
+supersedes the temporary-wrapper source posture without rewriting this failed
+Preview's evidence.
+
 Advisors were captured before deletion. Security returned 41 project-wide
 findings: 21 INFO `rls_enabled_no_policy` and 20 WARN
 `authenticated_security_definer_function_executable`. Performance returned 184

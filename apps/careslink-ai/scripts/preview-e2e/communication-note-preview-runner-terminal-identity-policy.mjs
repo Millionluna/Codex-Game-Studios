@@ -12,7 +12,7 @@ const MAXIMUM_STDIN_BYTES = 65_536;
 
 export const COMMUNICATION_NOTE_PREVIEW_RUNNER_TERMINAL_IDENTITY_POLICY =
   Object.freeze({
-    version: "2026-08-29.preview-runner-terminal-identity.1",
+    version: "2026-08-29.preview-runner-terminal-identity.2",
     productionProjectRef: "adocsnwnslxhxcjgbyee",
     requiredPort: 5432,
     cliPrimaryPoolerPort: 6543,
@@ -45,6 +45,10 @@ export const COMMUNICATION_NOTE_PREVIEW_RUNNER_TERMINAL_IDENTITY_ERROR_CODES =
     branchNotReady: "RUNNER_TERMINAL_IDENTITY_BRANCH_NOT_READY",
     productionDenied: "RUNNER_TERMINAL_IDENTITY_PRODUCTION_TARGET_DENIED",
     branchMismatch: "RUNNER_TERMINAL_IDENTITY_BRANCH_TARGET_MISMATCH",
+    branchParentMismatch:
+      "RUNNER_TERMINAL_IDENTITY_BRANCH_PARENT_MISMATCH",
+    branchNotDisposable:
+      "RUNNER_TERMINAL_IDENTITY_BRANCH_NOT_DISPOSABLE",
     databaseUrlInvalid: "RUNNER_TERMINAL_IDENTITY_DATABASE_URL_INVALID",
     databaseTargetDenied: "RUNNER_TERMINAL_IDENTITY_DATABASE_TARGET_DENIED",
     credentialMissing: "RUNNER_TERMINAL_IDENTITY_DATABASE_CREDENTIAL_MISSING",
@@ -97,6 +101,67 @@ function dataString(object, key) {
     typeof descriptor.value === "string"
     ? descriptor.value
     : null;
+}
+
+function dataBoolean(object, key) {
+  const descriptor = Object.getOwnPropertyDescriptor(object, key);
+  return descriptor &&
+      "value" in descriptor &&
+      typeof descriptor.value === "boolean"
+    ? descriptor.value
+    : null;
+}
+
+function ownDataValue(object, key) {
+  const descriptor = Object.getOwnPropertyDescriptor(object, key);
+  if (!descriptor || !("value" in descriptor)) {
+    fail(
+      COMMUNICATION_NOTE_PREVIEW_RUNNER_TERMINAL_IDENTITY_ERROR_CODES
+        .branchShapeInvalid,
+    );
+  }
+  return descriptor.value;
+}
+
+function hasExactKeys(object, expected) {
+  const keys = Object.keys(object);
+  return keys.length === expected.length &&
+    expected.every((key) => keys.includes(key));
+}
+
+function parseBoundedJsonObject(input) {
+  if (
+    typeof input !== "string" ||
+    input.length === 0 ||
+    Buffer.byteLength(input, "utf8") > MAXIMUM_STDIN_BYTES ||
+    CONTROL_CHARACTER_PATTERN.test(input.replace(/[\n\r\t]/g, ""))
+  ) {
+    fail(
+      COMMUNICATION_NOTE_PREVIEW_RUNNER_TERMINAL_IDENTITY_ERROR_CODES
+        .stdinInvalid,
+    );
+  }
+  const normalizedInput = input.trim();
+  if (normalizedInput.length === 0) {
+    fail(
+      COMMUNICATION_NOTE_PREVIEW_RUNNER_TERMINAL_IDENTITY_ERROR_CODES
+        .stdinInvalid,
+    );
+  }
+  let parsed;
+  try {
+    parsed = JSON.parse(normalizedInput);
+  } catch {
+    fail(
+      COMMUNICATION_NOTE_PREVIEW_RUNNER_TERMINAL_IDENTITY_ERROR_CODES
+        .branchShapeInvalid,
+    );
+  }
+  return plainRecord(
+    parsed,
+    COMMUNICATION_NOTE_PREVIEW_RUNNER_TERMINAL_IDENTITY_ERROR_CODES
+      .branchShapeInvalid,
+  );
 }
 
 function firstSingleValue(object, keys) {
@@ -208,6 +273,153 @@ export function parseCommunicationNotePreviewRunnerTerminalIdentityArguments(
 }
 
 /**
+ * Reads the destructive reset runner's canonical in-memory envelope. The
+ * metadata half must be a data-less, non-default, non-persistent child of the
+ * source-pinned Production project; the credential half must independently
+ * bind the same healthy branch ref and exact database targets.
+ */
+export function extractCommunicationNoteDisposablePreviewResetDatabaseTarget(
+  input,
+  options,
+) {
+  const optionObject = plainRecord(
+    options,
+    COMMUNICATION_NOTE_PREVIEW_RUNNER_TERMINAL_IDENTITY_ERROR_CODES
+      .argumentInvalid,
+  );
+  if (
+    !hasExactKeys(optionObject, ["expectedBranchRef"]) ||
+    typeof optionObject.expectedBranchRef !== "string" ||
+    !PROJECT_REF_PATTERN.test(optionObject.expectedBranchRef)
+  ) {
+    fail(
+      COMMUNICATION_NOTE_PREVIEW_RUNNER_TERMINAL_IDENTITY_ERROR_CODES
+        .argumentInvalid,
+    );
+  }
+  const expectedBranchRef = optionObject.expectedBranchRef;
+  const policy = COMMUNICATION_NOTE_PREVIEW_RUNNER_TERMINAL_IDENTITY_POLICY;
+  if (expectedBranchRef === policy.productionProjectRef) {
+    fail(
+      COMMUNICATION_NOTE_PREVIEW_RUNNER_TERMINAL_IDENTITY_ERROR_CODES
+        .productionDenied,
+    );
+  }
+
+  const envelope = parseBoundedJsonObject(input);
+  if (!hasExactKeys(envelope, ["metadata", "credentials"])) {
+    fail(
+      COMMUNICATION_NOTE_PREVIEW_RUNNER_TERMINAL_IDENTITY_ERROR_CODES
+        .branchShapeInvalid,
+    );
+  }
+  const metadata = plainRecord(
+    ownDataValue(envelope, "metadata"),
+    COMMUNICATION_NOTE_PREVIEW_RUNNER_TERMINAL_IDENTITY_ERROR_CODES
+      .branchShapeInvalid,
+  );
+  const credentials = plainRecord(
+    ownDataValue(envelope, "credentials"),
+    COMMUNICATION_NOTE_PREVIEW_RUNNER_TERMINAL_IDENTITY_ERROR_CODES
+      .branchShapeInvalid,
+  );
+  if (
+    !hasExactKeys(metadata, [
+      "ref",
+      "parent_project_ref",
+      "is_default",
+      "persistent",
+      "with_data",
+      "status",
+    ]) ||
+    !hasExactKeys(credentials, [
+      "REF",
+      "STATUS",
+      "POSTGRES_URL_NON_POOLING",
+      "POSTGRES_URL",
+    ])
+  ) {
+    fail(
+      COMMUNICATION_NOTE_PREVIEW_RUNNER_TERMINAL_IDENTITY_ERROR_CODES
+        .branchShapeInvalid,
+    );
+  }
+
+  const metadataRef = dataString(metadata, "ref");
+  const parentProjectRef = dataString(metadata, "parent_project_ref");
+  const metadataStatus = dataString(metadata, "status");
+  const isDefault = dataBoolean(metadata, "is_default");
+  const persistent = dataBoolean(metadata, "persistent");
+  const withData = dataBoolean(metadata, "with_data");
+  const credentialRef = dataString(credentials, "REF");
+  const credentialStatus = dataString(credentials, "STATUS");
+  if (
+    !PROJECT_REF_PATTERN.test(metadataRef ?? "") ||
+    !PROJECT_REF_PATTERN.test(parentProjectRef ?? "") ||
+    isDefault === null ||
+    persistent === null ||
+    withData === null ||
+    typeof metadataStatus !== "string" ||
+    !PROJECT_REF_PATTERN.test(credentialRef ?? "") ||
+    typeof credentialStatus !== "string"
+  ) {
+    fail(
+      COMMUNICATION_NOTE_PREVIEW_RUNNER_TERMINAL_IDENTITY_ERROR_CODES
+        .branchShapeInvalid,
+    );
+  }
+  if (metadataRef === policy.productionProjectRef || isDefault) {
+    fail(
+      COMMUNICATION_NOTE_PREVIEW_RUNNER_TERMINAL_IDENTITY_ERROR_CODES
+        .productionDenied,
+    );
+  }
+  if (metadataRef !== expectedBranchRef || credentialRef !== metadataRef) {
+    fail(
+      COMMUNICATION_NOTE_PREVIEW_RUNNER_TERMINAL_IDENTITY_ERROR_CODES
+        .branchMismatch,
+    );
+  }
+  if (parentProjectRef !== policy.productionProjectRef) {
+    fail(
+      COMMUNICATION_NOTE_PREVIEW_RUNNER_TERMINAL_IDENTITY_ERROR_CODES
+        .branchParentMismatch,
+    );
+  }
+  if (persistent || withData) {
+    fail(
+      COMMUNICATION_NOTE_PREVIEW_RUNNER_TERMINAL_IDENTITY_ERROR_CODES
+        .branchNotDisposable,
+    );
+  }
+  if (
+    metadataStatus !== "ACTIVE_HEALTHY" ||
+    credentialStatus !== "ACTIVE_HEALTHY"
+  ) {
+    fail(
+      COMMUNICATION_NOTE_PREVIEW_RUNNER_TERMINAL_IDENTITY_ERROR_CODES
+        .branchNotReady,
+    );
+  }
+
+  const target = extractCommunicationNotePreviewBranchDatabaseTarget(
+    JSON.stringify(credentials),
+    { expectedBranchRef },
+  );
+  return Object.freeze({
+    descriptor: Object.freeze({
+      ...target.descriptor,
+      controlPlaneMetadata:
+        "DATALESS_NONDEFAULT_NONPERSISTENT_PREVIEW_CROSS_BOUND",
+      parentProjectRefPinned: true,
+    }),
+    takeAdminConnectionCandidates() {
+      return target.takeAdminConnectionCandidates();
+    },
+  });
+}
+
+/**
  * Reads the credential-bearing JSON emitted by
  * `supabase branches get -o json` or its `--output-format json` envelope. The returned enumerable
  * descriptor is credential-free. The connection config is available once,
@@ -244,39 +456,7 @@ export function extractCommunicationNotePreviewBranchDatabaseTarget(
         .productionDenied,
     );
   }
-  if (
-    typeof input !== "string" ||
-    input.length === 0 ||
-    Buffer.byteLength(input, "utf8") > MAXIMUM_STDIN_BYTES ||
-    CONTROL_CHARACTER_PATTERN.test(input.replace(/[\n\r\t]/g, ""))
-  ) {
-    fail(
-      COMMUNICATION_NOTE_PREVIEW_RUNNER_TERMINAL_IDENTITY_ERROR_CODES
-        .stdinInvalid,
-    );
-  }
-
-  const normalizedInput = input.trim();
-  if (normalizedInput.length === 0) {
-    fail(
-      COMMUNICATION_NOTE_PREVIEW_RUNNER_TERMINAL_IDENTITY_ERROR_CODES
-        .stdinInvalid,
-    );
-  }
-  let parsed;
-  try {
-    parsed = JSON.parse(normalizedInput);
-  } catch {
-    fail(
-      COMMUNICATION_NOTE_PREVIEW_RUNNER_TERMINAL_IDENTITY_ERROR_CODES
-        .branchShapeInvalid,
-    );
-  }
-  let root = plainRecord(
-    parsed,
-    COMMUNICATION_NOTE_PREVIEW_RUNNER_TERMINAL_IDENTITY_ERROR_CODES
-      .branchShapeInvalid,
-  );
+  let root = parseBoundedJsonObject(input);
   const envelopeData = Object.getOwnPropertyDescriptor(root, "data");
   const envelopeResult = Object.getOwnPropertyDescriptor(root, "result");
   if (envelopeData && envelopeResult) {

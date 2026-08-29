@@ -2439,21 +2439,25 @@ real data, deployment, Production write, push, merge or activation occurred.
 
 ### Communication Note terminal ACCEPTED usage alignment gate M1g-i — 2026-08-29
 
-M1g-i is an additive successor to the historical M1g-h gate. Migration 38 and
-the failed Hosted M1g-h record remain unchanged. New migration
+M1g-i is an additive successor to the historical M1g-h gate. Migration
 `20260829041316_align_communication_note_preview_terminal_accepted_usage.sql`
 keeps the exact nine-key signed terminal usage and compares an exact six-fact
-projection with the durable receipt.
+projection with the durable receipt. The current source also adds explicit
+outer transactions to migrations 37 and 38 so their locks, temporary grants
+and cleanup stay atomic under statement-by-statement migration transports.
 
 | Gate | Result |
 |---|---|
-| migration identity | 39 migrations; ordered basenames `2bd2f029c86e1f4231b9a3bee7ee8681cb086dcd29eaaaceff21efcc1fec1fda`; ordered entries `75d78f30eb2fdc105890308a142d9cf7a0cadcbfda6f2900c06bff64699efb7c` |
+| migration identity | 39 migrations; ordered basenames `2bd2f029c86e1f4231b9a3bee7ee8681cb086dcd29eaaaceff21efcc1fec1fda`; current ordered entries `a0ad14e88a2c10400c4d2e86ee8ca4c67768ee094f8002687dd33c333c045fa2` |
+| transaction-wrapper migrations | migration 37: 39,965 bytes / `09e69476de4b5b1b925a281f2943ef541e289aab6bef60ad92aace14d0c6d432`; migration 38: 28,835 bytes / `4c13bf50d7866a4b948475b598bb1c103fb625e59824be98c4e272c659da283f`; each has one source-level `BEGIN`/`COMMIT` |
 | migration 39 | 26,279 bytes; SHA-256 `3d2cc53df3cf17ea21a4f93aaf673f8e911fcc9a35b5309cf7c633c6802e448e`; one explicit transaction contains every temporary DDL capability and its revocation; exact JSON key-set comparisons use explicit `C` collation |
 | terminal assertion / rollback manifest | A03 SHA-256 `addcc0524c5ae1a20ab0797ae5d005cff846105da61b4100d0db2a60c9e5c1e6`; fixed-stage 18-file manifest `f200ccd7da5fce6c14d6b532cf205f22e2f21b934824cc9027f061e48b610034` |
+| current policy pins | transactional `2026-08-29.preview-transactional-migrations.6` / `60314eb32f7ac26027862e30b27e60460cf4d17d49061126f4366b08a0cbd3a2` with 19 in-memory wrapper removals; identity `2026-08-29.preview-runner-terminal-identity.2`; preflight `m1g-i.v5` / `0e2582040995753efe95baa071fee4e0b58fa105c79db8bfa673abd66e2d01a1`; coordinator `m1g-i.v5` / `1f93fa2c0ba207a28cb706d922acc10bba8305f16c83c7973c70ae4d7ac7e5c2` |
 | ACCEPTED vectors | exact nine-key positive, exact replay and six-fact receipt projection passed; six-key source, missing/extra/invalid reconciliation, inconsistent `ASSUMED_ZERO`/`UNAVAILABLE` and receipt drift failed closed |
-| local database | disposable PostgreSQL 16.15 applied 39/39 and passed A01–A18; final summary was `{"postgres":"16.15 (Homebrew)","migrations":39,"rollbackAssertions":18,"terminalRoles":2}`; those two were the expected schema caller/executor, zero temporary assertion roles remained, and the cluster was removed |
-| application/static | 172 files / 2,315 tests; TypeScript; zero-warning ESLint; 73 adapter files; `git diff --check`; Next.js 16.2.9 Webpack build with 64/64 pages |
-| PostgreSQL 17 / Hosted | deleted no-data r20 applied 39/39 in one transaction, passed A01–A18, completed the actual temporary-LOGIN signed `ACCEPTED` path, exact replay and `IDEMPOTENCY_CONFLICT`, and independently verified `[1,0,1,1,1,1]` ledgers with zero temporary LOGINs/sessions |
+| current application/static | 172 files / 2,321 tests; TypeScript; zero-warning ESLint; 73 adapter files; `git diff --check`; Next.js 16.2.9 Webpack build with 64/64 pages |
+| current local database | disposable PostgreSQL 16.15 applied 39/39; migrations 37/38 passed a deliberate statement-by-statement sequence without a harness-supplied outer wrapper; A03 passed; final terminal rows and temporary SET edges were both zero; the cluster was removed |
+| historical application/static | the prior `4e84823` artifact set passed 172 files / 2,315 tests, TypeScript, zero-warning ESLint, 73 adapter files, `git diff --check` and the 64/64-page Webpack build; it is retained only as the previous checkpoint |
+| historical PostgreSQL 17 / Hosted | r19 id/ref `17627f14-b3ef-4d94-834e-8adde3850a2f` / `tsozyxxjxzqixkztdpmr`; r20 id/ref `0e4154f3-f995-4f6c-a025-898435d3b5c0` / `fhcmsezgladnmzhkzoeb`; r20's prior artifact set was committed as `4e84823d3c62e34abe0a0bd0f295e20dc456cae0` and passed 39/39, A01–A18, temporary-LOGIN signed `ACCEPTED`, replay, `IDEMPOTENCY_CONFLICT` and `[1,0,1,1,1,1]` with zero temporary LOGINs/sessions |
 
 The rollback runner now assigns `R00` to runner preflight and `A01`–`A18` to
 the fixed files. Every failure is one content-free JSON object with `stage` and
@@ -2462,16 +2466,22 @@ the fixed files. Every failure is one content-free JSON object with `stage` and
 credentials, driver detail and branch metadata are excluded, and rollback
 failure retains priority.
 
-This closes the source/local usage mismatch, Hosted PostgreSQL 17 rollback gate
-and the one-time Hosted identity plus source-valid signed `ACCEPTED` E2E. r19
-first proved 39/39 plus 18/18 but exposed an unsupported Vitest
-`--minWorkers` option before live test collection; a real child-process smoke
-test and bounded allowlisted fd4 status protocol now prevent recurrence. r20
-then passed the full chain. Both Previews were deleted and three listings after
-each deletion showed only healthy Production. Live custody/credential
-resolvers, provider/model evaluation, human review and final activation
-approval remain open. Readiness remains false; no model call, real data,
-deployment or Production write occurred. See the
+The source/local usage mismatch and the prior `4e84823` Hosted rollback,
+one-time identity and signed `ACCEPTED` gates are closed for that historical
+artifact set. r19 first proved 39/39 plus A01–A18 but exposed an unsupported
+Vitest `--minWorkers` option before live test collection; r20 then passed the
+full prior chain. Both Previews were deleted and three listings after each
+deletion showed only healthy Production. Those runs do not prove current native
+Supabase CLI apply, transactional policy `.6`, identity policy `.2` or the v5
+preflight/coordinator pins.
+
+The unchanged A03 signer-independence negative vector still accepts either
+`RUNNER_TERMINAL_SIGNER_NOT_INDEPENDENT` or generic `VALIDATION_ERROR`.
+Dedicated-code-only enforcement remains a separately pinned hardening that must
+be paired with another authorized disposable Preview rerun. Live
+custody/credential resolvers, provider/model evaluation, human review and final
+activation approval also remain open. Readiness remains false; no model call,
+real data, deployment or Production write occurred. See the
 [M1g-i handoff](communication-note-preview-terminal-accepted-usage-m1g-i.md).
 
 ### Current live/read-only evidence

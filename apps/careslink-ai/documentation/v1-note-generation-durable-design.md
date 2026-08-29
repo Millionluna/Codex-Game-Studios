@@ -1493,7 +1493,9 @@ key or database credential, or select an arbitrary function. Both factories
 are `TEST_ONLY`; their readiness constants remain `false` and their approved
 ports remain `undefined`.
 
-The fixed M1g-g bindings are:
+The following fixed bindings and PostgreSQL result are the historical M1g-g
+checkpoint. M1g-i later added explicit transaction wrappers to migrations 37
+and 38, so their historical bytes are not the current migration bytes.
 
 | Binding | Version / SHA-256 digest |
 |---|---|
@@ -1579,7 +1581,7 @@ deployment or Production change. Full evidence and advisor links are in
 ## 24. Communication signed terminal ACCEPTED usage alignment M1g-i — 2026-08-29
 
 M1g-i is the forward-only successor to M1g-h's diagnosed usage mismatch.
-Migration 38 remains unchanged. Additive migration
+Additive migration
 `20260829041316_align_communication_note_preview_terminal_accepted_usage.sql`
 replaces the signed three-argument terminal RPC so the independently signed
 statement retains its exact nine-key usage object while only the six provider
@@ -1588,31 +1590,59 @@ projection fields are reconciliation labels, not provider facts. Signature,
 authorization, claim, reservation, receipt, cost, parent-lock, append-only,
 replay and exact caller ACL semantics remain unchanged.
 
+The current source also wraps migrations 37 and 38 in explicit
+`BEGIN`/`COMMIT` boundaries. Their business SQL and privilege sequence are
+unchanged, but a statement-by-statement transport can no longer strand their
+temporary grants before `LOCK TABLE`. Migration 37 is 39,965 bytes with
+SHA-256 `09e69476de4b5b1b925a281f2943ef541e289aab6bef60ad92aace14d0c6d432`;
+migration 38 is 28,835 bytes with SHA-256
+`4c13bf50d7866a4b948475b598bb1c103fb625e59824be98c4e272c659da283f`.
+The 39-entry ordered-content digest is
+`a0ad14e88a2c10400c4d2e86ee8ca4c67768ee094f8002687dd33c333c045fa2`.
+
 The rollback harness assigns stable, content-free stages `R00` and
 `A01`–`A18`. Adjacent owner/worker assertions now account for the six isolated
 Communication Note tables without treating their `statement` and `usage`
-columns as registered-worker payload leakage. The exact 39-migration manifest,
-new migration, A03 terminal assertion and 18-file rollback manifest are bound
-by SHA-256; derived preflight/coordinator policy digests are
-`59a71d4e8668f16cbb0007cfa13bca595b4767cc4842a0d0bb69be0708e9a4ae`
+columns as registered-worker payload leakage. Transactional policy
+`2026-08-29.preview-transactional-migrations.6` binds all 39 entries with
+manifest SHA-256
+`60314eb32f7ac26027862e30b27e60460cf4d17d49061126f4366b08a0cbd3a2`
+and removes 19 known outer wrappers in memory before maintaining its own
+single transaction. The exact migration 39, A03 terminal assertion and
+18-file rollback manifest remain pinned. Derived v5 preflight/coordinator
+policy digests are
+`0e2582040995753efe95baa071fee4e0b58fa105c79db8bfa673abd66e2d01a1`
 and
-`02268069d8290059988bf96d488828b0b12dec912810972b97c790629fa848af`.
+`1f93fa2c0ba207a28cb706d922acc10bba8305f16c83c7973c70ae4d7ac7e5c2`.
+Identity policy `2026-08-29.preview-runner-terminal-identity.2` requires one
+exact `metadata` plus `credentials` envelope proving that the target is the
+same healthy, no-data, non-default, non-persistent child of pinned Production
+before the destructive reset runner may read CA material or connect.
 
-A disposable local PostgreSQL 16.15 cluster applied 39/39 migrations and
-passed all 18 rollback assertions, including a source-valid nine-key
-`ACCEPTED` insert, exact replay, receipt projection and reconciliation/drift
-negative vectors. The application gate passed 172 files / 2,315 tests,
-TypeScript, zero-warning ESLint, 73 adapter files, diff checks and the 64/64-page
-Webpack production build. The temporary cluster and roles were removed.
+A fresh disposable local PostgreSQL 16.15 cluster applied the current 39/39
+migrations. Migrations 37 and 38 were deliberately sent statement by statement
+without an external transaction and succeeded through their own explicit
+wrappers. A03 then passed as a rollback-only database assertion; final terminal
+rows and temporary SET-role edges were both zero. The server stopped and the
+cluster was deleted. Current source validation passed 172 files / 2,321 tests,
+TypeScript, zero-warning ESLint, 73-file adapter synchronization, diff checks
+and the 64/64-page Webpack production build. The earlier 172-file / 2,315-test
+result belongs to the prior artifact set committed as
+`4e84823d3c62e34abe0a0bd0f295e20dc456cae0`.
 
-Deleted no-data Hosted PostgreSQL 17 r20 subsequently applied 39/39 in one
-transaction, passed A01–A18 and completed the actual temporary-LOGIN signed
-`ACCEPTED`, exact replay and conflict gate. Independent postcheck found the
-expected `[1,0,1,1,1,1]` durable chain and zero temporary LOGINs/sessions. r20
-was deleted and three listings left only healthy Production. Live
-trust/custody and credential resolvers, provider/model evaluation, human review
-and final approval remain absent; readiness is still false and approved values
-are undefined. No provider/model, real-data, deployment or Production write is
-part of M1g-i.
+Deleted no-data Hosted PostgreSQL 17 r20 subsequently applied the prior
+`4e84823` artifact set in one transaction, passed A01–A18 and completed the
+actual temporary-LOGIN signed `ACCEPTED`, exact replay and conflict gate.
+Independent postcheck found the expected `[1,0,1,1,1,1]` durable chain and zero
+temporary LOGINs/sessions. r20 was deleted and three listings left only healthy
+Production. That historical result does not prove native Supabase CLI apply,
+transactional policy `.6`, identity policy `.2`, or the v5 pins at the current
+revision. A03 also still accepts either the dedicated signer-independence code
+or generic `VALIDATION_ERROR`; narrowing it to the dedicated code remains a
+separate repin and paid-Preview follow-up, not a claim of this checkpoint.
+Live trust/custody and credential resolvers, current exact-revision Hosted
+validation, provider/model evaluation, human review and final approval remain
+absent; readiness is still false and approved values are undefined. No
+provider/model, real-data, deployment or Production write is part of M1g-i.
 Full evidence is in
 `documentation/communication-note-preview-terminal-accepted-usage-m1g-i.md`.

@@ -3,7 +3,8 @@ import { readFile } from "node:fs/promises";
 
 import {
   COMMUNICATION_NOTE_PREVIEW_RUNNER_TERMINAL_IDENTITY_POLICY as IDENTITY_POLICY,
-  extractCommunicationNotePreviewBranchDatabaseTarget,
+  CommunicationNotePreviewRunnerTerminalIdentityPolicyError,
+  extractCommunicationNoteDisposablePreviewResetDatabaseTarget,
   parseCommunicationNotePreviewRunnerTerminalIdentityArguments,
 } from "./communication-note-preview-runner-terminal-identity-policy.mjs";
 import { assertVerifiedPreviewTlsConnection } from
@@ -2399,7 +2400,7 @@ async function main() {
       process.argv.slice(2),
     );
     branchJson = await readBoundedStdin();
-    const target = extractCommunicationNotePreviewBranchDatabaseTarget(
+    const target = extractCommunicationNoteDisposablePreviewResetDatabaseTarget(
       branchJson,
       { expectedBranchRef: args.expectedBranchRef },
     );
@@ -2481,7 +2482,8 @@ function safeCheckpoint(error) {
 if (import.meta.url === `file://${process.argv[1]}`) {
   main().catch((error) => {
     const code = error instanceof CommunicationNotePreviewTransactionalMigrationError ||
-        error instanceof CommunicationNotePreviewTransactionalMigrationPolicyError
+        error instanceof CommunicationNotePreviewTransactionalMigrationPolicyError ||
+        error instanceof CommunicationNotePreviewRunnerTerminalIdentityPolicyError
       ? error.code
       : "TRANSACTIONAL_MIGRATION_INTERNAL_FAILED";
     const checkpoint = safeCheckpoint(error);

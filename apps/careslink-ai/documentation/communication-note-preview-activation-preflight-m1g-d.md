@@ -110,8 +110,10 @@ attestation.
 
 ### Exact database manifest and caller candidates
 
-M1g-d v2 does not execute a migration. It pins the complete source manifest,
-including the new default-off M1g-f artifact:
+M1g-d v2 does not execute a migration. The following table is its historical
+37-file checkpoint; later M1g-i transaction-wrapper hardening supersedes the
+listed migration-37 bytes in current source. It pins the then-complete source
+manifest, including the new default-off M1g-f artifact:
 
 | Database evidence | Exact pin |
 |---|---|

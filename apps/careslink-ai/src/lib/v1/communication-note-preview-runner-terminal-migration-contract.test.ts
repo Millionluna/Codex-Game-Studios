@@ -32,6 +32,24 @@ const assertion = normalizeSql(
 );
 
 describe("Communication Note M1g-f runner terminal migration contract", () => {
+  it("keeps grants, locks and cleanup inside one explicit transaction", () => {
+    expect(normalized.startsWith("begin;")).toBe(true);
+    expect(normalized.endsWith("commit;")).toBe(true);
+    expect(normalized.match(/\bbegin;/g)).toHaveLength(1);
+    expect(normalized.match(/\bcommit;/g)).toHaveLength(1);
+    expect(normalized.indexOf("grant careslink_v1_generation_owner")).toBeGreaterThan(
+      normalized.indexOf("begin;"),
+    );
+    expect(normalized.indexOf("lock table")).toBeGreaterThan(
+      normalized.indexOf("begin;"),
+    );
+    expect(
+      normalized.lastIndexOf(
+        "revoke careslink_v1_generation_owner from current_user",
+      ),
+    ).toBeLessThan(normalized.lastIndexOf("commit;"));
+  });
+
   it("adds one inert executor and deliberately creates no runtime caller", () => {
     expect(
       [...migration.matchAll(/^\s*create role\s+([a-z0-9_]+)/gim)].map(
@@ -335,6 +353,24 @@ describe("Communication Note M1g-f runner terminal migration contract", () => {
 });
 
 describe("Communication Note M1g-g signed terminal caller migration contract", () => {
+  it("keeps grants, locks and cleanup inside one explicit transaction", () => {
+    expect(signedNormalized.startsWith("begin;")).toBe(true);
+    expect(signedNormalized.endsWith("commit;")).toBe(true);
+    expect(signedNormalized.match(/\bbegin;/g)).toHaveLength(1);
+    expect(signedNormalized.match(/\bcommit;/g)).toHaveLength(1);
+    expect(
+      signedNormalized.indexOf("grant careslink_v1_generation_owner"),
+    ).toBeGreaterThan(signedNormalized.indexOf("begin;"));
+    expect(signedNormalized.indexOf("lock table")).toBeGreaterThan(
+      signedNormalized.indexOf("begin;"),
+    );
+    expect(
+      signedNormalized.lastIndexOf(
+        "revoke careslink_v1_generation_owner from current_user",
+      ),
+    ).toBeLessThan(signedNormalized.lastIndexOf("commit;"));
+  });
+
   it("creates exactly one inert purpose-scoped terminal caller", () => {
     expect(
       [...signedMigration.matchAll(/^\s*create role\s+([a-z0-9_]+)/gim)].map(

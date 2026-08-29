@@ -23,7 +23,7 @@ import {
 import { CaresLinkV1ContractError } from "./shared-contracts";
 
 export const CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_ACTIVATION_PREFLIGHT_VERSION =
-  "preflight.communication.openai.synthetic-preview.2026-08-29.m1g-i.v4" as const;
+  "preflight.communication.openai.synthetic-preview.2026-08-29.m1g-i.v5" as const;
 
 const SHA256_PATTERN = /^[a-f0-9]{64}$/;
 const MAXIMUM_EVIDENCE_AGE_MS = 5 * 60 * 1_000;
@@ -55,7 +55,7 @@ export const CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_DATABASE_EVIDENCE_PINS =
     orderedMigrationBasenamesSha256:
       "2bd2f029c86e1f4231b9a3bee7ee8681cb086dcd29eaaaceff21efcc1fec1fda",
     orderedMigrationEntriesSha256:
-      "75d78f30eb2fdc105890308a142d9cf7a0cadcbfda6f2900c06bff64699efb7c",
+      "a0ad14e88a2c10400c4d2e86ee8ca4c67768ee094f8002687dd33c333c045fa2",
     authorityMigrationSha256:
       "94f83498ea04053e7238a95bb9be0bb8a38ad0a76fa0e751390419800da51f7f",
     custodyMigrationSha256:
@@ -65,9 +65,9 @@ export const CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_DATABASE_EVIDENCE_PINS =
     custodyAssertionSha256:
       "7fa7fa9d4c9667005b36c1f72c95aaf2418131d05037b5ea347f83e0bfcf16d2",
     runnerTerminalMigrationSha256:
-      "4341cdacb90e45eea428edfc57df29379ca211900e161844016daad190f7b9c5",
+      "09e69476de4b5b1b925a281f2943ef541e289aab6bef60ad92aace14d0c6d432",
     signedRunnerTerminalMigrationSha256:
-      "b095785331c848d02cabc417eb3131fe2f9328564abef6fc0dd35bccd2980c5a",
+      "4c13bf50d7866a4b948475b598bb1c103fb625e59824be98c4e272c659da283f",
     runnerTerminalAcceptedUsageMigrationSha256:
       "3d2cc53df3cf17ea21a4f93aaf673f8e911fcc9a35b5309cf7c633c6802e448e",
     runnerTerminalAssertionSha256:
@@ -159,7 +159,7 @@ export type CaresLinkV1CommunicationNotePreviewActivationPreflightPolicy =
     Readonly<{ policyDigest: string }>;
 
 export const CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_ACTIVATION_PREFLIGHT_POLICY_DIGEST =
-  "59a71d4e8668f16cbb0007cfa13bca595b4767cc4842a0d0bb69be0708e9a4ae" as const;
+  "0e2582040995753efe95baa071fee4e0b58fa105c79db8bfa673abd66e2d01a1" as const;
 
 if (
   createCanonicalSha256(ACTIVATION_PREFLIGHT_POLICY_CORE) !==

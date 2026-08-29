@@ -3,6 +3,8 @@
 -- Additive, source-only and default-off. This migration creates no LOGIN,
 -- credential, runtime membership, API grant, seed row or enabled capability.
 
+begin;
+
 select pg_catalog.set_config('careslink.migration_entry_role', current_user, true);
 
 grant careslink_v1_generation_owner to current_user
@@ -832,3 +834,5 @@ revoke careslink_v1_preview_runner_terminal_executor from current_user granted b
 revoke careslink_v1_preview_receipt_executor from current_user granted by current_user;
 revoke careslink_v1_preview_dispatch_executor from current_user granted by current_user;
 revoke careslink_v1_generation_owner from current_user granted by current_user;
+
+commit;

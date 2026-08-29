@@ -70,12 +70,12 @@ describe("Communication Note M1g-i activation preflight", () => {
     expect(
       CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_ACTIVATION_PREFLIGHT_VERSION,
     ).toBe(
-      "preflight.communication.openai.synthetic-preview.2026-08-29.m1g-i.v4",
+      "preflight.communication.openai.synthetic-preview.2026-08-29.m1g-i.v5",
     );
     expect(
       CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_ACTIVATION_PREFLIGHT_POLICY_DIGEST,
     ).toBe(
-      "59a71d4e8668f16cbb0007cfa13bca595b4767cc4842a0d0bb69be0708e9a4ae",
+      "0e2582040995753efe95baa071fee4e0b58fa105c79db8bfa673abd66e2d01a1",
     );
     expect(
       CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_ACTIVATION_PREFLIGHT_POLICY,

@@ -252,12 +252,19 @@ secret name or `.env.example` entry. Its one-shot test parent creates only
 process-local enable, fd3 config and fd4 fixed-status variables for the scrubbed
 child, and no credential is placed in an environment variable. Its migration
 and fixed-stage rollback diagnostics change only the source/database contract
-and test evidence. The preflight version
-`preflight.communication.openai.synthetic-preview.2026-08-29.m1g-i.v4` with
-digest `59a71d4e8668f16cbb0007cfa13bca595b4767cc4842a0d0bb69be0708e9a4ae`
+and test evidence. Transactional migration policy
+`2026-08-29.preview-transactional-migrations.6` has manifest digest
+`60314eb32f7ac26027862e30b27e60460cf4d17d49061126f4366b08a0cbd3a2`;
+disposable identity policy `2026-08-29.preview-runner-terminal-identity.2`
+cross-binds a healthy, no-data, non-default, non-persistent Preview, its exact
+Production parent and its credential target before credentials, CA bytes or a
+connection may be used. These are test invocation policies, not environment
+configuration. The preflight version
+`preflight.communication.openai.synthetic-preview.2026-08-29.m1g-i.v5` with
+digest `0e2582040995753efe95baa071fee4e0b58fa105c79db8bfa673abd66e2d01a1`
 and coordinator version
-`coordinator.communication.openai.synthetic-preview.2026-08-29.m1g-i.v4` with
-digest `02268069d8290059988bf96d488828b0b12dec912810972b97c790629fa848af`
+`coordinator.communication.openai.synthetic-preview.2026-08-29.m1g-i.v5` with
+digest `1f93fa2c0ba207a28cb706d922acc10bba8305f16c83c7973c70ae4d7ac7e5c2`
 are source-integrity pins, not runtime configuration or approval. No
 environment value can replace the still-absent live trust/custody and caller
 credential resolvers. Readiness remains `false` and approved values remain

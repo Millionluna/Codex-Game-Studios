@@ -7,6 +7,8 @@
 -- PostgreSQL persists and binds that verification evidence; it does not claim
 -- to perform Ed25519 verification itself.
 
+begin;
+
 select pg_catalog.set_config('careslink.migration_entry_role', current_user, true);
 
 grant careslink_v1_generation_owner to current_user
@@ -608,3 +610,5 @@ revoke careslink_v1_preview_authorization_executor
   from current_user granted by current_user;
 revoke careslink_v1_generation_owner
   from current_user granted by current_user;
+
+commit;
