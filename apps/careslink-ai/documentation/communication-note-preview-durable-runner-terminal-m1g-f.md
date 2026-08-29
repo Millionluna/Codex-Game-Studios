@@ -1,5 +1,10 @@
 # Communication Note Preview durable runner terminal M1g-f
 
+> Successor note (M1g-g, 2026-08-29): the current contract chooses the
+> independent Ed25519 trust-root option described below, removes the unsigned
+> overload and adds a fifth purpose-scoped `NOLOGIN` caller shell plus source-
+> only ports. See `communication-note-preview-signed-runner-terminal-port-m1g-g.md`.
+
 ## Status
 
 M1g-f adds the source database contract needed for a future executable

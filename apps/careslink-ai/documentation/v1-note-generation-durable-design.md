@@ -1440,3 +1440,82 @@ an independent signed-terminal envelope or an authenticated terminal adapter as
 the trust root, then atomically add the fifth caller, custody evidence and
 runtime port. Detailed scope is in
 `documentation/communication-note-preview-durable-runner-terminal-m1g-f.md`.
+
+## 22. Communication signed runner-terminal caller and ports M1g-g — 2026-08-29
+
+M1g-g is the additive successor to M1g-f. It preserves M1g-f as the historical
+unsigned source/database checkpoint and closes that checkpoint's chosen trust-
+root shape with an independent Ed25519 terminal envelope. The signing purpose
+is `CARESLINK_RUNNER_TERMINAL`, the allowed domain is
+`CARESLINK_COMMUNICATION_NOTE_PREVIEW_RUNNER_TERMINAL`, and the signed statement
+binds the signer key-id hash and public-key fingerprint alongside the existing
+authorization/run/claim/reservation/receipt, fixture/body, evaluation, review
+and terminal-state evidence. The caller identity HMAC remains correlation and
+scope evidence; it is not a signature or terminal trust root.
+
+The terminal verifier accepts only a purpose/domain-scoped Ed25519 SPKI
+snapshot and a canonical 64-byte signature encoded as 86-character unpadded
+Base64URL. It verifies the canonical CaresLink signing message, key validity
+window, observation time and signer fingerprints before creating immutable
+verified evidence. Owner-authorization, receipt and runner-terminal signer
+key-id hashes, public-key fingerprints and custody references must be pairwise
+distinct. This prevents either earlier signing purpose from being reused to
+authorize an `ACCEPTED` or `FAILED` terminal.
+
+CLI migration
+`20260829011323_add_communication_note_preview_signed_terminal_caller_shadow.sql`
+requires all six execution ledgers to be locked and empty. It removes
+`persist_verified_communication_note_preview_runner_terminal(jsonb,text)` and
+creates the exact signed replacement
+`persist_verified_communication_note_preview_runner_terminal(jsonb,text,text)`.
+The forced-RLS append-only ledger now persists the original signature,
+signature SHA-256, signer key-id hash, public-key fingerprint, authenticity,
+verifier method and verifier identity HMAC. PostgreSQL recomputes and binds
+this evidence and exact replay must match it byte-for-byte, but PostgreSQL does
+not claim to perform Ed25519 verification; that remains the source verifier's
+boundary.
+
+The new `careslink_v1_preview_runner_terminal_caller` is the fifth, separate
+`RUNNER_TERMINAL_PERSISTENCE` caller mapping. It is `NOLOGIN`, `NOINHERIT`,
+`NOSUPERUSER` and `NOBYPASSRLS`, and receives only private-schema `USAGE` plus
+exact three-argument terminal RPC `EXECUTE`. It receives no table, sequence,
+type, helper, authorization, revocation, claim, reservation or receipt RPC
+privilege; it has no executor membership, API/service-role edge, login member
+or `SET ROLE` path. The terminal executor remains the isolated security-
+definer owner with its existing forced-RLS ledger privileges.
+
+Two source-only ports preserve that separation. The signed-terminal runtime
+port verifies an injected envelope before forwarding only verified evidence to
+one purpose-scoped persistence method. The PostgreSQL port accepts only an
+injected parameterized query capability and the exact three-argument SQL; it
+cannot construct a connection, read environment variables, resolve a signing
+key or database credential, or select an arbitrary function. Both factories
+are `TEST_ONLY`; their readiness constants remain `false` and their approved
+ports remain `undefined`.
+
+The fixed M1g-g bindings are:
+
+| Binding | Version / SHA-256 digest |
+|---|---|
+| signed terminal policy | `policy.communication.openai.synthetic-preview.runner-terminal.2026-08-29.m1g-g.v2` / `d0ac3b14ceb97535cfed935250566b59d8ac42a93123a750d3a686102a8d1cfa` |
+| signed terminal statement | `runner-terminal.communication.openai.synthetic-preview.2026-08-29.m1g-g.v2` |
+| custody policy | `custody.communication.openai.synthetic-preview.2026-08-29.m1g-g.v2` / `f537dc64e3c57a34b6db6d0d1c871c38a70bcb51c4d071e625b026f840a309ca` |
+| derived activation preflight | `preflight.communication.openai.synthetic-preview.2026-08-29.m1g-g.v3` / `491481513a67198cba91babc3c172fc1f326f9ee7bdd883b3d1208c639bdaf73` |
+| derived coordinator | `coordinator.communication.openai.synthetic-preview.2026-08-29.m1g-g.v3` / `f6609c2f357b5fda92ae5aa1b459dfb1e32b7893c3e8436e0e94a8ffa2bbe675` |
+| migration bytes | `b095785331c848d02cabc417eb3131fe2f9328564abef6fc0dd35bccd2980c5a` |
+| rollback-assertion bytes | `f8e8307718e3bdf0835b93cdac075279ae4f5ba3dbab287af46e1280ce587ad5` |
+
+The local PostgreSQL 16.15 gate clean-applied the exact 38/38 migration set and
+passed the signed-terminal assertion boundary. That evidence does not activate
+the design. Two explicit blockers remain: the runtime factory's test-only
+signing-key snapshot is not cross-bound to a validated live M1g-c custody/
+trust-registry resolver, and its verifier HMAC is not cross-bound to a fifth-
+caller credential/identity resolver. Login/membership provisioning and both
+resolver bindings require a separately authorized disposable-Preview batch.
+No ordinary environment value can stand in for them.
+
+All readiness remains false; approved signer/custody/runtime/PostgreSQL values
+remain absent. M1g-g creates no product route, worker, queue, cron, Supabase
+Function, provider/model call, Hosted application, deployment or Production
+change. Detailed scope is in
+`documentation/communication-note-preview-signed-runner-terminal-port-m1g-g.md`.

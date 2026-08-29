@@ -1,5 +1,10 @@
 # Communication Note Preview activation preflight M1g-d
 
+> Successor note (M1g-g, 2026-08-29): the current preflight derives a five-
+> caller, 38-migration evidence contract and separately binds runner-terminal
+> signer custody while keeping live identity, membership and resolver evidence
+> absent. See `communication-note-preview-signed-runner-terminal-port-m1g-g.md`.
+
 ## Status
 
 M1g-d adds a **server-only, pure, `TEST_ONLY` activation-preflight

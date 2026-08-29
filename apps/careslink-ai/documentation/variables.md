@@ -184,6 +184,43 @@ trusted runtime invokes that result or supplies it to M1g-e. M1g-e output remain
 `dispatchCapability=ABSENT`, with pre-run approval and post-run acceptance
 false. Nothing from this batch belongs in `.env.example`.
 
+Communication Note M1g-g is the source-only successor to M1g-f and also adds
+no environment variable or secret name. It selects an independent Ed25519
+terminal trust root with purpose `CARESLINK_RUNNER_TERMINAL` and domain
+`CARESLINK_COMMUNICATION_NOTE_PREVIEW_RUNNER_TERMINAL`, adds the fifth dormant
+`careslink_v1_preview_runner_terminal_caller` shell and replaces the unsigned
+two-argument terminal RPC with the signed three-argument boundary. The new
+signed-terminal runtime and PostgreSQL ports accept only explicitly injected
+test dependencies; they create no connection, inspect no environment and
+resolve no key, credential or HMAC secret.
+
+The terminal private signing key must not be exported into an ordinary
+environment variable. A string in the environment cannot become an approved
+purpose-scoped signing-key snapshot, M1g-c custody/trust-registry observation
+or valid signature. Likewise, a database username/password or token value in
+the environment cannot create the reviewed login identity, fifth-caller role
+membership, exact target binding, rotation or teardown evidence. The verifier
+identity HMAC is only a scope/correlation binding; an arbitrary hexadecimal
+environment value cannot authenticate a caller or activate the RPC. None of
+these categories may be inferred from `OPENAI_API_KEY`, a Supabase service-role
+key or an existing feature flag, and no placeholder for them belongs in
+`.env.example`.
+
+M1g-g remains default-off because its test-only signing-key snapshot is not yet
+cross-bound to a validated live M1g-c custody/trust-registry resolver and its
+verifier HMAC is not cross-bound to a fifth-caller credential/identity
+resolver. These are activation blockers that require a separately reviewed
+resolver and identity-provisioning batch; environment configuration cannot
+close them. The fixed terminal, custody, derived preflight and coordinator
+digests are respectively
+`d0ac3b14ceb97535cfed935250566b59d8ac42a93123a750d3a686102a8d1cfa`,
+`f537dc64e3c57a34b6db6d0d1c871c38a70bcb51c4d071e625b026f840a309ca`,
+`491481513a67198cba91babc3c172fc1f326f9ee7bdd883b3d1208c639bdaf73`
+and
+`f6609c2f357b5fda92ae5aa1b459dfb1e32b7893c3e8436e0e94a8ffa2bbe675`;
+they are source-integrity bindings, not configuration or approval. No Hosted,
+provider/model, deployment or Production capability is introduced.
+
 ## Current auth, URL and feature variables
 
 | Variable | Class | Purpose | Boundary |

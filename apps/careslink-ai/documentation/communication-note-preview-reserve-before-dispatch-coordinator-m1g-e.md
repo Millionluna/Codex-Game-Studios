@@ -1,5 +1,10 @@
 # Communication Note Preview reserve-before-dispatch coordinator M1g-e
 
+> Successor note (M1g-g, 2026-08-29): a signed terminal source port and fifth
+> caller shell now exist, but no authenticated runtime identity is activated and
+> the database/runtime evidence blockers remain. See
+> `communication-note-preview-signed-runner-terminal-port-m1g-g.md`.
+
 ## Status
 
 M1g-e adds a **server-only, pure, `TEST_ONLY`, content-free transcript and

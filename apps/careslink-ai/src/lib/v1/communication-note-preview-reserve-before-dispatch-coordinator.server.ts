@@ -35,7 +35,7 @@ import {
 import { CaresLinkV1ContractError } from "./shared-contracts";
 
 export const CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_COORDINATOR_VERSION =
-  "coordinator.communication.openai.synthetic-preview.2026-08-29.m1g-e.v2" as const;
+  "coordinator.communication.openai.synthetic-preview.2026-08-29.m1g-g.v3" as const;
 
 const SHA256_PATTERN = /^[a-f0-9]{64}$/;
 const UUID_PATTERN =
@@ -66,7 +66,7 @@ export const CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_COORDINATOR_BLOCKED_REASONS
   deepFreeze([
     "ACTIVATION_PREFLIGHT_REMAINS_BLOCKED",
     "PRE_RUN_DISPATCH_APPROVAL_ABSENT",
-    "PURPOSE_SCOPED_RUNTIME_PORTS_ABSENT",
+    "PURPOSE_SCOPED_RUNTIME_IDENTITY_NOT_ACTIVATED",
     "DATABASE_ATTESTED_RESERVED_AT_ABSENT",
     "DURABLE_RUNNER_TERMINAL_STATE_ABSENT",
   ] as const);
@@ -84,7 +84,7 @@ const COORDINATOR_POLICY_CORE = deepFreeze({
     reservationResultReservedAt:
       "PRESENT_SOURCE_ONLY_NOT_RUNTIME_EVIDENCE",
     runnerTerminalLedger:
-      "PRESENT_SOURCE_ONLY_NO_RUNTIME_CALLER",
+      "PRESENT_SIGNED_SOURCE_CONTRACT_CALLER_SHELL_NO_RUNTIME_IDENTITY",
     runnerTerminalPolicyVersion:
       CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RUNNER_TERMINAL_POLICY_VERSION,
     runnerTerminalPolicyDigest:
@@ -157,6 +157,8 @@ const COORDINATOR_POLICY_CORE = deepFreeze({
       "CANDIDATE_ONLY_RUNTIME_RPC_RESULT_NOT_OBTAINED",
     receiptSignature:
       "CRYPTOGRAPHICALLY_VERIFIED_AGAINST_TEST_ONLY_CUSTODY_SNAPSHOT",
+    runnerTerminalSignature:
+      "SOURCE_PORT_PRESENT_NO_VERIFIED_RUNTIME_ENVELOPE",
     runnerProviderCorrelation:
       "UNATTESTED_NO_SHARED_IDENTIFIER_WITH_RECEIPT_HMAC",
   },
@@ -168,6 +170,7 @@ const COORDINATOR_POLICY_CORE = deepFreeze({
       "RUNNER_PROVIDER_REQUEST_HASH",
       "RUNNER_CANDIDATE_DIGEST",
       "RECEIPT_DIGEST_OR_SIGNATURE_HASH",
+      "RUNNER_TERMINAL_DIGEST_OR_SIGNATURE_HASH",
       "FIXTURE_DIGEST",
     ],
     crossRoleReuse: "PROHIBITED",
@@ -194,7 +197,7 @@ export type CaresLinkV1CommunicationNotePreviewCoordinatorPolicy =
   typeof COORDINATOR_POLICY_CORE & Readonly<{ policyDigest: string }>;
 
 export const CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_COORDINATOR_POLICY_DIGEST =
-  "4649f620bc60425d5ca40d308d167110befd4a29c772e9877ddbeac5eaaa3531" as const;
+  "f6609c2f357b5fda92ae5aa1b459dfb1e32b7893c3e8436e0e94a8ffa2bbe675" as const;
 
 if (
   createCanonicalSha256(COORDINATOR_POLICY_CORE) !==

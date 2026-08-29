@@ -263,6 +263,41 @@ login identity or automatic retry. Without a fifth purpose-scoped caller and
 reviewed runtime adapter, its terminal RPC cannot be reached by product code.
 See `documentation/communication-note-preview-durable-runner-terminal-m1g-f.md`.
 
+M1g-g is the separately reviewed source-only successor that fills those two
+contract shapes without activating automation. It chooses an independent
+Ed25519 terminal trust root with purpose `CARESLINK_RUNNER_TERMINAL`, adds the
+fifth `NOLOGIN` caller shell and replaces the unsigned two-argument terminal
+RPC with the exact signed three-argument form
+`persist_verified_communication_note_preview_runner_terminal(jsonb,text,text)`.
+The caller gets only private-schema `USAGE` plus exact RPC `EXECUTE`; it has no
+login-capable member or executor-role membership. The caller identity HMAC is
+only a scope/correlation binding and never substitutes for the independently
+verified signature.
+
+The new signed-terminal runtime port verifies the envelope before persistence,
+and the PostgreSQL port can invoke only the exact parameterized function
+through an injected query capability. Both are test-only source ports: they do
+not construct a database connection, inspect environment variables, resolve a
+credential or signing key, schedule work, call a provider or expose a product
+runtime importer. Readiness remains `false` and approved ports/signing material
+remain absent. Its test-only signing-key snapshot is not cross-bound to a live
+M1g-c custody/trust-registry resolver, and its verifier HMAC is not cross-bound
+to a fifth-caller credential/identity resolver; these remain activation
+blockers rather than end-to-end automation evidence. The local PostgreSQL
+16.15 gate clean-applied 38/38 migrations;
+the migration and rollback-assertion SHA-256 values are
+`b095785331c848d02cabc417eb3131fe2f9328564abef6fc0dd35bccd2980c5a`
+and
+`f8e8307718e3bdf0835b93cdac075279ae4f5ba3dbab287af46e1280ce587ad5`.
+The revised preflight/coordinator bindings remain non-authoritative and use
+digests
+`491481513a67198cba91babc3c172fc1f326f9ee7bdd883b3d1208c639bdaf73`
+and
+`f6609c2f357b5fda92ae5aa1b459dfb1e32b7893c3e8436e0e94a8ffa2bbe675`.
+No Hosted Supabase action, real provider/model call, deployment or Production
+change occurred. See
+`documentation/communication-note-preview-signed-runner-terminal-port-m1g-g.md`.
+
 Supabase CLI 2.115.0 has since generated source-only migration `20260823213144_harden_v1_note_generation_registration_retention.sql`. It adds `attempts_registration_digest_idx` and the named `attempts_registration_catalog_fk` from `attempts.registration_digest` to `worker_registrations.registration_digest`, with update/delete `RESTRICT`, `NOT VALID` creation and explicit validation. It creates no seed, caller grant, runtime surface or Production change. Its local gate passed 39/39 focused contracts, the full 125-file / 1,381-test suite, lint, TypeScript, the 63/63-page production build, the 73-file Codex-adapter sync check and `git diff --check`. Deleted disposable `r22` then clean-applied the current manifest 15/15 and passed the seven rollback suites; the hosted registration-retention gate is now closed without enabling any runtime automation.
 
 ### PostgreSQL 16.15 local isolated gate — 2026-08-24

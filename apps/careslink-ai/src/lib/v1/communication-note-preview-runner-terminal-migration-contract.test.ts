@@ -7,6 +7,13 @@ const migrationPath =
   "supabase/migrations/20260828235426_harden_communication_note_preview_reservation_runner_terminal_shadow.sql";
 const migration = readFileSync(join(process.cwd(), migrationPath), "utf8");
 const normalized = normalizeSql(migration);
+const signedMigrationPath =
+  "supabase/migrations/20260829011323_add_communication_note_preview_signed_terminal_caller_shadow.sql";
+const signedMigration = readFileSync(
+  join(process.cwd(), signedMigrationPath),
+  "utf8",
+);
+const signedNormalized = normalizeSql(signedMigration);
 const assertion = normalizeSql(
   readFileSync(
     join(
@@ -320,6 +327,175 @@ describe("Communication Note M1g-f runner terminal migration contract", () => {
   });
 });
 
+describe("Communication Note M1g-g signed terminal caller migration contract", () => {
+  it("creates exactly one inert purpose-scoped terminal caller", () => {
+    expect(
+      [...signedMigration.matchAll(/^\s*create role\s+([a-z0-9_]+)/gim)].map(
+        (match) => match[1],
+      ),
+    ).toEqual(["careslink_v1_preview_runner_terminal_caller"]);
+    expect(signedNormalized).toContain(
+      "create role careslink_v1_preview_runner_terminal_caller with nologin nosuperuser nocreatedb nocreaterole noinherit noreplication nobypassrls;",
+    );
+    expect(signedMigration).not.toMatch(
+      /\b(?:login|password)\b[\s\S]{0,80}runner_terminal_caller/i,
+    );
+    expect(signedMigration).not.toMatch(
+      /grant\s+careslink_v1_preview_runner_terminal_executor\s+to\s+careslink_v1_preview_runner_terminal_caller/i,
+    );
+  });
+
+  it("serializes and refuses the signed cut-over unless all six ledgers are empty", () => {
+    const gateStart = signedNormalized.indexOf("do $$");
+    const gateEnd = signedNormalized.indexOf("$$;", gateStart);
+    const gate = signedNormalized.slice(gateStart, gateEnd);
+    for (const ledger of [
+      "communication_note_preview_authorizations",
+      "communication_note_preview_authorization_revocations",
+      "communication_note_preview_claims",
+      "communication_note_preview_dispatch_reservations",
+      "communication_note_preview_dispatch_receipts",
+      "communication_note_preview_runner_terminals",
+    ]) {
+      expect(gate).toContain(ledger);
+    }
+    expect(gate).toContain("preview_execution_ledgers_must_be_empty");
+    expect(signedNormalized.indexOf("lock table")).toBeLessThan(gateStart);
+    expect(
+      signedNormalized.indexOf("in share row exclusive mode"),
+    ).toBeLessThan(gateStart);
+    expect(
+      signedNormalized.indexOf("set role careslink_v1_preview_dispatch_executor"),
+    ).toBeLessThan(gateStart);
+  });
+
+  it("hardens the terminal ledger with independent signed-envelope evidence", () => {
+    const alteration = signedNormalized.slice(
+      signedNormalized.indexOf(
+        "alter table careslink_v1_generation.communication_note_preview_runner_terminals add column",
+      ),
+      signedNormalized.indexOf(
+        "grant usage on schema careslink_v1_generation",
+      ),
+    );
+    for (const column of [
+      "signature_base64url text not null",
+      "signature_sha256 text not null unique",
+      "signer_key_id_hash text not null",
+      "signer_public_key_sha256 text not null",
+      "authenticity text not null",
+      "verifier_method text not null",
+    ]) {
+      expect(alteration).toContain(column);
+    }
+    expect(alteration).toContain(
+      "external_runner_terminal_ed25519_verified",
+    );
+    expect(alteration).toContain(
+      "application_ed25519_terminal_trust_registry",
+    );
+    expect(alteration).toContain(
+      "policy.communication.openai.synthetic-preview.runner-terminal.2026-08-29.m1g-g.v2",
+    );
+    expect(alteration).toContain(
+      "d0ac3b14ceb97535cfed935250566b59d8ac42a93123a750d3a686102a8d1cfa",
+    );
+  });
+
+  it("removes the unsigned overload and installs only the signed three-argument RPC", () => {
+    expect(signedNormalized).toContain(
+      "drop function careslink_v1_generation.persist_verified_communication_note_preview_runner_terminal( jsonb, text );",
+    );
+    expect(signedNormalized).toContain(
+      "create function careslink_v1_generation.persist_verified_communication_note_preview_runner_terminal( p_statement jsonb, p_signature_base64url text, p_verifier_identity_hmac text )",
+    );
+    const grant = signedStatement(
+      "grant execute on function careslink_v1_generation.persist_verified_communication_note_preview_runner_terminal(",
+    );
+    expect(grant).toContain("jsonb, text, text");
+    expect(grant).toContain("careslink_v1_preview_runner_terminal_executor");
+    expect(grant).toContain("careslink_v1_preview_runner_terminal_caller");
+    for (const role of [
+      "public",
+      "anon",
+      "authenticated",
+      "service_role",
+      "careslink_v1_preview_receipt_executor",
+      "careslink_v1_preview_receipt_caller",
+      "careslink_v1_preview_dispatch_caller",
+    ]) {
+      expect(
+        signedStatement(
+          "revoke all on function careslink_v1_generation.persist_verified_communication_note_preview_runner_terminal(",
+        ),
+      ).toContain(role);
+    }
+  });
+
+  it("strictly binds purpose, signature, signer independence and exact replay", () => {
+    const body = signedFunctionBody(
+      "persist_verified_communication_note_preview_runner_terminal",
+    );
+    expect(body).toContain("security definer set search_path = ''");
+    expect(body).toContain("p_signature_base64url ~");
+    expect(body).toContain("'signerkeyidhash'");
+    expect(body).toContain("'signerpublickeysha256'");
+    expect(body).toContain("'signingpurpose'");
+    expect(body).toContain("careslink_runner_terminal");
+    expect(body).toContain("runner_terminal_signer_not_independent");
+    expect(body).toContain(
+      "v_authorization.signer_key_id_hash = v_receipt.signer_key_id_hash",
+    );
+    expect(body).toContain("v_existing.signature_base64url");
+    expect(body).toContain("v_existing.signature_sha256");
+    expect(body).toContain(") <> 23");
+    expect(body).toContain(") <> 26");
+  });
+
+  it("keeps the fifth caller away from ledgers and every earlier RPC", () => {
+    expect(signedNormalized).toContain(
+      "revoke all on all tables in schema careslink_v1_generation from careslink_v1_preview_runner_terminal_caller;",
+    );
+    expect(signedNormalized).toContain(
+      "revoke all on all sequences in schema careslink_v1_generation from careslink_v1_preview_runner_terminal_caller;",
+    );
+    for (const rpc of [
+      "persist_verified_communication_note_preview_authorization",
+      "revoke_communication_note_preview_authorization",
+      "claim_communication_note_preview_authorization",
+      "reserve_communication_note_preview_dispatch",
+      "persist_verified_communication_note_preview_dispatch_receipt",
+    ]) {
+      expect(signedNormalized).toMatch(
+        new RegExp(
+          `revoke all on function[\\s\\S]{0,700}${rpc}[\\s\\S]{0,700}from careslink_v1_preview_runner_terminal_caller`,
+        ),
+      );
+    }
+    expect(signedNormalized).toContain(
+      "revoke careslink_v1_preview_runner_terminal_executor from current_user granted by current_user;",
+    );
+  });
+
+  it("upgrades the rollback-only lifecycle proof to the signed caller", () => {
+    expect(assertion).toContain(
+      "set local role careslink_v1_preview_runner_terminal_caller",
+    );
+    expect(assertion).toContain("malformed terminal signature was accepted");
+    expect(assertion).toContain(
+      "authorization signing key reuse was accepted",
+    );
+    expect(assertion).toContain(
+      "changed terminal signature replay was accepted",
+    );
+    expect(assertion).toContain("signed terminal evidence was not stored exactly");
+    expect(assertion).toContain(
+      "persist_verified_communication_note_preview_runner_terminal(jsonb,text,text)",
+    );
+    expect(assertion.endsWith("rollback;")).toBe(true);
+  });
+});
+
 function normalizeSql(value: string) {
   return value.replace(/--[^\n]*/g, " ").replace(/\s+/g, " ").trim().toLowerCase();
 }
@@ -334,12 +510,36 @@ function functionBody(name: string) {
   return normalized.slice(start, end + 3);
 }
 
+function signedFunctionBody(name: string) {
+  const start = signedNormalized.indexOf(
+    `create function careslink_v1_generation.${name}`,
+  );
+  expect(start, `${name} is missing from signed migration`).toBeGreaterThanOrEqual(
+    0,
+  );
+  const end = signedNormalized.indexOf("$$;", start);
+  expect(end, `${name} terminator is missing from signed migration`).toBeGreaterThan(
+    start,
+  );
+  return signedNormalized.slice(start, end + 3);
+}
+
 function statement(prefix: string) {
   const normalizedPrefix = normalizeSql(prefix);
   const start = normalized.lastIndexOf(normalizedPrefix);
   expect(start, `${prefix} is missing`).toBeGreaterThanOrEqual(0);
   const end = normalized.indexOf(";", start);
   return normalized.slice(start, end + 1);
+}
+
+function signedStatement(prefix: string) {
+  const normalizedPrefix = normalizeSql(prefix);
+  const start = signedNormalized.lastIndexOf(normalizedPrefix);
+  expect(start, `${prefix} is missing from signed migration`).toBeGreaterThanOrEqual(
+    0,
+  );
+  const end = signedNormalized.indexOf(";", start);
+  return signedNormalized.slice(start, end + 1);
 }
 
 function block(startText: string, endText: string) {

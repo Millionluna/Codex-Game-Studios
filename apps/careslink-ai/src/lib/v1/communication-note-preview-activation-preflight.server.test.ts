@@ -65,17 +65,17 @@ vi.mock("server-only", () => ({}));
 
 const NOW = "2026-08-28T02:00:00.000Z";
 
-describe("Communication Note M1g-d activation preflight", () => {
+describe("Communication Note M1g-g activation preflight", () => {
   it("literal-pins a source-only policy while preserving all existing readiness and approval latches", () => {
     expect(
       CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_ACTIVATION_PREFLIGHT_VERSION,
     ).toBe(
-      "preflight.communication.openai.synthetic-preview.2026-08-29.m1g-d.v2",
+      "preflight.communication.openai.synthetic-preview.2026-08-29.m1g-g.v3",
     );
     expect(
       CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_ACTIVATION_PREFLIGHT_POLICY_DIGEST,
     ).toBe(
-      "791a4d893afd4e490ab0164a8f604589bcf8015d25e5723b4df210f8c0b44f67",
+      "491481513a67198cba91babc3c172fc1f326f9ee7bdd883b3d1208c639bdaf73",
     );
     expect(
       CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_ACTIVATION_PREFLIGHT_POLICY,
@@ -104,10 +104,15 @@ describe("Communication Note M1g-d activation preflight", () => {
         privilegedRoleAttributes: false,
         directObjectPrivileges: false,
         additionalCallerShellMemberships: false,
-        runnerTerminalContract: "SOURCE_ONLY_DEFAULT_OFF",
+        callerCount: 5,
+        runnerTerminalContract: "SIGNED_SOURCE_ONLY_DEFAULT_OFF",
         runnerTerminalExecutorRole:
           "careslink_v1_preview_runner_terminal_executor",
-        runnerTerminalCallerPresent: false,
+        runnerTerminalCallerPresent: true,
+        runnerTerminalCallerExecuteGranted: true,
+        runnerTerminalRuntimeIdentityPresent: false,
+        runnerTerminalRuntimeMembershipPresent: false,
+        runnerTerminalCredentialResolverPresent: false,
         runnerTerminalRuntimeExecute: false,
       },
     });
@@ -220,7 +225,7 @@ describe("Communication Note M1g-d activation preflight", () => {
     }
   });
 
-  it("pins the exact 37-migration manifest and six M1g-b/M1g-c/M1g-f database artifacts", () => {
+  it("pins the exact 38-migration manifest and seven M1g-b/M1g-c/M1g-f/M1g-g database artifacts", () => {
     const migrationsDirectory = join(process.cwd(), "supabase/migrations");
     const migrationNames = readdirSync(migrationsDirectory)
       .filter((name) => name.endsWith(".sql"))
@@ -271,6 +276,11 @@ describe("Communication Note M1g-d activation preflight", () => {
         "supabase/migrations/20260828235426_harden_communication_note_preview_reservation_runner_terminal_shadow.sql",
         CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_DATABASE_EVIDENCE_PINS
           .runnerTerminalMigrationSha256,
+      ],
+      [
+        "supabase/migrations/20260829011323_add_communication_note_preview_signed_terminal_caller_shadow.sql",
+        CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_DATABASE_EVIDENCE_PINS
+          .signedRunnerTerminalMigrationSha256,
       ],
       [
         "supabase/assertions/communication_note_preview_runner_terminal_shadow_assertions.sql",
@@ -331,6 +341,15 @@ describe("Communication Note M1g-d activation preflight", () => {
       },
       (candidate) => {
         candidate.receiptCustody.exportAllowed = true;
+      },
+      (candidate) => {
+        candidate.runnerTerminalCustody.custodyReferenceSha256 = hex("0");
+      },
+      (candidate) => {
+        candidate.runnerTerminalCustody.keyIdHash = hex("0");
+      },
+      (candidate) => {
+        candidate.runnerTerminalCustody.publicKeySha256 = hex("0");
       },
       (candidate) => {
         candidate.provider.projectIdHmac = hex("f");
@@ -502,6 +521,11 @@ describe("Communication Note M1g-d activation preflight", () => {
       },
       (candidate) => {
         (
+          candidate.database as { signedRunnerTerminalMigrationSha256: string }
+        ).signedRunnerTerminalMigrationSha256 = hex("f");
+      },
+      (candidate) => {
+        (
           candidate.database as { runnerTerminalAssertionSha256: string }
         ).runnerTerminalAssertionSha256 = hex("f");
       },
@@ -518,7 +542,12 @@ describe("Communication Note M1g-d activation preflight", () => {
       (candidate) => {
         (
           candidate.database as { runnerTerminalCallerPresent: boolean }
-        ).runnerTerminalCallerPresent = true;
+        ).runnerTerminalCallerPresent = false;
+      },
+      (candidate) => {
+        (
+          candidate.database as { runnerTerminalCallerExecuteGranted: boolean }
+        ).runnerTerminalCallerExecuteGranted = false;
       },
       (candidate) => {
         (
@@ -656,6 +685,7 @@ describe("Communication Note M1g-d activation preflight", () => {
 
     for (const section of [
       "receiptCustody",
+      "runnerTerminalCustody",
       "provider",
       "database",
       "humanReview",
@@ -876,6 +906,7 @@ function createFixture(
 ) {
   const ownerSigner = createSigner("OWNER_AUTHORIZATION");
   const receiptSigner = createSigner("CARESLINK_DISPATCH_RECEIPT");
+  const runnerTerminalSigner = createRunnerTerminalSigner();
   const registryObservedAt =
     input.registryObservedAt ?? "2026-08-28T01:59:55.000Z";
   const authorizationIssuedAt =
@@ -937,6 +968,19 @@ function createFixture(
       nonExportable: true,
       exportAllowed: false,
       signingScope: "CARESLINK_PREVIEW_RECEIPT_DOMAIN_ONLY",
+      genericSigning: "PROHIBITED",
+    },
+    runnerTerminalSigner: {
+      trustedSigningKey: runnerTerminalSigner.trustedKey,
+      keyIdHash: sha256(runnerTerminalSigner.trustedKey.keyId),
+      publicKeySha256: runnerTerminalSigner.trustedKey.publicKeySha256,
+      custodyReferenceSha256: sha256(
+        "runner-terminal-custody-reference",
+      ),
+      privateKeyMaterialPresent: false,
+      nonExportable: true,
+      exportAllowed: false,
+      signingScope: "CARESLINK_PREVIEW_RUNNER_TERMINAL_DOMAIN_ONLY",
       genericSigning: "PROHIBITED",
     },
     providerCredential: {
@@ -1061,6 +1105,22 @@ function createCandidate(
       rotationAndRevocationEvidenceSha256: sha256("receipt-lifecycle"),
       teardownPlanSha256: sha256("receipt-teardown"),
     },
+    runnerTerminalCustody: {
+      observedAt: custodySnapshot.ownerTrustRegistry.observedAt,
+      custodyReferenceSha256:
+        custodySnapshot.runnerTerminalSigner.custodyReferenceSha256,
+      keyIdHash: custodySnapshot.runnerTerminalSigner.keyIdHash,
+      publicKeySha256:
+        custodySnapshot.runnerTerminalSigner.publicKeySha256,
+      status: "NON_EXPORTABLE_ACTIVE_CANDIDATE",
+      privateKeyMaterialPresent: false,
+      exportAllowed: false,
+      accessLogEvidenceSha256: sha256("runner-terminal-access-log"),
+      rotationAndRevocationEvidenceSha256: sha256(
+        "runner-terminal-lifecycle",
+      ),
+      teardownPlanSha256: sha256("runner-terminal-teardown"),
+    },
     provider: {
       observedAt: custodySnapshot.ownerTrustRegistry.observedAt,
       projectIdHmac: statement.environmentEvidence.openAiProjectIdHmac,
@@ -1126,10 +1186,14 @@ function createCandidate(
       withData: false,
       productionExcluded: true,
       ...CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_DATABASE_EVIDENCE_PINS,
-      runnerTerminalContract: "SOURCE_ONLY_DEFAULT_OFF",
+      runnerTerminalContract: "SIGNED_SOURCE_ONLY_DEFAULT_OFF",
       runnerTerminalExecutorRole:
         "careslink_v1_preview_runner_terminal_executor",
-      runnerTerminalCallerPresent: false,
+      runnerTerminalCallerPresent: true,
+      runnerTerminalCallerExecuteGranted: true,
+      runnerTerminalRuntimeIdentityPresent: false,
+      runnerTerminalRuntimeMembershipPresent: false,
+      runnerTerminalCredentialResolverPresent: false,
       runnerTerminalRuntimeExecute: false,
       apiRoleExecute: false,
       fixtureRowCount: 0,
@@ -1288,6 +1352,27 @@ function createSigner(
     privateKey,
     trustedKey:
       trustedKey satisfies CaresLinkV1CommunicationNotePreviewTrustedSigningKey,
+  };
+}
+
+function createRunnerTerminalSigner() {
+  const { publicKey, privateKey } = generateKeyPairSync("ed25519");
+  const publicKeyDer = publicKey.export({ format: "der", type: "spki" });
+  return {
+    privateKey,
+    trustedKey: {
+      keyId: "runner-terminal-preview-2026-08",
+      publicKeySpkiDerBase64: publicKeyDer.toString("base64"),
+      publicKeySha256: createHash("sha256")
+        .update(publicKeyDer)
+        .digest("hex"),
+      status: "ACTIVE" as const,
+      notBefore: "2026-08-28T01:00:00.000Z",
+      expiresAt: "2026-08-28T03:00:00.000Z",
+      purpose: "CARESLINK_RUNNER_TERMINAL" as const,
+      allowedDomain:
+        "CARESLINK_COMMUNICATION_NOTE_PREVIEW_RUNNER_TERMINAL" as const,
+    },
   };
 }
 

@@ -411,6 +411,52 @@ No real key, signing operation, login-capable caller, hosted database mutation,
 provider call, deployment or Production permission is part of M1g-c. See
 `documentation/communication-note-preview-key-custody-callers-m1g-c.md`.
 
+### Communication Note Preview signed terminal caller M1g-g (source-only)
+
+M1g-g adds the fifth purpose-scoped caller that M1g-f deliberately left
+absent. Historical M1g-f evidence remains accurate for that revision; the new
+CLI migration adds the following separate shell without widening any of the
+four M1g-c bundles:
+
+| Caller shell | Exact function bundle | Explicitly absent |
+|---|---|---|
+| `careslink_v1_preview_runner_terminal_caller` | `persist_verified_communication_note_preview_runner_terminal(jsonb,text,text)` only | authorization, revocation, claim, reservation and receipt RPCs; tables, sequences, types, helper functions, executor membership, login and API/service-role access |
+
+The caller is `NOLOGIN`, `NOINHERIT`, `NOSUPERUSER` and `NOBYPASSRLS`. It
+receives private-schema `USAGE` and exact three-argument function `EXECUTE`
+only. The isolated runner-terminal executor remains the security-definer
+function owner and retains only its forced-RLS ledger privileges; no runtime
+identity may assume either role. The old unsigned
+`persist_verified_communication_note_preview_runner_terminal(jsonb,text)`
+entry is removed so it cannot bypass the independent signature evidence.
+
+The terminal authority is an Ed25519 envelope under purpose
+`CARESLINK_RUNNER_TERMINAL` and domain
+`CARESLINK_COMMUNICATION_NOTE_PREVIEW_RUNNER_TERMINAL`, not the caller identity
+HMAC. The application verifies the purpose- and domain-scoped public-key
+snapshot before calling PostgreSQL. The database binds and persists the exact
+statement, unpadded Base64URL signature, signature SHA-256, signer key-id hash,
+public-key fingerprint, authenticity/method labels and verifier identity HMAC;
+it does not claim to verify Ed25519 itself. Owner-authorization, receipt and
+terminal signer identifiers, fingerprints and custody references must remain
+pairwise distinct.
+
+The source-only signed-terminal and PostgreSQL ports accept only explicit
+dependency injection and an exact parameterized RPC. They create no pool or
+connection, read no environment, resolve no secret or signing key and expose
+no product route/worker importer. Their readiness values remain `false`, all
+approved ports and the approved terminal signing key remain `undefined`, and
+the fifth shell has no login-capable member. The test-only signing-key snapshot
+is not yet cross-bound to a validated M1g-c custody/trust-registry resolver,
+and the verifier HMAC is not cross-bound to a fifth-caller credential/identity
+resolver. Those are explicit activation blockers, not live registry, custody
+or caller-authentication evidence. M1g-g therefore grants no Hosted,
+provider/model, deployment or Production permission. Its terminal policy and
+custody digests are respectively
+`d0ac3b14ceb97535cfed935250566b59d8ac42a93123a750d3a686102a8d1cfa`
+and
+`f537dc64e3c57a34b6db6d0d1c871c38a70bcb51c4d071e625b026f840a309ca`.
+
 ## Intended V1 matrix (partly codified, not available at runtime)
 
 | Target resource | Owner | Admin/support | Service/backend | Required control |

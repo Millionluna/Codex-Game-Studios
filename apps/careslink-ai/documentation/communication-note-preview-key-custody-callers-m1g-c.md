@@ -1,5 +1,11 @@
 # Communication Note Preview key custody and callers M1g-c
 
+> Successor note (M1g-g, 2026-08-29): the current source contract extends
+> this historical four-caller baseline with an independently signed runner-
+> terminal envelope, separate terminal signer custody and a fifth purpose-
+> scoped `NOLOGIN` caller shell. See
+> `communication-note-preview-signed-runner-terminal-port-m1g-g.md`.
+
 ## Status
 
 M1g-c is a **source-only, default-off custody and least-privilege caller

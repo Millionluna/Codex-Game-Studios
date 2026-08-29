@@ -1,5 +1,5 @@
 -- Rollback-only PostgreSQL 16+ posture and functional assertions for
--- Communication Note M1g-f. Synthetic fixture rows and SET-role edges exist
+-- Communication Note M1g-f/M1g-g. Synthetic fixture rows and SET-role edges exist
 -- only inside this transaction and are removed before the final ROLLBACK.
 
 \set ON_ERROR_STOP on
@@ -13,6 +13,7 @@ declare
   v_schema oid := to_regnamespace('careslink_v1_generation');
   v_owner oid := to_regrole('careslink_v1_generation_owner');
   v_executor oid := to_regrole('careslink_v1_preview_runner_terminal_executor');
+  v_caller oid := to_regrole('careslink_v1_preview_runner_terminal_caller');
   v_relation oid := to_regclass(
     'careslink_v1_generation.communication_note_preview_runner_terminals'
   );
@@ -20,7 +21,7 @@ declare
     'careslink_v1_generation.communication_note_preview_runner_terminals'
   );
   v_function oid := to_regprocedure(
-    'careslink_v1_generation.persist_verified_communication_note_preview_runner_terminal(jsonb,text)'
+    'careslink_v1_generation.persist_verified_communication_note_preview_runner_terminal(jsonb,text,text)'
   );
   v_reserve oid := to_regprocedure(
     'careslink_v1_generation.reserve_communication_note_preview_dispatch(uuid,text,uuid,integer,text,integer,text,integer,text,text)'
@@ -45,7 +46,7 @@ begin
   if current_setting('server_version_num')::integer < 160000 then
     raise exception 'M1g-f assertions require PostgreSQL 16+';
   end if;
-  if v_schema is null or v_owner is null or v_executor is null
+  if v_schema is null or v_owner is null or v_executor is null or v_caller is null
     or v_relation is null or v_type is null
     or v_function is null or v_reserve is null
     or v_guard is null or v_canonical_json is null
@@ -53,8 +54,10 @@ begin
   then
     raise exception 'M1g-f durable objects are incomplete';
   end if;
-  if to_regrole('careslink_v1_preview_runner_terminal_caller') is not null then
-    raise exception 'M1g-f must not create a runtime caller';
+  if to_regprocedure(
+    'careslink_v1_generation.persist_verified_communication_note_preview_runner_terminal(jsonb,text)'
+  ) is not null then
+    raise exception 'unsigned M1g-f terminal RPC remains callable';
   end if;
   if (
     select count(*)
@@ -67,27 +70,38 @@ begin
   ) <> 1 then
     raise exception 'unsafe M1g-f executor posture';
   end if;
+  if (
+    select count(*)
+    from pg_catalog.pg_roles r
+    where r.oid = v_caller
+      and not r.rolcanlogin and not r.rolsuper and not r.rolcreatedb
+      and not r.rolcreaterole and not r.rolinherit and not r.rolreplication
+      and not r.rolbypassrls and r.rolconnlimit = -1
+      and r.rolvaliduntil is null and r.rolconfig is null
+  ) <> 1 then
+    raise exception 'unsafe M1g-g terminal caller posture';
+  end if;
   select r.rolsuper into v_entry_actor_super
   from pg_catalog.pg_roles r where r.oid = current_user::regrole;
   if v_entry_actor_super then
-    execute 'select exists (select 1 from pg_catalog.pg_authid where oid = $1 and rolpassword is not null)'
-      into v_has_password using v_executor;
+    execute 'select exists (select 1 from pg_catalog.pg_authid where oid in ($1,$2) and rolpassword is not null)'
+      into v_has_password using v_executor, v_caller;
     if v_has_password then
-      raise exception 'M1g-f executor has a password';
+      raise exception 'M1g-g terminal executor/caller has a password';
     end if;
   end if;
   select count(*) into v_edge_count
   from pg_catalog.pg_auth_members m
-  where m.roleid = v_executor or m.member = v_executor;
-  v_expected_edges := case when v_entry_actor_super then 0 else 1 end;
+  where m.roleid in (v_executor, v_caller) or m.member in (v_executor, v_caller);
+  v_expected_edges := case when v_entry_actor_super then 0 else 2 end;
   if v_edge_count <> v_expected_edges or exists (
     select 1
     from pg_catalog.pg_auth_members m
     join pg_catalog.pg_roles member_role on member_role.oid = m.member
     join pg_catalog.pg_roles grantor_role on grantor_role.oid = m.grantor
-    where (m.roleid = v_executor or m.member = v_executor)
+    where (m.roleid in (v_executor, v_caller) or m.member in (v_executor, v_caller))
       and not (
-        m.roleid = v_executor
+        m.roleid in (v_executor, v_caller)
         and member_role.oid = current_user::regrole
         and grantor_role.rolsuper
         and grantor_role.oid <> member_role.oid
@@ -96,7 +110,7 @@ begin
         and coalesce((pg_catalog.to_jsonb(m)->>'set_option')::boolean, false) is false
       )
   ) then
-    raise exception 'M1g-f executor has unsafe durable membership/bootstrap edge';
+    raise exception 'M1g-g terminal roles have unsafe durable membership/bootstrap edge';
   end if;
   if (
     select count(*) from pg_catalog.pg_class c
@@ -157,7 +171,7 @@ begin
     where p.oid = v_function
       and acl.privilege_type = 'EXECUTE'
       and (
-        acl.grantee is distinct from v_executor
+        acl.grantee not in (v_executor, v_caller)
         or acl.is_grantable
       )
   ) then
@@ -197,8 +211,31 @@ begin
   end loop;
   if not has_function_privilege(
     'careslink_v1_preview_runner_terminal_executor', v_function, 'EXECUTE'
+  ) or not has_function_privilege(
+    'careslink_v1_preview_runner_terminal_caller', v_function, 'EXECUTE'
   ) then
-    raise exception 'M1g-f executor cannot execute its owned RPC';
+    raise exception 'M1g-g terminal executor/caller exact RPC edge missing';
+  end if;
+  if exists (
+    select 1
+    from pg_catalog.pg_proc p
+    cross join lateral pg_catalog.aclexplode(
+      coalesce(p.proacl, pg_catalog.acldefault('f', p.proowner))
+    ) acl
+    where p.pronamespace = v_schema
+      and p.oid <> v_function
+      and acl.grantee = v_caller
+      and acl.privilege_type = 'EXECUTE'
+  ) then
+    raise exception 'M1g-g terminal caller crossed into another private RPC';
+  end if;
+  if not has_schema_privilege(
+      'careslink_v1_preview_runner_terminal_caller', v_schema, 'USAGE'
+    ) or has_schema_privilege(
+      'careslink_v1_preview_runner_terminal_caller', v_schema, 'CREATE'
+    )
+  then
+    raise exception 'M1g-g terminal caller schema posture drifted';
   end if;
   if not has_schema_privilege(
       'careslink_v1_preview_runner_terminal_executor', 'public', 'USAGE'
@@ -245,6 +282,15 @@ begin
       raise exception 'M1g-f ledger leaked to API role %', v_role;
     end if;
   end loop;
+  if has_table_privilege(
+      'careslink_v1_preview_runner_terminal_caller', v_relation,
+      'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER'
+    ) or has_type_privilege(
+      'careslink_v1_preview_runner_terminal_caller', v_type, 'USAGE'
+    )
+  then
+    raise exception 'M1g-g terminal caller gained direct ledger/type privilege';
+  end if;
   if exists (
     with expected(role_name, privilege_type, is_grantable) as (
       values
@@ -360,7 +406,8 @@ begin
     'careslink_v1_preview_runner_terminal_executor',
     'careslink_v1_preview_authorization_registration_caller',
     'careslink_v1_preview_authorization_revocation_caller',
-    'careslink_v1_preview_receipt_caller'
+    'careslink_v1_preview_receipt_caller',
+    'careslink_v1_preview_runner_terminal_caller'
   ] loop
     if has_function_privilege(v_role, v_reserve, 'EXECUTE') then
       raise exception 'reserve RPC execute leaked to %', v_role;
@@ -395,6 +442,13 @@ begin
   select pg_catalog.pg_get_functiondef(v_function) into v_definition;
   if v_definition !~* 'security definer'
     or v_definition !~* 'set search_path to '''''
+    or v_definition !~* 'p_signature_base64url text'
+    or v_definition !~* 'CARESLINK_RUNNER_TERMINAL'
+    or v_definition !~* 'signerKeyIdHash'
+    or v_definition !~* 'signerPublicKeySha256'
+    or v_definition !~* 'RUNNER_TERMINAL_SIGNER_NOT_INDEPENDENT'
+    or v_definition !~* 'v_existing.signature_base64url'
+    or v_definition !~* 'v_existing.signature_sha256'
     or v_definition !~* 'transaction_isolation'
     or v_definition !~* 'read committed'
     or v_definition !~* 'outcome <> ''COMPLETED'''
@@ -405,7 +459,19 @@ begin
     or v_definition !~* 'receiptSignatureSha256'
     or v_definition !~* 'p_statement->''usage'' is distinct from v_receipt.usage'
   then
-    raise exception 'M1g-f terminal RPC contract drifted';
+    raise exception 'M1g-g signed terminal RPC contract drifted';
+  end if;
+  if not exists (
+    select 1
+    from pg_catalog.pg_constraint c
+    where c.conrelid = v_relation
+      and c.conname = 'comm_preview_runner_terminals_signed_envelope_check'
+      and pg_catalog.pg_get_constraintdef(c.oid) ~
+        'EXTERNAL_RUNNER_TERMINAL_ED25519_VERIFIED'
+      and pg_catalog.pg_get_constraintdef(c.oid) ~
+        'APPLICATION_ED25519_TERMINAL_TRUST_REGISTRY'
+  ) then
+    raise exception 'M1g-g signed terminal ledger constraint drifted';
   end if;
   select pg_catalog.pg_get_functiondef(v_reserve) into v_definition;
   if v_definition !~* '''reservedAt'''
@@ -438,6 +504,8 @@ grant careslink_v1_preview_receipt_executor to current_user
   with admin false, inherit false, set true granted by current_user;
 grant careslink_v1_preview_runner_terminal_executor to current_user
   with admin false, inherit false, set true granted by current_user;
+grant careslink_v1_preview_runner_terminal_caller to current_user
+  with admin false, inherit false, set true granted by current_user;
 
 savepoint m1gf_functional_fixture;
 
@@ -458,7 +526,8 @@ grant select, insert, update on m1gf_state to
   careslink_v1_preview_authorization_executor,
   careslink_v1_preview_dispatch_executor,
   careslink_v1_preview_receipt_executor,
-  careslink_v1_preview_runner_terminal_executor;
+  careslink_v1_preview_runner_terminal_executor,
+  careslink_v1_preview_runner_terminal_caller;
 
 set local role careslink_v1_preview_authorization_executor;
 do $$
@@ -583,10 +652,12 @@ begin
   for s in select * from pg_temp.m1gf_state order by scenario loop
     if s.scenario='accepted' then
       req_hmac:=repeat('b',64); resp_hmac:=repeat('c',64);
-      key_hmac:=repeat('d',64); pub_hash:=repeat('e',64); verifier:=repeat('f',64);
+      key_hmac:=repeat('d',64); pub_hash:=repeat('e',64);
+      verifier:=repeat('0',63)||'7';
     else
       req_hmac:=repeat('1',64); resp_hmac:=repeat('2',64);
-      key_hmac:=repeat('5',64); pub_hash:=repeat('6',64); verifier:=repeat('7',64);
+      key_hmac:=repeat('5',64); pub_hash:=repeat('6',64);
+      verifier:=repeat('0',63)||'7';
     end if;
     st := jsonb_build_object(
       'domain','careslink.communication-note.preview-dispatch-receipt',
@@ -638,7 +709,7 @@ begin
 end $$;
 
 select set_config('role',current_setting('careslink.assertion_entry_role'),false);
-set local role careslink_v1_preview_runner_terminal_executor;
+set local role careslink_v1_preview_runner_terminal_caller;
 do $$
 declare
   s pg_temp.m1gf_state%rowtype;
@@ -652,29 +723,61 @@ begin
   select * into s from pg_temp.m1gf_state where scenario='accepted';
   st := jsonb_build_object(
     'domain','CARESLINK_COMMUNICATION_NOTE_PREVIEW_RUNNER_TERMINAL',
-    'version','runner-terminal.communication.openai.synthetic-preview.2026-08-29.m1g-f.v1',
+    'version','runner-terminal.communication.openai.synthetic-preview.2026-08-29.m1g-g.v2',
     'authorityPolicyDigest','7804c7d60bb8c686d66a4c0aed74b373023dda672f1ebfa0a8e7c8af4eb7a9d9',
     'authorizationDigest',s.authorization_digest,'claimId',s.claim_id,'runIdHash',s.authorization_statement->>'runIdHash',
     'reservationId',s.reservation_id,'receiptDigest',s.receipt_digest,'slotIndex',0,
     'fixtureId','communication.en.phone-duration.v1','runOrdinal',1,
     'runnerPolicyDigest','a604057aceed70b741d4e1ac2a0e1f9bdf5d13721955448ec083948fb8b4a7c4',
-    'terminalPolicyVersion','policy.communication.openai.synthetic-preview.runner-terminal.2026-08-29.m1g-f.v1',
-    'terminalPolicyDigest','4f38d9ea27e9673138350ecdbc294e14e200cd09247f07244433a51cb62f6f5a',
+    'terminalPolicyVersion','policy.communication.openai.synthetic-preview.runner-terminal.2026-08-29.m1g-g.v2',
+    'terminalPolicyDigest','d0ac3b14ceb97535cfed935250566b59d8ac42a93123a750d3a686102a8d1cfa',
     'state','ACCEPTED','failureReason',null,'noRetry',true,
     'requestBodySha256','98d37d028c742a2e05d079a38e0d6b27fb1fe91a71d397a4bdc9ed607af45213',
     'requestBodyUtf8ByteLength',2522,
     'semanticCanonicalRequestSha256','f404c8f239c20b49a40836a371e928dd6241e95dca598ae8661193443c7c6a68',
-    'receiptSignatureSha256',s.receipt_signature_sha256,'fixtureDigest',repeat('5',64),
-    'preflightInputTokens',120,'providerRequestIdHash',repeat('6',64),'candidateDigest',repeat('7',64),
+    'signerKeyIdHash',repeat('0',63)||'8',
+    'signerPublicKeySha256',repeat('0',63)||'9',
+    'signingPurpose','CARESLINK_RUNNER_TERMINAL',
+    'receiptSignatureSha256',s.receipt_signature_sha256,
+    'fixtureDigest',repeat('0',63)||'b',
+    'preflightInputTokens',120,
+    'providerRequestIdHash',repeat('0',63)||'c',
+    'candidateDigest',repeat('0',63)||'d',
     'usage',s.receipt_usage,'calculatedCostUpperBoundMicroUsd',s.receipt_cost,
     'criticalChecks',jsonb_build_object('STRICT_SCHEMA',true,'SHARED_OUTPUT_PRIVACY',true,'DATE_TIME_PARITY',true,'NUMERIC_PARITY',true,'DECISION_LANGUAGE',true,'REFUSAL_ABSENT',true,'HUMAN_SEMANTIC_GROUNDEDNESS',true),
     'humanReviews',jsonb_build_array(jsonb_build_object('locale','en','passed',true),jsonb_build_object('locale','zh-Hans','passed',true),jsonb_build_object('locale','zh-Hant','passed',true)),
     'receiptProviderCorrelation','UNATTESTED_NO_SHARED_IDENTIFIER',
     'observedAt',to_char(date_trunc('milliseconds',clock_timestamp()) at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'));
 
+  rejected:=false; begin
+    perform careslink_v1_generation.persist_verified_communication_note_preview_runner_terminal(
+      st,repeat('E',85),repeat('0',63)||'a');
+    raise exception 'ASSERTION_EXPECTED_REJECTION';
+  exception when others then get stacked diagnostics m=message_text;
+    rejected:=m='VALIDATION_ERROR';
+  end;
+  if not rejected then
+    raise exception 'malformed terminal signature was accepted: %',m;
+  end if;
+
+  bad := jsonb_set(
+    st,'{signerKeyIdHash}',to_jsonb(s.authorization_statement->>'signerKeyIdHash'),false
+  );
+  rejected:=false; begin
+    perform careslink_v1_generation.persist_verified_communication_note_preview_runner_terminal(
+      bad,repeat('E',86),repeat('0',63)||'a');
+    raise exception 'ASSERTION_EXPECTED_REJECTION';
+  exception when others then get stacked diagnostics m=message_text;
+    rejected:=m='RUNNER_TERMINAL_SIGNER_NOT_INDEPENDENT';
+  end;
+  if not rejected then
+    raise exception 'authorization signing key reuse was accepted: %',m;
+  end if;
+
   bad := jsonb_set(st,'{preflightInputTokens}',to_jsonb('120'::text),false);
   rejected:=false; begin
-    perform careslink_v1_generation.persist_verified_communication_note_preview_runner_terminal(bad,repeat('9',64));
+    perform careslink_v1_generation.persist_verified_communication_note_preview_runner_terminal(
+      bad,repeat('E',86),repeat('0',63)||'a');
     raise exception 'ASSERTION_EXPECTED_REJECTION';
   exception when others then get stacked diagnostics m=message_text; rejected:=m<>'ASSERTION_EXPECTED_REJECTION'; end;
   if not rejected or m is distinct from 'VALIDATION_ERROR' then
@@ -683,7 +786,8 @@ begin
 
   bad := jsonb_set(st,'{usage,inputTokens}',to_jsonb(121),false);
   rejected:=false; begin
-    perform careslink_v1_generation.persist_verified_communication_note_preview_runner_terminal(bad,repeat('9',64));
+    perform careslink_v1_generation.persist_verified_communication_note_preview_runner_terminal(
+      bad,repeat('E',86),repeat('0',63)||'a');
     raise exception 'ASSERTION_EXPECTED_REJECTION';
   exception when others then get stacked diagnostics m=message_text; rejected:=m<>'ASSERTION_EXPECTED_REJECTION'; end;
   if not rejected or m is distinct from 'RUNNER_TERMINAL_BINDING_INVALID' then
@@ -692,15 +796,18 @@ begin
 
   bad := jsonb_set(st,'{preflightInputTokens}',to_jsonb(119),false);
   rejected:=false; begin
-    perform careslink_v1_generation.persist_verified_communication_note_preview_runner_terminal(bad,repeat('9',64));
+    perform careslink_v1_generation.persist_verified_communication_note_preview_runner_terminal(
+      bad,repeat('E',86),repeat('0',63)||'a');
     raise exception 'ASSERTION_EXPECTED_REJECTION';
   exception when others then get stacked diagnostics m=message_text; rejected:=m<>'ASSERTION_EXPECTED_REJECTION'; end;
   if not rejected or m is distinct from 'RUNNER_TERMINAL_BINDING_INVALID' then
     raise exception 'preflight token underestimate did not fail binding: %',m;
   end if;
 
-  result := careslink_v1_generation.persist_verified_communication_note_preview_runner_terminal(st,repeat('9',64));
-  replay := careslink_v1_generation.persist_verified_communication_note_preview_runner_terminal(st,repeat('9',64));
+  result := careslink_v1_generation.persist_verified_communication_note_preview_runner_terminal(
+    st,repeat('E',86),repeat('0',63)||'a');
+  replay := careslink_v1_generation.persist_verified_communication_note_preview_runner_terminal(
+    st,repeat('E',86),repeat('0',63)||'a');
   if result->'created' is distinct from 'true'::jsonb
     or result->'continuationEligible' is distinct from 'true'::jsonb
     or replay->'created' is distinct from 'false'::jsonb
@@ -708,22 +815,36 @@ begin
     or replay->>'recordedAt' is distinct from result->>'recordedAt' then
     raise exception 'ACCEPTED terminal create/replay drifted: %, %',result,replay;
   end if;
+  rejected:=false; begin
+    perform careslink_v1_generation.persist_verified_communication_note_preview_runner_terminal(
+      st,repeat('D',86),repeat('0',63)||'a');
+    raise exception 'ASSERTION_EXPECTED_REJECTION';
+  exception when others then get stacked diagnostics m=message_text;
+    rejected:=m='RUNNER_TERMINAL_CONFLICT';
+  end;
+  if not rejected then
+    raise exception 'changed terminal signature replay was accepted: %',m;
+  end if;
 
   select * into s from pg_temp.m1gf_state where scenario='failed';
   st := jsonb_build_object(
-    'domain','CARESLINK_COMMUNICATION_NOTE_PREVIEW_RUNNER_TERMINAL','version','runner-terminal.communication.openai.synthetic-preview.2026-08-29.m1g-f.v1',
+    'domain','CARESLINK_COMMUNICATION_NOTE_PREVIEW_RUNNER_TERMINAL','version','runner-terminal.communication.openai.synthetic-preview.2026-08-29.m1g-g.v2',
     'authorityPolicyDigest','7804c7d60bb8c686d66a4c0aed74b373023dda672f1ebfa0a8e7c8af4eb7a9d9',
     'authorizationDigest',s.authorization_digest,'claimId',s.claim_id,'runIdHash',s.authorization_statement->>'runIdHash',
     'reservationId',s.reservation_id,'receiptDigest',s.receipt_digest,'slotIndex',0,'fixtureId','communication.en.phone-duration.v1','runOrdinal',1,
     'runnerPolicyDigest','a604057aceed70b741d4e1ac2a0e1f9bdf5d13721955448ec083948fb8b4a7c4',
-    'terminalPolicyVersion','policy.communication.openai.synthetic-preview.runner-terminal.2026-08-29.m1g-f.v1',
-    'terminalPolicyDigest','4f38d9ea27e9673138350ecdbc294e14e200cd09247f07244433a51cb62f6f5a',
+    'terminalPolicyVersion','policy.communication.openai.synthetic-preview.runner-terminal.2026-08-29.m1g-g.v2',
+    'terminalPolicyDigest','d0ac3b14ceb97535cfed935250566b59d8ac42a93123a750d3a686102a8d1cfa',
+    'signerKeyIdHash',repeat('0',63)||'8',
+    'signerPublicKeySha256',repeat('0',63)||'9',
+    'signingPurpose','CARESLINK_RUNNER_TERMINAL',
     'state','FAILED','failureReason','HUMAN_REVIEW_FAILED','noRetry',true,
     'requestBodySha256',null,'requestBodyUtf8ByteLength',null,'semanticCanonicalRequestSha256',null,
     'receiptSignatureSha256',null,'fixtureDigest',null,'preflightInputTokens',null,'providerRequestIdHash',null,'candidateDigest',null,
     'usage',null,'calculatedCostUpperBoundMicroUsd',null,'criticalChecks',null,'humanReviews',null,'receiptProviderCorrelation',null,
     'observedAt',to_char(date_trunc('milliseconds',clock_timestamp()) at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'));
-  result := careslink_v1_generation.persist_verified_communication_note_preview_runner_terminal(st,repeat('9',64));
+  result := careslink_v1_generation.persist_verified_communication_note_preview_runner_terminal(
+    st,repeat('F',86),repeat('0',63)||'a');
   if result->>'state' is distinct from 'FAILED' or result->'continuationEligible' is distinct from 'false'::jsonb then
     raise exception 'FAILED terminal drifted: %',result;
   end if;
@@ -737,10 +858,38 @@ begin
     'humanReviews',jsonb_build_array(jsonb_build_object('locale','en','passed',true),jsonb_build_object('locale','zh-Hans','passed',true),jsonb_build_object('locale','zh-Hant','passed',true)),
     'receiptProviderCorrelation','UNATTESTED_NO_SHARED_IDENTIFIER');
   rejected:=false; begin
-    perform careslink_v1_generation.persist_verified_communication_note_preview_runner_terminal(bad,repeat('b',64));
+    perform careslink_v1_generation.persist_verified_communication_note_preview_runner_terminal(
+      bad,repeat('G',86),repeat('0',63)||'a');
     raise exception 'ASSERTION_EXPECTED_REJECTION';
   exception when others then get stacked diagnostics m=message_text; rejected:=m='RUNNER_TERMINAL_CONFLICT'; end;
   if not rejected then raise exception 'FAILED terminal was overwritable by ACCEPTED: %',m; end if;
+end $$;
+
+select set_config('role',current_setting('careslink.assertion_entry_role'),false);
+set local role careslink_v1_preview_runner_terminal_executor;
+do $$
+declare
+  s pg_temp.m1gf_state%rowtype;
+  t careslink_v1_generation.communication_note_preview_runner_terminals%rowtype;
+  v_expected_signature_sha256 text;
+begin
+  select * into s from pg_temp.m1gf_state where scenario='accepted';
+  select terminal.* into t
+  from careslink_v1_generation.communication_note_preview_runner_terminals terminal
+  where terminal.reservation_id=s.reservation_id;
+  v_expected_signature_sha256 := pg_catalog.encode(
+    extensions.digest(pg_catalog.convert_to(repeat('E',86),'UTF8'),'sha256'),
+    'hex'
+  );
+  if t.signature_base64url is distinct from repeat('E',86)
+    or t.signature_sha256 is distinct from v_expected_signature_sha256
+    or t.signer_key_id_hash is distinct from repeat('0',63)||'8'
+    or t.signer_public_key_sha256 is distinct from repeat('0',63)||'9'
+    or t.authenticity is distinct from 'EXTERNAL_RUNNER_TERMINAL_ED25519_VERIFIED'
+    or t.verifier_method is distinct from 'APPLICATION_ED25519_TERMINAL_TRUST_REGISTRY'
+  then
+    raise exception 'signed terminal evidence was not stored exactly';
+  end if;
 end $$;
 
 select set_config('role',current_setting('careslink.assertion_entry_role'),false);
@@ -789,5 +938,6 @@ revoke careslink_v1_preview_authorization_executor from current_user granted by 
 revoke careslink_v1_preview_dispatch_executor from current_user granted by current_user;
 revoke careslink_v1_preview_receipt_executor from current_user granted by current_user;
 revoke careslink_v1_preview_runner_terminal_executor from current_user granted by current_user;
+revoke careslink_v1_preview_runner_terminal_caller from current_user granted by current_user;
 
 rollback;

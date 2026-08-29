@@ -2325,6 +2325,65 @@ resolution or real care data was used. The M1g-e runtime evidence blockers
 blockers rather than activation claims. Detailed boundaries are in
 `documentation/communication-note-preview-durable-runner-terminal-m1g-f.md`.
 
+### Communication Note signed runner-terminal caller/port gate M1g-g — 2026-08-29
+
+M1g-g is an additive successor to the historical M1g-f gate. It selects an
+independent Ed25519 terminal trust root, adds a fifth purpose-scoped `NOLOGIN`
+caller and source-only signed-terminal/PostgreSQL ports, while leaving every
+runtime readiness and approval latch closed. The caller identity HMAC remains
+a purpose-scoped binding and is not accepted as terminal authenticity.
+
+The signed statement binds purpose `CARESLINK_RUNNER_TERMINAL`, domain
+`CARESLINK_COMMUNICATION_NOTE_PREVIEW_RUNNER_TERMINAL`, signer key-id hash and
+public-key fingerprint. Verification accepts only a canonical 64-byte Ed25519
+signature encoded as 86-character unpadded Base64URL and checks the scoped
+public-key snapshot before exposing immutable verified evidence. Owner,
+receipt and terminal signer identifiers, fingerprints and custody references
+must be pairwise distinct.
+
+The CLI migration requires all six Preview execution ledgers to be empty,
+drops the former unsigned
+`persist_verified_communication_note_preview_runner_terminal(jsonb,text)`
+entry and creates only the signed
+`persist_verified_communication_note_preview_runner_terminal(jsonb,text,text)`
+entry. PostgreSQL recomputes the signature SHA-256 and binds the signer and
+verifier fields, but does not claim application-side Ed25519 verification. The
+new caller gets only private-schema `USAGE` and exact function `EXECUTE`; it has
+no login, table/sequence/type/helper privilege, executor membership or API-role
+edge.
+
+Evidence recorded for this local source revision:
+
+| Evidence | Final value |
+|---|---|
+| terminal policy / digest | `policy.communication.openai.synthetic-preview.runner-terminal.2026-08-29.m1g-g.v2` / `d0ac3b14ceb97535cfed935250566b59d8ac42a93123a750d3a686102a8d1cfa` |
+| terminal statement version | `runner-terminal.communication.openai.synthetic-preview.2026-08-29.m1g-g.v2` |
+| custody policy / digest | `custody.communication.openai.synthetic-preview.2026-08-29.m1g-g.v2` / `f537dc64e3c57a34b6db6d0d1c871c38a70bcb51c4d071e625b026f840a309ca` |
+| derived preflight version / digest | `preflight.communication.openai.synthetic-preview.2026-08-29.m1g-g.v3` / `491481513a67198cba91babc3c172fc1f326f9ee7bdd883b3d1208c639bdaf73` |
+| derived coordinator version / digest | `coordinator.communication.openai.synthetic-preview.2026-08-29.m1g-g.v3` / `f6609c2f357b5fda92ae5aa1b459dfb1e32b7893c3e8436e0e94a8ffa2bbe675` |
+| signed terminal migration | SHA-256 `b095785331c848d02cabc417eb3131fe2f9328564abef6fc0dd35bccd2980c5a` |
+| signed terminal rollback assertion | SHA-256 `f8e8307718e3bdf0835b93cdac075279ae4f5ba3dbab287af46e1280ce587ad5` |
+| PostgreSQL compatibility | PostgreSQL 16.15 clean-applied the exact 38/38 migration set and passed the signed terminal assertion gate |
+| non-empty-ledger cut-over refusal | PostgreSQL 16.15 applied the first 37 migrations, created one valid synthetic authorization (`1/0/0/0/0/0` across the six ledgers), then rejected migration 38 with exact `PREVIEW_EXECUTION_LEDGERS_MUST_BE_EMPTY`; the fifth caller, six new columns, signed constraint and three-argument RPC remained absent, the old two-argument RPC remained present, and the temporary cluster was deleted |
+| focused signed-terminal/port/migration/boundary tests | 5 files / 53 tests passed |
+| complete Vitest gate | 166 files / 2,250 tests passed |
+| static gates | TypeScript passed; ESLint passed with zero warnings; 73-file Codex adapter check and `git diff --check` passed |
+| production build | Next.js 16.2.9 explicit webpack build passed with 64/64 static pages; the default Turbopack command was not used as evidence because this isolated worktree's shared `node_modules` symlink resolves outside Turbopack's filesystem root |
+
+The runtime and PostgreSQL factories are `TEST_ONLY`, accept only explicitly
+injected dependencies and cannot create a pool/connection, read environment,
+resolve keys/credentials or select another RPC. Runtime readiness stays
+`false`; approved runtime/PostgreSQL ports, custody snapshot and terminal
+signing key stay absent. The test-only signing-key snapshot is not cross-bound
+to a live M1g-c custody/trust-registry resolver, and the verifier HMAC is not
+cross-bound to a fifth-caller credential/identity resolver. These are explicit
+activation blockers, so this evidence is not a live/end-to-end registry,
+custody or caller-authentication claim. This gate used no Hosted Supabase
+connection or write, real provider/model call, deployment, Production action
+or real care data.
+Detailed boundaries are in
+`documentation/communication-note-preview-signed-runner-terminal-port-m1g-g.md`.
+
 ### Current live/read-only evidence
 
 - Supabase migrations, tables, RLS flags, policies, grants, function grants and aggregate row counts were checked read-only.

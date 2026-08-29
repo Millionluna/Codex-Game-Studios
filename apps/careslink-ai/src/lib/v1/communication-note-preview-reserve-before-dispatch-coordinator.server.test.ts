@@ -13,7 +13,6 @@ import { CARESLINK_V1_COMMUNICATION_NOTE_GOLDEN_FIXTURES } from "./communication
 vi.mock("server-only", () => ({}));
 
 import {
-  CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_ACTIVATION_BLOCKED_REASONS,
   CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_ACTIVATION_PREFLIGHT_POLICY_DIGEST,
   CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_ACTIVATION_PREFLIGHT_VERSION,
   CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_DATABASE_EVIDENCE_PINS,
@@ -81,15 +80,15 @@ import { CARESLINK_V1_OPENAI_COMMUNICATION_NOTE_PROVIDER_READY } from "./communi
 const NOW = "2026-08-28T02:00:00.000Z";
 const PREFLIGHT_OBSERVED_AT = "2026-08-28T01:59:00.000Z";
 
-describe("Communication Note M1g-e reserve-before-dispatch coordinator transcript", () => {
+describe("Communication Note M1g-g reserve-before-dispatch coordinator transcript", () => {
   it("literal-pins a source-only policy and preserves every existing readiness and approval latch", () => {
     expect(CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_COORDINATOR_VERSION).toBe(
-      "coordinator.communication.openai.synthetic-preview.2026-08-29.m1g-e.v2",
+      "coordinator.communication.openai.synthetic-preview.2026-08-29.m1g-g.v3",
     );
     expect(
       CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_COORDINATOR_POLICY_DIGEST,
     ).toBe(
-      "4649f620bc60425d5ca40d308d167110befd4a29c772e9877ddbeac5eaaa3531",
+      "f6609c2f357b5fda92ae5aa1b459dfb1e32b7893c3e8436e0e94a8ffa2bbe675",
     );
     expect(
       CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_COORDINATOR_POLICY,
@@ -105,7 +104,7 @@ describe("Communication Note M1g-e reserve-before-dispatch coordinator transcrip
         reservationResultReservedAt:
           "PRESENT_SOURCE_ONLY_NOT_RUNTIME_EVIDENCE",
         runnerTerminalLedger:
-          "PRESENT_SOURCE_ONLY_NO_RUNTIME_CALLER",
+          "PRESENT_SIGNED_SOURCE_CONTRACT_CALLER_SHELL_NO_RUNTIME_IDENTITY",
         runnerTerminalPolicyVersion:
           CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RUNNER_TERMINAL_POLICY_VERSION,
         runnerTerminalPolicyDigest:
@@ -157,7 +156,7 @@ describe("Communication Note M1g-e reserve-before-dispatch coordinator transcrip
     ).toEqual([
       "ACTIVATION_PREFLIGHT_REMAINS_BLOCKED",
       "PRE_RUN_DISPATCH_APPROVAL_ABSENT",
-      "PURPOSE_SCOPED_RUNTIME_PORTS_ABSENT",
+      "PURPOSE_SCOPED_RUNTIME_IDENTITY_NOT_ACTIVATED",
       "DATABASE_ATTESTED_RESERVED_AT_ABSENT",
       "DURABLE_RUNNER_TERMINAL_STATE_ABSENT",
     ]);
@@ -205,7 +204,7 @@ describe("Communication Note M1g-e reserve-before-dispatch coordinator transcrip
       coordinatorBlockedReasons: [
         "ACTIVATION_PREFLIGHT_REMAINS_BLOCKED",
         "PRE_RUN_DISPATCH_APPROVAL_ABSENT",
-        "PURPOSE_SCOPED_RUNTIME_PORTS_ABSENT",
+        "PURPOSE_SCOPED_RUNTIME_IDENTITY_NOT_ACTIVATED",
         "DATABASE_ATTESTED_RESERVED_AT_ABSENT",
         "DURABLE_RUNNER_TERMINAL_STATE_ABSENT",
       ],
@@ -742,6 +741,7 @@ function createFixture(
 ) {
   const ownerSigner = createSigningFixture("OWNER_AUTHORIZATION");
   const receiptSigner = createSigningFixture("CARESLINK_DISPATCH_RECEIPT");
+  const runnerTerminalSigner = createRunnerTerminalSigningFixture();
   const authorizationStatement = createAuthorizationStatement(
     ownerSigner.trustedKey,
     input.authorizationExpiresAt,
@@ -770,6 +770,7 @@ function createFixture(
       createCustodySnapshot(
         ownerSigner.trustedKey,
         receiptSigner.trustedKey,
+        runnerTerminalSigner.trustedKey,
         verifiedAuthorization,
       ),
       { now: NOW, verifiedAuthorization },
@@ -1218,6 +1219,9 @@ function createAuthorizationStatement(
 function createCustodySnapshot(
   ownerTrustedKey: CaresLinkV1CommunicationNotePreviewTrustedSigningKey,
   receiptTrustedKey: CaresLinkV1CommunicationNotePreviewTrustedSigningKey,
+  runnerTerminalTrustedKey: ReturnType<
+    typeof createRunnerTerminalSigningFixture
+  >["trustedKey"],
   verifiedAuthorization: CaresLinkV1VerifiedCommunicationNotePreviewAuthorization,
 ): CaresLinkV1CommunicationNotePreviewKeyCustodySnapshot {
   return {
@@ -1253,6 +1257,19 @@ function createCustodySnapshot(
       nonExportable: true,
       exportAllowed: false,
       signingScope: "CARESLINK_PREVIEW_RECEIPT_DOMAIN_ONLY",
+      genericSigning: "PROHIBITED",
+    },
+    runnerTerminalSigner: {
+      trustedSigningKey: runnerTerminalTrustedKey,
+      keyIdHash: sha256(runnerTerminalTrustedKey.keyId),
+      publicKeySha256: runnerTerminalTrustedKey.publicKeySha256,
+      custodyReferenceSha256: sha256(
+        "runner-terminal-custody-reference",
+      ),
+      privateKeyMaterialPresent: false,
+      nonExportable: true,
+      exportAllowed: false,
+      signingScope: "CARESLINK_PREVIEW_RUNNER_TERMINAL_DOMAIN_ONLY",
       genericSigning: "PROHIBITED",
     },
     providerCredential: {
@@ -1357,6 +1374,22 @@ function createPreflightCandidate(
       rotationAndRevocationEvidenceSha256: sha256("receipt-lifecycle"),
       teardownPlanSha256: sha256("receipt-teardown"),
     },
+    runnerTerminalCustody: {
+      observedAt: custodySnapshot.ownerTrustRegistry.observedAt,
+      custodyReferenceSha256:
+        custodySnapshot.runnerTerminalSigner.custodyReferenceSha256,
+      keyIdHash: custodySnapshot.runnerTerminalSigner.keyIdHash,
+      publicKeySha256:
+        custodySnapshot.runnerTerminalSigner.publicKeySha256,
+      status: "NON_EXPORTABLE_ACTIVE_CANDIDATE",
+      privateKeyMaterialPresent: false,
+      exportAllowed: false,
+      accessLogEvidenceSha256: sha256("runner-terminal-access-log"),
+      rotationAndRevocationEvidenceSha256: sha256(
+        "runner-terminal-lifecycle",
+      ),
+      teardownPlanSha256: sha256("runner-terminal-teardown"),
+    },
     provider: {
       observedAt: custodySnapshot.ownerTrustRegistry.observedAt,
       projectIdHmac: statement.environmentEvidence.openAiProjectIdHmac,
@@ -1424,10 +1457,14 @@ function createPreflightCandidate(
       withData: false,
       productionExcluded: true,
       ...CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_DATABASE_EVIDENCE_PINS,
-      runnerTerminalContract: "SOURCE_ONLY_DEFAULT_OFF",
+      runnerTerminalContract: "SIGNED_SOURCE_ONLY_DEFAULT_OFF",
       runnerTerminalExecutorRole:
         "careslink_v1_preview_runner_terminal_executor",
-      runnerTerminalCallerPresent: false,
+      runnerTerminalCallerPresent: true,
+      runnerTerminalCallerExecuteGranted: true,
+      runnerTerminalRuntimeIdentityPresent: false,
+      runnerTerminalRuntimeMembershipPresent: false,
+      runnerTerminalCredentialResolverPresent: false,
       runnerTerminalRuntimeExecute: false,
       apiRoleExecute: false,
       fixtureRowCount: 0,
@@ -1527,6 +1564,27 @@ function createSigningFixture(
     privateKey,
     trustedKey:
       trustedKey satisfies CaresLinkV1CommunicationNotePreviewTrustedSigningKey,
+  };
+}
+
+function createRunnerTerminalSigningFixture() {
+  const { publicKey, privateKey } = generateKeyPairSync("ed25519");
+  const publicKeyDer = publicKey.export({ format: "der", type: "spki" });
+  return {
+    privateKey,
+    trustedKey: {
+      keyId: "runner-terminal-preview-2026-08",
+      publicKeySpkiDerBase64: publicKeyDer.toString("base64"),
+      publicKeySha256: createHash("sha256")
+        .update(publicKeyDer)
+        .digest("hex"),
+      status: "ACTIVE" as const,
+      notBefore: "2026-08-28T01:00:00.000Z",
+      expiresAt: "2026-08-28T03:00:00.000Z",
+      purpose: "CARESLINK_RUNNER_TERMINAL" as const,
+      allowedDomain:
+        "CARESLINK_COMMUNICATION_NOTE_PREVIEW_RUNNER_TERMINAL" as const,
+    },
   };
 }
 

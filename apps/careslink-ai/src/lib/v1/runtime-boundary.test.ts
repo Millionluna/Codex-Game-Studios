@@ -73,6 +73,8 @@ describe("V1 shadow runtime boundary", () => {
       "src/lib/v1/communication-note-preview-activation-preflight.server.ts",
       "src/lib/v1/communication-note-preview-reserve-before-dispatch-coordinator.server.ts",
       "src/lib/v1/communication-note-preview-runner-terminal-policy.server.ts",
+      "src/lib/v1/communication-note-preview-signed-runner-terminal-runtime-port.server.ts",
+      "src/lib/v1/communication-note-preview-runner-terminal-postgres.server.ts",
       "src/lib/v1/native-auth-boundary.server.ts",
       "src/lib/v1/openai-communication-note-provider.server.ts",
       "src/lib/v1/communication-note-provider-policy.ts",
@@ -240,6 +242,10 @@ describe("V1 shadow runtime boundary", () => {
       coordinatorModule,
       coordinatorTest,
       custodyTest,
+      join(
+        process.cwd(),
+        "src/lib/v1/communication-note-preview-runner-terminal-postgres.server.test.ts",
+      ),
     ].sort());
     expect(walkSourceFiles("src/app").filter((file) =>
       importPattern.test(readFileSync(file, "utf8")),
@@ -328,7 +334,7 @@ describe("V1 shadow runtime boundary", () => {
     );
   });
 
-  it("quarantines the M1g-f runner terminal policy to source tests and contracts", () => {
+  it("quarantines the M1g-g signed runner-terminal policy and ports to exact source importers", () => {
     const policyModule = join(
       process.cwd(),
       "src/lib/v1/communication-note-preview-runner-terminal-policy.server.ts",
@@ -337,17 +343,46 @@ describe("V1 shadow runtime boundary", () => {
       process.cwd(),
       "src/lib/v1/communication-note-preview-runner-terminal-policy.server.test.ts",
     );
-    const importPattern =
+    const policyImportPattern =
       /(?:from\s+|import\s*\(|require\s*\()\s*["'][^"']*communication-note-preview-runner-terminal-policy\.server(?:\.(?:[cm]?[jt]s|[jt]sx))?["']/;
-    const importers = walkControlledScriptFiles().filter((file) =>
-      importPattern.test(readFileSync(file, "utf8")),
+    const policyImporters = walkControlledScriptFiles().filter((file) =>
+      policyImportPattern.test(readFileSync(file, "utf8")),
     );
-    const source = readFileSync(policyModule, "utf8");
+    const signedRuntimeModule = join(
+      process.cwd(),
+      "src/lib/v1/communication-note-preview-signed-runner-terminal-runtime-port.server.ts",
+    );
+    const signedRuntimeTest = join(
+      process.cwd(),
+      "src/lib/v1/communication-note-preview-signed-runner-terminal-runtime-port.server.test.ts",
+    );
+    const signedRuntimeImportPattern =
+      /(?:from\s+|import\s*\(|require\s*\()\s*["'][^"']*communication-note-preview-signed-runner-terminal-runtime-port\.server(?:\.(?:[cm]?[jt]s|[jt]sx))?["']/;
+    const signedRuntimeImporters = walkControlledScriptFiles().filter((file) =>
+      signedRuntimeImportPattern.test(readFileSync(file, "utf8")),
+    );
+    const postgresModule = join(
+      process.cwd(),
+      "src/lib/v1/communication-note-preview-runner-terminal-postgres.server.ts",
+    );
+    const postgresTest = join(
+      process.cwd(),
+      "src/lib/v1/communication-note-preview-runner-terminal-postgres.server.test.ts",
+    );
+    const postgresImportPattern =
+      /(?:from\s+|import\s*\(|require\s*\()\s*["'][^"']*communication-note-preview-runner-terminal-postgres\.server(?:\.(?:[cm]?[jt]s|[jt]sx))?["']/;
+    const postgresImporters = walkControlledScriptFiles().filter((file) =>
+      postgresImportPattern.test(readFileSync(file, "utf8")),
+    );
 
-    expect(importers).toEqual([
+    expect(policyImporters).toEqual([
       join(
         process.cwd(),
         "src/lib/v1/communication-note-preview-activation-preflight.server.ts",
+      ),
+      join(
+        process.cwd(),
+        "src/lib/v1/communication-note-preview-key-custody.server.ts",
       ),
       join(
         process.cwd(),
@@ -357,21 +392,36 @@ describe("V1 shadow runtime boundary", () => {
         process.cwd(),
         "src/lib/v1/communication-note-preview-reserve-before-dispatch-coordinator.server.test.ts",
       ),
+      postgresModule,
+      postgresTest,
+      signedRuntimeModule,
+      signedRuntimeTest,
       policyTest,
     ].sort());
-    expect(walkSourceFiles("src/app").filter((file) =>
-      importPattern.test(readFileSync(file, "utf8")),
-    )).toEqual([]);
-    expect(walkSourceFiles("src/components").filter((file) =>
-      importPattern.test(readFileSync(file, "utf8")),
-    )).toEqual([]);
-    expect(source).not.toMatch(
-      /process\.env|fetch\s*\(|from\s+["'](?:openai|@supabase\/|node:(?:http|https|net|tls))[^"']*["']|SUPABASE_SERVICE_ROLE_KEY|NEXT_PUBLIC_/,
+    expect(signedRuntimeImporters).toEqual([signedRuntimeTest]);
+    expect(postgresImporters).toEqual([postgresTest, signedRuntimeModule].sort());
+
+    for (const pattern of [
+      policyImportPattern,
+      signedRuntimeImportPattern,
+      postgresImportPattern,
+    ]) {
+      expect(walkSourceFiles("src/app").filter((file) =>
+        pattern.test(readFileSync(file, "utf8")),
+      )).toEqual([]);
+      expect(walkSourceFiles("src/components").filter((file) =>
+        pattern.test(readFileSync(file, "utf8")),
+      )).toEqual([]);
+    }
+    for (const modulePath of [policyModule, signedRuntimeModule, postgresModule]) {
+      expect(readFileSync(modulePath, "utf8")).not.toMatch(
+        /process\.env|fetch\s*\(|from\s+["'](?:openai|@supabase\/|node:(?:http|https|net|tls))[^"']*["']|SUPABASE_SERVICE_ROLE_KEY|NEXT_PUBLIC_/,
+      );
+    }
+    expect(readFileSync(policyModule, "utf8")).toContain(
+      "SOURCE_CONTRACT_ONLY_SIGNED_CALLER_NOT_PROVISIONED",
     );
-    expect(source).toContain(
-      "SOURCE_CONTRACT_ONLY_NO_RUNTIME_CALLER",
-    );
-    expect(source).toContain(
+    expect(readFileSync(policyModule, "utf8")).toContain(
       "Communication Note preview runner terminal persistence is unavailable",
     );
   });
