@@ -90,6 +90,8 @@ describe("Communication Note runner-terminal Postgres adapter", () => {
     [{ code: "42501", message: "secret-denial" }, "FORBIDDEN"],
     [{ code: "P0001", message: "RUNNER_TERMINAL_CONFLICT" }, "IDEMPOTENCY_CONFLICT"],
     [{ code: "P0001", message: "RUNNER_TERMINAL_BINDING_INVALID" }, "INVALID_STATE_TRANSITION"],
+    [{ code: "P0001", message: "RUNTIME_CREDENTIAL_NOT_ACTIVE" }, "INVALID_STATE_TRANSITION"],
+    [{ code: "55P03", message: "lock timeout secret" }, "INVALID_STATE_TRANSITION"],
     [{ code: "P0001", message: "VALIDATION_ERROR" }, "VALIDATION_ERROR"],
     [{ code: "XX000", message: "database-secret" }, "PRODUCT_API_DISABLED"],
   ] as const)("maps database failures to fixed product errors", async (failure, code) => {

@@ -10,6 +10,8 @@ import {
   CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RUNNER_TERMINAL_VALID_RUNTIME_APPLICATION_NAME,
   assertCaresLinkV1CommunicationNotePreviewRunnerTerminalHostedSqlPolicy,
   drainTestOnlyCaresLinkV1CommunicationNotePreviewRunnerTerminalHostedBackends,
+  prepareTestOnlyCaresLinkV1CommunicationNotePreviewRuntimeBrokerHostedLiveGate,
+  runTestOnlyCaresLinkV1CommunicationNotePreviewPreparedRuntimeBrokerHostedLiveGate,
   runTestOnlyCaresLinkV1CommunicationNotePreviewRunnerTerminalHostedLiveGate,
   runTestOnlyCaresLinkV1CommunicationNotePreviewRunnerTerminalHostedPostcheck,
   runTestOnlyCaresLinkV1CommunicationNotePreviewRunnerTerminalHostedQuiesce,
@@ -19,6 +21,7 @@ import {
   createM1ghRunnerTerminalTrustFixture,
 } from "./communication-note-preview-runner-terminal-trust-test-fixtures";
 import {
+  createCaresLinkV1CommunicationNotePreviewRunnerTerminalStatementDigest,
   verifyTestOnlyCaresLinkV1CommunicationNotePreviewSignedRunnerTerminal,
 } from "./communication-note-preview-runner-terminal-policy.server";
 
@@ -255,6 +258,212 @@ describe("Communication Note signed runner-terminal disposable Hosted live gate"
     await expect(invoke(new Error(fixed))).rejects.toThrowError(fixed);
     await expect(invoke(new Error("untrusted database text"))).rejects
       .toThrowError("RUNNER_TERMINAL_HOSTED_LIVE_SETUP_FAILED");
+  });
+
+  it("runs the full signed chain under the branded M1l inherited runtime identity without SET ROLE", async () => {
+    const databaseNow = "2026-08-30T08:00:00.000Z";
+    const runtimeRole =
+      "careslink_v1_preview_runner_terminal_runtime_0123456789abcdef";
+    const adminSql: string[] = [];
+    let adaptedSetupSql = "";
+    let activeBinding:
+      | Readonly<{ authorizationDigest: string; runIdHash: string }>
+      | undefined;
+    const adminQueryPort = Object.freeze({
+      async query(sql: string) {
+        adminSql.push(sql);
+        if (sql.startsWith("-- TEST_ONLY setup body")) {
+          adaptedSetupSql = sql;
+          return Object.freeze({ rows: Object.freeze([]) });
+        }
+        if (sql.includes("clock_timestamp") && sql.includes("current_database")) {
+          return Object.freeze({
+            rows: Object.freeze([Object.freeze({
+              database_now: databaseNow,
+              current_user: "postgres",
+              session_user: "postgres",
+              database_name: "postgres",
+              postgres_major: 17,
+            })]),
+          });
+        }
+        if (sql.includes("authorization_record.authorization_digest")) {
+          if (!activeBinding) throw new Error("missing active binding");
+          return Object.freeze({
+            rows: Object.freeze([Object.freeze({
+              database_now: databaseNow,
+              authorization_digest: activeBinding.authorizationDigest,
+              run_id_hash: activeBinding.runIdHash,
+              claim_id: "00000000-0000-4000-8000-000000000001",
+              reservation_id: "00000000-0000-4000-8000-000000000002",
+              slot_index: 0,
+              fixture_id: "communication.en.phone-duration.v1",
+              run_ordinal: 1,
+              request_body_sha256:
+                "98d37d028c742a2e05d079a38e0d6b27fb1fe91a71d397a4bdc9ed607af45213",
+              request_body_utf8_byte_length: 2522,
+              semantic_canonical_request_sha256:
+                "f404c8f239c20b49a40836a371e928dd6241e95dca598ae8661193443c7c6a68",
+              receipt_digest: "1".repeat(64),
+              receipt_signature_sha256: "2".repeat(64),
+              receipt_usage: {
+                source: "PROVIDER",
+                inputTokens: 120,
+                outputTokens: 80,
+                totalTokens: 200,
+                cachedInputTokens: 20,
+                reasoningTokens: 10,
+              },
+              calculated_cost_upper_bound_micro_usd: 481,
+            })]),
+          });
+        }
+        return Object.freeze({ rows: Object.freeze([]) });
+      },
+    });
+    const runtimeSql: string[] = [];
+    let acceptedCalls = 0;
+    const runtimeQueryPort = Object.freeze({
+      async query(sql: string, values?: readonly unknown[]) {
+        runtimeSql.push(sql);
+        if (sql.includes("'MEMBER'")) {
+          return Object.freeze({ rows: Object.freeze([Object.freeze({
+            current_user: runtimeRole,
+            session_user: runtimeRole,
+            statement_timeout: "5s",
+            lock_timeout: "1s",
+            idle_in_transaction_session_timeout: "5s",
+            idle_session_timeout: "5s",
+            caller_member: true,
+            caller_set: false,
+            caller_inherited: true,
+          })]) });
+        }
+        if (sql.includes("has_function_privilege")) {
+          return Object.freeze({ rows: Object.freeze([Object.freeze({
+            current_user: runtimeRole,
+            session_user: runtimeRole,
+            exact_rpc_executable: true,
+            generation_schema_create: false,
+          })]) });
+        }
+        if (
+          sql ===
+            "select careslink_v1_generation.persist_verified_communication_note_preview_runner_terminal(\n  $1::pg_catalog.jsonb,\n  $2::pg_catalog.text,\n  $3::pg_catalog.text\n) as data"
+        ) {
+          const statement = values?.[0] as Readonly<{
+            state: "ACCEPTED";
+            usage: Readonly<{ totalTokensReconciliation: string }>;
+          }>;
+          if (statement.usage.totalTokensReconciliation === "CALCULATED") {
+            throw new Error("RUNNER_TERMINAL_CONFLICT");
+          }
+          const created = acceptedCalls === 0;
+          acceptedCalls += 1;
+          return Object.freeze({ rows: Object.freeze([Object.freeze({
+            data: Object.freeze({
+              created,
+              runnerTerminalRecorded: true,
+              continuationEligible: true,
+              runnerTerminalDigest:
+                createCaresLinkV1CommunicationNotePreviewRunnerTerminalStatementDigest(
+                  statement as never,
+                ),
+              state: "ACCEPTED",
+              recordedAt: databaseNow,
+              status: created
+                ? "RUNNER_TERMINAL_RECORDED"
+                : "ALREADY_RECORDED",
+            }),
+          })]) });
+        }
+        throw new Error("unexpected runtime query");
+      },
+    });
+    const prepared =
+      await prepareTestOnlyCaresLinkV1CommunicationNotePreviewRuntimeBrokerHostedLiveGate(
+        { adminQueryPort, expectedPostgresMajor: 17, setupSql },
+      );
+    activeBinding = prepared.brokerBinding;
+    expect(prepared.brokerBinding).toEqual({
+      authorizationDigest: expect.stringMatching(/^[a-f0-9]{64}$/),
+      runIdHash: expect.stringMatching(/^[a-f0-9]{64}$/),
+      callerIdentityHmac: "e".repeat(64),
+    });
+    await expect(
+      runTestOnlyCaresLinkV1CommunicationNotePreviewPreparedRuntimeBrokerHostedLiveGate(
+        {
+          prepared: prepared.prepared,
+          runtimeQueryPort,
+          runtimeRole,
+        },
+      ),
+    ).resolves.toMatchObject({
+      ok: true,
+      terminalState: "ACCEPTED",
+      firstCreated: true,
+      exactReplayCreated: false,
+      validConflictRejected: true,
+    });
+    expect(adaptedSetupSql).toContain("and not role_record.rolcanlogin");
+    expect(adaptedSetupSql).toContain("and role_record.rolinherit");
+    expect(adaptedSetupSql).toContain("and membership.inherit_option");
+    expect(adaptedSetupSql).toContain("and not membership.set_option");
+    expect(runtimeSql.some((sql) => /^\s*set\s+role\b/i.test(sql))).toBe(false);
+    expect(adminSql.filter((sql) => sql === setupSql)).toHaveLength(0);
+    await expect(
+      runTestOnlyCaresLinkV1CommunicationNotePreviewPreparedRuntimeBrokerHostedLiveGate(
+        {
+          prepared: prepared.prepared,
+          runtimeQueryPort,
+          runtimeRole,
+        },
+      ),
+    ).rejects.toThrowError(
+      "RUNNER_TERMINAL_HOSTED_LIVE_PREPARED_GATE_FAILED",
+    );
+
+    const driftPrepared =
+      await prepareTestOnlyCaresLinkV1CommunicationNotePreviewRuntimeBrokerHostedLiveGate(
+        { adminQueryPort, expectedPostgresMajor: 17, setupSql },
+      );
+    activeBinding = driftPrepared.brokerBinding;
+    const driftRuntimeSql: string[] = [];
+    const driftRuntimeQueryPort = Object.freeze({
+      async query(sql: string, values?: readonly unknown[]) {
+        driftRuntimeSql.push(sql);
+        if (sql.includes("'MEMBER'")) {
+          return Object.freeze({ rows: Object.freeze([Object.freeze({
+            current_user: runtimeRole,
+            session_user: runtimeRole,
+            statement_timeout: "9s",
+            lock_timeout: "1s",
+            idle_in_transaction_session_timeout: "5s",
+            idle_session_timeout: "5s",
+            caller_member: true,
+            caller_set: false,
+            caller_inherited: true,
+          })]) });
+        }
+        return runtimeQueryPort.query(sql, values);
+      },
+    });
+    await expect(
+      runTestOnlyCaresLinkV1CommunicationNotePreviewPreparedRuntimeBrokerHostedLiveGate(
+        {
+          prepared: driftPrepared.prepared,
+          runtimeQueryPort: driftRuntimeQueryPort,
+          runtimeRole,
+        },
+      ),
+    ).rejects.toThrowError(
+      "RUNNER_TERMINAL_HOSTED_LIVE_BROKER_RUNTIME_SESSION_POSTURE_FAILED",
+    );
+    expect(
+      driftRuntimeSql.includes(
+        "select careslink_v1_generation.persist_verified_communication_note_preview_runner_terminal(\n  $1::pg_catalog.jsonb,\n  $2::pg_catalog.text,\n  $3::pg_catalog.text\n) as data",
+      ),
+    ).toBe(false);
   });
 
   if (hostedEnvironment.enabled === "1") {

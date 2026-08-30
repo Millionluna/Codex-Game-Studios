@@ -2548,6 +2548,168 @@ Preview, provider/model call, deployment or Production change.
 See the
 [M1j handoff](communication-note-preview-live-custody-caller-resolver-m1j.md).
 
+### Communication Note durable caller-credential resolver gate M1k — 2026-08-30
+
+M1k adds one server-only resolver test and one static SQL contract test without
+changing the 39-migration manifest. Together with `runtime-boundary.test.ts`,
+the focused gate passed 3 files / 32 tests. It covers a secret-free M1j lease,
+exact acquire → open → bind order, durable tombstone → physical-session destroy
+→ finalize → independent inspect order, digest-only cleanup after acquire
+response loss, no pre-tombstone destroy on bind/Abort, bounded hung destroy,
+late non-cooperative session open after revoke, immutable injected-port/session
+snapshots, fixed redacted errors, and rejection of a false `NOT_ACQUIRED` /
+`NOT_ISSUED` result after a local session existed. The boundary test limits the
+module to server-only TestOnly support and proves no product app/component
+importer, environment lookup or network/provider adapter was added.
+
+The static SQL gate passed 11 tests. It asserts that the repository still has
+exactly 39 migrations; broker lifecycle is monotonic and all mutations share
+one acquisition-digest advisory lock; tombstone and finalize require separate
+top-level transactions; tombstone atomically commits an OID/name-bound
+`NOLOGIN` fence; ACTIVE bind replay re-attests PID/backend-start/application/
+expiry; no password, SCRAM verifier, DSN or connection string is stored or
+returned; role creation is SCRAM-only with one SET-only caller edge; API/PUBLIC
+ACL remains empty; and cleanup precedes a read-only independent zero-residue
+postcheck.
+
+The real local gate used an owned no-TCP private-socket PostgreSQL 16.15
+cluster. Six scenario groups covered normal bind plus wrong PID and ACTIVE
+replay; a real blocked acquire versus an uncommitted tombstone; simultaneous
+duplicate acquire; response loss plus wrong application, committed `NOLOGIN`
+and rejected late reconnect; simultaneous idempotent revoke; and active backend
+termination. Before teardown, postcheck observed three immutable metadata
+tombstones—two issued and one never issued—and cleanup/postcheck ran three times
+each. Final counts were zero runtime roles, zero runtime sessions and zero
+runtime memberships. The exact fixed output is retained in the
+[M1k handoff](communication-note-preview-durable-caller-credential-resolver-m1k.md).
+The server was stopped, its exact temporary directory was absent afterward and
+the fixed probe port did not respond.
+
+This is source/static and PostgreSQL 16.15 local evidence. It does not prove
+PostgreSQL 17, Hosted Supabase, TLS/pinned CA, a production migration, a live
+secret broker, the terminal RPC's future ACTIVE-fence check, a provider/model
+call, deployment or Production safety. The final repository gate passed 175
+files / 2,366 tests, TypeScript, repository-wide zero-warning ESLint and the
+73-file Codex adapter synchronization check. The Next.js 16.2.9 explicit
+Webpack production build generated 64/64 static pages. The default Turbopack
+invocation rejected this temporary worktree's cross-root shared
+`node_modules` symlink before compilation, so it is not a passing build gate.
+
+### Communication Note formal runtime-credential broker gate M1l — 2026-08-30
+
+M1l adds the formal 40th migration contract and retains the old three-argument
+terminal RPC. Binding version/digest are
+`binding.communication.openai.synthetic-preview.2026-08-30.m1l.v1` /
+`cfb9f27b63f1a623950b3033fc04300149bcba26389994aa04eb2d2213ea1115`;
+durable resolver version/digest are
+`resolver.communication.openai.synthetic-preview.2026-08-30.m1l.v2` /
+`e53114d9d247ffcdb20ed83b4724fa5b8b09eeab31e4f2fc1a868ade13a2f43e`.
+Static tests assert the Hosted-shaped non-superuser management
+guard, private forced-RLS hash-only broker, derived runtime role, exact
+45–90-second issuance window, bind-time `NOLOGIN`, shared terminal transaction
+fence versus exclusive tombstone/finalize fence, post-lock ACTIVE and
+role/OID/PID/backend-start/application/auth/run/HMAC/expiry checks, private
+unfenced implementation, helper/function/default ACLs, and zero raw
+password/SCRAM/DSN storage. They also pin the inherited-role model: runtime
+`INHERIT=true`; an outbound caller edge with
+`ADMIN=false`/`INHERIT=true`/`SET=false`; and a distinct inbound inert
+PostgreSQL 16/17 creator edge with `member=postgres`, superuser grantor and
+`ADMIN=true`/`INHERIT=false`/`SET=false`. Client SQL never sends `SET ROLE`:
+outside the wrapper `current_user=session_user=runtime`, while inside the
+`SECURITY DEFINER` wrapper `current_user=executor` and
+`session_user=runtime`.
+
+Static coverage additionally proves cluster-wide `pg_shdepend` has zero static-
+caller ownership dependencies and exact ACL dependencies only for the current
+database generation schema and terminal wrapper. It pins acquire/bind/wrapper
+runtime revalidation, generation-column denial through
+`has_any_column_privilege`, and both wrapper/inner as exact executor-owned
+`SECURITY DEFINER` functions with empty `search_path` and exact ACL. The runtime inherits only the exact
+terminal wrapper and has no generation table/sequence/column/other-function
+privilege. Migration entry-role tests also retain the temporary
+executor role switch and restoration contract.
+
+Resolver/terminal-port tests cover the new connection-bound `cancelInFlight()`
+barrier: Abort waits up to 250 ms for both cancellation and the underlying query
+to settle, restores a session only after confirmed settlement, and permanently
+quarantines a driver on timeout so no later SQL can reuse it. The Postgres port
+maps both fixed `RUNTIME_CREDENTIAL_NOT_ACTIVE` and SQLSTATE `55P03` to the
+fixed invalid-state transition.
+
+The formal-migration harness created an owned PostgreSQL 16.15 cluster on a
+private Unix socket with TCP rejected. A bootstrap superuser creates the actual
+migration actor as `NOSUPERUSER`, `CREATEROLE`, `BYPASSRLS` and grants
+`pg_signal_backend` plus `pg_read_all_stats`; the harness then applies the
+unmodified 40th migration source. It passed six scenarios with four issued-and-
+revoked acquisitions and zero runtime role/session/membership/API-privilege
+residue. The sixth case created a second local database and a runtime-owned large
+object. Its first finalize returned SQLSTATE `2BP01`, routine `DropRole`, while
+TOMBSTONED ledger, `NOLOGIN` role, caller membership and remote residue survived
+rollback. After the unique owner dependency was removed, finalize and inspect
+succeeded with zero residue. Static SQL coverage separately pins the intended fail-closed order—
+durable tombstone and `NOLOGIN` before `DROP ROLE`, `REVOKED` only after
+successful deletion. This local PG16 evidence is independently complemented by
+the same-revision Hosted PostgreSQL 17 gate below.
+
+```json
+{"ok":true,"gate":"communication-note-runtime-broker-migration-local-pg16","postgresMajor":16,"postgresVersion":"16.15","postgresVersionNum":160015,"scenarioCount":6,"acquisitionCount":4,"revokedIssuedCount":4,"runtimeRoleCount":0,"runtimeSessionCount":0,"runtimeMembershipCount":0,"apiPrivilegeCount":0}
+```
+
+The atomic pin set passed 53/53 focused checks and is frozen as: migration
+`64dcb8c57f2c73d3fbd5adc99e3261f8e2e0ddd8e8efcf5cca52c12ca34ba5aa`;
+transactional `2026-08-30.preview-transactional-migrations.7`, 40 entries,
+20 wrappers, manifest
+`6590eed19602c4d7931355f18dafde699b1c47012a3fe09f9d040c179e11792d`;
+ordered basenames/entries `f9905d27a907045dfd6e7677e54c50af84be06a194535682bcf9dc4859657d4f` /
+`7006c0ef8cb62d9596fdd236ffd3357d16338370e9d1437f54a58eb668b4b250`;
+A03 `0f8192bccf46101103c301fcfd2b00cb818dd6725425a952777f697db8ea8172`;
+rollback `2026-08-30.preview-schema-rollback-assertions.5`, manifest
+`e0b5f30f9a4c33bf04020a4d11453c87a52321b69c6edd74982446b0fadd58fe`;
+preflight/coordinator
+`4447c071fa37ab21f23624a4d3d4d28b2ee9ba2e1ef4c9be969bf9a0481de2f3` /
+`570544bf700997a0ba90e06422019c237a01835ba8b75ff70bed5348cdf4bf02`.
+The same final revision passed 179 test files / 2,418 tests, TypeScript
+with no emit, full ESLint, `git diff --check`, and the Next.js 16.2.9 Webpack
+production build with 64/64 pages. The default Turbopack entry was
+environment-blocked before compilation because this temporary worktree's
+shared `node_modules` symlink resolves outside its filesystem root, so it is
+not counted as passing evidence.
+
+The final no-data, non-default, non-persistent Micro PostgreSQL 17 Preview
+`careslink-note-runtime-broker-m1l-r5-20260830` (branch ID
+`5f088eac-ac66-4625-8f4c-c9e7d9b02c2a`, ref
+`ucdmoxqzruohiqmsokfv`) passed the exact 40/40 single-transaction migration
+pipeline, A01–A18 18/18, the pinned-CA Hosted child and an independent outer
+postcheck. The child reported `terminalState=ACCEPTED`, direct-login inherited
+caller identity without `SET ROLE`, bind-time `NOLOGIN`, a successful exact
+replay without a new row, rejected valid idempotency conflict, two issued and
+revoked acquisitions, final ledger counts `[1,0,1,1,1,1]`, and zero runtime
+role/session/membership/API privilege/verifier/temporary-database residue.
+Credential transport was an anonymous FD pipe with process-memory-only material;
+no raw credential material was present in the result.
+
+The cross-database test used exact PostgreSQL 17 catalog evidence: two raw large-
+object ACL items expanded to the four owner/postgres × SELECT/UPDATE rows with
+the exact runtime grantor and no grant option, plus current-database and cluster-
+wide `pg_shdepend` owner-dependency binding. The first finalize failed with
+SQLSTATE `2BP01` / `DropRole` while the tombstone, `NOLOGIN` fence and remote
+residue survived rollback; controlled cleanup then allowed finalize, inspect and
+all residue checks to converge to zero.
+
+Security Advisors returned 41 global findings (21 INFO, 20 WARN) and Performance
+Advisors returned 129 (105 INFO, 24 WARN), with zero findings in the
+`careslink_v1_runtime_broker` scope. Database lint returned 17 issues across 14
+functions: the broker had two non-blocking shadow/unused-variable warnings, while
+the two errors were pre-existing permission-denied calls in generation analyzers.
+This is not a global zero-warning lint claim.
+
+The r5 Preview was deleted after metadata revalidation. Three independent final
+branch lists contained only the default Production project and it remained
+`ACTIVE_HEALTHY`; Production was never the SQL target. The migration remains
+unapplied/default-off in Production, and no provider/model or deployment gate ran
+for M1l. Readiness and approval remain false/absent. See the
+[M1l handoff](communication-note-preview-runtime-credential-broker-m1l.md).
+
 ### Current live/read-only evidence
 
 - Supabase migrations, tables, RLS flags, policies, grants, function grants and aggregate row counts were checked read-only.

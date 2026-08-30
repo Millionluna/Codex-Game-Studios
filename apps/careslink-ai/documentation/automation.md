@@ -418,6 +418,107 @@ and an independent post-release zero-role/session check remain automation
 activation blockers. See
 `documentation/communication-note-preview-live-custody-caller-resolver-m1j.md`.
 
+M1k supplies a TestOnly/local implementation of the fifth caller's durable
+acquisition and release boundary; it still does not schedule or activate any
+automation. An isolated PostgreSQL broker serializes each acquisition digest,
+creates at most one short-lived runtime LOGIN, binds one physical backend and
+atomically commits an irreversible tombstone plus OID/name-bound `NOLOGIN`
+before session destruction, role revocation and independent zero-residue
+inspection. Resolver release remains in the fixed order tombstone → local
+destroy → finalize → independent inspect → M1j receipt.
+Acquire-response loss and concurrent cleanup use the durable digest rather than
+an in-process lease object.
+
+The disposable private-socket PostgreSQL 16.15 harness passed six scenarios;
+postcheck observed three terminal metadata tombstones and zero runtime roles,
+sessions and memberships before its server and temporary directory were
+removed. The real matrix included a proven advisory-lock waiter for concurrent
+tombstone/acquire and rejected both a wrong-application bind and an old-password
+reconnect after the committed login fence.
+The broker SQL is a verification artifact under `scripts/preview-e2e`, not a
+Supabase migration or service. Readiness remains `false`, the approved resolver
+is `undefined`, and no worker, queue, cron, Edge Function, environment/SDK/
+network adapter, product importer, Hosted Preview, provider/model call,
+deployment or Production action was added. A live step must separately migrate
+and repin the broker on PostgreSQL 17, guard the terminal RPC with the same
+ACTIVE fence, and complete the remaining four caller purposes. See
+`documentation/communication-note-preview-durable-caller-credential-resolver-m1k.md`.
+
+M1l supplies binding
+`binding.communication.openai.synthetic-preview.2026-08-30.m1l.v1` with digest
+`cfb9f27b63f1a623950b3033fc04300149bcba26389994aa04eb2d2213ea1115`
+and durable resolver `resolver.communication.openai.synthetic-preview.2026-08-30.m1l.v2`
+with digest `e53114d9d247ffcdb20ed83b4724fa5b8b09eeab31e4f2fc1a868ade13a2f43e`.
+It supplies the formal additive migration source that M1k intentionally left
+isolated, but it still schedules and activates nothing. The source tree now has
+40 migrations; the 40th creates the private, forced-RLS, hash-only durable
+broker and preserves the existing three-argument terminal RPC behind a shared
+transaction fence. Runtime bind changes the 45–90-second SCRAM role to
+`NOLOGIN`; terminal writes then re-attest the ACTIVE acquisition, role/OID,
+PID/backend start, fixed application, authorization/run/HMAC and expiry while
+holding that shared fence. Tombstone and finalize take the matching exclusive
+fence. Resolver Abort now requires a connection-bound cancel and both cancel
+and query settlement within 250 ms, otherwise that driver is permanently
+quarantined.
+
+The current inherited-role binding supersedes M1j's `SET LOCAL ROLE` runtime
+model. The runtime role is `INHERIT=true`; its outbound terminal-caller edge is
+`ADMIN=false`/`INHERIT=true`/`SET=false`. A separate PostgreSQL 16/17
+`CREATEROLE` creator edge is inbound and inert: `member=postgres`, superuser
+grantor, `ADMIN=true`/`INHERIT=false`/`SET=false`. The client transaction sends
+no `SET ROLE`: outside the wrapper both `current_user` and `session_user` are
+the runtime; inside the `SECURITY DEFINER` wrapper `current_user` is the
+executor and `session_user` remains the runtime. SQL `SET ROLE` and
+`set_config('role',...)` are forbidden.
+
+Migration-time and acquire/bind/wrapper checks use cluster-wide `pg_shdepend`
+to require zero static-caller ownership and exact ACL dependencies only for the
+current database generation schema and terminal wrapper. They also reject any
+generation-column privilege via `has_any_column_privilege` and re-attest that
+both wrapper and inner have the exact executor owner, `SECURITY DEFINER`, empty
+`search_path` and exact ACL. The runtime inherits only the exact terminal wrapper and has no generation
+table, sequence, column or other-function privilege.
+
+The formal migration remains Production-unapplied and default-off. The current
+private-socket PostgreSQL 16.15 harness passed six scenarios with four issued-
+and-revoked acquisitions and zero runtime role/session/membership/API-privilege
+residue. Its second-database runtime-owned large-object case observed the first
+finalize fail with SQLSTATE `2BP01`, routine `DropRole`, while preserving
+TOMBSTONED/`NOLOGIN`/membership/remote residue. After the unique owner dependency
+was removed, finalize and inspect succeeded with zero residue. The SQL order is
+independently designed to fail closed—durable tombstone and
+`NOLOGIN` precede `DROP ROLE`, and `REVOKED` follows only successful deletion—
+and the same-revision Hosted/PG17 cross-database proof is now closed. Deleted
+no-data/non-default/non-persistent Preview r5 (branch ID
+`5f088eac-ac66-4625-8f4c-c9e7d9b02c2a`, ref `ucdmoxqzruohiqmsokfv`) passed the
+40/40 single-transaction pipeline, A01–A18, pinned-CA child and independent
+postcheck. It proved direct-login inherited caller execution without `SET ROLE`,
+bind-time `NOLOGIN`, terminal `ACCEPTED`, exact replay/conflict behavior, the
+large-object `2BP01`/`DropRole` rollback fence and controlled cleanup, and zero
+runtime role/session/membership/API/verifier/temporary-database residue. Three
+final branch lists left only healthy default Production; Production was never
+the SQL target. Broker-scoped Security and Performance Advisor findings were
+zero, while global findings and pre-existing generation lint errors remain and
+must not be described as a globally clean Advisor/lint result.
+The atomic pin set is now frozen and passed 53/53 focused checks: migration
+`64dcb8c57f2c73d3fbd5adc99e3261f8e2e0ddd8e8efcf5cca52c12ca34ba5aa`;
+transactional `2026-08-30.preview-transactional-migrations.7` with 40 entries,
+20 wrappers and manifest
+`6590eed19602c4d7931355f18dafde699b1c47012a3fe09f9d040c179e11792d`;
+ordered basenames/entries `f9905d27a907045dfd6e7677e54c50af84be06a194535682bcf9dc4859657d4f` /
+`7006c0ef8cb62d9596fdd236ffd3357d16338370e9d1437f54a58eb668b4b250`;
+A03 `0f8192bccf46101103c301fcfd2b00cb818dd6725425a952777f697db8ea8172`;
+rollback `2026-08-30.preview-schema-rollback-assertions.5` manifest
+`e0b5f30f9a4c33bf04020a4d11453c87a52321b69c6edd74982446b0fadd58fe`;
+preflight/coordinator
+`4447c071fa37ab21f23624a4d3d4d28b2ee9ba2e1ef4c9be969bf9a0481de2f3` /
+`570544bf700997a0ba90e06422019c237a01835ba8b75ff70bed5348cdf4bf02`.
+These are source-integrity pins plus deleted-Preview evidence only; readiness is `false`,
+approved adapters remain
+absent, and no worker, queue, cron, Edge Function, provider/model call or
+product route was enabled. See
+`documentation/communication-note-preview-runtime-credential-broker-m1l.md`.
+
 Supabase CLI 2.115.0 has since generated source-only migration `20260823213144_harden_v1_note_generation_registration_retention.sql`. It adds `attempts_registration_digest_idx` and the named `attempts_registration_catalog_fk` from `attempts.registration_digest` to `worker_registrations.registration_digest`, with update/delete `RESTRICT`, `NOT VALID` creation and explicit validation. It creates no seed, caller grant, runtime surface or Production change. Its local gate passed 39/39 focused contracts, the full 125-file / 1,381-test suite, lint, TypeScript, the 63/63-page production build, the 73-file Codex-adapter sync check and `git diff --check`. Deleted disposable `r22` then clean-applied the current manifest 15/15 and passed the seven rollback suites; the hosted registration-retention gate is now closed without enabling any runtime automation.
 
 ### PostgreSQL 16.15 local isolated gate — 2026-08-24

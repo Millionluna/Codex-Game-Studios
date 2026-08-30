@@ -78,6 +78,7 @@ describe("V1 shadow runtime boundary", () => {
       "src/lib/v1/communication-note-preview-signed-runner-terminal-runtime-port.server.ts",
       "src/lib/v1/communication-note-preview-runner-terminal-postgres.server.ts",
       "src/lib/v1/communication-note-preview-runner-terminal-resolved-runtime-binding.server.ts",
+      "src/lib/v1/communication-note-preview-durable-caller-credential-resolver.server.ts",
       "src/lib/v1/native-auth-boundary.server.ts",
       "src/lib/v1/openai-communication-note-provider.server.ts",
       "src/lib/v1/communication-note-provider-policy.ts",
@@ -440,6 +441,10 @@ describe("V1 shadow runtime boundary", () => {
       process.cwd(),
       "src/lib/v1/communication-note-preview-runner-terminal-hosted.live.test.ts",
     );
+    const runtimeBrokerHostedLiveTest = join(
+      process.cwd(),
+      "src/lib/v1/communication-note-preview-runtime-credential-broker-hosted.live.test.ts",
+    );
     const hostedLiveImportPattern =
       /(?:from\s+|import\s*\(|require\s*\()\s*["'][^"']*communication-note-preview-runner-terminal-hosted-live\.server(?:\.(?:[cm]?[jt]s|[jt]sx))?["']/;
     const hostedLiveImporters = walkControlledScriptFiles().filter((file) =>
@@ -458,6 +463,20 @@ describe("V1 shadow runtime boundary", () => {
     const resolvedRuntimeBindingImporters = walkControlledScriptFiles().filter(
       (file) =>
         resolvedRuntimeBindingImportPattern.test(readFileSync(file, "utf8")),
+    );
+    const durableCredentialResolverModule = join(
+      process.cwd(),
+      "src/lib/v1/communication-note-preview-durable-caller-credential-resolver.server.ts",
+    );
+    const durableCredentialResolverTest = join(
+      process.cwd(),
+      "src/lib/v1/communication-note-preview-durable-caller-credential-resolver.server.test.ts",
+    );
+    const durableCredentialResolverImportPattern =
+      /(?:from\s+|import\s*\(|require\s*\()\s*["'][^"']*communication-note-preview-durable-caller-credential-resolver\.server(?:\.(?:[cm]?[jt]s|[jt]sx))?["']/;
+    const durableCredentialResolverImporters = walkControlledScriptFiles().filter(
+      (file) =>
+        durableCredentialResolverImportPattern.test(readFileSync(file, "utf8")),
     );
 
     expect(policyImporters).toEqual([
@@ -494,6 +513,7 @@ describe("V1 shadow runtime boundary", () => {
       signedRuntimeTest,
     ].sort());
     expect(postgresImporters).toEqual([
+      durableCredentialResolverModule,
       hostedLiveModule,
       postgresTest,
       resolvedRuntimeBindingModule,
@@ -502,6 +522,7 @@ describe("V1 shadow runtime boundary", () => {
       signedRuntimeTest,
     ].sort());
     expect(trustCompositionImporters).toEqual([
+      hostedLiveModule,
       postgresModule,
       postgresTest,
       resolvedRuntimeBindingModule,
@@ -518,9 +539,17 @@ describe("V1 shadow runtime boundary", () => {
       signedRuntimeTest,
       trustCompositionTest,
     ].sort());
-    expect(hostedLiveImporters).toEqual([hostedLiveTest]);
+    expect(hostedLiveImporters).toEqual([
+      hostedLiveTest,
+      runtimeBrokerHostedLiveTest,
+    ].sort());
     expect(resolvedRuntimeBindingImporters).toEqual([
+      durableCredentialResolverModule,
+      durableCredentialResolverTest,
       resolvedRuntimeBindingTest,
+    ].sort());
+    expect(durableCredentialResolverImporters).toEqual([
+      durableCredentialResolverTest,
     ]);
 
     for (const pattern of [
@@ -531,6 +560,7 @@ describe("V1 shadow runtime boundary", () => {
       postgresImportPattern,
       hostedLiveImportPattern,
       resolvedRuntimeBindingImportPattern,
+      durableCredentialResolverImportPattern,
     ]) {
       expect(walkSourceFiles("src/app").filter((file) =>
         pattern.test(readFileSync(file, "utf8")),
@@ -547,6 +577,7 @@ describe("V1 shadow runtime boundary", () => {
       postgresModule,
       hostedLiveModule,
       resolvedRuntimeBindingModule,
+      durableCredentialResolverModule,
     ]) {
       expect(readFileSync(modulePath, "utf8")).not.toMatch(
         /process\.env|fetch\s*\(|from\s+["'](?:openai|@supabase\/|node:(?:http|https|net|tls))[^"']*["']|SUPABASE_SERVICE_ROLE_KEY|NEXT_PUBLIC_/,
@@ -559,10 +590,16 @@ describe("V1 shadow runtime boundary", () => {
       "Communication Note preview runner terminal persistence is unavailable",
     );
     expect(readFileSync(resolvedRuntimeBindingModule, "utf8")).toContain(
-      "SOURCE_CONTRACT_ONLY_NO_APPROVED_TARGET_OR_RESOLVERS",
+      "SOURCE_CONTRACT_WITH_UNAPPLIED_INHERITED_CALLER_BINDING_NOT_APPROVED",
     );
     expect(readFileSync(resolvedRuntimeBindingModule, "utf8")).toContain(
       "RESOLVED_RUNTIME_BINDING_READY =\n  false",
+    );
+    expect(readFileSync(durableCredentialResolverModule, "utf8")).toContain(
+      "SOURCE_CONTRACT_WITH_UNAPPLIED_DURABLE_BROKER_NOT_APPROVED",
+    );
+    expect(readFileSync(durableCredentialResolverModule, "utf8")).toContain(
+      "DURABLE_CALLER_CREDENTIAL_RESOLVER_READY =\n  false",
     );
   });
 

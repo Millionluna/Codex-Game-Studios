@@ -14,11 +14,10 @@ import {
   CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RESOLVED_RUNTIME_BINDING_POLICY,
   CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RESOLVED_RUNTIME_BINDING_POLICY_DIGEST,
   CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RESOLVED_RUNTIME_BINDING_READY,
-  CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RESOLVED_RUNTIME_CALLER_IDENTITY_SQL,
+  CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RESOLVED_RUNTIME_INHERITED_CALLER_IDENTITY_SQL,
   CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RESOLVED_RUNTIME_COMMIT_SQL,
   CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RESOLVED_RUNTIME_RESET_IDENTITY_SQL,
   CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RESOLVED_RUNTIME_ROLLBACK_SQL,
-  CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RESOLVED_RUNTIME_SET_ROLE_SQL,
   CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RESOLVED_RUNTIME_TIMEOUT_SQL,
   createCaresLinkV1CommunicationNotePreviewReleaseReportDigest,
   createCaresLinkV1CommunicationNotePreviewResolvedRunnerTerminalRuntimePort,
@@ -49,8 +48,8 @@ const NOW = M1GH_TEST_NOW;
 let opaqueReferenceSequence = 10;
 let runtimeRoleSequence = 0;
 
-describe("Communication Note M1j resolved runner-terminal runtime binding", () => {
-  it("resolves custody before a short caller lease and persists through one exact transaction-local caller", async () => {
+describe("Communication Note M1l resolved runner-terminal runtime binding", () => {
+  it("resolves custody before a short caller lease and persists with one exact inherited caller capability", async () => {
     const harness = createHarness();
 
     await expect(harness.port.persist(harness.envelope)).resolves.toEqual(
@@ -63,13 +62,49 @@ describe("Communication Note M1j resolved runner-terminal runtime binding", () =
       CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RESOLVED_RUNTIME_BEGIN_SQL,
       ...CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RESOLVED_RUNTIME_TIMEOUT_SQL,
       CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RESOLVED_RUNTIME_BASE_IDENTITY_SQL,
-      CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RESOLVED_RUNTIME_SET_ROLE_SQL,
-      CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RESOLVED_RUNTIME_CALLER_IDENTITY_SQL,
+      CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RESOLVED_RUNTIME_INHERITED_CALLER_IDENTITY_SQL,
       CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RUNNER_TERMINAL_POSTGRES_SQL,
-      CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RESOLVED_RUNTIME_CALLER_IDENTITY_SQL,
+      CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RESOLVED_RUNTIME_INHERITED_CALLER_IDENTITY_SQL,
       CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RESOLVED_RUNTIME_COMMIT_SQL,
       CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RESOLVED_RUNTIME_RESET_IDENTITY_SQL,
     ]);
+    expect(
+      harness.query.mock.calls.some(([sql]) =>
+        /\bset\s+(?:local\s+)?role\b/i.test(sql),
+      ),
+    ).toBe(false);
+    expect(
+      CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RESOLVED_RUNTIME_BASE_IDENTITY_SQL,
+    ).toContain("runtime_inbound_membership_count");
+    for (const identitySql of [
+      CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RESOLVED_RUNTIME_BASE_IDENTITY_SQL,
+      CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RESOLVED_RUNTIME_INHERITED_CALLER_IDENTITY_SQL,
+    ]) {
+      expect(identitySql).toMatch(
+        /\.member = pg_catalog\.to_regrole\('postgres'\)/,
+      );
+      expect(identitySql).toContain("grantor_role.rolsuper");
+      expect(identitySql).toMatch(
+        /\.grantor <>\s+(?:runtime_)?inbound_membership\.member/,
+      );
+      expect(identitySql).toContain(".admin_option");
+      expect(identitySql).toMatch(
+        /not (?:runtime_)?inbound_membership\.inherit_option/,
+      );
+      expect(identitySql).toMatch(
+        /not (?:runtime_)?inbound_membership\.set_option/,
+      );
+      expect(identitySql).toContain(
+        "with candidate_relation as materialized",
+      );
+      expect(identitySql).toContain(
+        "with candidate_sequence as materialized",
+      );
+      expect(identitySql).toContain("has_any_column_privilege");
+    }
+    expect(
+      CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RESOLVED_RUNTIME_INHERITED_CALLER_IDENTITY_SQL,
+    ).toContain("privilege_record.grantor = executor_role.oid");
     expect(harness.query).toHaveBeenCalledWith(
       CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RUNNER_TERMINAL_POSTGRES_SQL,
       [
@@ -115,17 +150,34 @@ describe("Communication Note M1j resolved runner-terminal runtime binding", () =
     expect(Object.isFrozen(harness.port)).toBe(true);
   });
 
-  it("keeps the M1j policy and every approved resolver/port fail-closed", () => {
+  it("keeps the M1l inherited-caller policy and every approved resolver/port fail-closed", () => {
     expect(
       CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RESOLVED_RUNTIME_BINDING_READY,
     ).toBe(false);
     expect(
       CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RESOLVED_RUNTIME_BINDING_POLICY,
     ).toMatchObject({
-      status: "SOURCE_CONTRACT_ONLY_NO_APPROVED_TARGET_OR_RESOLVERS",
+      status:
+        "SOURCE_CONTRACT_WITH_UNAPPLIED_INHERITED_CALLER_BINDING_NOT_APPROVED",
       ready: false,
       transactionIsolation: "READ COMMITTED",
-      roleScope: "SET LOCAL",
+      roleScope: "INHERITED_CALLER_PRIVILEGES_WITHOUT_SET_ROLE",
+      runtimeCurrentUserRemainsSessionUser: true,
+      runtimeLoginRevokedBeforeUse: true,
+      callerMembershipAdmin: false,
+      callerMembershipInherit: true,
+      callerMembershipSet: false,
+      runtimeInboundCreatorMembershipSource:
+        "POSTGRESQL_CREATEROLE_AUTOMATIC_CREATOR_EDGE",
+      runtimeInboundCreatorMembershipCount: 1,
+      runtimeInboundCreatorMembershipMember: "postgres",
+      runtimeInboundCreatorMembershipGrantorSuperuser: true,
+      runtimeInboundCreatorMembershipGrantorDistinctFromMember: true,
+      runtimeInboundCreatorMembershipAdmin: true,
+      runtimeInboundCreatorMembershipInherit: false,
+      runtimeInboundCreatorMembershipSet: false,
+      runtimeInboundCreatorMembershipImmediatelyUsable: false,
+      callerOwnedPersistentObjectsAllowed: false,
       resolverSettlementTimeoutMs: 5_000,
       databaseSettlementTimeoutMs: 12_000,
       cleanupSettlementTimeoutMs: 5_000,
@@ -153,7 +205,7 @@ describe("Communication Note M1j resolved runner-terminal runtime binding", () =
     const fixture = createM1ghRunnerTerminalTrustFixture();
     expect(() =>
       createCaresLinkV1CommunicationNotePreviewResolvedRunnerTerminalRuntimePort({
-        capability: "M1J_APPROVED_RESOLVED_RUNTIME_BINDING",
+        capability: "M1L_APPROVED_RESOLVED_RUNTIME_BINDING",
         verifiedAuthorization: fixture.verifiedAuthorization,
         clock: { now: () => NOW },
       }),
@@ -269,14 +321,37 @@ describe("Communication Note M1j resolved runner-terminal runtime binding", () =
     expect(expandedRelease).toHaveBeenCalledOnce();
   });
 
-  it("rolls back, proves role reset and releases when base or caller identity drifts", async () => {
+  it("rolls back, proves the runtime identity never switches and releases on inherited-caller drift", async () => {
     for (const options of [
-      { baseOverrides: { rolinherit: true } },
-      { baseOverrides: { base_exact_rpc_executable: true } },
+      { baseOverrides: { rolcanlogin: true } },
+      { baseOverrides: { rolinherit: false } },
+      { baseOverrides: { caller_set: true } },
+      { baseOverrides: { caller_inherited: false } },
+      { baseOverrides: { caller_membership_inherit: false } },
+      { baseOverrides: { caller_membership_set: true } },
+      { baseOverrides: { direct_membership_count: 2 } },
+      { baseOverrides: { runtime_inbound_membership_count: 2 } },
+      { baseOverrides: { runtime_inbound_membership_posture: false } },
+      { baseOverrides: { base_exact_rpc_executable: false } },
       { baseOverrides: { base_generation_table_privilege_count: 1 } },
+      { baseOverrides: { base_generation_sequence_privilege_count: 1 } },
       { baseOverrides: { authenticator_can_set_runtime: true } },
+      {
+        callerOverrides: {
+          current_user: "careslink_v1_preview_runner_terminal_caller",
+        },
+      },
+      { callerOverrides: { runtime_rolinherit: false } },
+      { callerOverrides: { caller_set: true } },
+      { callerOverrides: { caller_inherited: false } },
+      { callerOverrides: { caller_membership_admin: true } },
+      { callerOverrides: { caller_membership_inherit: false } },
+      { callerOverrides: { caller_membership_set: true } },
+      { callerOverrides: { direct_membership_count: 2 } },
+      { callerOverrides: { runtime_inbound_membership_count: 2 } },
+      { callerOverrides: { runtime_inbound_membership_posture: false } },
       { callerOverrides: { generation_executable_function_count: 2 } },
-      { callerOverrides: { caller_membership_count: 1 } },
+      { callerOverrides: { caller_outbound_membership_count: 1 } },
       { callerOverrides: { generation_schema_usage: false } },
       { callerOverrides: { exact_rpc_metadata_valid: false } },
       { callerOverrides: { exact_rpc_acl_valid: false } },
@@ -290,7 +365,10 @@ describe("Communication Note M1j resolved runner-terminal runtime binding", () =
       { callerOverrides: { executor_outbound_membership_count: 1 } },
       { callerOverrides: { executor_inbound_active_membership_count: 1 } },
       { callerOverrides: { service_role_exact_rpc_executable: true } },
-      { callerOverrides: { authenticated_can_set_caller: true } },
+      { callerOverrides: { generation_table_privilege_count: 1 } },
+      { callerOverrides: { generation_sequence_privilege_count: 1 } },
+      { callerOverrides: { authenticated_set: true } },
+      { callerOverrides: { authenticated_can_set_runtime: true } },
       { callerOverrides: { backend_pid: 4243 } },
       { callerOverrides: { transaction_id: "9002" } },
       { callerOverrides: { executor_set: true } },
@@ -655,8 +733,7 @@ describe("Communication Note M1j resolved runner-terminal runtime binding", () =
         CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RESOLVED_RUNTIME_BEGIN_SQL,
         ...CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RESOLVED_RUNTIME_TIMEOUT_SQL,
         CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RESOLVED_RUNTIME_BASE_IDENTITY_SQL,
-        CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RESOLVED_RUNTIME_SET_ROLE_SQL,
-        CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RESOLVED_RUNTIME_CALLER_IDENTITY_SQL,
+        CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RESOLVED_RUNTIME_INHERITED_CALLER_IDENTITY_SQL,
         CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RUNNER_TERMINAL_POSTGRES_SQL,
         CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RESOLVED_RUNTIME_COMMIT_SQL,
       ]) {
@@ -806,7 +883,7 @@ describe("Communication Note M1j resolved runner-terminal runtime binding", () =
     );
     expect(
       concurrentA.query.mock.calls.length + concurrentB.query.mock.calls.length,
-    ).toBe(12);
+    ).toBe(11);
   });
 
   it("quarantines invalid factory leases before concurrent cleanup can race shared identities", async () => {
@@ -876,7 +953,7 @@ describe("Communication Note M1j resolved runner-terminal runtime binding", () =
 
     expect(() =>
       createCaresLinkV1CommunicationNotePreviewResolvedRunnerTerminalRuntimePort({
-        capability: "M1J_SOURCE_ONLY_RESOLVED_RUNTIME_BINDING",
+        capability: "M1L_SOURCE_ONLY_RESOLVED_RUNTIME_BINDING",
         verifiedAuthorization: fixture.verifiedAuthorization,
         databaseTarget: createDatabaseTarget(),
         custodyResolver: { resolve: vi.fn() },
@@ -1019,7 +1096,7 @@ function createHarness(options: HarnessOptions = {}) {
     }
     if (
       sql ===
-      CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RESOLVED_RUNTIME_CALLER_IDENTITY_SQL
+      CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RESOLVED_RUNTIME_INHERITED_CALLER_IDENTITY_SQL
     ) {
       const overrides =
         callerIdentityReadCount === 0
@@ -1160,7 +1237,7 @@ function createHarness(options: HarnessOptions = {}) {
   });
   const port =
     createTestOnlyCaresLinkV1CommunicationNotePreviewResolvedRunnerTerminalRuntimePort({
-      capability: "TEST_ONLY_M1J_RESOLVED_RUNTIME_BINDING",
+      capability: "TEST_ONLY_M1L_RESOLVED_RUNTIME_BINDING",
       verifiedAuthorization: fixture.verifiedAuthorization,
       databaseTarget,
       custodyResolver,
@@ -1280,9 +1357,9 @@ function baseIdentityRow(runtimeRole: string) {
     database_name: "postgres",
     postgres_major: 17,
     transaction_isolation: "read committed",
-    rolcanlogin: true,
+    rolcanlogin: false,
     rolsuper: false,
-    rolinherit: false,
+    rolinherit: true,
     rolcreaterole: false,
     rolcreatedb: false,
     rolreplication: false,
@@ -1290,16 +1367,18 @@ function baseIdentityRow(runtimeRole: string) {
     rolconnlimit: 1,
     role_valid_until: shiftTimestamp(NOW, 3 * 60_000),
     caller_member: true,
-    caller_set: true,
-    caller_inherited: false,
+    caller_set: false,
+    caller_inherited: true,
     direct_membership_count: 1,
+    runtime_inbound_membership_count: 1,
+    runtime_inbound_membership_posture: true,
     caller_membership_admin: false,
-    caller_membership_inherit: false,
-    caller_membership_set: true,
-    base_exact_rpc_executable: false,
-    base_generation_schema_usage: false,
+    caller_membership_inherit: true,
+    caller_membership_set: false,
+    base_exact_rpc_executable: true,
+    base_generation_schema_usage: true,
     base_generation_schema_create: false,
-    base_generation_executable_function_count: 0,
+    base_generation_executable_function_count: 1,
     base_generation_table_privilege_count: 0,
     base_generation_sequence_privilege_count: 0,
     executor_set: false,
@@ -1316,19 +1395,39 @@ function baseIdentityRow(runtimeRole: string) {
 
 function callerIdentityRow(runtimeRole: string) {
   return {
-    current_user: "careslink_v1_preview_runner_terminal_caller",
+    current_user: runtimeRole,
     session_user: runtimeRole,
     backend_pid: 4242,
     transaction_id: "9001",
     database_now: NOW,
+    database_name: "postgres",
+    postgres_major: 17,
     transaction_isolation: "read committed",
-    rolcanlogin: false,
-    rolsuper: false,
-    rolinherit: false,
-    rolcreaterole: false,
-    rolcreatedb: false,
-    rolreplication: false,
-    rolbypassrls: false,
+    runtime_rolcanlogin: false,
+    runtime_rolsuper: false,
+    runtime_rolinherit: true,
+    runtime_rolcreaterole: false,
+    runtime_rolcreatedb: false,
+    runtime_rolreplication: false,
+    runtime_rolbypassrls: false,
+    runtime_rolconnlimit: 1,
+    runtime_role_valid_until: shiftTimestamp(NOW, 3 * 60_000),
+    caller_rolcanlogin: false,
+    caller_rolsuper: false,
+    caller_rolinherit: false,
+    caller_rolcreaterole: false,
+    caller_rolcreatedb: false,
+    caller_rolreplication: false,
+    caller_rolbypassrls: false,
+    caller_member: true,
+    caller_set: false,
+    caller_inherited: true,
+    direct_membership_count: 1,
+    runtime_inbound_membership_count: 1,
+    runtime_inbound_membership_posture: true,
+    caller_membership_admin: false,
+    caller_membership_inherit: true,
+    caller_membership_set: false,
     executor_rolcanlogin: false,
     executor_rolsuper: false,
     executor_rolinherit: false,
@@ -1338,9 +1437,8 @@ function callerIdentityRow(runtimeRole: string) {
     executor_rolbypassrls: false,
     executor_outbound_membership_count: 0,
     executor_inbound_active_membership_count: 0,
-    caller_membership_count: 0,
+    caller_outbound_membership_count: 0,
     non_runtime_inbound_active_membership_count: 0,
-    session_runtime_can_set_caller: true,
     exact_rpc_executable: true,
     generation_schema_usage: true,
     generation_schema_create: false,
@@ -1358,10 +1456,10 @@ function callerIdentityRow(runtimeRole: string) {
     anon_set: false,
     authenticated_set: false,
     service_role_set: false,
-    authenticator_can_set_caller: false,
-    anon_can_set_caller: false,
-    authenticated_can_set_caller: false,
-    service_role_can_set_caller: false,
+    authenticator_can_set_runtime: false,
+    anon_can_set_runtime: false,
+    authenticated_can_set_runtime: false,
+    service_role_can_set_runtime: false,
   };
 }
 

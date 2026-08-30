@@ -29,6 +29,76 @@ M1j 不改变 M1g-i 的 39 个 migration、manifest、preflight 或 coordinator 
 也不继承已删除 Preview 的任何凭据。现有第五个 `NOLOGIN` caller shell 和精确
 三参数终态 RPC 已足以表达本批次边界，所以本批次不需要新 migration。
 
+Successor note (M1k, 2026-08-30): M1k adds an isolated TestOnly PostgreSQL
+broker plus an injected server-only resolver for this fifth caller. A fresh
+disposable no-TCP PostgreSQL 16.15 run proved durable digest fencing,
+tombstone-plus-`NOLOGIN` before destroy, response-loss cleanup, concurrent
+acquire/revoke, rejected late reconnect and independent zero role/session/
+membership residue. It adds zero Supabase
+migrations, so the 39-entry manifest and M1g-i Hosted attribution remain
+unchanged. It is not PostgreSQL 17, Hosted, TLS, approved secret transport or
+product-runtime evidence; readiness remains false and the approved resolver is
+undefined. See the
+[M1k handoff](communication-note-preview-durable-caller-credential-resolver-m1k.md).
+
+Successor note (M1l, 2026-08-30): M1l adds the formal, additive 40th
+migration source for the private durable broker and closes the terminal late-
+write window with a shared ACTIVE transaction fence against exclusive
+tombstone/finalize. It preserves the exact three-argument terminal RPC, binds
+45–90-second digest-derived SCRAM roles to role/OID/PID/backend-start/fixed
+application/auth/run/HMAC/expiry, applies `NOLOGIN` at bind, and requires a
+250 ms connection-bound cancel/query settlement barrier or permanent driver
+quarantine. The current local PostgreSQL 16.15 harness passed six scenarios
+with four issued-and-revoked acquisitions and zero runtime role/session/
+membership/API-privilege residue. Its cross-database case observed SQLSTATE
+`2BP01`, routine `DropRole`, before cleanup and successful finalize/inspect.
+Deleted same-revision PostgreSQL 17 Preview r5 then passed 40/40, A01–A18,
+pinned-CA terminal and exact cross-database owner-residue gates with zero final
+residue. The migration remains Production-unapplied/default-off; no deployment
+or product/provider evidence exists, and readiness/approval remain false/absent.
+See the
+[M1l handoff](communication-note-preview-runtime-credential-broker-m1l.md).
+
+M1j 下文的 `SET LOCAL ROLE`、runtime `NOINHERIT` 与 SET-only caller edge 是该
+历史 TestOnly checkpoint 的模型，**已被 M1l supersede，不得作为当前实现描述**。
+当前 M1l binding 是
+`binding.communication.openai.synthetic-preview.2026-08-30.m1l.v1` /
+`cfb9f27b63f1a623950b3033fc04300149bcba26389994aa04eb2d2213ea1115`：
+runtime 为 `INHERIT=true`，outbound caller edge 为
+`ADMIN=false`/`INHERIT=true`/`SET=false`；另有 PostgreSQL 16/17 `CREATEROLE`
+自动产生的 inbound inert creator edge（`member=postgres`、superuser grantor、
+`ADMIN=true`/`INHERIT=false`/`SET=false`）。客户端事务不发 `SET ROLE`；wrapper 外
+`current_user=session_user=runtime`，进入 `SECURITY DEFINER` wrapper 后则是
+`current_user=executor`、`session_user=runtime`。Migration 及 acquire/bind/wrapper
+还以 cluster-wide `pg_shdepend` 重验 static caller 零 ownership、ACL 仅限当前数据库
+generation schema 与 terminal wrapper，并重验列级零权限及 wrapper/inner 的 exact
+executor owner、`SECURITY DEFINER`、空 `search_path`、精确 ACL。配套 durable resolver 是
+`resolver.communication.openai.synthetic-preview.2026-08-30.m1l.v2` /
+`e53114d9d247ffcdb20ed83b4724fa5b8b09eeab31e4f2fc1a868ade13a2f43e`。
+
+M1l 当前本地 PostgreSQL 16.15 harness 的跨数据库 runtime-owned large-object 场景已
+全绿：第一次 `DROP ROLE` 精确返回 SQLSTATE `2BP01`、routine `DropRole`，rollback 后
+保留 TOMBSTONED/`NOLOGIN`/membership/remote residue；清除唯一 owner dependency 后
+finalize 与 inspect 成功并证明零残留。同 revision 的 PostgreSQL 17 Hosted Preview
+r5 已独立关闭跨库 empirical gate：精确 large-object ACL/owner dependency、回滚保留与
+受控清理全部通过，最终 residue 为零；该 Preview 随后删除。SQL 的
+tombstone/`NOLOGIN` 先于 `DROP ROLE`、
+`REVOKED` 后于成功删除，仍是独立的 fail-closed 顺序设计。
+M1l 原子 pin 集已冻结并通过 53/53 聚焦覆盖：migration
+`64dcb8c57f2c73d3fbd5adc99e3261f8e2e0ddd8e8efcf5cca52c12ca34ba5aa`；
+transactional `2026-08-30.preview-transactional-migrations.7` 40-entry/20-wrapper manifest
+`6590eed19602c4d7931355f18dafde699b1c47012a3fe09f9d040c179e11792d`；ordered
+basenames/entries `f9905d27a907045dfd6e7677e54c50af84be06a194535682bcf9dc4859657d4f` /
+`7006c0ef8cb62d9596fdd236ffd3357d16338370e9d1437f54a58eb668b4b250`；A03
+`0f8192bccf46101103c301fcfd2b00cb818dd6725425a952777f697db8ea8172`；rollback
+`2026-08-30.preview-schema-rollback-assertions.5`
+manifest `e0b5f30f9a4c33bf04020a4d11453c87a52321b69c6edd74982446b0fadd58fe`；
+preflight/coordinator `4447c071fa37ab21f23624a4d3d4d28b2ee9ba2e1ef4c9be969bf9a0481de2f3` /
+`570544bf700997a0ba90e06422019c237a01835ba8b75ff70bed5348cdf4bf02`。
+这些只是 source-integrity pins；r5 另提供已删除 Preview 的 Hosted/PG17/pinned-CA
+证据。readiness 仍为 `false`，且没有 Production 应用、deployment 或产品/provider
+证据。
+
 ## 解析链与证据对象
 
 下面五类对象都是精确键集、规范化摘要和 fail-closed 校验的一部分。除
@@ -100,7 +170,7 @@ caller identity、credential reference、target/Production HMAC、CA 和控制�
 
 ### 4. dedicated PostgreSQL session
 
-一次 `persist` 必须在同一条 PostgreSQL 17 物理会话上按固定顺序执行：
+以下是 M1j 历史 TestOnly `persist` 顺序，已由上述 M1l 继承模型取代：
 
 1. `BEGIN ISOLATION LEVEL READ COMMITTED READ WRITE`；
 2. `SET LOCAL statement_timeout = '5s'`、`lock_timeout = '1s'`、

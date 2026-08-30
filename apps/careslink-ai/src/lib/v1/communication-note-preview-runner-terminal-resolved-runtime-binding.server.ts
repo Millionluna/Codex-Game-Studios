@@ -61,14 +61,15 @@ const TEST_ONLY_EXCLUSIVE_SESSION_LEASES = new WeakMap<
 >();
 
 export const CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RESOLVED_RUNTIME_BINDING_VERSION =
-  "binding.communication.openai.synthetic-preview.2026-08-30.m1j.v1" as const;
+  "binding.communication.openai.synthetic-preview.2026-08-30.m1l.v1" as const;
 export const CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RESOLVED_RUNTIME_BINDING_READY =
   false as const;
 
 const RESOLVED_RUNTIME_BINDING_POLICY_CORE = deepFreeze({
   version:
     CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RESOLVED_RUNTIME_BINDING_VERSION,
-  status: "SOURCE_CONTRACT_ONLY_NO_APPROVED_TARGET_OR_RESOLVERS",
+  status:
+    "SOURCE_CONTRACT_WITH_UNAPPLIED_INHERITED_CALLER_BINDING_NOT_APPROVED",
   ready: false,
   purpose:
     CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RUNNER_TERMINAL_DATABASE_PURPOSE,
@@ -94,7 +95,23 @@ const RESOLVED_RUNTIME_BINDING_POLICY_CORE = deepFreeze({
   targetClass: "DISPOSABLE_NO_DATA_NON_PRODUCTION_PREVIEW",
   postgresMajor: 17,
   transactionIsolation: "READ COMMITTED",
-  roleScope: "SET LOCAL",
+  roleScope: "INHERITED_CALLER_PRIVILEGES_WITHOUT_SET_ROLE",
+  runtimeCurrentUserRemainsSessionUser: true,
+  runtimeLoginRevokedBeforeUse: true,
+  callerMembershipAdmin: false,
+  callerMembershipInherit: true,
+  callerMembershipSet: false,
+  runtimeInboundCreatorMembershipSource:
+    "POSTGRESQL_CREATEROLE_AUTOMATIC_CREATOR_EDGE",
+  runtimeInboundCreatorMembershipCount: 1,
+  runtimeInboundCreatorMembershipMember: "postgres",
+  runtimeInboundCreatorMembershipGrantorSuperuser: true,
+  runtimeInboundCreatorMembershipGrantorDistinctFromMember: true,
+  runtimeInboundCreatorMembershipAdmin: true,
+  runtimeInboundCreatorMembershipInherit: false,
+  runtimeInboundCreatorMembershipSet: false,
+  runtimeInboundCreatorMembershipImmediatelyUsable: false,
+  callerOwnedPersistentObjectsAllowed: false,
   connectionMode: "ONE_PHYSICAL_SESSION_SINGLE_USE",
   queryResultMode: "NORMALIZED_ROWS_ONLY",
   databaseClockAndBackendAttestationRequired: true,
@@ -112,7 +129,7 @@ const RESOLVED_RUNTIME_BINDING_POLICY_CORE = deepFreeze({
 } as const);
 
 export const CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RESOLVED_RUNTIME_BINDING_POLICY_DIGEST =
-  "6e33f6a6c061f539b75808afc27abfe6f33fedfcf28de5f7b2a5fdeed5faee04" as const;
+  "cfb9f27b63f1a623950b3033fc04300149bcba26389994aa04eb2d2213ea1115" as const;
 
 if (
   canonicalSha256(RESOLVED_RUNTIME_BINDING_POLICY_CORE) !==
@@ -154,8 +171,6 @@ export const CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RESOLVED_RUNTIME_TIMEOUT_SQ
     CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RESOLVED_RUNTIME_IDLE_TIMEOUT_SQL,
     CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RESOLVED_RUNTIME_TRANSACTION_TIMEOUT_SQL,
   ] as const);
-export const CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RESOLVED_RUNTIME_SET_ROLE_SQL =
-  `set local role ${CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RUNNER_TERMINAL_CALLER_ROLE}` as const;
 export const CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RESOLVED_RUNTIME_COMMIT_SQL =
   "commit" as const;
 export const CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RESOLVED_RUNTIME_ROLLBACK_SQL =
@@ -207,6 +222,26 @@ export const CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RESOLVED_RUNTIME_BASE_IDENT
     from pg_catalog.pg_auth_members as membership
     where membership.member = runtime_role.oid
   ) as direct_membership_count,
+  (
+    select pg_catalog.count(*)::pg_catalog.int4
+    from pg_catalog.pg_auth_members as inbound_membership
+    where inbound_membership.roleid = runtime_role.oid
+  ) as runtime_inbound_membership_count,
+  not exists (
+    select 1
+    from pg_catalog.pg_auth_members as inbound_membership
+    join pg_catalog.pg_roles as grantor_role
+      on grantor_role.oid = inbound_membership.grantor
+    where inbound_membership.roleid = runtime_role.oid
+      and not (
+        inbound_membership.member = pg_catalog.to_regrole('postgres')
+        and grantor_role.rolsuper
+        and inbound_membership.grantor <> inbound_membership.member
+        and inbound_membership.admin_option
+        and not inbound_membership.inherit_option
+        and not inbound_membership.set_option
+      )
+  ) as runtime_inbound_membership_posture,
   membership.admin_option as caller_membership_admin,
   membership.inherit_option as caller_membership_inherit,
   membership.set_option as caller_membership_set,
@@ -248,13 +283,17 @@ export const CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RESOLVED_RUNTIME_BASE_IDENT
       )
   ) as base_generation_executable_function_count,
   (
+    with candidate_relation as materialized (
+      select relation_record.oid
+      from pg_catalog.pg_class as relation_record
+      join pg_catalog.pg_namespace as namespace_record
+        on namespace_record.oid = relation_record.relnamespace
+      where namespace_record.nspname = 'careslink_v1_generation'
+        and relation_record.relkind in ('r', 'p', 'v', 'm', 'f')
+    )
     select pg_catalog.count(*)::pg_catalog.int4
-    from pg_catalog.pg_class as relation_record
-    join pg_catalog.pg_namespace as namespace_record
-      on namespace_record.oid = relation_record.relnamespace
-    where namespace_record.nspname = 'careslink_v1_generation'
-      and relation_record.relkind in ('r', 'p', 'v', 'm', 'f')
-      and (
+    from candidate_relation as relation_record
+    where (
         pg_catalog.has_table_privilege(
           current_user,
           relation_record.oid,
@@ -268,13 +307,17 @@ export const CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RESOLVED_RUNTIME_BASE_IDENT
       )
   ) as base_generation_table_privilege_count,
   (
+    with candidate_sequence as materialized (
+      select sequence_record.oid
+      from pg_catalog.pg_class as sequence_record
+      join pg_catalog.pg_namespace as namespace_record
+        on namespace_record.oid = sequence_record.relnamespace
+      where namespace_record.nspname = 'careslink_v1_generation'
+        and sequence_record.relkind = 'S'
+    )
     select pg_catalog.count(*)::pg_catalog.int4
-    from pg_catalog.pg_class as sequence_record
-    join pg_catalog.pg_namespace as namespace_record
-      on namespace_record.oid = sequence_record.relnamespace
-    where namespace_record.nspname = 'careslink_v1_generation'
-      and sequence_record.relkind = 'S'
-      and pg_catalog.has_sequence_privilege(
+    from candidate_sequence as sequence_record
+    where pg_catalog.has_sequence_privilege(
         current_user,
         sequence_record.oid,
         'USAGE,SELECT,UPDATE'
@@ -302,7 +345,7 @@ join pg_catalog.pg_auth_members as membership
  and membership.roleid = caller_role.oid
 where runtime_role.rolname = current_user` as const;
 
-export const CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RESOLVED_RUNTIME_CALLER_IDENTITY_SQL =
+export const CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RESOLVED_RUNTIME_INHERITED_CALLER_IDENTITY_SQL =
   `select
   current_user,
   session_user,
@@ -312,14 +355,73 @@ export const CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RESOLVED_RUNTIME_CALLER_IDE
     pg_catalog.clock_timestamp() at time zone 'UTC',
     'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'
   ) as database_now,
+  pg_catalog.current_database() as database_name,
+  pg_catalog.current_setting('server_version_num')::pg_catalog.int4 /
+    10000 as postgres_major,
   pg_catalog.current_setting('transaction_isolation') as transaction_isolation,
-  caller_role.rolcanlogin,
-  caller_role.rolsuper,
-  caller_role.rolinherit,
-  caller_role.rolcreaterole,
-  caller_role.rolcreatedb,
-  caller_role.rolreplication,
-  caller_role.rolbypassrls,
+  runtime_role.rolcanlogin as runtime_rolcanlogin,
+  runtime_role.rolsuper as runtime_rolsuper,
+  runtime_role.rolinherit as runtime_rolinherit,
+  runtime_role.rolcreaterole as runtime_rolcreaterole,
+  runtime_role.rolcreatedb as runtime_rolcreatedb,
+  runtime_role.rolreplication as runtime_rolreplication,
+  runtime_role.rolbypassrls as runtime_rolbypassrls,
+  runtime_role.rolconnlimit as runtime_rolconnlimit,
+  pg_catalog.to_char(
+    runtime_role.rolvaliduntil at time zone 'UTC',
+    'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'
+  ) as runtime_role_valid_until,
+  caller_role.rolcanlogin as caller_rolcanlogin,
+  caller_role.rolsuper as caller_rolsuper,
+  caller_role.rolinherit as caller_rolinherit,
+  caller_role.rolcreaterole as caller_rolcreaterole,
+  caller_role.rolcreatedb as caller_rolcreatedb,
+  caller_role.rolreplication as caller_rolreplication,
+  caller_role.rolbypassrls as caller_rolbypassrls,
+  pg_catalog.pg_has_role(
+    current_user,
+    '${CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RUNNER_TERMINAL_CALLER_ROLE}',
+    'MEMBER'
+  ) as caller_member,
+  pg_catalog.pg_has_role(
+    current_user,
+    '${CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RUNNER_TERMINAL_CALLER_ROLE}',
+    'SET'
+  ) as caller_set,
+  pg_catalog.pg_has_role(
+    current_user,
+    '${CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RUNNER_TERMINAL_CALLER_ROLE}',
+    'USAGE'
+  ) as caller_inherited,
+  (
+    select pg_catalog.count(*)::pg_catalog.int4
+    from pg_catalog.pg_auth_members as direct_membership
+    where direct_membership.member = runtime_role.oid
+  ) as direct_membership_count,
+  (
+    select pg_catalog.count(*)::pg_catalog.int4
+    from pg_catalog.pg_auth_members as runtime_inbound_membership
+    where runtime_inbound_membership.roleid = runtime_role.oid
+  ) as runtime_inbound_membership_count,
+  not exists (
+    select 1
+    from pg_catalog.pg_auth_members as runtime_inbound_membership
+    join pg_catalog.pg_roles as grantor_role
+      on grantor_role.oid = runtime_inbound_membership.grantor
+    where runtime_inbound_membership.roleid = runtime_role.oid
+      and not (
+        runtime_inbound_membership.member = pg_catalog.to_regrole('postgres')
+        and grantor_role.rolsuper
+        and runtime_inbound_membership.grantor <>
+          runtime_inbound_membership.member
+        and runtime_inbound_membership.admin_option
+        and not runtime_inbound_membership.inherit_option
+        and not runtime_inbound_membership.set_option
+      )
+  ) as runtime_inbound_membership_posture,
+  membership.admin_option as caller_membership_admin,
+  membership.inherit_option as caller_membership_inherit,
+  membership.set_option as caller_membership_set,
   attested_executor_role.rolcanlogin as executor_rolcanlogin,
   attested_executor_role.rolsuper as executor_rolsuper,
   attested_executor_role.rolinherit as executor_rolinherit,
@@ -345,7 +447,7 @@ export const CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RESOLVED_RUNTIME_CALLER_IDE
     select pg_catalog.count(*)::pg_catalog.int4
     from pg_catalog.pg_auth_members as membership
     where membership.member = caller_role.oid
-  ) as caller_membership_count,
+  ) as caller_outbound_membership_count,
   (
     select pg_catalog.count(*)::pg_catalog.int4
     from pg_catalog.pg_auth_members as inbound_membership
@@ -356,11 +458,6 @@ export const CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RESOLVED_RUNTIME_CALLER_IDE
       and inbound_member_role.rolname !~
         '^careslink_v1_preview_runner_terminal_runtime_[a-f0-9]{16}$'
   ) as non_runtime_inbound_active_membership_count,
-  pg_catalog.pg_has_role(
-    session_user,
-    current_user,
-    'SET'
-  ) as session_runtime_can_set_caller,
   (
     select pg_catalog.has_function_privilege(
       current_user,
@@ -426,6 +523,9 @@ export const CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RESOLVED_RUNTIME_CALLER_IDE
       and pg_catalog.count(*) filter (
         where privilege_record.grantee = executor_role.oid
       ) = 1
+      and pg_catalog.bool_and(
+        privilege_record.grantor = executor_role.oid
+      )
       and pg_catalog.bool_and(not privilege_record.is_grantable)
     from pg_catalog.pg_proc as function_record
     join pg_catalog.pg_namespace as namespace_record
@@ -511,13 +611,17 @@ export const CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RESOLVED_RUNTIME_CALLER_IDE
       )
   ) as generation_executable_function_count,
   (
+    with candidate_relation as materialized (
+      select relation_record.oid
+      from pg_catalog.pg_class as relation_record
+      join pg_catalog.pg_namespace as namespace_record
+        on namespace_record.oid = relation_record.relnamespace
+      where namespace_record.nspname = 'careslink_v1_generation'
+        and relation_record.relkind in ('r', 'p', 'v', 'm', 'f')
+    )
     select pg_catalog.count(*)::pg_catalog.int4
-    from pg_catalog.pg_class as relation_record
-    join pg_catalog.pg_namespace as namespace_record
-      on namespace_record.oid = relation_record.relnamespace
-    where namespace_record.nspname = 'careslink_v1_generation'
-      and relation_record.relkind in ('r', 'p', 'v', 'm', 'f')
-      and (
+    from candidate_relation as relation_record
+    where (
         pg_catalog.has_table_privilege(
           current_user,
           relation_record.oid,
@@ -531,13 +635,17 @@ export const CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RESOLVED_RUNTIME_CALLER_IDE
       )
   ) as generation_table_privilege_count,
   (
+    with candidate_sequence as materialized (
+      select sequence_record.oid
+      from pg_catalog.pg_class as sequence_record
+      join pg_catalog.pg_namespace as namespace_record
+        on namespace_record.oid = sequence_record.relnamespace
+      where namespace_record.nspname = 'careslink_v1_generation'
+        and sequence_record.relkind = 'S'
+    )
     select pg_catalog.count(*)::pg_catalog.int4
-    from pg_catalog.pg_class as sequence_record
-    join pg_catalog.pg_namespace as namespace_record
-      on namespace_record.oid = sequence_record.relnamespace
-    where namespace_record.nspname = 'careslink_v1_generation'
-      and sequence_record.relkind = 'S'
-      and pg_catalog.has_sequence_privilege(
+    from candidate_sequence as sequence_record
+    where pg_catalog.has_sequence_privilege(
         current_user,
         sequence_record.oid,
         'USAGE,SELECT,UPDATE'
@@ -552,15 +660,21 @@ export const CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RESOLVED_RUNTIME_CALLER_IDE
   pg_catalog.pg_has_role(current_user, 'anon', 'SET') as anon_set,
   pg_catalog.pg_has_role(current_user, 'authenticated', 'SET') as authenticated_set,
   pg_catalog.pg_has_role(current_user, 'service_role', 'SET') as service_role_set,
-  pg_catalog.pg_has_role('authenticator', current_user, 'SET') as authenticator_can_set_caller,
-  pg_catalog.pg_has_role('anon', current_user, 'SET') as anon_can_set_caller,
-  pg_catalog.pg_has_role('authenticated', current_user, 'SET') as authenticated_can_set_caller,
-  pg_catalog.pg_has_role('service_role', current_user, 'SET') as service_role_can_set_caller
-from pg_catalog.pg_roles as caller_role
+  pg_catalog.pg_has_role('authenticator', current_user, 'SET') as authenticator_can_set_runtime,
+  pg_catalog.pg_has_role('anon', current_user, 'SET') as anon_can_set_runtime,
+  pg_catalog.pg_has_role('authenticated', current_user, 'SET') as authenticated_can_set_runtime,
+  pg_catalog.pg_has_role('service_role', current_user, 'SET') as service_role_can_set_runtime
+from pg_catalog.pg_roles as runtime_role
+join pg_catalog.pg_roles as caller_role
+  on caller_role.rolname =
+    '${CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RUNNER_TERMINAL_CALLER_ROLE}'
+join pg_catalog.pg_auth_members as membership
+  on membership.member = runtime_role.oid
+ and membership.roleid = caller_role.oid
 join pg_catalog.pg_roles as attested_executor_role
   on attested_executor_role.rolname =
     '${CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RUNNER_TERMINAL_EXECUTOR_ROLE}'
-where caller_role.rolname = current_user` as const;
+where runtime_role.rolname = current_user` as const;
 
 export const CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RESOLVED_RUNTIME_RESET_IDENTITY_SQL =
   `select
@@ -740,7 +854,7 @@ export function createTestOnlyCaresLinkV1CommunicationNotePreviewResolvedRunnerT
     "callerCredentialResolver",
     "clock",
   ]);
-  if (options.capability !== "TEST_ONLY_M1J_RESOLVED_RUNTIME_BINDING") {
+  if (options.capability !== "TEST_ONLY_M1L_RESOLVED_RUNTIME_BINDING") {
     throw unavailable();
   }
   const verifiedAuthorization =
@@ -1283,16 +1397,10 @@ async function persistWithLease(
       ),
       lease,
     );
-    validateEmptyNormalizedQueryResult(
+    validateInheritedCallerIdentity(
       await queryBounded(
         DATABASE_SETTLEMENT_TIMEOUT_MS,
-        CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RESOLVED_RUNTIME_SET_ROLE_SQL,
-      ),
-    );
-    validateCallerIdentity(
-      await queryBounded(
-        DATABASE_SETTLEMENT_TIMEOUT_MS,
-        CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RESOLVED_RUNTIME_CALLER_IDENTITY_SQL,
+        CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RESOLVED_RUNTIME_INHERITED_CALLER_IDENTITY_SQL,
       ),
       lease,
       databaseSession,
@@ -1348,10 +1456,10 @@ async function persistWithLease(
       readClock(clock),
       1,
     );
-    validateCallerIdentity(
+    validateInheritedCallerIdentity(
       await queryBounded(
         DATABASE_SETTLEMENT_TIMEOUT_MS,
-        CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RESOLVED_RUNTIME_CALLER_IDENTITY_SQL,
+        CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RESOLVED_RUNTIME_INHERITED_CALLER_IDENTITY_SQL,
       ),
       lease,
       databaseSession,
@@ -1411,9 +1519,9 @@ function validateBaseIdentity(value: unknown, lease: ValidatedCallerLease) {
     row.database_name !== lease.databaseName ||
     row.postgres_major !== lease.postgresMajor ||
     row.transaction_isolation !== "read committed" ||
-    row.rolcanlogin !== true ||
+    row.rolcanlogin !== false ||
     row.rolsuper !== false ||
-    row.rolinherit !== false ||
+    row.rolinherit !== true ||
     row.rolcreaterole !== false ||
     row.rolcreatedb !== false ||
     row.rolreplication !== false ||
@@ -1421,16 +1529,18 @@ function validateBaseIdentity(value: unknown, lease: ValidatedCallerLease) {
     row.rolconnlimit !== 1 ||
     row.role_valid_until !== lease.expiresAt ||
     row.caller_member !== true ||
-    row.caller_set !== true ||
-    row.caller_inherited !== false ||
+    row.caller_set !== false ||
+    row.caller_inherited !== true ||
     row.direct_membership_count !== 1 ||
+    row.runtime_inbound_membership_count !== 1 ||
+    row.runtime_inbound_membership_posture !== true ||
     row.caller_membership_admin !== false ||
-    row.caller_membership_inherit !== false ||
-    row.caller_membership_set !== true ||
-    row.base_exact_rpc_executable !== false ||
-    row.base_generation_schema_usage !== false ||
+    row.caller_membership_inherit !== true ||
+    row.caller_membership_set !== false ||
+    row.base_exact_rpc_executable !== true ||
+    row.base_generation_schema_usage !== true ||
     row.base_generation_schema_create !== false ||
-    row.base_generation_executable_function_count !== 0 ||
+    row.base_generation_executable_function_count !== 1 ||
     row.base_generation_table_privilege_count !== 0 ||
     row.base_generation_sequence_privilege_count !== 0 ||
     row.executor_set !== false ||
@@ -1448,7 +1558,7 @@ function validateBaseIdentity(value: unknown, lease: ValidatedCallerLease) {
   return Object.freeze({ backendPid, transactionId });
 }
 
-function validateCallerIdentity(
+function validateInheritedCallerIdentity(
   value: unknown,
   lease: ValidatedCallerLease,
   expectedSession: Readonly<{ backendPid: number; transactionId: string }>,
@@ -1459,19 +1569,38 @@ function validateCallerIdentity(
   const transactionId = requireTransactionId(row.transaction_id);
   validateDatabaseLeaseTime(row.database_now, lease, minimumRemainingMs);
   if (
-    row.current_user !==
-      CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RUNNER_TERMINAL_CALLER_ROLE ||
+    row.current_user !== lease.runtimeRole ||
     row.session_user !== lease.runtimeRole ||
     backendPid !== expectedSession.backendPid ||
     transactionId !== expectedSession.transactionId ||
+    row.database_name !== lease.databaseName ||
+    row.postgres_major !== lease.postgresMajor ||
     row.transaction_isolation !== "read committed" ||
-    row.rolcanlogin !== false ||
-    row.rolsuper !== false ||
-    row.rolinherit !== false ||
-    row.rolcreaterole !== false ||
-    row.rolcreatedb !== false ||
-    row.rolreplication !== false ||
-    row.rolbypassrls !== false ||
+    row.runtime_rolcanlogin !== false ||
+    row.runtime_rolsuper !== false ||
+    row.runtime_rolinherit !== true ||
+    row.runtime_rolcreaterole !== false ||
+    row.runtime_rolcreatedb !== false ||
+    row.runtime_rolreplication !== false ||
+    row.runtime_rolbypassrls !== false ||
+    row.runtime_rolconnlimit !== 1 ||
+    row.runtime_role_valid_until !== lease.expiresAt ||
+    row.caller_rolcanlogin !== false ||
+    row.caller_rolsuper !== false ||
+    row.caller_rolinherit !== false ||
+    row.caller_rolcreaterole !== false ||
+    row.caller_rolcreatedb !== false ||
+    row.caller_rolreplication !== false ||
+    row.caller_rolbypassrls !== false ||
+    row.caller_member !== true ||
+    row.caller_set !== false ||
+    row.caller_inherited !== true ||
+    row.direct_membership_count !== 1 ||
+    row.runtime_inbound_membership_count !== 1 ||
+    row.runtime_inbound_membership_posture !== true ||
+    row.caller_membership_admin !== false ||
+    row.caller_membership_inherit !== true ||
+    row.caller_membership_set !== false ||
     row.executor_rolcanlogin !== false ||
     row.executor_rolsuper !== false ||
     row.executor_rolinherit !== false ||
@@ -1481,9 +1610,8 @@ function validateCallerIdentity(
     row.executor_rolbypassrls !== false ||
     row.executor_outbound_membership_count !== 0 ||
     row.executor_inbound_active_membership_count !== 0 ||
-    row.caller_membership_count !== 0 ||
+    row.caller_outbound_membership_count !== 0 ||
     row.non_runtime_inbound_active_membership_count !== 0 ||
-    row.session_runtime_can_set_caller !== true ||
     row.exact_rpc_executable !== true ||
     row.generation_schema_usage !== true ||
     row.generation_schema_create !== false ||
@@ -1501,10 +1629,10 @@ function validateCallerIdentity(
     row.anon_set !== false ||
     row.authenticated_set !== false ||
     row.service_role_set !== false ||
-    row.authenticator_can_set_caller !== false ||
-    row.anon_can_set_caller !== false ||
-    row.authenticated_can_set_caller !== false ||
-    row.service_role_can_set_caller !== false
+    row.authenticator_can_set_runtime !== false ||
+    row.anon_can_set_runtime !== false ||
+    row.authenticated_can_set_runtime !== false ||
+    row.service_role_can_set_runtime !== false
   ) {
     throw unavailable();
   }

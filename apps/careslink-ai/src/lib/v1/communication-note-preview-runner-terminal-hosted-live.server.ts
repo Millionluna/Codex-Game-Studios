@@ -14,6 +14,9 @@ import {
   createM1giAcceptedRunnerTerminalEnvelope,
   createM1ghRunnerTerminalTrustFixture,
 } from "./communication-note-preview-runner-terminal-trust-test-fixtures";
+import {
+  resolveTestOnlyCaresLinkV1CommunicationNotePreviewRunnerTerminalCallerIdentity,
+} from "./communication-note-preview-runner-terminal-trust-composition.server";
 import { CaresLinkV1ContractError } from "./shared-contracts";
 
 export const CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RUNNER_TERMINAL_HOSTED_LIVE_READY =
@@ -81,6 +84,12 @@ where authorization_record.authorization_digest = $1::pg_catalog.text` as const;
 const RUNTIME_BASE_IDENTITY_SQL = `select
   current_user,
   session_user,
+  pg_catalog.current_setting('statement_timeout') as statement_timeout,
+  pg_catalog.current_setting('lock_timeout') as lock_timeout,
+  pg_catalog.current_setting(
+    'idle_in_transaction_session_timeout'
+  ) as idle_in_transaction_session_timeout,
+  pg_catalog.current_setting('idle_session_timeout') as idle_session_timeout,
   pg_catalog.pg_has_role(
     current_user,
     'careslink_v1_preview_runner_terminal_caller',
@@ -140,6 +149,194 @@ export type CaresLinkV1CommunicationNotePreviewRunnerTerminalHostedLiveEvidence 
     acceptedNineKeyUsageVerified: true;
     receiptSixFactProjectionVerified: true;
   }>;
+
+export type CaresLinkV1CommunicationNotePreviewPreparedRuntimeBrokerHostedLiveGate =
+  Readonly<{
+    capability: "TEST_ONLY_PREPARED_RUNTIME_BROKER_HOSTED_LIVE_GATE";
+  }>;
+
+type HostedLiveFixture = ReturnType<
+  typeof createM1ghRunnerTerminalTrustFixture
+>;
+type PreparedRuntimeBrokerHostedLiveState = {
+  admin: CaresLinkV1CommunicationNotePreviewRunnerTerminalHostedLiveQueryPort;
+  expectedPostgresMajor: 16 | 17;
+  setupSql: string;
+  fixture: HostedLiveFixture;
+  state: "PREPARED" | "RUNNING" | "CONSUMED";
+};
+
+const PREPARED_RUNTIME_BROKER_HOSTED_LIVE_GATES = new WeakMap<
+  object,
+  PreparedRuntimeBrokerHostedLiveState
+>();
+
+export async function prepareTestOnlyCaresLinkV1CommunicationNotePreviewRuntimeBrokerHostedLiveGate(
+  value: unknown,
+): Promise<
+  Readonly<{
+    brokerBinding: Readonly<{
+      authorizationDigest: string;
+      runIdHash: string;
+      callerIdentityHmac: string;
+    }>;
+    prepared: CaresLinkV1CommunicationNotePreviewPreparedRuntimeBrokerHostedLiveGate;
+  }>
+> {
+  const options = exactDataRecord(value, [
+    "adminQueryPort",
+    "expectedPostgresMajor",
+    "setupSql",
+  ]);
+  const admin = requireQueryPort(options.adminQueryPort);
+  const expectedPostgresMajor = requirePostgresMajor(
+    options.expectedPostgresMajor,
+  );
+  const setupSql = adaptSetupSqlForRuntimeBroker(
+    requireSetupSql(options.setupSql),
+  );
+  try {
+    const initialClock = parseManagementClock(
+      await admin.query(DATABASE_CLOCK_SQL),
+      expectedPostgresMajor,
+    );
+    const fixture = createM1ghRunnerTerminalTrustFixture({ now: initialClock });
+    const callerIdentity =
+      resolveTestOnlyCaresLinkV1CommunicationNotePreviewRunnerTerminalCallerIdentity(
+        fixture.trustComposition,
+      );
+    if (!SHA256_PATTERN.test(callerIdentity.identityHmac)) {
+      throw failed(
+        "RUNNER_TERMINAL_HOSTED_LIVE_BROKER_BINDING_FAILED",
+      );
+    }
+    const prepared = Object.freeze({
+      capability:
+        "TEST_ONLY_PREPARED_RUNTIME_BROKER_HOSTED_LIVE_GATE" as const,
+    });
+    PREPARED_RUNTIME_BROKER_HOSTED_LIVE_GATES.set(prepared, {
+      admin,
+      expectedPostgresMajor,
+      setupSql,
+      fixture,
+      state: "PREPARED",
+    });
+    return Object.freeze({
+      brokerBinding: Object.freeze({
+        authorizationDigest:
+          fixture.verifiedAuthorization.authorizationDigest,
+        runIdHash: fixture.authorizationStatement.runIdHash,
+        callerIdentityHmac: callerIdentity.identityHmac,
+      }),
+      prepared,
+    });
+  } catch (error) {
+    if (isHostedLiveError(error)) throw error;
+    throw failed("RUNNER_TERMINAL_HOSTED_LIVE_PREPARE_FAILED");
+  }
+}
+
+export async function runTestOnlyCaresLinkV1CommunicationNotePreviewPreparedRuntimeBrokerHostedLiveGate(
+  value: unknown,
+): Promise<CaresLinkV1CommunicationNotePreviewRunnerTerminalHostedLiveEvidence> {
+  const options = exactDataRecord(value, [
+    "prepared",
+    "runtimeQueryPort",
+    "runtimeRole",
+  ]);
+  const runtime = requireQueryPort(options.runtimeQueryPort);
+  const runtimeRole = requireRuntimeRole(options.runtimeRole);
+  if (
+    !options.prepared ||
+    typeof options.prepared !== "object" ||
+    nodeTypes.isProxy(options.prepared)
+  ) {
+    throw failed("RUNNER_TERMINAL_HOSTED_LIVE_PREPARED_GATE_FAILED");
+  }
+  const prepared = PREPARED_RUNTIME_BROKER_HOSTED_LIVE_GATES.get(
+    options.prepared,
+  );
+  if (!prepared || prepared.state !== "PREPARED") {
+    throw failed("RUNNER_TERMINAL_HOSTED_LIVE_PREPARED_GATE_FAILED");
+  }
+  prepared.state = "RUNNING";
+  try {
+    await runSetupTransaction(prepared.admin, prepared.setupSql, [
+      [
+        "application_name",
+        CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RUNNER_TERMINAL_VALID_MANAGEMENT_APPLICATION_NAME,
+      ],
+      ["careslink.runner_terminal_valid.runtime_role", runtimeRole],
+      [
+        "careslink.runner_terminal_valid.expected_pg_major",
+        String(prepared.expectedPostgresMajor),
+      ],
+      [
+        "careslink.runner_terminal_valid.authorization_statement",
+        JSON.stringify(prepared.fixture.authorizationStatement),
+      ],
+      [
+        "careslink.runner_terminal_valid.authorization_signature",
+        prepared.fixture.authorizationSignature,
+      ],
+    ]);
+    const catalog = parseChainCatalog(
+      await prepared.admin.query(CHAIN_CATALOG_SQL, [
+        prepared.fixture.verifiedAuthorization.authorizationDigest,
+      ]),
+      prepared.fixture.verifiedAuthorization.authorizationDigest,
+      prepared.fixture.authorizationStatement.runIdHash,
+    );
+    const baseIdentity = singleDataRow(
+      await runtime.query(RUNTIME_BASE_IDENTITY_SQL),
+    );
+    if (
+      baseIdentity.current_user !== runtimeRole ||
+      baseIdentity.session_user !== runtimeRole ||
+      baseIdentity.caller_member !== true ||
+      baseIdentity.caller_set !== false ||
+      baseIdentity.caller_inherited !== true
+    ) {
+      throw failed(
+        "RUNNER_TERMINAL_HOSTED_LIVE_BROKER_RUNTIME_IDENTITY_FAILED",
+      );
+    }
+    if (
+      baseIdentity.statement_timeout !== "5s" ||
+      baseIdentity.lock_timeout !== "1s" ||
+      baseIdentity.idle_in_transaction_session_timeout !== "5s" ||
+      baseIdentity.idle_session_timeout !== "5s"
+    ) {
+      throw failed(
+        "RUNNER_TERMINAL_HOSTED_LIVE_BROKER_RUNTIME_SESSION_POSTURE_FAILED",
+      );
+    }
+    const callerIdentity = singleDataRow(
+      await runtime.query(RUNTIME_CALLER_IDENTITY_SQL),
+    );
+    if (
+      callerIdentity.current_user !== runtimeRole ||
+      callerIdentity.session_user !== runtimeRole ||
+      callerIdentity.exact_rpc_executable !== true ||
+      callerIdentity.generation_schema_create !== false
+    ) {
+      throw failed(
+        "RUNNER_TERMINAL_HOSTED_LIVE_BROKER_CALLER_IDENTITY_FAILED",
+      );
+    }
+    return await persistHostedLiveChain(
+      runtime,
+      prepared.fixture,
+      catalog,
+    );
+  } catch (error) {
+    if (isHostedLiveError(error)) throw error;
+    throw failed("RUNNER_TERMINAL_HOSTED_LIVE_BROKER_GATE_FAILED");
+  } finally {
+    prepared.state = "CONSUMED";
+    PREPARED_RUNTIME_BROKER_HOSTED_LIVE_GATES.delete(options.prepared);
+  }
+}
 
 export async function runTestOnlyCaresLinkV1CommunicationNotePreviewRunnerTerminalHostedLiveGate(
   value: unknown,
@@ -345,6 +542,124 @@ export async function runTestOnlyCaresLinkV1CommunicationNotePreviewRunnerTermin
       }
     }
   }
+}
+
+async function persistHostedLiveChain(
+  runtime: CaresLinkV1CommunicationNotePreviewRunnerTerminalHostedLiveQueryPort,
+  fixture: HostedLiveFixture,
+  catalog: ReturnType<typeof parseChainCatalog>,
+): Promise<CaresLinkV1CommunicationNotePreviewRunnerTerminalHostedLiveEvidence> {
+  const databasePort =
+    createTestOnlyCaresLinkV1CommunicationNotePreviewRunnerTerminalPostgresPort(
+      {
+        capability: "TEST_ONLY_RUNNER_TERMINAL_POSTGRES_PORT",
+        trustComposition: fixture.trustComposition,
+        queryPort: Object.freeze({
+          async query(
+            sql: typeof CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RUNNER_TERMINAL_POSTGRES_SQL,
+            values: readonly [unknown, string, string],
+          ) {
+            if (
+              sql !==
+              CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RUNNER_TERMINAL_POSTGRES_SQL
+            ) {
+              throw failed(
+                "RUNNER_TERMINAL_HOSTED_LIVE_QUERY_CONTRACT_FAILED",
+              );
+            }
+            const result = await runtime.query(sql, values);
+            return Object.freeze({ rows: result.rows });
+          },
+        }),
+      },
+    );
+  const runtimePort =
+    createTestOnlyCaresLinkV1CommunicationNotePreviewSignedRunnerTerminalRuntimePort(
+      {
+        capability: "TEST_ONLY_SIGNED_RUNNER_TERMINAL_RUNTIME_PORT",
+        trustComposition: fixture.trustComposition,
+        databasePort,
+        clock: Object.freeze({ now: () => catalog.databaseNow }),
+      },
+    );
+  const binding = Object.freeze({
+    claimId: catalog.claimId,
+    reservationId: catalog.reservationId,
+    receiptDigest: catalog.receiptDigest,
+    slotIndex: catalog.slotIndex,
+    fixtureId: catalog.fixtureId,
+    runOrdinal: catalog.runOrdinal,
+    observedAt: catalog.databaseNow,
+    requestBodySha256: catalog.requestBodySha256,
+    requestBodyUtf8ByteLength: catalog.requestBodyUtf8ByteLength,
+    semanticCanonicalRequestSha256:
+      catalog.semanticCanonicalRequestSha256,
+    receiptSignatureSha256: catalog.receiptSignatureSha256,
+    receiptUsage: catalog.receiptUsage,
+    calculatedCostUpperBoundMicroUsd:
+      catalog.calculatedCostUpperBoundMicroUsd,
+  });
+  const envelope = createM1giAcceptedRunnerTerminalEnvelope(fixture, {
+    ...binding,
+  });
+  let first;
+  let replay;
+  try {
+    first = await runtimePort.persist(envelope);
+  } catch {
+    throw failed("RUNNER_TERMINAL_HOSTED_LIVE_FIRST_PERSIST_FAILED");
+  }
+  try {
+    replay = await runtimePort.persist(envelope);
+  } catch {
+    throw failed("RUNNER_TERMINAL_HOSTED_LIVE_REPLAY_PERSIST_FAILED");
+  }
+  if (
+    first.created !== true ||
+    first.state !== "ACCEPTED" ||
+    first.continuationEligible !== true ||
+    first.status !== "RUNNER_TERMINAL_RECORDED" ||
+    replay.created !== false ||
+    replay.state !== "ACCEPTED" ||
+    replay.continuationEligible !== true ||
+    replay.status !== "ALREADY_RECORDED" ||
+    replay.runnerTerminalDigest !== first.runnerTerminalDigest ||
+    replay.recordedAt !== first.recordedAt
+  ) {
+    throw failed("RUNNER_TERMINAL_HOSTED_LIVE_REPLAY_FAILED");
+  }
+
+  const conflict = createM1giAcceptedRunnerTerminalEnvelope(fixture, {
+    ...binding,
+    totalTokensReconciliation: "CALCULATED",
+  });
+  let conflictRejected = false;
+  try {
+    await runtimePort.persist(conflict);
+  } catch (error) {
+    conflictRejected =
+      error instanceof CaresLinkV1ContractError &&
+      error.code === "IDEMPOTENCY_CONFLICT";
+  }
+  if (!conflictRejected) {
+    throw failed("RUNNER_TERMINAL_HOSTED_LIVE_CONFLICT_FAILED");
+  }
+
+  return Object.freeze({
+    ok: true as const,
+    terminalState: "ACCEPTED" as const,
+    failureReason: null,
+    continuationEligible: true as const,
+    firstCreated: true as const,
+    exactReplayCreated: false as const,
+    validConflictRejected: true as const,
+    conflictCode: "IDEMPOTENCY_CONFLICT" as const,
+    sourceTrustCompositionVerified: true as const,
+    actualRuntimeLoginQueryVerified: true as const,
+    finalExpectedLedgerCounts: Object.freeze([1, 0, 1, 1, 1, 1] as const),
+    acceptedNineKeyUsageVerified: true as const,
+    receiptSixFactProjectionVerified: true as const,
+  });
 }
 
 export async function runTestOnlyCaresLinkV1CommunicationNotePreviewRunnerTerminalHostedPostcheck(
@@ -766,6 +1081,47 @@ function requireSetupSql(value: unknown) {
     throw failed("RUNNER_TERMINAL_HOSTED_LIVE_SETUP_SQL_POLICY_FAILED");
   }
   return value;
+}
+
+function adaptSetupSqlForRuntimeBroker(setupSql: string) {
+  const replacements = Object.freeze([
+    Object.freeze([
+      "        and role_record.rolcanlogin\n",
+      "        and not role_record.rolcanlogin\n",
+    ] as const),
+    Object.freeze([
+      "        and not role_record.rolinherit\n",
+      "        and role_record.rolinherit\n",
+    ] as const),
+    Object.freeze([
+      "        and not membership.inherit_option\n",
+      "        and membership.inherit_option\n",
+    ] as const),
+    Object.freeze([
+      "        and membership.set_option\n",
+      "        and not membership.set_option\n",
+    ] as const),
+  ]);
+  let adapted = setupSql;
+  for (const [expected, replacement] of replacements) {
+    if (adapted.split(expected).length !== 2) {
+      throw failed(
+        "RUNNER_TERMINAL_HOSTED_LIVE_BROKER_SETUP_SQL_DRIFT",
+      );
+    }
+    adapted = adapted.replace(expected, replacement);
+  }
+  if (
+    adapted.includes("        and role_record.rolcanlogin\n") ||
+    adapted.includes("        and not role_record.rolinherit\n") ||
+    adapted.includes("        and not membership.inherit_option\n") ||
+    adapted.includes("        and membership.set_option\n")
+  ) {
+    throw failed(
+      "RUNNER_TERMINAL_HOSTED_LIVE_BROKER_SETUP_SQL_DRIFT",
+    );
+  }
+  return adapted;
 }
 
 function requirePostcheckSql(value: unknown) {
