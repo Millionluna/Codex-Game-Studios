@@ -118,6 +118,158 @@ not represented by placeholders in `.env.example`. A caller-supplied identity
 HMAC is correlation/scope evidence and must not be treated as database or Auth
 authentication.
 
+Communication Note M1g-d also adds no environment variable. Its server-only,
+pure `TEST_ONLY` validator accepts explicitly injected content-free candidate
+evidence and cross-binds M1g-b authorization, M1g-c custody, six provider
+evidence hashes, the exact 36-entry migration manifest and six database digest
+pins, four caller-identity candidates, receipt-key lifecycle/teardown and the
+18-review plan. It performs no environment
+lookup, fetch/SDK call, secret/KMS/HMAC resolver, database connection or hosted
+operation. A valid result remains `activationReady=false`; the live factory
+always throws, the existing eight readiness constants remain `false` and the
+existing six approved values remain `undefined`.
+
+All receipt/provider/database/review observations must equal the exact
+candidate/registry timestamp and follow authorization/credential issuance.
+Database target/Production project-reference HMACs share a declared
+purpose/version/key-reference and must differ, while every caller asserts no
+superuser/role/database/replication/bypass-RLS attributes, no extra membership
+and no direct table/sequence/function privilege. These are injected candidate
+claims only, not authenticated control-plane inventory or PostgreSQL catalog
+evidence; no environment variable can upgrade them into activation authority.
+
+Its preflight version and literal policy digest are
+`preflight.communication.openai.synthetic-preview.2026-08-29.m1g-d.v2` and
+`791a4d893afd4e490ab0164a8f604589bcf8015d25e5723b4df210f8c0b44f67`.
+They are source-integrity bindings, not configuration or approval.
+
+The M1g-d service-account descriptor states
+`providerEnforcedExpiry=ABSENT`. Its `operationalExpiresAt` and `teardownBy`
+timestamps are CaresLink-controlled deletion deadlines, not a provider TTL and
+not authorization to resolve the credential. The US$0.25 provider hard spend
+limit requires a monthly interval and enforcing status, but remains a defence-
+in-depth control rather than the per-run cap; the separate
+six-slot, one-attempt, no-retry/no-fallback 250,000-micro-USD application limit
+still applies. No M1g-d value belongs in `.env.example`, and no ordinary
+environment variable can remove its five fixed activation blockers.
+
+Communication Note M1g-e also adds no environment variable or secret name.
+Its policy version
+`coordinator.communication.openai.synthetic-preview.2026-08-29.m1g-e.v2` and
+digest
+`4649f620bc60425d5ca40d308d167110befd4a29c772e9877ddbeac5eaaa3531`
+are literal source-integrity bindings. They do not configure the registration,
+six-slot runner preflight, five-minute claim window, reservation/transport,
+receipt/persistence or runner-acceptance sequence. The only callable surface
+validates an explicitly injected, content-free test transcript. It does not
+resolve the M1g-c database identities, claim token, HMAC keys, receipt private
+key, OpenAI credential or Supabase target; it does not call a database, KMS,
+provider or transport. The live coordinator factory always throws.
+
+Communication Note M1g-f likewise adds no environment variable or secret name.
+Its terminal policy version
+`policy.communication.openai.synthetic-preview.runner-terminal.2026-08-29.m1g-f.v1`
+and digest
+`4f38d9ea27e9673138350ecdbc294e14e200cd09247f07244433a51cb62f6f5a`
+bind a source-only database contract. The terminal executor has no fifth caller,
+login, credential, membership or runtime execute authority. No environment
+value can manufacture those missing custody/runtime boundaries or a trusted
+terminal row; `DURABLE_RUNNER_TERMINAL_STATE_ABSENT` remains a runtime-evidence
+blocker, not configuration.
+
+No environment value may supply or infer a database-attested reservation
+timestamp. The M1g-f source migration returns the stored `reserved_at`, but no
+trusted runtime invokes that result or supplies it to M1g-e. M1g-e output remains
+`coordinatorReady=false`, `activationReady=false` and
+`dispatchCapability=ABSENT`, with pre-run approval and post-run acceptance
+false. Nothing from this batch belongs in `.env.example`.
+
+Communication Note M1g-g is the source-only successor to M1g-f and also adds
+no environment variable or secret name. It selects an independent Ed25519
+terminal trust root with purpose `CARESLINK_RUNNER_TERMINAL` and domain
+`CARESLINK_COMMUNICATION_NOTE_PREVIEW_RUNNER_TERMINAL`, adds the fifth dormant
+`careslink_v1_preview_runner_terminal_caller` shell and replaces the unsigned
+two-argument terminal RPC with the signed three-argument boundary. The new
+signed-terminal runtime and PostgreSQL ports accept only explicitly injected
+test dependencies; they create no connection, inspect no environment and
+resolve no key, credential or HMAC secret.
+
+The terminal private signing key must not be exported into an ordinary
+environment variable. A string in the environment cannot become an approved
+purpose-scoped signing-key snapshot, M1g-c custody/trust-registry observation
+or valid signature. Likewise, a database username/password or token value in
+the environment cannot create the reviewed login identity, fifth-caller role
+membership, exact target binding, rotation or teardown evidence. The verifier
+identity HMAC is only a scope/correlation binding; an arbitrary hexadecimal
+environment value cannot authenticate a caller or activate the RPC. None of
+these categories may be inferred from `OPENAI_API_KEY`, a Supabase service-role
+key or an existing feature flag, and no placeholder for them belongs in
+`.env.example`.
+
+M1g-g remains default-off because its test-only signing-key snapshot is not yet
+cross-bound to a validated live M1g-c custody/trust-registry resolver and its
+verifier HMAC is not cross-bound to a fifth-caller credential/identity
+resolver. These are activation blockers that require a separately reviewed
+resolver and identity-provisioning batch; environment configuration cannot
+close them. The fixed terminal, custody, derived preflight and coordinator
+digests are respectively
+`d0ac3b14ceb97535cfed935250566b59d8ac42a93123a750d3a686102a8d1cfa`,
+`f537dc64e3c57a34b6db6d0d1c871c38a70bcb51c4d071e625b026f840a309ca`,
+`491481513a67198cba91babc3c172fc1f326f9ee7bdd883b3d1208c639bdaf73`
+and
+`f6609c2f357b5fda92ae5aa1b459dfb1e32b7893c3e8436e0e94a8ffa2bbe675`;
+they are source-integrity bindings, not configuration or approval. No Hosted,
+provider/model, deployment or Production capability is introduced.
+
+Communication Note M1g-h adds no persistent environment variable, secret name
+or `.env.example` entry. Its disposable-Preview commands take four explicit
+CLI-only assertions: the expected Preview ref, expected PostgreSQL major, an
+absolute CA path and the expected CA SHA-256. For the recorded attempt those
+were `hspkccjobyqmoomiidjp`, `17`,
+`/Users/milliohusky/Downloads/prod-ca-2021.crt` and
+`700723581420dd1ac98fd7e9ac529f0ef210eadcaf87fc868a3ad7d114c2f3b7`.
+They are invocation evidence, not product configuration, approval or a secret
+resolver.
+
+Bounded Supabase branch JSON enters through stdin only. Credential-bearing
+child configuration enters through an anonymous fd3 pipe and process memory,
+and the one-test worker receives a strict environment allowlist. Ambient `PG*`
+values, `NODE_TLS_REJECT_UNAUTHORIZED=0`, Production/mismatched refs and
+unverified CA bytes fail closed. The random database password exists only in
+memory and belongs to a short-lived role that the harness is designed to set
+`NOLOGIN`, drain, revoke and drop.
+
+The Hosted sequence stopped before creating that role and the whole no-data
+Preview was deleted. No branch JSON, URL, password or certificate body was
+written to an environment file or evidence document. Registry/composition
+statuses remain test-only, readiness remains `false`, and an environment value
+cannot manufacture an approved trust registry, custody provenance, signing key,
+database identity or passing Hosted gate. Detailed boundaries are in
+`documentation/communication-note-preview-hosted-runner-terminal-identity-m1g-h.md`.
+
+Communication Note M1g-i adds no product/deployment environment variable,
+secret name or `.env.example` entry. Its one-shot test parent creates only
+process-local enable, fd3 config and fd4 fixed-status variables for the scrubbed
+child, and no credential is placed in an environment variable. Its migration
+and fixed-stage rollback diagnostics change only the source/database contract
+and test evidence. Transactional migration policy
+`2026-08-29.preview-transactional-migrations.6` has manifest digest
+`60314eb32f7ac26027862e30b27e60460cf4d17d49061126f4366b08a0cbd3a2`;
+disposable identity policy `2026-08-29.preview-runner-terminal-identity.2`
+cross-binds a healthy, no-data, non-default, non-persistent Preview, its exact
+Production parent and its credential target before credentials, CA bytes or a
+connection may be used. These are test invocation policies, not environment
+configuration. The preflight version
+`preflight.communication.openai.synthetic-preview.2026-08-29.m1g-i.v5` with
+digest `0e2582040995753efe95baa071fee4e0b58fa105c79db8bfa673abd66e2d01a1`
+and coordinator version
+`coordinator.communication.openai.synthetic-preview.2026-08-29.m1g-i.v5` with
+digest `1f93fa2c0ba207a28cb706d922acc10bba8305f16c83c7973c70ae4d7ac7e5c2`
+are source-integrity pins, not runtime configuration or approval. No
+environment value can replace the still-absent live trust/custody and caller
+credential resolvers. Readiness remains `false` and approved values remain
+`undefined`.
+
 ## Current auth, URL and feature variables
 
 | Variable | Class | Purpose | Boundary |

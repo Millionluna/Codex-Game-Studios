@@ -11,10 +11,19 @@ import {
   type CaresLinkV1CommunicationNotePreviewTrustedSigningKey,
   type CaresLinkV1VerifiedCommunicationNotePreviewAuthorization,
 } from "./communication-note-preview-execution-authority.server";
+import {
+  validateTestOnlyCaresLinkV1CommunicationNotePreviewRunnerTerminalTrustedSigningKey,
+  type CaresLinkV1CommunicationNotePreviewRunnerTerminalTrustedSigningKey,
+} from "./communication-note-preview-runner-terminal-policy.server";
 import { CaresLinkV1ContractError } from "./shared-contracts";
 
+const MAXIMUM_PLAIN_DATA_ARRAY_LENGTH = 256;
+const MAXIMUM_PLAIN_DATA_OBJECT_KEY_COUNT = 256;
+const MAXIMUM_PLAIN_DATA_DEPTH = 32;
+const MAXIMUM_PLAIN_DATA_NODE_COUNT = 4_096;
+
 export const CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_KEY_CUSTODY_VERSION =
-  "custody.communication.openai.synthetic-preview.2026-08-28.m1g-c.v1" as const;
+  "custody.communication.openai.synthetic-preview.2026-08-29.m1g-g.v2" as const;
 export const CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_KEY_CUSTODY_READY =
   false as const;
 export const CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_CALLER_IDENTITIES_READY =
@@ -32,6 +41,8 @@ export const CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_CUSTODY_RPC_NAMES =
       "reserve_communication_note_preview_dispatch",
     persistReceipt:
       "persist_verified_communication_note_preview_dispatch_receipt",
+    persistRunnerTerminal:
+      "persist_verified_communication_note_preview_runner_terminal",
   } as const);
 
 export const CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_EXECUTOR_ROLES =
@@ -39,6 +50,7 @@ export const CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_EXECUTOR_ROLES =
     authorization: "careslink_v1_preview_authorization_executor",
     dispatch: "careslink_v1_preview_dispatch_executor",
     receipt: "careslink_v1_preview_receipt_executor",
+    runnerTerminal: "careslink_v1_preview_runner_terminal_executor",
   } as const);
 
 export const CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_CALLER_MAPPINGS =
@@ -86,6 +98,16 @@ export const CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_CALLER_MAPPINGS =
           .persistReceipt,
       ],
     },
+    {
+      purpose: "RUNNER_TERMINAL_PERSISTENCE",
+      callerRole: "careslink_v1_preview_runner_terminal_caller",
+      executorRole:
+        CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_EXECUTOR_ROLES.runnerTerminal,
+      rpcNames: [
+        CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_CUSTODY_RPC_NAMES
+          .persistRunnerTerminal,
+      ],
+    },
   ] as const);
 
 export const CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_IDENTITY_HMAC_VERSION =
@@ -123,6 +145,15 @@ const KEY_CUSTODY_POLICY_CORE = deepFreeze({
     exportAllowed: false,
     genericSigning: "PROHIBITED",
   },
+  runnerTerminalSigning: {
+    purpose: "CARESLINK_RUNNER_TERMINAL",
+    signingScope: "CARESLINK_PREVIEW_RUNNER_TERMINAL_DOMAIN_ONLY",
+    privateKeyMaterialPresent: false,
+    nonExportable: true,
+    exportAllowed: false,
+    genericSigning: "PROHIBITED",
+    signerSeparation: "DISTINCT_FROM_OWNER_AND_RECEIPT_SIGNERS",
+  },
   providerCredential: {
     credentialType: "PROJECT_SERVICE_ACCOUNT_API_KEY",
     administrationAllowed: false,
@@ -156,7 +187,7 @@ export type CaresLinkV1CommunicationNotePreviewKeyCustodyPolicy =
   typeof KEY_CUSTODY_POLICY_CORE & Readonly<{ policyDigest: string }>;
 
 export const CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_KEY_CUSTODY_POLICY_DIGEST =
-  "1f7a3c586155fb4246e40207136cc1e521daedf6f2d01d1f89f7beebfad66438" as const;
+  "f537dc64e3c57a34b6db6d0d1c871c38a70bcb51c4d071e625b026f840a309ca" as const;
 
 if (
   createCanonicalSha256(KEY_CUSTODY_POLICY_CORE) !==
@@ -190,6 +221,19 @@ type ReceiptSignerCustody = Readonly<{
   nonExportable: true;
   exportAllowed: false;
   signingScope: "CARESLINK_PREVIEW_RECEIPT_DOMAIN_ONLY";
+  genericSigning: "PROHIBITED";
+}>;
+
+type RunnerTerminalSignerCustody = Readonly<{
+  trustedSigningKey:
+    CaresLinkV1CommunicationNotePreviewRunnerTerminalTrustedSigningKey;
+  keyIdHash: string;
+  publicKeySha256: string;
+  custodyReferenceSha256: string;
+  privateKeyMaterialPresent: false;
+  nonExportable: true;
+  exportAllowed: false;
+  signingScope: "CARESLINK_PREVIEW_RUNNER_TERMINAL_DOMAIN_ONLY";
   genericSigning: "PROHIBITED";
 }>;
 
@@ -256,6 +300,7 @@ export type CaresLinkV1CommunicationNotePreviewKeyCustodySnapshot =
     }>;
     ownerTrustRegistry: OwnerTrustRegistrySnapshot;
     receiptSigner: ReceiptSignerCustody;
+    runnerTerminalSigner: RunnerTerminalSignerCustody;
     providerCredential: ProjectCredentialCustody;
     hmacDomains: Readonly<{
       callerIdentity: HmacDomainCustody;
@@ -315,6 +360,7 @@ function validateSnapshot(
     "authorizationBinding",
     "ownerTrustRegistry",
     "receiptSigner",
+    "runnerTerminalSigner",
     "providerCredential",
     "hmacDomains",
     "callers",
@@ -377,6 +423,18 @@ function validateSnapshot(
   ) {
     throw unavailable();
   }
+  const runnerTerminalSigner = validateRunnerTerminalSigner(
+    object.runnerTerminalSigner,
+    now,
+  );
+  if (
+    Date.parse(runnerTerminalSigner.trustedSigningKey.notBefore) >
+      Date.parse(verifiedAuthorization.statement.issuedAt) ||
+    Date.parse(runnerTerminalSigner.trustedSigningKey.expiresAt) <
+      Date.parse(verifiedAuthorization.statement.expiresAt)
+  ) {
+    throw unavailable();
+  }
   const providerCredential = validateProviderCredential(
     object.providerCredential,
     now,
@@ -392,6 +450,7 @@ function validateSnapshot(
   const custodyReferences = [
     ownerTrustRegistry.registryReferenceSha256,
     receiptSigner.custodyReferenceSha256,
+    runnerTerminalSigner.custodyReferenceSha256,
     providerCredential.credentialReferenceSha256,
     hmacDomains.callerIdentity.keyReferenceSha256,
     hmacDomains.providerCorrelation.keyReferenceSha256,
@@ -405,7 +464,17 @@ function validateSnapshot(
     hmacDomains.callerIdentity.purpose ===
       hmacDomains.providerCorrelation.purpose ||
     hmacDomains.callerIdentity.version ===
-      hmacDomains.providerCorrelation.version
+      hmacDomains.providerCorrelation.version ||
+    new Set([
+      createTextSha256(ownerTrustRegistry.trustedSigningKey.keyId),
+      receiptSigner.keyIdHash,
+      runnerTerminalSigner.keyIdHash,
+    ]).size !== 3 ||
+    new Set([
+      ownerTrustRegistry.trustedSigningKey.publicKeySha256,
+      receiptSigner.publicKeySha256,
+      runnerTerminalSigner.publicKeySha256,
+    ]).size !== 3
   ) {
     throw unavailable();
   }
@@ -420,6 +489,7 @@ function validateSnapshot(
     authorizationBinding,
     ownerTrustRegistry,
     receiptSigner,
+    runnerTerminalSigner,
     providerCredential,
     hmacDomains,
     callers,
@@ -598,6 +668,55 @@ function validateReceiptSigner(value: unknown, now: number) {
   });
 }
 
+function validateRunnerTerminalSigner(value: unknown, now: number) {
+  const object = exactDataRecord(value, [
+    "trustedSigningKey",
+    "keyIdHash",
+    "publicKeySha256",
+    "custodyReferenceSha256",
+    "privateKeyMaterialPresent",
+    "nonExportable",
+    "exportAllowed",
+    "signingScope",
+    "genericSigning",
+  ]);
+  if (
+    object.privateKeyMaterialPresent !== false ||
+    object.nonExportable !== true ||
+    object.exportAllowed !== false ||
+    object.signingScope !==
+      "CARESLINK_PREVIEW_RUNNER_TERMINAL_DOMAIN_ONLY" ||
+    object.genericSigning !== "PROHIBITED"
+  ) {
+    throw unavailable();
+  }
+  const trustedSigningKey =
+    validateTestOnlyCaresLinkV1CommunicationNotePreviewRunnerTerminalTrustedSigningKey(
+      object.trustedSigningKey,
+      { now: new Date(now).toISOString() },
+    );
+  const keyIdHash = requireSha256(object.keyIdHash);
+  const publicKeySha256 = requireSha256(object.publicKeySha256);
+  if (
+    keyIdHash !== createTextSha256(trustedSigningKey.keyId) ||
+    publicKeySha256 !== trustedSigningKey.publicKeySha256
+  ) {
+    throw unavailable();
+  }
+  return deepFreeze({
+    trustedSigningKey,
+    keyIdHash,
+    publicKeySha256,
+    custodyReferenceSha256: requireSha256(object.custodyReferenceSha256),
+    privateKeyMaterialPresent: false as const,
+    nonExportable: true as const,
+    exportAllowed: false as const,
+    signingScope:
+      "CARESLINK_PREVIEW_RUNNER_TERMINAL_DOMAIN_ONLY" as const,
+    genericSigning: "PROHIBITED" as const,
+  });
+}
+
 function validateProviderCredential(
   value: unknown,
   now: number,
@@ -720,7 +839,13 @@ function validateHmacDomain(
 }
 
 function validateCallers(value: unknown) {
-  if (!Array.isArray(value) || value.length !== 4) throw unavailable();
+  if (
+    !Array.isArray(value) ||
+    value.length !==
+      CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_CALLER_MAPPINGS.length
+  ) {
+    throw unavailable();
+  }
   return deepFreeze(
     CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_CALLER_MAPPINGS.map(
       (mapping, index) => validateCaller(value[index], mapping),
@@ -815,7 +940,19 @@ function exactDataRecord<const Key extends string>(
   return result;
 }
 
-function assertPlainDataTree(value: unknown, seen = new Set<object>()): void {
+function assertPlainDataTree(value: unknown): void {
+  assertPlainDataNode(
+    value,
+    { seen: new Set<object>(), nodeCount: 0 },
+    0,
+  );
+}
+
+function assertPlainDataNode(
+  value: unknown,
+  state: { seen: Set<object>; nodeCount: number },
+  depth: number,
+): void {
   if (
     value === null ||
     typeof value === "string" ||
@@ -827,15 +964,23 @@ function assertPlainDataTree(value: unknown, seen = new Set<object>()): void {
   if (
     !value ||
     typeof value !== "object" ||
-    seen.has(value) ||
     nodeTypes.isProxy(value)
   ) {
     throw unavailable();
   }
-  seen.add(value);
+  state.nodeCount += 1;
+  if (
+    depth > MAXIMUM_PLAIN_DATA_DEPTH ||
+    state.nodeCount > MAXIMUM_PLAIN_DATA_NODE_COUNT ||
+    state.seen.has(value)
+  ) {
+    throw unavailable();
+  }
+  state.seen.add(value);
   if (Array.isArray(value)) {
     if (
       Object.getPrototypeOf(value) !== Array.prototype ||
+      value.length > MAXIMUM_PLAIN_DATA_ARRAY_LENGTH ||
       Object.getOwnPropertySymbols(value).length !== 0
     ) {
       throw unavailable();
@@ -863,7 +1008,7 @@ function assertPlainDataTree(value: unknown, seen = new Set<object>()): void {
       ) {
         throw unavailable();
       }
-      assertPlainDataTree(descriptor.value, seen);
+      assertPlainDataNode(descriptor.value, state, depth + 1);
     }
     return;
   }
@@ -874,9 +1019,11 @@ function assertPlainDataTree(value: unknown, seen = new Set<object>()): void {
   ) {
     throw unavailable();
   }
-  for (const descriptor of Object.values(
-    Object.getOwnPropertyDescriptors(value),
-  )) {
+  const descriptors = Object.getOwnPropertyDescriptors(value);
+  if (Reflect.ownKeys(descriptors).length > MAXIMUM_PLAIN_DATA_OBJECT_KEY_COUNT) {
+    throw unavailable();
+  }
+  for (const descriptor of Object.values(descriptors)) {
     if (
       !descriptor.enumerable ||
       !("value" in descriptor) ||
@@ -885,7 +1032,7 @@ function assertPlainDataTree(value: unknown, seen = new Set<object>()): void {
     ) {
       throw unavailable();
     }
-    assertPlainDataTree(descriptor.value, seen);
+    assertPlainDataNode(descriptor.value, state, depth + 1);
   }
 }
 

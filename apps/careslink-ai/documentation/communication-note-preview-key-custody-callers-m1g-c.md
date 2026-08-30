@@ -1,5 +1,11 @@
 # Communication Note Preview key custody and callers M1g-c
 
+> Successor note (M1g-g, 2026-08-29): the current source contract extends
+> this historical four-caller baseline with an independently signed runner-
+> terminal envelope, separate terminal signer custody and a fifth purpose-
+> scoped `NOLOGIN` caller shell. See
+> `communication-note-preview-signed-runner-terminal-port-m1g-g.md`.
+
 ## Status
 
 M1g-c is a **source-only, default-off custody and least-privilege caller
@@ -235,3 +241,11 @@ bundles. A separately approved disposable synthetic Preview run still requires:
 
 Until all blockers are closed, the bounded evaluation cannot make a paid call,
 and no real care data is permitted.
+
+## Successor M1g-e
+
+The follow-on [M1g-e reserve-before-dispatch coordinator transcript
+contract](communication-note-preview-reserve-before-dispatch-coordinator-m1g-e.md)
+revalidates the injected M1g-c custody snapshot and verifies test-only receipt
+signatures, but resolves no managed key, credential or caller identity and
+creates no runtime capability.

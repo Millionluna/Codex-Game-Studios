@@ -1414,18 +1414,18 @@ describe("V1 Note registered-worker RPC shadow migration contract", () => {
       "eqqlvqqhvsogusqhzuaq",
       "deletion and exact id/ref absence were confirmed",
       "current post-r5 proowner-hardened BEGIN-through-ROLLBACK source",
-      "162857 bytes",
-      "1c30fd7a8604ec8a279ac8d8cf00155bf54801ee15d91dc8ecbc7bc9bc9cf859",
-      "source and static-contract evidence only",
-      "independent postcheck separately proved the same invariant",
+      "163950 bytes",
+      "ad3d5ffca482e76a530602c43ca16ad3adbbf9afb5742b156fe0b106044308cb",
+      "local PostgreSQL 16.15 and static-contract evidence only",
+      "independent postcheck separately proved the earlier invariant",
     ]) {
       expect(assertionHeader).toContain(marker);
     }
     expect(assertionBodyStart).toBeGreaterThanOrEqual(0);
-    expect(Buffer.byteLength(assertionBody, "utf8")).toBe(162_857);
+    expect(Buffer.byteLength(assertionBody, "utf8")).toBe(163_950);
     expect(
       createHash("sha256").update(assertionBody, "utf8").digest("hex"),
-    ).toBe("1c30fd7a8604ec8a279ac8d8cf00155bf54801ee15d91dc8ecbc7bc9bc9cf859");
+    ).toBe("ad3d5ffca482e76a530602c43ca16ad3adbbf9afb5742b156fe0b106044308cb");
     expect(assertions).toContain("transaction-only TEST_ONLY fixtures");
     expect(assertions).toContain("pg_get_function_identity_arguments");
     expect(assertions).toContain("aclexplode(");
@@ -1446,6 +1446,19 @@ describe("V1 Note registered-worker RPC shadow migration contract", () => {
       /(?:->>|#>>|#>)\s*'[^']+'\s*<>/,
     );
     expect(assertions).toContain("v_owner_extension_fixture_count bigint := 0");
+    for (const successorTable of [
+      "communication_note_preview_authorization_revocations",
+      "communication_note_preview_authorizations",
+      "communication_note_preview_claims",
+      "communication_note_preview_dispatch_receipts",
+      "communication_note_preview_dispatch_reservations",
+      "communication_note_preview_runner_terminals",
+    ]) {
+      expect(assertionBody).toContain(successorTable);
+    }
+    expect(normalizeSql(assertionBody)).toContain(
+      "column_metadata.table_name in ('admission_policy_bindings', 'attempts', 'jobs'",
+    );
     expect(normalizeSql(assertions)).toContain(
       normalizeSql(
         `if to_regclass('${schemaName}.admission_policy_bindings') is not null then execute 'alter table ${schemaName}.admission_policy_bindings ' || 'no force row level security'; execute 'select count(*) from ' || '${schemaName}.admission_policy_bindings' into v_owner_extension_fixture_count; execute 'alter table ${schemaName}.admission_policy_bindings ' || 'force row level security'; end if;`,

@@ -62,12 +62,15 @@
 -- deletion and exact id/ref absence were confirmed. Production was never a
 -- SQL target.
 -- The current post-r5 proowner-hardened BEGIN-through-ROLLBACK source is
--- 162857 bytes with SHA-256
--- 1c30fd7a8604ec8a279ac8d8cf00155bf54801ee15d91dc8ecbc7bc9bc9cf859.
+-- 163950 bytes with SHA-256
+-- ad3d5ffca482e76a530602c43ca16ad3adbbf9afb5742b156fe0b106044308cb.
 -- It moves the two migration-entry reader ownership checks from the one-time
--- postcheck into this committed suite. This exact augmented body has source and
--- static-contract evidence only until a fresh disposable Preview reruns it;
--- the deleted-r5 independent postcheck separately proved the same invariant.
+-- postcheck into this committed suite, recognizes the six later isolated
+-- Communication Note tables in the schema inventory and keeps the sensitive
+-- metadata scan scoped to the worker domain. This exact augmented body has
+-- local PostgreSQL 16.15 and static-contract evidence only until a fresh
+-- disposable Preview reruns it; the deleted-r5 independent postcheck
+-- separately proved the earlier invariant.
 
 \set ON_ERROR_STOP on
 
@@ -95,6 +98,7 @@ declare
   v_schema oid := to_regnamespace('careslink_v1_generation');
   v_actual text[];
   v_expected text[];
+  v_successor_table text;
 begin
   if current_setting('server_version_num')::integer < 160000 then
     raise exception 'worker RPC shadow requires PostgreSQL 16 or newer';
@@ -137,6 +141,24 @@ begin
       array_append(v_expected, 'worker_registration_retirements')
     ) as expected_table(table_name);
   end if;
+
+  foreach v_successor_table in array array[
+    'communication_note_preview_authorization_revocations',
+    'communication_note_preview_authorizations',
+    'communication_note_preview_claims',
+    'communication_note_preview_dispatch_receipts',
+    'communication_note_preview_dispatch_reservations',
+    'communication_note_preview_runner_terminals'
+  ] loop
+    if to_regclass(
+      format('careslink_v1_generation.%I', v_successor_table)
+    ) is not null then
+      v_expected := array_append(v_expected, v_successor_table);
+    end if;
+  end loop;
+  select array_agg(table_name order by table_name)
+  into v_expected
+  from unnest(v_expected) as expected_table(table_name);
 
   if v_actual is distinct from v_expected then
     raise exception 'worker RPC private table scope drifted: %', v_actual;
@@ -388,6 +410,13 @@ begin
     select 1
     from information_schema.columns as column_metadata
     where column_metadata.table_schema = 'careslink_v1_generation'
+      and column_metadata.table_name in (
+        'admission_policy_bindings', 'attempts', 'jobs', 'payload_grants',
+        'payload_policies', 'payload_purge_outbox', 'payloads',
+        'provider_evidence', 'provider_policies', 'settings',
+        'worker_policies', 'worker_registration_provider_policies',
+        'worker_registration_retirements', 'worker_registrations'
+      )
       and (
         column_metadata.column_name in (
           'cleaned_facts', 'facts', 'canonical_content', 'provider_output',

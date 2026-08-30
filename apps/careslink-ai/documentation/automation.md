@@ -181,6 +181,202 @@ full tests, TypeScript, lint, a 64/64-page Webpack production build and the
 PostgreSQL 16.15 dual-role-topology rollback gate passed. See
 `documentation/communication-note-preview-key-custody-callers-m1g-c.md`.
 
+M1g-d adds only a server-only, pure `TEST_ONLY` activation-preflight validator.
+Its policy digest is
+`791a4d893afd4e490ab0164a8f604589bcf8015d25e5723b4df210f8c0b44f67`.
+It cross-binds the M1g-b authorization, M1g-c custody snapshot, six pairwise-
+distinct provider evidence hashes, the exact 37-migration manifest and six
+artifact pins, four ordered caller-identity candidates, non-exportable receipt-key
+lifecycle/teardown evidence and the attributable 18-review plan. Evidence may
+be at most five minutes old; receipt, provider, database and review sections
+must share the exact candidate/registry observation and cannot predate the
+authorization or provider credential. A candidate may remain live for at most
+15 minutes without outliving the owner authorization. The database descriptor
+also requires one purpose/version/common-key-reference claim for distinct
+Preview and Production project-ref HMACs, and complete unprivileged caller-role
+and direct-ACL assertions. Those values remain injected candidate consistency,
+not independent control-plane or PostgreSQL-catalog attestation. Even a valid
+candidate returns `activationReady=false` with five fixed blockers. The
+existing eight readiness constants stay `false`, the existing six approved
+values stay `undefined`, and the live factory always throws.
+
+The provider credential has no asserted provider-enforced TTL:
+`operationalExpiresAt` and `teardownBy` are CaresLink operational controls only.
+The US$0.25 provider hard limit must report monthly interval and enforcing
+status; it is defence in depth, not the per-run cap
+and not a substitute for the six-slot/no-retry 250,000-micro-USD application
+ceiling. M1g-d adds no migration, environment lookup, fetch/SDK, resolver,
+database/Hosted action, route, deployment, paid call or Production capability.
+See
+`documentation/communication-note-preview-activation-preflight-m1g-d.md`.
+
+M1g-e adds a source-only reserve-before-dispatch **transcript validator**, not
+an automation runtime. Version
+`coordinator.communication.openai.synthetic-preview.2026-08-29.m1g-e.v2` and
+policy digest
+`4649f620bc60425d5ca40d308d167110befd4a29c772e9877ddbeac5eaaa3531`
+pin the future order: registered authorization candidate, exact six-slot runner
+preflight, then a fresh claim with at least five minutes of authorization life
+remaining. Each serial slot requires a claim/authorization/run-bound fresh
+reservation before optional transport, followed by a verified CaresLink-signed
+receipt and receipt-persistence candidate. A `COMPLETED` result may advance only
+after an explicit runner acceptance binds authorization/run/claim/reservation,
+receipt digest/signature, exact fixture/body/preflight/usage/cost, seven true
+critical checks and passed `en`/`zh-Hans`/`zh-Hant` reviews. Provider HTTP
+errors, ambiguous transport and local pre-dispatch aborts are terminal and
+cannot retry. An exact receipt-persistence replay proves only the same candidate
+record; it never re-authorizes transport.
+
+A provider-completed slot whose runner evidence, golden evaluation, human
+review or final report fails is represented by a mutually exclusive,
+parent/receipt-bound `RUNNER_SLOT_FAILED_TEST_CANDIDATE`; it is terminal and
+cannot retry or continue. M1g-f now defines the source-only durable terminal
+ledger and requires `COMPLETED + ACCEPTED` before a later reservation, but its
+executor has no runtime caller. The transcript state is still injected only, so
+`DURABLE_RUNNER_TERMINAL_STATE_ABSENT` remains a fixed runtime-evidence blocker.
+
+For `COMPLETED` and `PROVIDER_HTTP_ERROR`, receipt observation must remain within
+the policy's 30-second application-transcript candidate interval after transport
+entry. Delayed `TRANSPORT_AMBIGUOUS` remains allowed but terminal. Cross-role
+reuse is rejected across static evidence and client, transport, runner-provider,
+runner-candidate, receipt and fixture values. The runner provider-request hash
+and receipt correlation HMACs deliberately remain
+`UNATTESTED_NO_SHARED_IDENTIFIER`; neither attests the other.
+
+The validator reruns M1g-d and M1g-c validation and cryptographically verifies
+the injected Ed25519 receipt envelope, but all database event states remain
+explicitly unattested test claims. M1g-f makes
+`reserve_communication_note_preview_dispatch` return the database `reserved_at`
+value, but M1g-e has no runtime database port and never observes that result.
+The injected `databaseReservedAtCandidate` therefore cannot close the durable
+reservation binding, and `DATABASE_ATTESTED_RESERVED_AT_ABSENT` remains fixed.
+The same transcript cannot supply the absent durable runner terminal state;
+`DURABLE_RUNNER_TERMINAL_STATE_ABSENT` also remains fixed.
+M1g-e executes no callback, RPC, transport or signer; reads no environment;
+adds no migration or runtime importer; and leaves coordinator, activation,
+dispatch, pre-run approval and post-run acceptance closed. See
+`documentation/communication-note-preview-reserve-before-dispatch-coordinator-m1g-e.md`.
+
+M1g-f adds only a CLI-generated private-schema migration, rollback assertion
+and source policy. It creates no scheduled worker, queue, cron, Edge Function,
+login identity or automatic retry. Without a fifth purpose-scoped caller and
+reviewed runtime adapter, its terminal RPC cannot be reached by product code.
+See `documentation/communication-note-preview-durable-runner-terminal-m1g-f.md`.
+
+The historical M1g-g source-only checkpoint was the separately reviewed
+successor that filled those two contract shapes without activating automation.
+It chose an independent
+Ed25519 terminal trust root with purpose `CARESLINK_RUNNER_TERMINAL`, adds the
+fifth `NOLOGIN` caller shell and replaces the unsigned two-argument terminal
+RPC with the exact signed three-argument form
+`persist_verified_communication_note_preview_runner_terminal(jsonb,text,text)`.
+The caller gets only private-schema `USAGE` plus exact RPC `EXECUTE`; it has no
+login-capable member or executor-role membership. The caller identity HMAC is
+only a scope/correlation binding and never substitutes for the independently
+verified signature.
+
+The new signed-terminal runtime port verifies the envelope before persistence,
+and the PostgreSQL port can invoke only the exact parameterized function
+through an injected query capability. Both are test-only source ports: they do
+not construct a database connection, inspect environment variables, resolve a
+credential or signing key, schedule work, call a provider or expose a product
+runtime importer. Readiness remains `false` and approved ports/signing material
+remain absent. Its test-only signing-key snapshot is not cross-bound to a live
+M1g-c custody/trust-registry resolver, and its verifier HMAC is not cross-bound
+to a fifth-caller credential/identity resolver; these remain activation
+blockers rather than end-to-end automation evidence. At that historical
+checkpoint, the local PostgreSQL 16.15 gate clean-applied 38/38 migrations; the
+then-current migration and rollback-assertion SHA-256 values were
+`b095785331c848d02cabc417eb3131fe2f9328564abef6fc0dd35bccd2980c5a`
+and
+`f8e8307718e3bdf0835b93cdac075279ae4f5ba3dbab287af46e1280ce587ad5`.
+The then-revised preflight/coordinator bindings remained non-authoritative and
+used digests
+`491481513a67198cba91babc3c172fc1f326f9ee7bdd883b3d1208c639bdaf73`
+and
+`f6609c2f357b5fda92ae5aa1b459dfb1e32b7893c3e8436e0e94a8ffa2bbe675`.
+No Hosted Supabase action, real provider/model call, deployment or Production
+change occurred. See
+`documentation/communication-note-preview-signed-runner-terminal-port-m1g-g.md`.
+
+The historical M1g-h checkpoint composed those source ports with a
+content-free, branded test registry and a disposable-Preview identity harness.
+It was test orchestration, not a worker, queue, cron, retry loop or product
+automation. Registry and composition statuses remain
+`TEST_ONLY_VALIDATED_NOT_APPROVED` and
+`TEST_ONLY_COMPOSED_NOT_APPROVED`; live readiness stays `false` and all
+approved values stay absent.
+
+The local PostgreSQL 16.15 harness proved a source-valid signed
+`FAILED`/`CANCELLED` terminal, fresh insert, write-free exact replay, altered
+valid-signature conflict and final six-ledger counts `1/0/1/1/1/1`. The
+corresponding M1g-h Hosted run did not reach that terminal path: its preceding
+18-file rollback bundle returned `SCHEMA_ROLLBACK_ASSERTION_FAILED`, so the
+one-time LOGIN, no-write identity probe and signed runtime-to-PostgreSQL gate
+were skipped. The no-data Preview was deleted and Production remained healthy.
+`ACCEPTED` is still blocked by the source nine-key versus stored receipt
+six-key usage mismatch. No provider transport, model call, paid model spend,
+deployment, retained identity or automatic action occurred. See
+`documentation/communication-note-preview-hosted-runner-terminal-identity-m1g-h.md`.
+
+Current M1g-i closes that contract mismatch without activating automation. The
+signed terminal continues to carry nine exact usage keys; migration 39 removes
+only the three reconciliation labels for exact comparison with the receipt
+ledger's six facts and has SHA-256
+`3d2cc53df3cf17ea21a4f93aaf673f8e911fcc9a35b5309cf7c633c6802e448e`.
+Migrations 37 and 38 now keep their grants, locks and cleanup inside explicit
+repository transactions; their current SHA-256 values are
+`09e69476de4b5b1b925a281f2943ef541e289aab6bef60ad92aace14d0c6d432`
+and
+`4c13bf50d7866a4b948475b598bb1c103fb625e59824be98c4e272c659da283f`.
+The ordered migration entries SHA-256 is
+`a0ad14e88a2c10400c4d2e86ee8ca4c67768ee094f8002687dd33c333c045fa2`.
+Transactional policy `2026-08-29.preview-transactional-migrations.6` binds
+manifest
+`60314eb32f7ac26027862e30b27e60460cf4d17d49061126f4366b08a0cbd3a2`
+and removes only the 19 known explicit wrappers in memory before running the
+full chain in its own transaction.
+
+Identity policy `2026-08-29.preview-runner-terminal-identity.2` now requires a
+canonical in-memory `metadata` plus projected `credentials` envelope before the
+destructive reset runner can read the CA or connect. The target ref, credential
+ref, direct host and pooler user must cross-bind; metadata must have exact
+`with_data=false`, `is_default=false`, `persistent=false` and
+`status=ACTIVE_HEALTHY` values plus the source-pinned Production
+`parent_project_ref`. Rotated/default Production, another parent, data-bearing
+or persistent targets fail closed. Preflight/coordinator versions are now
+`preflight.communication.openai.synthetic-preview.2026-08-29.m1g-i.v5` and
+`coordinator.communication.openai.synthetic-preview.2026-08-29.m1g-i.v5`, with
+digests
+`0e2582040995753efe95baa071fee4e0b58fa105c79db8bfa673abd66e2d01a1`
+and
+`1f93fa2c0ba207a28cb706d922acc10bba8305f16c83c7973c70ae4d7ac7e5c2`.
+
+The current focused source gate passed 5 files / 79 tests plus targeted lint,
+Node syntax and diff checks. The complete current source gate then passed 172
+files / 2,321 tests, TypeScript, zero-warning ESLint, the 73-file adapter sync
+check and the 64/64-page Webpack build. A fresh isolated PostgreSQL 16.15 gate
+passed 39/39; migrations 37 and 38 were deliberately sent statement by
+statement without an ad hoc outer wrapper and succeeded through their repository
+transactions, A03 passed, and the final postcheck found zero terminal rows
+and zero residual `SET` membership edges. The earlier 172 files / 2,315 tests
+and deleted r20 Hosted result remain attributed only to artifact set `4e84823`.
+Exact-current execution source `02949d1a666fa8aa0496d3e995f1dd88c52a29a0`
+then passed a fresh no-data PostgreSQL 17 gate on deleted Preview
+`careslink-note-terminal-m1g-i-v5-r2-20260830` (id
+`0e63cac9-d1dc-4096-9f65-c36de91c85fa`; ref `yrsgxbxislyenblphfdl`): pinned
+19-row baseline, transactional 39/39 policy `.6`, A01–A18, identity `.2`,
+signed `ACCEPTED`/replay/`IDEMPOTENCY_CONFLICT`, independent 39-row plus
+`[1,0,1,1,1,1]` and zero-role/session postcheck, and final security/performance
+Advisors with 0 ERROR. The branch was deleted and three listings showed only
+default Production `ACTIVE_HEALTHY`. This closes exact-current Hosted evidence
+through the pinned repository runner; native Supabase CLI migration apply
+remains an unproved transport. Activation, dispatch and live resolver readiness
+remain false/absent; no worker, retry, provider transport, deployment or
+Production action is enabled.
+See
+`documentation/communication-note-preview-terminal-accepted-usage-m1g-i.md`.
+
 Supabase CLI 2.115.0 has since generated source-only migration `20260823213144_harden_v1_note_generation_registration_retention.sql`. It adds `attempts_registration_digest_idx` and the named `attempts_registration_catalog_fk` from `attempts.registration_digest` to `worker_registrations.registration_digest`, with update/delete `RESTRICT`, `NOT VALID` creation and explicit validation. It creates no seed, caller grant, runtime surface or Production change. Its local gate passed 39/39 focused contracts, the full 125-file / 1,381-test suite, lint, TypeScript, the 63/63-page production build, the 73-file Codex-adapter sync check and `git diff --check`. Deleted disposable `r22` then clean-applied the current manifest 15/15 and passed the seven rollback suites; the hosted registration-retention gate is now closed without enabling any runtime automation.
 
 ### PostgreSQL 16.15 local isolated gate — 2026-08-24

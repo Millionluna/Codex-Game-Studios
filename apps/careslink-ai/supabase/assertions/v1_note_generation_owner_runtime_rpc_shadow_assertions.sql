@@ -114,7 +114,14 @@ begin
     and relation.relkind = 'r';
 
   if v_actual is distinct from array[
-    'admission_policy_bindings', 'attempts', 'jobs', 'payload_grants',
+    'admission_policy_bindings', 'attempts',
+    'communication_note_preview_authorization_revocations',
+    'communication_note_preview_authorizations',
+    'communication_note_preview_claims',
+    'communication_note_preview_dispatch_receipts',
+    'communication_note_preview_dispatch_reservations',
+    'communication_note_preview_runner_terminals',
+    'jobs', 'payload_grants',
     'payload_policies', 'payload_purge_outbox', 'payloads',
     'provider_evidence', 'provider_policies', 'settings', 'worker_policies',
     'worker_registration_provider_policies', 'worker_registration_retirements',

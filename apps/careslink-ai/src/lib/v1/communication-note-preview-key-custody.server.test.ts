@@ -38,8 +38,8 @@ vi.mock("server-only", () => ({}));
 
 const NOW = "2026-08-28T02:00:00.000Z";
 
-describe("Communication Note M1g-c key custody contract", () => {
-  it("stays source-only and literal-pins the M1g-b, five-RPC and three-executor boundary", () => {
+describe("Communication Note M1g-g key custody contract", () => {
+  it("stays source-only and literal-pins the M1g-b, six-RPC and four-executor boundary", () => {
     expect([
       CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_KEY_CUSTODY_READY,
       CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_CALLER_IDENTITIES_READY,
@@ -48,12 +48,12 @@ describe("Communication Note M1g-c key custody contract", () => {
       CARESLINK_V1_COMMUNICATION_NOTE_APPROVED_KEY_CUSTODY_SNAPSHOT,
     ).toBeUndefined();
     expect(CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_KEY_CUSTODY_VERSION).toBe(
-      "custody.communication.openai.synthetic-preview.2026-08-28.m1g-c.v1",
+      "custody.communication.openai.synthetic-preview.2026-08-29.m1g-g.v2",
     );
     expect(
       CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_KEY_CUSTODY_POLICY_DIGEST,
     ).toBe(
-      "1f7a3c586155fb4246e40207136cc1e521daedf6f2d01d1f89f7beebfad66438",
+      "f537dc64e3c57a34b6db6d0d1c871c38a70bcb51c4d071e625b026f840a309ca",
     );
     expect(
       CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_KEY_CUSTODY_POLICY
@@ -63,12 +63,12 @@ describe("Communication Note M1g-c key custody contract", () => {
       Object.values(
         CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_CUSTODY_RPC_NAMES,
       ),
-    ).toHaveLength(5);
+    ).toHaveLength(6);
     expect(
       Object.values(CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_EXECUTOR_ROLES),
-    ).toHaveLength(3);
+    ).toHaveLength(4);
     expect(CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_CALLER_MAPPINGS).toHaveLength(
-      4,
+      5,
     );
     expect(
       CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_CALLER_MAPPINGS.flatMap(
@@ -85,6 +85,18 @@ describe("Communication Note M1g-c key custody contract", () => {
       callerLogin: false,
       executorMembershipEnabled: false,
       dataApiAccess: false,
+    });
+    expect(
+      CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_KEY_CUSTODY_POLICY
+        .runnerTerminalSigning,
+    ).toEqual({
+      purpose: "CARESLINK_RUNNER_TERMINAL",
+      signingScope: "CARESLINK_PREVIEW_RUNNER_TERMINAL_DOMAIN_ONLY",
+      privateKeyMaterialPresent: false,
+      nonExportable: true,
+      exportAllowed: false,
+      genericSigning: "PROHIBITED",
+      signerSeparation: "DISTINCT_FROM_OWNER_AND_RECEIPT_SIGNERS",
     });
     expect(
       Object.isFrozen(
@@ -114,6 +126,13 @@ describe("Communication Note M1g-c key custody contract", () => {
       signingScope: "CARESLINK_PREVIEW_RECEIPT_DOMAIN_ONLY",
       genericSigning: "PROHIBITED",
     });
+    expect(result.runnerTerminalSigner).toMatchObject({
+      privateKeyMaterialPresent: false,
+      nonExportable: true,
+      exportAllowed: false,
+      signingScope: "CARESLINK_PREVIEW_RUNNER_TERMINAL_DOMAIN_ONLY",
+      genericSigning: "PROHIBITED",
+    });
     expect(result.providerCredential).toMatchObject({
       credentialType: "PROJECT_SERVICE_ACCOUNT_API_KEY",
       administrationAllowed: false,
@@ -130,6 +149,9 @@ describe("Communication Note M1g-c key custody contract", () => {
     expect(Object.isFrozen(result)).toBe(true);
     expect(Object.isFrozen(result.callers)).toBe(true);
     expect(Object.isFrozen(result.receiptSigner.trustedSigningKey)).toBe(true);
+    expect(
+      Object.isFrozen(result.runnerTerminalSigner.trustedSigningKey),
+    ).toBe(true);
     const serialized = JSON.stringify(result);
     for (const forbidden of [
       '"apiKey":',
@@ -244,7 +266,7 @@ describe("Communication Note M1g-c key custody contract", () => {
     }
   });
 
-  it("reuses the M1g-b owner and receipt public-key purpose, fingerprint and lifetime checks", () => {
+  it("enforces owner, receipt and runner-terminal public-key purpose, fingerprint and lifetime checks", () => {
     const fixture = createFixture();
     const { publicKey: rsaPublicKey } = generateKeyPairSync("rsa", {
       modulusLength: 2_048,
@@ -260,12 +282,46 @@ describe("Communication Note M1g-c key custody contract", () => {
       },
       {
         ...fixture.snapshot,
+        runnerTerminalSigner: {
+          ...fixture.snapshot.runnerTerminalSigner,
+          trustedSigningKey: {
+            ...fixture.snapshot.runnerTerminalSigner.trustedSigningKey,
+            publicKeySha256: hex("0"),
+          },
+        },
+      },
+      {
+        ...fixture.snapshot,
+        runnerTerminalSigner: {
+          ...fixture.snapshot.runnerTerminalSigner,
+          trustedSigningKey: {
+            ...fixture.snapshot.runnerTerminalSigner.trustedSigningKey,
+            expiresAt: "2026-08-28T02:00:00.000Z",
+          },
+        },
+      },
+      {
+        ...fixture.snapshot,
         receiptSigner: {
           ...fixture.snapshot.receiptSigner,
           trustedSigningKey: {
             ...fixture.snapshot.receiptSigner.trustedSigningKey,
             publicKeySha256: hex("0"),
           },
+        },
+      },
+      {
+        ...fixture.snapshot,
+        runnerTerminalSigner: {
+          ...fixture.snapshot.runnerTerminalSigner,
+          genericSigning: "ALLOWED",
+        },
+      },
+      {
+        ...fixture.snapshot,
+        runnerTerminalSigner: {
+          ...fixture.snapshot.runnerTerminalSigner,
+          privateKeyMaterialPresent: true,
         },
       },
       {
@@ -301,6 +357,78 @@ describe("Communication Note M1g-c key custody contract", () => {
         ),
       );
     }
+  });
+
+  it("requires owner, receipt and runner-terminal signer keys and custody references to be independent", () => {
+    const fixture = createFixture();
+    const ownerKey = fixture.snapshot.ownerTrustRegistry.trustedSigningKey;
+    expectFixedFailure(() =>
+      validateTestOnlyCaresLinkV1CommunicationNotePreviewKeyCustodySnapshot(
+        {
+          ...fixture.snapshot,
+          receiptSigner: {
+            ...fixture.snapshot.receiptSigner,
+            trustedSigningKey: {
+              ...fixture.snapshot.receiptSigner.trustedSigningKey,
+              keyId: ownerKey.keyId,
+              publicKeySpkiDerBase64: ownerKey.publicKeySpkiDerBase64,
+              publicKeySha256: ownerKey.publicKeySha256,
+            },
+            keyIdHash: sha256(ownerKey.keyId),
+            publicKeySha256: ownerKey.publicKeySha256,
+          },
+        },
+        {
+          now: NOW,
+          verifiedAuthorization: fixture.verifiedAuthorization,
+        },
+      ),
+    );
+
+    for (const reusedKey of [
+      ownerKey,
+      fixture.snapshot.receiptSigner.trustedSigningKey,
+    ]) {
+      expectFixedFailure(() =>
+        validateTestOnlyCaresLinkV1CommunicationNotePreviewKeyCustodySnapshot(
+          {
+            ...fixture.snapshot,
+            runnerTerminalSigner: {
+              ...fixture.snapshot.runnerTerminalSigner,
+              trustedSigningKey: {
+                ...fixture.snapshot.runnerTerminalSigner.trustedSigningKey,
+                keyId: reusedKey.keyId,
+                publicKeySpkiDerBase64: reusedKey.publicKeySpkiDerBase64,
+                publicKeySha256: reusedKey.publicKeySha256,
+              },
+              keyIdHash: sha256(reusedKey.keyId),
+              publicKeySha256: reusedKey.publicKeySha256,
+            },
+          },
+          {
+            now: NOW,
+            verifiedAuthorization: fixture.verifiedAuthorization,
+          },
+        ),
+      );
+    }
+
+    expectFixedFailure(() =>
+      validateTestOnlyCaresLinkV1CommunicationNotePreviewKeyCustodySnapshot(
+        {
+          ...fixture.snapshot,
+          runnerTerminalSigner: {
+            ...fixture.snapshot.runnerTerminalSigner,
+            custodyReferenceSha256:
+              fixture.snapshot.receiptSigner.custodyReferenceSha256,
+          },
+        },
+        {
+          now: NOW,
+          verifiedAuthorization: fixture.verifiedAuthorization,
+        },
+      ),
+    );
   });
 
   it("prohibits raw/exportable/admin/renewable/generic authority and scope drift", () => {
@@ -362,7 +490,7 @@ describe("Communication Note M1g-c key custody contract", () => {
     }
   });
 
-  it("requires four ordered exact caller mappings and pairwise-distinct identities and references", () => {
+  it("requires five ordered exact caller mappings and pairwise-distinct identities and references", () => {
     const fixture = createFixture();
     const duplicateIdentity = fixture.snapshot.callers.map((caller, index) =>
       index === 1
@@ -373,11 +501,11 @@ describe("Communication Note M1g-c key custody contract", () => {
         : caller,
     );
     const duplicateReference = fixture.snapshot.callers.map((caller, index) =>
-      index === 3
+      index === 4
         ? {
             ...caller,
             credentialReferenceSha256:
-              fixture.snapshot.callers[2].credentialReferenceSha256,
+              fixture.snapshot.callers[3].credentialReferenceSha256,
           }
         : caller,
     );
@@ -385,7 +513,7 @@ describe("Communication Note M1g-c key custody contract", () => {
       [...fixture.snapshot.callers].reverse(),
       duplicateIdentity,
       duplicateReference,
-      fixture.snapshot.callers.slice(0, 3),
+      fixture.snapshot.callers.slice(0, 4),
     ]) {
       expectFixedFailure(() =>
         validateTestOnlyCaresLinkV1CommunicationNotePreviewKeyCustodySnapshot(
@@ -449,7 +577,7 @@ describe("Communication Note M1g-c key custody contract", () => {
     );
   });
 
-  it("rejects accessors, proxies and extra credential material with one non-leaking error", () => {
+  it("rejects hostile shapes, excessive traversal and extra credential material with one non-leaking error", () => {
     const fixture = createFixture();
     const getter = vi.fn(() => 6);
     const accessor = structuredClone(fixture.snapshot);
@@ -498,6 +626,49 @@ describe("Communication Note M1g-c key custody contract", () => {
         },
       ),
     );
+
+    let deeplyNested: Record<string, unknown> = {};
+    for (let depth = 0; depth < 34; depth += 1) {
+      deeplyNested = { child: deeplyNested };
+    }
+    for (const providerCredential of [
+      {
+        ...fixture.snapshot.providerCredential,
+        deeplyNested,
+      },
+      {
+        ...fixture.snapshot.providerCredential,
+        excessiveObject: Object.fromEntries(
+          Array.from({ length: 257 }, (_, index) => [`key-${index}`, index]),
+        ),
+      },
+    ]) {
+      expectFixedFailure(() =>
+        validateTestOnlyCaresLinkV1CommunicationNotePreviewKeyCustodySnapshot(
+          { ...fixture.snapshot, providerCredential },
+          {
+            now: NOW,
+            verifiedAuthorization: fixture.verifiedAuthorization,
+          },
+        ),
+      );
+    }
+
+    expectFixedFailure(() =>
+      validateTestOnlyCaresLinkV1CommunicationNotePreviewKeyCustodySnapshot(
+        {
+          ...fixture.snapshot,
+          callers: Array.from(
+            { length: 257 },
+            () => fixture.snapshot.callers[0],
+          ),
+        },
+        {
+          now: NOW,
+          verifiedAuthorization: fixture.verifiedAuthorization,
+        },
+      ),
+    );
   });
 });
 
@@ -514,6 +685,7 @@ function validate(fixture: ReturnType<typeof createFixture>) {
 function createFixture() {
   const ownerSigner = createSigner("OWNER_AUTHORIZATION");
   const receiptSigner = createSigner("CARESLINK_DISPATCH_RECEIPT");
+  const runnerTerminalSigner = createRunnerTerminalSigner();
   const statement = createAuthorizationStatement(ownerSigner.trustedKey);
   const signature = signStatement(statement, ownerSigner.privateKey);
   const verifiedAuthorization =
@@ -562,6 +734,17 @@ function createFixture() {
       signingScope: "CARESLINK_PREVIEW_RECEIPT_DOMAIN_ONLY",
       genericSigning: "PROHIBITED",
     },
+    runnerTerminalSigner: {
+      trustedSigningKey: runnerTerminalSigner.trustedKey,
+      keyIdHash: sha256(runnerTerminalSigner.trustedKey.keyId),
+      publicKeySha256: runnerTerminalSigner.trustedKey.publicKeySha256,
+      custodyReferenceSha256: hex("3"),
+      privateKeyMaterialPresent: false,
+      nonExportable: true,
+      exportAllowed: false,
+      signingScope: "CARESLINK_PREVIEW_RUNNER_TERMINAL_DOMAIN_ONLY",
+      genericSigning: "PROHIBITED",
+    },
     providerCredential: {
       credentialType: "PROJECT_SERVICE_ACCOUNT_API_KEY",
       projectIdHmac: statement.environmentEvidence.openAiProjectIdHmac,
@@ -602,8 +785,8 @@ function createFixture() {
     callers: CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_CALLER_MAPPINGS.map(
       (mapping, index) => ({
         ...mapping,
-        identityHmac: hex(["a", "b", "c", "d"][index]),
-        credentialReferenceSha256: hex(String(index + 6)),
+        identityHmac: hex(["a", "b", "c", "d", "e"][index]),
+        credentialReferenceSha256: hex(["6", "7", "8", "9", "5"][index]),
         databaseLogin: false,
         executorMembershipEnabled: false,
         rawCredentialMaterialPresent: false,
@@ -611,7 +794,13 @@ function createFixture() {
       }),
     ),
   };
-  return { ownerSigner, receiptSigner, verifiedAuthorization, snapshot };
+  return {
+    ownerSigner,
+    receiptSigner,
+    runnerTerminalSigner,
+    verifiedAuthorization,
+    snapshot,
+  };
 }
 
 function createAuthorizationStatement(
@@ -701,6 +890,25 @@ function createSigner(
     privateKey,
     trustedKey:
       trustedKey satisfies CaresLinkV1CommunicationNotePreviewTrustedSigningKey,
+  };
+}
+
+function createRunnerTerminalSigner() {
+  const { publicKey, privateKey } = generateKeyPairSync("ed25519");
+  const publicKeyDer = publicKey.export({ format: "der", type: "spki" });
+  return {
+    privateKey,
+    trustedKey: {
+      keyId: "runner-terminal-preview-2026-08",
+      publicKeySpkiDerBase64: publicKeyDer.toString("base64"),
+      publicKeySha256: createHash("sha256").update(publicKeyDer).digest("hex"),
+      status: "ACTIVE" as const,
+      notBefore: "2026-08-28T01:00:00.000Z",
+      expiresAt: "2026-08-28T03:00:00.000Z",
+      purpose: "CARESLINK_RUNNER_TERMINAL" as const,
+      allowedDomain:
+        "CARESLINK_COMMUNICATION_NOTE_PREVIEW_RUNNER_TERMINAL" as const,
+    },
   };
 }
 

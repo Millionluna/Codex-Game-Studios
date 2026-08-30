@@ -967,10 +967,10 @@ describe("V1 Note owner runtime RPC shadow migration contract", () => {
     expect(assertionsPath).toBe(
       "supabase/assertions/v1_note_generation_owner_runtime_rpc_shadow_assertions.sql",
     );
-    expect(Buffer.byteLength(assertions, "utf8")).toBe(105_236);
+    expect(Buffer.byteLength(assertions, "utf8")).toBe(105_549);
     expect(
       createHash("sha256").update(assertions, "utf8").digest("hex"),
-    ).toBe("065550a45b1b68a38c536d27a2a54a87cb73bae03567b05eda095a92b1448ef3");
+    ).toBe("b699e5967fd487656dc34c398b61c464396b26d40d48fc1bfbe8c53f3c423a3b");
     for (const marker of [
       "Manual rollback-only assertions for a fresh disposable PostgreSQL 16+ database",
       "after every repository migration has been applied",
@@ -990,10 +990,10 @@ describe("V1 Note owner runtime RPC shadow migration contract", () => {
     expect(assertionBody.startsWith("begin;\n")).toBe(true);
     expect(assertionBody.endsWith("rollback;\n")).toBe(true);
     expect(assertionBody).not.toMatch(/^commit\s*;/im);
-    expect(Buffer.byteLength(assertionBody, "utf8")).toBe(104_193);
+    expect(Buffer.byteLength(assertionBody, "utf8")).toBe(104_506);
     expect(
       createHash("sha256").update(assertionBody, "utf8").digest("hex"),
-    ).toBe("9377611059f0f816a45edeb2c391a2905896e1534d37384047b06c5ca5b2946a");
+    ).toBe("53eb0f2c5265617f00ea37ab946ac9c9746589fddca39236279ba93bb2907b16");
 
     for (const marker of [
       "owner runtime RPC shadow requires PostgreSQL 16 or newer",
@@ -1037,6 +1037,16 @@ describe("V1 Note owner runtime RPC shadow migration contract", () => {
       expect(assertionBody).toContain(marker);
     }
     const normalizedAssertionBody = normalizeSql(assertionBody);
+    for (const successorTable of [
+      "communication_note_preview_authorization_revocations",
+      "communication_note_preview_authorizations",
+      "communication_note_preview_claims",
+      "communication_note_preview_dispatch_receipts",
+      "communication_note_preview_dispatch_reservations",
+      "communication_note_preview_runner_terminals",
+    ]) {
+      expect(normalizedAssertionBody).toContain(successorTable);
+    }
     for (const schema of [schemaName, "extensions", "public"]) {
       expect(normalizedAssertionBody).toContain(`('${schema}', 'USAGE')`);
     }

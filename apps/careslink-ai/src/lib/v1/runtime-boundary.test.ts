@@ -70,6 +70,13 @@ describe("V1 shadow runtime boundary", () => {
       "src/lib/v1/communication-note-preview-evaluation-runner.server.ts",
       "src/lib/v1/communication-note-preview-execution-authority.server.ts",
       "src/lib/v1/communication-note-preview-key-custody.server.ts",
+      "src/lib/v1/communication-note-preview-activation-preflight.server.ts",
+      "src/lib/v1/communication-note-preview-reserve-before-dispatch-coordinator.server.ts",
+      "src/lib/v1/communication-note-preview-runner-terminal-policy.server.ts",
+      "src/lib/v1/communication-note-preview-runner-terminal-trust-composition.server.ts",
+      "src/lib/v1/communication-note-preview-runner-terminal-trust-test-fixtures.ts",
+      "src/lib/v1/communication-note-preview-signed-runner-terminal-runtime-port.server.ts",
+      "src/lib/v1/communication-note-preview-runner-terminal-postgres.server.ts",
       "src/lib/v1/native-auth-boundary.server.ts",
       "src/lib/v1/openai-communication-note-provider.server.ts",
       "src/lib/v1/communication-note-provider-policy.ts",
@@ -154,9 +161,33 @@ describe("V1 shadow runtime boundary", () => {
       process.cwd(),
       "src/lib/v1/communication-note-preview-key-custody.server.test.ts",
     );
+    const activationPreflightModule = join(
+      process.cwd(),
+      "src/lib/v1/communication-note-preview-activation-preflight.server.ts",
+    );
+    const activationPreflightTest = join(
+      process.cwd(),
+      "src/lib/v1/communication-note-preview-activation-preflight.server.test.ts",
+    );
+    const coordinatorModule = join(
+      process.cwd(),
+      "src/lib/v1/communication-note-preview-reserve-before-dispatch-coordinator.server.ts",
+    );
+    const coordinatorTest = join(
+      process.cwd(),
+      "src/lib/v1/communication-note-preview-reserve-before-dispatch-coordinator.server.test.ts",
+    );
     const migrationContractTest = join(
       process.cwd(),
       "src/lib/v1/communication-note-preview-execution-authority-migration-contract.test.ts",
+    );
+    const trustCompositionModule = join(
+      process.cwd(),
+      "src/lib/v1/communication-note-preview-runner-terminal-trust-composition.server.ts",
+    );
+    const trustTestFixtures = join(
+      process.cwd(),
+      "src/lib/v1/communication-note-preview-runner-terminal-trust-test-fixtures.ts",
     );
     const importPattern =
       /(?:from\s+|import\s*\(|require\s*\()\s*["'][^"']*communication-note-preview-execution-authority\.server(?:\.(?:[cm]?[jt]s|[jt]sx))?["']/;
@@ -166,13 +197,25 @@ describe("V1 shadow runtime boundary", () => {
 
     expect(importers).toEqual([
       migrationContractTest,
+      activationPreflightModule,
+      activationPreflightTest,
       authorityTest,
+      coordinatorModule,
+      coordinatorTest,
       keyCustodyModule,
       keyCustodyTest,
+      trustCompositionModule,
+      trustTestFixtures,
     ].sort());
     expect(walkSourceFiles("src").filter((file) =>
       importPattern.test(readFileSync(file, "utf8")),
-    )).toEqual([keyCustodyModule]);
+    )).toEqual([
+      activationPreflightModule,
+      coordinatorModule,
+      keyCustodyModule,
+      trustCompositionModule,
+      trustTestFixtures,
+    ].sort());
   });
 
   it("quarantines M1g-c custody metadata from every controlled script and runtime importer", () => {
@@ -184,6 +227,30 @@ describe("V1 shadow runtime boundary", () => {
       process.cwd(),
       "src/lib/v1/communication-note-preview-key-custody.server.test.ts",
     );
+    const activationPreflightModule = join(
+      process.cwd(),
+      "src/lib/v1/communication-note-preview-activation-preflight.server.ts",
+    );
+    const activationPreflightTest = join(
+      process.cwd(),
+      "src/lib/v1/communication-note-preview-activation-preflight.server.test.ts",
+    );
+    const coordinatorModule = join(
+      process.cwd(),
+      "src/lib/v1/communication-note-preview-reserve-before-dispatch-coordinator.server.ts",
+    );
+    const coordinatorTest = join(
+      process.cwd(),
+      "src/lib/v1/communication-note-preview-reserve-before-dispatch-coordinator.server.test.ts",
+    );
+    const trustCompositionModule = join(
+      process.cwd(),
+      "src/lib/v1/communication-note-preview-runner-terminal-trust-composition.server.ts",
+    );
+    const trustTestFixtures = join(
+      process.cwd(),
+      "src/lib/v1/communication-note-preview-runner-terminal-trust-test-fixtures.ts",
+    );
     const importPattern =
       /(?:from\s+|import\s*\(|require\s*\()\s*["'][^"']*communication-note-preview-key-custody\.server(?:\.(?:[cm]?[jt]s|[jt]sx))?["']/;
     const importers = walkControlledScriptFiles().filter((file) =>
@@ -191,7 +258,19 @@ describe("V1 shadow runtime boundary", () => {
     );
     const source = readFileSync(custodyModule, "utf8");
 
-    expect(importers).toEqual([custodyTest]);
+    expect(importers).toEqual([
+      activationPreflightModule,
+      activationPreflightTest,
+      coordinatorModule,
+      coordinatorTest,
+      custodyTest,
+      trustCompositionModule,
+      trustTestFixtures,
+      join(
+        process.cwd(),
+        "src/lib/v1/communication-note-preview-runner-terminal-postgres.server.test.ts",
+      ),
+    ].sort());
     expect(walkSourceFiles("src/app").filter((file) =>
       importPattern.test(readFileSync(file, "utf8")),
     )).toEqual([]);
@@ -199,6 +278,247 @@ describe("V1 shadow runtime boundary", () => {
       importPattern.test(readFileSync(file, "utf8")),
     )).toEqual([]);
     expect(source).not.toMatch(/process\.env|fetch\s*\(|from\s+["']openai["']/);
+  });
+
+  it("quarantines the M1g-d activation preflight to the M1g-e source-only chain and tests", () => {
+    const preflightModule = join(
+      process.cwd(),
+      "src/lib/v1/communication-note-preview-activation-preflight.server.ts",
+    );
+    const preflightTest = join(
+      process.cwd(),
+      "src/lib/v1/communication-note-preview-activation-preflight.server.test.ts",
+    );
+    const coordinatorModule = join(
+      process.cwd(),
+      "src/lib/v1/communication-note-preview-reserve-before-dispatch-coordinator.server.ts",
+    );
+    const coordinatorTest = join(
+      process.cwd(),
+      "src/lib/v1/communication-note-preview-reserve-before-dispatch-coordinator.server.test.ts",
+    );
+    const importPattern =
+      /(?:from\s+|import\s*\(|require\s*\()\s*["'][^"']*communication-note-preview-activation-preflight\.server(?:\.(?:[cm]?[jt]s|[jt]sx))?["']/;
+    const importers = walkControlledScriptFiles().filter((file) =>
+      importPattern.test(readFileSync(file, "utf8")),
+    );
+    const source = readFileSync(preflightModule, "utf8");
+
+    expect(importers).toEqual([
+      coordinatorModule,
+      coordinatorTest,
+      preflightTest,
+    ].sort());
+    expect(walkSourceFiles("src/app").filter((file) =>
+      importPattern.test(readFileSync(file, "utf8")),
+    )).toEqual([]);
+    expect(walkSourceFiles("src/components").filter((file) =>
+      importPattern.test(readFileSync(file, "utf8")),
+    )).toEqual([]);
+    expect(source).not.toMatch(
+      /process\.env|fetch\s*\(|from\s+["'](?:openai|@supabase\/)[^"']*["']|SUPABASE_SERVICE_ROLE_KEY|NEXT_PUBLIC_/,
+    );
+    expect(source).toContain("activationReady: false");
+    expect(source).toContain(
+      "Communication Note preview activation preflight is unavailable",
+    );
+  });
+
+  it("quarantines the M1g-e coordinator transcript validator to its own test", () => {
+    const coordinatorModule = join(
+      process.cwd(),
+      "src/lib/v1/communication-note-preview-reserve-before-dispatch-coordinator.server.ts",
+    );
+    const coordinatorTest = join(
+      process.cwd(),
+      "src/lib/v1/communication-note-preview-reserve-before-dispatch-coordinator.server.test.ts",
+    );
+    const importPattern =
+      /(?:from\s+|import\s*\(|require\s*\()\s*["'][^"']*communication-note-preview-reserve-before-dispatch-coordinator\.server(?:\.(?:[cm]?[jt]s|[jt]sx))?["']/;
+    const importers = walkControlledScriptFiles().filter((file) =>
+      importPattern.test(readFileSync(file, "utf8")),
+    );
+    const source = readFileSync(coordinatorModule, "utf8");
+
+    expect(importers).toEqual([coordinatorTest]);
+    expect(walkSourceFiles("src/app").filter((file) =>
+      importPattern.test(readFileSync(file, "utf8")),
+    )).toEqual([]);
+    expect(walkSourceFiles("src/components").filter((file) =>
+      importPattern.test(readFileSync(file, "utf8")),
+    )).toEqual([]);
+    expect(source).not.toMatch(
+      /process\.env|fetch\s*\(|from\s+["'](?:openai|@supabase\/|node:(?:http|https|net|tls))[^"']*["']|SUPABASE_SERVICE_ROLE_KEY|NEXT_PUBLIC_/,
+    );
+    expect(source).not.toMatch(/callback|claimToken\s*:\s*(?:string|unknown)/i);
+    expect(source).toContain("coordinatorReady: false");
+    expect(source).toContain('dispatchCapability: "ABSENT"');
+    expect(source).toContain(
+      "Communication Note preview reserve-before-dispatch coordinator is unavailable",
+    );
+  });
+
+  it("quarantines the M1g-h runner-terminal trust composition and ports to exact source importers", () => {
+    const policyModule = join(
+      process.cwd(),
+      "src/lib/v1/communication-note-preview-runner-terminal-policy.server.ts",
+    );
+    const policyTest = join(
+      process.cwd(),
+      "src/lib/v1/communication-note-preview-runner-terminal-policy.server.test.ts",
+    );
+    const policyImportPattern =
+      /(?:from\s+|import\s*\(|require\s*\()\s*["'][^"']*communication-note-preview-runner-terminal-policy\.server(?:\.(?:[cm]?[jt]s|[jt]sx))?["']/;
+    const policyImporters = walkControlledScriptFiles().filter((file) =>
+      policyImportPattern.test(readFileSync(file, "utf8")),
+    );
+    const trustCompositionModule = join(
+      process.cwd(),
+      "src/lib/v1/communication-note-preview-runner-terminal-trust-composition.server.ts",
+    );
+    const trustCompositionTest = join(
+      process.cwd(),
+      "src/lib/v1/communication-note-preview-runner-terminal-trust-composition.server.test.ts",
+    );
+    const trustTestFixtures = join(
+      process.cwd(),
+      "src/lib/v1/communication-note-preview-runner-terminal-trust-test-fixtures.ts",
+    );
+    const trustCompositionImportPattern =
+      /(?:from\s+|import\s*\(|require\s*\()\s*["'][^"']*communication-note-preview-runner-terminal-trust-composition\.server(?:\.(?:[cm]?[jt]s|[jt]sx))?["']/;
+    const trustCompositionImporters = walkControlledScriptFiles().filter(
+      (file) => trustCompositionImportPattern.test(readFileSync(file, "utf8")),
+    );
+    const trustTestFixtureImportPattern =
+      /(?:from\s+|import\s*\(|require\s*\()\s*["'][^"']*communication-note-preview-runner-terminal-trust-test-fixtures(?:\.(?:[cm]?[jt]s|[jt]sx))?["']/;
+    const trustTestFixtureImporters = walkControlledScriptFiles().filter(
+      (file) => trustTestFixtureImportPattern.test(readFileSync(file, "utf8")),
+    );
+    const signedRuntimeModule = join(
+      process.cwd(),
+      "src/lib/v1/communication-note-preview-signed-runner-terminal-runtime-port.server.ts",
+    );
+    const signedRuntimeTest = join(
+      process.cwd(),
+      "src/lib/v1/communication-note-preview-signed-runner-terminal-runtime-port.server.test.ts",
+    );
+    const signedRuntimeImportPattern =
+      /(?:from\s+|import\s*\(|require\s*\()\s*["'][^"']*communication-note-preview-signed-runner-terminal-runtime-port\.server(?:\.(?:[cm]?[jt]s|[jt]sx))?["']/;
+    const signedRuntimeImporters = walkControlledScriptFiles().filter((file) =>
+      signedRuntimeImportPattern.test(readFileSync(file, "utf8")),
+    );
+    const postgresModule = join(
+      process.cwd(),
+      "src/lib/v1/communication-note-preview-runner-terminal-postgres.server.ts",
+    );
+    const postgresTest = join(
+      process.cwd(),
+      "src/lib/v1/communication-note-preview-runner-terminal-postgres.server.test.ts",
+    );
+    const postgresImportPattern =
+      /(?:from\s+|import\s*\(|require\s*\()\s*["'][^"']*communication-note-preview-runner-terminal-postgres\.server(?:\.(?:[cm]?[jt]s|[jt]sx))?["']/;
+    const postgresImporters = walkControlledScriptFiles().filter((file) =>
+      postgresImportPattern.test(readFileSync(file, "utf8")),
+    );
+    const hostedLiveModule = join(
+      process.cwd(),
+      "src/lib/v1/communication-note-preview-runner-terminal-hosted-live.server.ts",
+    );
+    const hostedLiveTest = join(
+      process.cwd(),
+      "src/lib/v1/communication-note-preview-runner-terminal-hosted.live.test.ts",
+    );
+    const hostedLiveImportPattern =
+      /(?:from\s+|import\s*\(|require\s*\()\s*["'][^"']*communication-note-preview-runner-terminal-hosted-live\.server(?:\.(?:[cm]?[jt]s|[jt]sx))?["']/;
+    const hostedLiveImporters = walkControlledScriptFiles().filter((file) =>
+      hostedLiveImportPattern.test(readFileSync(file, "utf8")),
+    );
+
+    expect(policyImporters).toEqual([
+      join(
+        process.cwd(),
+        "src/lib/v1/communication-note-preview-activation-preflight.server.ts",
+      ),
+      join(
+        process.cwd(),
+        "src/lib/v1/communication-note-preview-key-custody.server.ts",
+      ),
+      join(
+        process.cwd(),
+        "src/lib/v1/communication-note-preview-reserve-before-dispatch-coordinator.server.ts",
+      ),
+      join(
+        process.cwd(),
+        "src/lib/v1/communication-note-preview-reserve-before-dispatch-coordinator.server.test.ts",
+      ),
+      hostedLiveTest,
+      postgresModule,
+      postgresTest,
+      signedRuntimeModule,
+      signedRuntimeTest,
+      policyTest,
+      trustCompositionModule,
+      trustTestFixtures,
+    ].sort());
+    expect(signedRuntimeImporters).toEqual([
+      hostedLiveModule,
+      signedRuntimeTest,
+    ].sort());
+    expect(postgresImporters).toEqual([
+      hostedLiveModule,
+      postgresTest,
+      signedRuntimeModule,
+      signedRuntimeTest,
+    ].sort());
+    expect(trustCompositionImporters).toEqual([
+      postgresModule,
+      postgresTest,
+      signedRuntimeModule,
+      trustCompositionTest,
+      trustTestFixtures,
+    ].sort());
+    expect(trustTestFixtureImporters).toEqual([
+      hostedLiveModule,
+      hostedLiveTest,
+      postgresTest,
+      signedRuntimeTest,
+      trustCompositionTest,
+    ].sort());
+    expect(hostedLiveImporters).toEqual([hostedLiveTest]);
+
+    for (const pattern of [
+      policyImportPattern,
+      trustCompositionImportPattern,
+      trustTestFixtureImportPattern,
+      signedRuntimeImportPattern,
+      postgresImportPattern,
+      hostedLiveImportPattern,
+    ]) {
+      expect(walkSourceFiles("src/app").filter((file) =>
+        pattern.test(readFileSync(file, "utf8")),
+      )).toEqual([]);
+      expect(walkSourceFiles("src/components").filter((file) =>
+        pattern.test(readFileSync(file, "utf8")),
+      )).toEqual([]);
+    }
+    for (const modulePath of [
+      policyModule,
+      trustCompositionModule,
+      trustTestFixtures,
+      signedRuntimeModule,
+      postgresModule,
+      hostedLiveModule,
+    ]) {
+      expect(readFileSync(modulePath, "utf8")).not.toMatch(
+        /process\.env|fetch\s*\(|from\s+["'](?:openai|@supabase\/|node:(?:http|https|net|tls))[^"']*["']|SUPABASE_SERVICE_ROLE_KEY|NEXT_PUBLIC_/,
+      );
+    }
+    expect(readFileSync(policyModule, "utf8")).toContain(
+      "SOURCE_CONTRACT_ONLY_SIGNED_CALLER_NOT_PROVISIONED",
+    );
+    expect(readFileSync(policyModule, "utf8")).toContain(
+      "Communication Note preview runner terminal persistence is unavailable",
+    );
   });
 
   it("exposes the privacy review as a physical POST-only route", () => {
