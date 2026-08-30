@@ -2710,6 +2710,31 @@ unapplied/default-off in Production, and no provider/model or deployment gate ra
 for M1l. Readiness and approval remain false/absent. See the
 [M1l handoff](communication-note-preview-runtime-credential-broker-m1l.md).
 
+### Communication Note approved runtime adapters M1m — source only
+
+M1m adds five server-only, default-off adapter contracts: an authenticated
+disposable-Preview target resolver with pinned CA bytes; a one-use callback
+management credential transport and exclusive management session; durable
+broker SQL adapters; an exclusive runtime PostgreSQL session with exact-client
+hard-close cancellation; and a sealed composition into the existing durable
+resolver/runtime port. Every approved export remains absent and every readiness
+constant remains `false`. The concrete `pg` client constructors and credential
+transport are test-only injections; no product route, environment lookup, DSN,
+SDK import, log sink, retained credential, provider/model call or deployment is
+introduced.
+
+Static boundary coverage pins the exact importer graph for all five M1m modules,
+including the inherited resolved-binding and durable-resolver dependencies, and
+rejects imports from `src/app` and `src/components`. Unit coverage uses synthetic
+clients, targets, CA material and credentials only. It does not constitute a
+Hosted Preview, PostgreSQL 17, Supabase Auth/Data API, live secret-manager,
+Production migration or activation result. Final repository closeout counts are
+now fixed at M1m focused 99/99, runtime-boundary 12/12 and the complete
+184-file / 2,518-test Vitest suite. The same source passed `tsc --noEmit`, full
+ESLint, tracked plus new-file whitespace checks and the Next.js 16.2.9 Webpack
+production build with 64/64 pages. These are local source results, not Preview,
+deployment or Production evidence.
+
 ### Current live/read-only evidence
 
 - Supabase migrations, tables, RLS flags, policies, grants, function grants and aggregate row counts were checked read-only.

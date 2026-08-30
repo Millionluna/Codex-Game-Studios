@@ -79,6 +79,11 @@ describe("V1 shadow runtime boundary", () => {
       "src/lib/v1/communication-note-preview-runner-terminal-postgres.server.ts",
       "src/lib/v1/communication-note-preview-runner-terminal-resolved-runtime-binding.server.ts",
       "src/lib/v1/communication-note-preview-durable-caller-credential-resolver.server.ts",
+      "src/lib/v1/communication-note-preview-approved-runtime-target.server.ts",
+      "src/lib/v1/communication-note-preview-approved-runtime-management-session.server.ts",
+      "src/lib/v1/communication-note-preview-approved-runtime-broker.server.ts",
+      "src/lib/v1/communication-note-preview-approved-runtime-postgres-session.server.ts",
+      "src/lib/v1/communication-note-preview-approved-runtime-adapters.server.ts",
       "src/lib/v1/native-auth-boundary.server.ts",
       "src/lib/v1/openai-communication-note-provider.server.ts",
       "src/lib/v1/communication-note-provider-policy.ts",
@@ -513,6 +518,14 @@ describe("V1 shadow runtime boundary", () => {
       signedRuntimeTest,
     ].sort());
     expect(postgresImporters).toEqual([
+      join(
+        process.cwd(),
+        "src/lib/v1/communication-note-preview-approved-runtime-broker.server.test.ts",
+      ),
+      join(
+        process.cwd(),
+        "src/lib/v1/communication-note-preview-approved-runtime-broker.server.ts",
+      ),
       durableCredentialResolverModule,
       hostedLiveModule,
       postgresTest,
@@ -532,6 +545,10 @@ describe("V1 shadow runtime boundary", () => {
       trustTestFixtures,
     ].sort());
     expect(trustTestFixtureImporters).toEqual([
+      join(
+        process.cwd(),
+        "src/lib/v1/communication-note-preview-approved-runtime-adapters.server.test.ts",
+      ),
       hostedLiveModule,
       hostedLiveTest,
       postgresTest,
@@ -544,13 +561,53 @@ describe("V1 shadow runtime boundary", () => {
       runtimeBrokerHostedLiveTest,
     ].sort());
     expect(resolvedRuntimeBindingImporters).toEqual([
+      join(
+        process.cwd(),
+        "src/lib/v1/communication-note-preview-approved-runtime-adapters.server.test.ts",
+      ),
+      join(
+        process.cwd(),
+        "src/lib/v1/communication-note-preview-approved-runtime-adapters.server.ts",
+      ),
+      join(
+        process.cwd(),
+        "src/lib/v1/communication-note-preview-approved-runtime-target.server.test.ts",
+      ),
+      join(
+        process.cwd(),
+        "src/lib/v1/communication-note-preview-approved-runtime-target.server.ts",
+      ),
       durableCredentialResolverModule,
       durableCredentialResolverTest,
       resolvedRuntimeBindingTest,
     ].sort());
     expect(durableCredentialResolverImporters).toEqual([
+      join(
+        process.cwd(),
+        "src/lib/v1/communication-note-preview-approved-runtime-adapters.server.test.ts",
+      ),
+      join(
+        process.cwd(),
+        "src/lib/v1/communication-note-preview-approved-runtime-adapters.server.ts",
+      ),
+      join(
+        process.cwd(),
+        "src/lib/v1/communication-note-preview-approved-runtime-broker.server.test.ts",
+      ),
+      join(
+        process.cwd(),
+        "src/lib/v1/communication-note-preview-approved-runtime-broker.server.ts",
+      ),
+      join(
+        process.cwd(),
+        "src/lib/v1/communication-note-preview-approved-runtime-management-session.server.ts",
+      ),
+      join(
+        process.cwd(),
+        "src/lib/v1/communication-note-preview-approved-runtime-postgres-session.server.ts",
+      ),
       durableCredentialResolverTest,
-    ]);
+    ].sort());
 
     for (const pattern of [
       policyImportPattern,
@@ -601,6 +658,89 @@ describe("V1 shadow runtime boundary", () => {
     expect(readFileSync(durableCredentialResolverModule, "utf8")).toContain(
       "DURABLE_CALLER_CREDENTIAL_RESOLVER_READY =\n  false",
     );
+  });
+
+  it("quarantines the M1m approved runtime adapters to exact audited source-only importers", () => {
+    const modules = [
+      {
+        relativePath:
+          "src/lib/v1/communication-note-preview-approved-runtime-target.server.ts",
+        expectedImporterPaths: [
+          "src/lib/v1/communication-note-preview-approved-runtime-adapters.server.test.ts",
+          "src/lib/v1/communication-note-preview-approved-runtime-adapters.server.ts",
+          "src/lib/v1/communication-note-preview-approved-runtime-target.server.test.ts",
+        ],
+      },
+      {
+        relativePath:
+          "src/lib/v1/communication-note-preview-approved-runtime-management-session.server.ts",
+        expectedImporterPaths: [
+          "src/lib/v1/communication-note-preview-approved-runtime-adapters.server.test.ts",
+          "src/lib/v1/communication-note-preview-approved-runtime-adapters.server.ts",
+          "src/lib/v1/communication-note-preview-approved-runtime-management-session.server.test.ts",
+        ],
+      },
+      {
+        relativePath:
+          "src/lib/v1/communication-note-preview-approved-runtime-broker.server.ts",
+        expectedImporterPaths: [
+          "src/lib/v1/communication-note-preview-approved-runtime-adapters.server.ts",
+          "src/lib/v1/communication-note-preview-approved-runtime-broker.server.test.ts",
+          "src/lib/v1/communication-note-preview-approved-runtime-management-session.server.test.ts",
+          "src/lib/v1/communication-note-preview-approved-runtime-management-session.server.ts",
+        ],
+      },
+      {
+        relativePath:
+          "src/lib/v1/communication-note-preview-approved-runtime-postgres-session.server.ts",
+        expectedImporterPaths: [
+          "src/lib/v1/communication-note-preview-approved-runtime-adapters.server.test.ts",
+          "src/lib/v1/communication-note-preview-approved-runtime-adapters.server.ts",
+          "src/lib/v1/communication-note-preview-approved-runtime-postgres-session.server.test.ts",
+        ],
+      },
+      {
+        relativePath:
+          "src/lib/v1/communication-note-preview-approved-runtime-adapters.server.ts",
+        expectedImporterPaths: [
+          "src/lib/v1/communication-note-preview-approved-runtime-adapters.server.test.ts",
+        ],
+      },
+    ] as const;
+
+    for (const { relativePath, expectedImporterPaths } of modules) {
+      const modulePath = join(process.cwd(), relativePath);
+      const importStem = relativePath
+        .split("/")
+        .at(-1)
+        ?.replace(/\.ts$/, "");
+      expect(importStem).toBeDefined();
+      const importPattern = new RegExp(
+        `(?:from\\s+|import\\s*\\(|require\\s*\\()\\s*["'][^"']*${importStem?.replaceAll(".", "\\.")}(?:\\.(?:[cm]?[jt]s|[jt]sx))?["']`,
+      );
+      const importers = walkControlledScriptFiles().filter((file) =>
+        importPattern.test(readFileSync(file, "utf8")),
+      );
+      const source = readFileSync(modulePath, "utf8");
+
+      expect(importers).toEqual(
+        expectedImporterPaths
+          .map((path) => join(process.cwd(), path))
+          .sort(),
+      );
+      expect(walkSourceFiles("src/app").filter((file) =>
+        importPattern.test(readFileSync(file, "utf8")),
+      )).toEqual([]);
+      expect(walkSourceFiles("src/components").filter((file) =>
+        importPattern.test(readFileSync(file, "utf8")),
+      )).toEqual([]);
+      expect(source).not.toMatch(
+        /process\.env|fetch\s*\(|(?:from\s+|import\s*\(|require\s*\()\s*["'](?:pg|openai|@supabase\/)|SUPABASE_SERVICE_ROLE_KEY|SUPABASE_SECRET_KEY|NEXT_PUBLIC_|postgres(?:ql)?:\/\/|DATABASE_URL|connectionString\s*:|console\.(?:debug|error|info|log|warn)|\blogger\b|\blog\s*\(/i,
+      );
+      expect(source).not.toMatch(/_READY\s*=\s*(?:\r?\n\s*)?true\b/);
+      expect(source).toMatch(/_READY\s*=\s*(?:\r?\n\s*)?false\s+as const/);
+      expect(source).toContain("SOURCE_ADAPTER");
+    }
   });
 
   it("exposes the privacy review as a physical POST-only route", () => {
