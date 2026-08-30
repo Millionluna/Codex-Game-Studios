@@ -553,6 +553,58 @@ broader grant, runtime permission or Production authority. Native Supabase CLI
 migration apply remains an unproved transport; readiness and approval remain
 closed.
 
+### Communication Note Preview resolved custody/caller runtime binding M1j (source-only/TestOnly)
+
+M1j adds no database grant and does not widen the M1g-i Hosted permission
+result. Its public runtime factory always throws the fixed disabled error
+without reading the supplied object. The approved disposable target, custody
+resolver, caller-credential resolver and resolved runtime port remain literal
+`undefined`; the readiness latch remains `false`. Only an explicitly named
+TestOnly factory accepts module-branded target/resolver/session objects.
+
+The TestOnly session contract is deliberately narrower than a generic database
+client. It requires one physical, single-use normalized-query session and a
+short-lived, lease-bound runtime LOGIN with only one exact `SET=true`,
+`INHERIT=false`, `ADMIN=false` edge to
+`careslink_v1_preview_runner_terminal_caller`. Before the terminal RPC, catalog
+checks require the runtime to have no private-schema usage/create, function,
+table, column or sequence capability. After `SET LOCAL ROLE`, the caller must
+have schema `USAGE`, no `CREATE`, no relation/column/sequence authority and
+execution of exactly the signed terminal function. The function must remain
+executor-owned, `SECURITY DEFINER`, `VOLATILE`, `plpgsql`, scalar `jsonb`,
+non-variadic, with exact named arguments, empty `search_path` and an exact
+non-grantable two-grantee EXECUTE ACL for the caller and executor. API/service
+roles may neither execute the RPC nor switch into the runtime/caller roles.
+The executor itself must remain `NOLOGIN`, non-superuser, non-inheriting,
+without create-role/create-db/replication/BYPASSRLS flags, outbound membership
+or any active inbound `SET`/`INHERIT` edge. This posture is re-attested before
+and after the RPC.
+
+Stable PostgreSQL backend PID and transaction ID are compared before and after
+the write. A monotonic clock, database clock, authorization/trust/target/lease
+expiry ceilings, 30-second minimum lease window and PostgreSQL 17
+`transaction_timeout` constrain use. BEGIN/COMMIT response ambiguity causes a
+single rollback attempt and never an RPC retry. Resolver, database and cleanup
+calls have 5-second, 12-second and 5-second bounded settlement respectively,
+each with a fresh AbortSignal; an approved adapter must bind abort to real
+driver cancellation and exclusive-session destruction. Every credential-acquisition
+attempt sends an acquisition-digest-bound cleanup request; no success can be
+returned until its TestOnly release report is validated. With no returned
+binding, only paired destroyed/revoked or paired not-acquired/not-issued
+dispositions are accepted; every accepted report must additionally claim that
+the acquisition digest is tombstoned and future issuance is blocked. These are
+contract claims, not independent evidence of a durable broker fence, a dropped
+live role or termination of every session.
+
+No migration, login, grant, credential, environment variable, network client,
+product importer, Hosted action, model call, deployment or Production change is
+part of M1j. Activation still requires independently approved control-plane
+target evidence, real custody and caller/session adapters, pinned TLS/target
+binding, durable cross-process lease/session/runtime replay prevention, an
+acquisition-digest tombstone that prevents late issuance, and an administrative
+post-release check proving the temporary role and sessions are actually zero. See
+`documentation/communication-note-preview-live-custody-caller-resolver-m1j.md`.
+
 ## Intended V1 matrix (partly codified, not available at runtime)
 
 | Target resource | Owner | Admin/support | Service/backend | Required control |

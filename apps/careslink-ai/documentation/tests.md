@@ -2496,6 +2496,58 @@ activation approval also remain open. Readiness remains false; no model call,
 real data, deployment or Production write occurred. See the
 [M1g-i handoff](communication-note-preview-terminal-accepted-usage-m1g-i.md).
 
+### Communication Note resolved custody/caller runtime binding gate M1j — 2026-08-30
+
+M1j adds one server-only source contract and its focused test. The public
+factory is tested as unconditionally disabled and accessor-safe; the approved
+target, custody resolver, caller resolver and runtime port stay `undefined`.
+Only the TestOnly path accepts module-branded target/resolver objects and a
+WeakMap-backed one-physical-session lease. Factory-provenance leases quarantine
+every recognizable lease/session/runtime/query identity before the remaining
+lease validation, so an invalid lease waiting in revoke cannot race a corrected
+port with the same identities. Plain/spread leases, duplicate identities and
+expanded/accessor-backed shapes fail before any SQL.
+
+The focused matrix covers exact happy-path order, four separate transaction
+timeouts, authorization/trust/target/lease cross-binding, clock rollback and
+post-resolver expiry, minimum remaining lease time, stable backend PID and
+transaction ID, runtime/caller role and reverse-membership drift, schema and
+relation/column/sequence ACL drift, exact terminal RPC owner/security/
+volatility/language/signature/search-path/ACL posture, exact executor role and
+membership posture before and after the RPC, no retry, fixed error
+mapping, normalized `{rows}` adapter enforcement, BEGIN and COMMIT response
+loss, rollback/reset failures, issued acquire-response loss cleanup by
+acquisition digest, strict complete/none/invalid paired release bindings,
+mandatory TestOnly acquisition tombstone/future-issuance claims, a resolver
+state-model test rejecting work that resumes after the tombstone, same-isolate
+atomic single consumption, expired-authorization precheck, and 5s/12s/5s
+resolver/database/cleanup bounded settlement with fresh abort signals.
+The runtime-boundary gate also allows only the module's own test importer and
+keeps every direct dependency outside `src/app` and `src/components`.
+
+The strengthened focused M1j plus runtime-boundary run passed 2 files / 35
+tests. A temporary
+local PostgreSQL 16.15 catalog then executed the real base identity,
+`SET LOCAL ROLE` and caller identity SQL and returned the expected backend PID,
+transaction ID, caller/executor attributes and membership edges, schema, RPC
+metadata/ACL and role-edge posture. This local syntax/catalog check intentionally
+omitted PostgreSQL 17-only
+`transaction_timeout`; the M1j target contract remains PostgreSQL 17. The
+server was stopped and its temporary cluster/test file were deleted.
+
+The adjacent 12-file regression passed 143 tests. The final application gate
+passed 173 files / 2,345 tests, TypeScript, repository-wide zero-warning ESLint,
+the 73-file Codex adapter check, `git diff --check`, and the Next.js 16.2.9
+explicit Webpack production build with 64/64 static pages.
+
+This is source/local TestOnly evidence, not a live custody resolver, approved
+database target, real credential lifecycle, durable broker tombstone against
+late issuance, independent administrative cleanup proof, driver-level
+cancellation, cross-process replay prevention, retained
+Preview, provider/model call, deployment or Production change.
+See the
+[M1j handoff](communication-note-preview-live-custody-caller-resolver-m1j.md).
+
 ### Current live/read-only evidence
 
 - Supabase migrations, tables, RLS flags, policies, grants, function grants and aggregate row counts were checked read-only.

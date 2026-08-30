@@ -270,6 +270,20 @@ environment value can replace the still-absent live trust/custody and caller
 credential resolvers. Readiness remains `false` and approved values remain
 `undefined`.
 
+Communication Note M1j adds no product, deployment or test environment
+variable, no secret name and no `.env.example` entry. Version
+`binding.communication.openai.synthetic-preview.2026-08-30.m1j.v1` and policy
+digest `6e33f6a6c061f539b75808afc27abfe6f33fedfcf28de5f7b2a5fdeed5faee04`
+are source-integrity constants, not configuration. The public factory remains
+unconditionally unavailable, and the approved target, custody resolver,
+caller-credential resolver and runtime port remain `undefined`. The TestOnly
+factories accept injected, content-free descriptors and function capabilities
+only inside the server-only source/test boundary; they do not read a DSN,
+password, signing key, CA body, Supabase ref or provider key from the
+environment. A future live adapter must introduce its own separately reviewed
+secret transport and rotation contract rather than assigning an environment
+variable to these approval constants.
+
 ## Current auth, URL and feature variables
 
 | Variable | Class | Purpose | Boundary |

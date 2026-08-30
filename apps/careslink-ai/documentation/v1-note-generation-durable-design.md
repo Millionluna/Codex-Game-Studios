@@ -1646,3 +1646,75 @@ absent; readiness is still false and approved values are undefined. No
 provider/model, real-data, deployment or Production write is part of M1g-i.
 Full evidence is in
 `documentation/communication-note-preview-terminal-accepted-usage-m1g-i.md`.
+
+## 25. Communication resolved custody/caller runtime binding M1j — 2026-08-30
+
+M1j is the source-only successor to M1g-i's accepted terminal evidence. It does
+not create the missing live custody or credential services. Instead,
+`communication-note-preview-runner-terminal-resolved-runtime-binding.server.ts`
+defines the production-shaped boundary those future services must satisfy,
+under version
+`binding.communication.openai.synthetic-preview.2026-08-30.m1j.v1` and policy
+digest `6e33f6a6c061f539b75808afc27abfe6f33fedfcf28de5f7b2a5fdeed5faee04`.
+
+The public constructor unconditionally fails without inspecting its input.
+Readiness is `false`, and the approved disposable target, custody resolver,
+caller-credential resolver and resolved runtime port remain `undefined`. The
+executable constructor and all resolver/session constructors are explicitly
+TestOnly. Module-local WeakSet/WeakMap provenance prevents a plain or spread
+object from standing in for those test objects; lease reference, session
+binding, runtime role and query-function identity are synchronously claimed for
+single consumption within the module.
+
+The TestOnly sequence is:
+
+1. validate a content-free, no-data, non-default, non-persistent,
+   Production-excluded PostgreSQL 17 target descriptor;
+2. resolve the M1g-c/M1g-g custody and trust composition without accepting raw
+   private keys or credentials;
+3. acquire the exact fifth-caller lease on one physical, dedicated, single-use
+   session whose adapter normalizes every result to exact `{rows}`;
+4. begin one `READ COMMITTED` read-write transaction, apply separate statement,
+   lock, idle-in-transaction and transaction timeouts, attest the base runtime,
+   then use `SET LOCAL ROLE` for the fifth caller;
+5. attest the same backend PID and transaction ID, database clock, caller and
+   SECURITY DEFINER executor attributes/membership edges,
+   schema/relation/column/sequence posture and exact signed-terminal RPC
+   metadata/ACL before and after the one parameterized persistence call;
+6. commit once, or attempt rollback for every unacknowledged BEGIN/COMMIT path,
+   prove the role reset on the same backend when transport state permits, and
+   never retry the RPC; and
+7. request idempotent cleanup by acquisition digest even if credential acquire
+   lost its response, then validate a request-bound TestOnly release report
+   whose paired disposition is either destroyed/revoked or, only without a
+   returned binding, not-acquired/not-issued; every accepted report must also
+   claim that the acquisition digest is tombstoned and future issuance blocked
+   before returning success.
+
+Clock observations must be monotonic. Authorization expiry caps trust expiry;
+trust and target expiry cap the lease; the lease requires 30 seconds remaining
+before database use, while PostgreSQL 17 `transaction_timeout` limits the whole
+transaction to ten seconds. `VALID UNTIL` is treated only as login posture, not
+as a mechanism that kills an existing session. Custody/acquire operations have
+a 5-second settlement bound, every main-transaction database operation a
+12-second bound, and rollback/reset/revoke independent 5-second bounds. Each receives a fresh
+AbortSignal, but the JS watchdog alone cannot prove remote cancellation; a live
+adapter must bind abort to driver cancel/session destruction. Errors expose
+only fixed domain codes/messages.
+
+This boundary deliberately calls its cleanup artifact a TestOnly report. Its
+tombstone and future-issuance fields are resolver self-report, not independent
+proof that a live administrator durably fenced the acquisition digest, dropped
+the LOGIN, revoked the credential and terminated every backend. Activation therefore still requires
+an approved control-plane target verifier, real custody and caller/session
+adapters, TLS endpoint-to-target binding, an administrative zero-role/session
+postcheck, durable cross-process replay prevention and acquisition-digest
+tombstoning that wins against late issuance, and a same-revision
+disposable PostgreSQL 17 gate. M1j adds no
+migration, environment variable, network/SDK client, product importer,
+provider/model call, Preview, deployment or Production write. The M1g-i
+preflight/coordinator pins remain unchanged because their false/absent resolver
+claims are still true.
+
+Detailed handoff is in
+`documentation/communication-note-preview-live-custody-caller-resolver-m1j.md`.

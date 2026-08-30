@@ -377,6 +377,47 @@ Production action is enabled.
 See
 `documentation/communication-note-preview-terminal-accepted-usage-m1g-i.md`.
 
+M1j adds a source-only/TestOnly resolved-custody and fifth-caller binding; it
+does not schedule or activate automation. Its public factory is
+unconditionally disabled, readiness is `false`, and the approved target,
+custody resolver, caller-credential resolver and runtime port remain
+`undefined`. The TestOnly path requires module-branded dependencies and a
+WeakMap-backed, one-physical-session, single-use PostgreSQL 17 lease. It
+cross-binds the owner authorization, custody/trust snapshot, disposable target
+and fifth caller; applies `READ COMMITTED`, four separate transaction-local
+timeouts and `SET LOCAL ROLE`; compares one backend PID and transaction ID;
+checks exact caller and SECURITY DEFINER executor role/membership posture,
+schema, relation/column/sequence and terminal-RPC metadata/ACL posture; and
+performs only one persistence attempt. Lease reference, session binding,
+runtime role and module-local query identity are atomically single-consumed.
+
+The monotonic clock is checked initially, after each resolver, before entering
+the database, before the RPC, before commit and when validating the release
+report. Authorization expiry caps the trust resolution, which together with
+the target caps the lease. Custody/acquire settle within 5 seconds, each
+main-transaction database operation within 12 seconds, and rollback/reset/
+revoke within an independent 5 seconds; every call gets a fresh AbortSignal. BEGIN or COMMIT
+response ambiguity triggers one rollback attempt and never an automatic RPC
+retry. Credential acquire response loss still produces an idempotent cleanup
+request keyed by the acquisition digest. A digest-bound TestOnly release report
+must be returned before success. With no returned binding it may report either
+the paired destroyed/revoked result or the paired not-acquired/not-issued
+result; every accepted report must also claim that the acquisition digest is
+tombstoned and future issuance is blocked. Those fields remain TestOnly
+resolver self-report, not independent control-plane proof that a durable fence
+won against late issuance, a live role was dropped or all sessions were
+terminated. The JS watchdog proves bounded caller settlement only; a live
+adapter must bind abort to driver cancellation/session destruction and use
+durable cross-process replay protection plus acquisition-digest fencing.
+
+M1j adds no worker, queue, cron, Edge Function, environment lookup, network/
+SDK adapter, migration, product importer, provider/model call, Hosted action,
+deployment or Production change. Approved control-plane target evidence, live
+custody and credential/session adapters with a durable late-issuance tombstone,
+and an independent post-release zero-role/session check remain automation
+activation blockers. See
+`documentation/communication-note-preview-live-custody-caller-resolver-m1j.md`.
+
 Supabase CLI 2.115.0 has since generated source-only migration `20260823213144_harden_v1_note_generation_registration_retention.sql`. It adds `attempts_registration_digest_idx` and the named `attempts_registration_catalog_fk` from `attempts.registration_digest` to `worker_registrations.registration_digest`, with update/delete `RESTRICT`, `NOT VALID` creation and explicit validation. It creates no seed, caller grant, runtime surface or Production change. Its local gate passed 39/39 focused contracts, the full 125-file / 1,381-test suite, lint, TypeScript, the 63/63-page production build, the 73-file Codex-adapter sync check and `git diff --check`. Deleted disposable `r22` then clean-applied the current manifest 15/15 and passed the seven rollback suites; the hosted registration-retention gate is now closed without enabling any runtime automation.
 
 ### PostgreSQL 16.15 local isolated gate — 2026-08-24
