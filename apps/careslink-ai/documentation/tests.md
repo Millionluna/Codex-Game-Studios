@@ -2458,6 +2458,7 @@ and cleanup stay atomic under statement-by-statement migration transports.
 | current local database | disposable PostgreSQL 16.15 applied 39/39; migrations 37/38 passed a deliberate statement-by-statement sequence without a harness-supplied outer wrapper; A03 passed; final terminal rows and temporary SET edges were both zero; the cluster was removed |
 | historical application/static | the prior `4e84823` artifact set passed 172 files / 2,315 tests, TypeScript, zero-warning ESLint, 73 adapter files, `git diff --check` and the 64/64-page Webpack build; it is retained only as the previous checkpoint |
 | historical PostgreSQL 17 / Hosted | r19 id/ref `17627f14-b3ef-4d94-834e-8adde3850a2f` / `tsozyxxjxzqixkztdpmr`; r20 id/ref `0e4154f3-f995-4f6c-a025-898435d3b5c0` / `fhcmsezgladnmzhkzoeb`; r20's prior artifact set was committed as `4e84823d3c62e34abe0a0bd0f295e20dc456cae0` and passed 39/39, A01–A18, temporary-LOGIN signed `ACCEPTED`, replay, `IDEMPOTENCY_CONFLICT` and `[1,0,1,1,1,1]` with zero temporary LOGINs/sessions |
+| exact-current PostgreSQL 17 / Hosted | execution source `02949d1a666fa8aa0496d3e995f1dd88c52a29a0`; deleted no-data Preview `careslink-note-terminal-m1g-i-v5-r2-20260830`, id/ref `0e63cac9-d1dc-4096-9f65-c36de91c85fa` / `yrsgxbxislyenblphfdl`; pinned 19-row baseline, transactional 39/39 policy `.6`, A01–A18, identity `.2`, signed `ACCEPTED`/replay/`IDEMPOTENCY_CONFLICT`, `[1,0,1,1,1,1]`, independent migration/ledger/zero-role/session postcheck and final Advisors all passed; three deletion probes left only healthy Production |
 
 The rollback runner now assigns `R00` to runner preflight and `A01`–`A18` to
 the fixed files. Every failure is one content-free JSON object with `stage` and
@@ -2471,9 +2472,20 @@ one-time identity and signed `ACCEPTED` gates are closed for that historical
 artifact set. r19 first proved 39/39 plus A01–A18 but exposed an unsupported
 Vitest `--minWorkers` option before live test collection; r20 then passed the
 full prior chain. Both Previews were deleted and three listings after each
-deletion showed only healthy Production. Those runs do not prove current native
-Supabase CLI apply, transactional policy `.6`, identity policy `.2` or the v5
-preflight/coordinator pins.
+deletion showed only healthy Production.
+
+The exact-current replacement Preview then proved the current transactional
+manifest and policies. Its independent postcheck found 39 versions from
+`20260625125102` through `20260829041316`, one nine-key `ACCEPTED` terminal,
+ledger counts `[1,0,1,1,1,1]` and zero temporary roles/sessions. Final security
+Advisors returned 21 INFO / 20 WARN / 0 ERROR with zero
+Communication/generation-schema findings. Performance returned 105 INFO / 24
+WARN / 0 ERROR; its generation-schema subset was 18 INFO / 13 WARN / 0 ERROR
+across `auth_rls_initplan`, `unindexed_foreign_keys` and `unused_index`. The
+global Advisor totals matched r20. The exact replacement branch was deleted and
+three independent listings showed only default Production `ACTIVE_HEALTHY`.
+This closes exact-current Hosted PostgreSQL 17 through the pinned repository
+runner; native Supabase CLI migration apply remains an unproved transport.
 
 The unchanged A03 signer-independence negative vector still accepts either
 `RUNNER_TERMINAL_SIGNER_NOT_INDEPENDENT` or generic `VALIDATION_ERROR`.

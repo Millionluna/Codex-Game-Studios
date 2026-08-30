@@ -360,13 +360,20 @@ passed 39/39; migrations 37 and 38 were deliberately sent statement by
 statement without an ad hoc outer wrapper and succeeded through their repository
 transactions, A03 passed, and the final postcheck found zero terminal rows
 and zero residual `SET` membership edges. The earlier 172 files / 2,315 tests
-and deleted r20 Hosted result belong only to artifact set `4e84823`: r20 did
-complete the one-time LOGIN, signed `ACCEPTED`, exact replay/conflict and cleanup,
-but it does not prove the current transaction hashes, policy `.6`, identity
-policy `.2` or v5 bindings. Exact-current Hosted/native-CLI evidence therefore
-requires a separately authorized fresh disposable Preview. Activation, dispatch
-and live resolver readiness remain false/absent; no worker, retry, provider
-transport, deployment or Production action is enabled.
+and deleted r20 Hosted result remain attributed only to artifact set `4e84823`.
+Exact-current execution source `02949d1a666fa8aa0496d3e995f1dd88c52a29a0`
+then passed a fresh no-data PostgreSQL 17 gate on deleted Preview
+`careslink-note-terminal-m1g-i-v5-r2-20260830` (id
+`0e63cac9-d1dc-4096-9f65-c36de91c85fa`; ref `yrsgxbxislyenblphfdl`): pinned
+19-row baseline, transactional 39/39 policy `.6`, A01–A18, identity `.2`,
+signed `ACCEPTED`/replay/`IDEMPOTENCY_CONFLICT`, independent 39-row plus
+`[1,0,1,1,1,1]` and zero-role/session postcheck, and final security/performance
+Advisors with 0 ERROR. The branch was deleted and three listings showed only
+default Production `ACTIVE_HEALTHY`. This closes exact-current Hosted evidence
+through the pinned repository runner; native Supabase CLI migration apply
+remains an unproved transport. Activation, dispatch and live resolver readiness
+remain false/absent; no worker, retry, provider transport, deployment or
+Production action is enabled.
 See
 `documentation/communication-note-preview-terminal-accepted-usage-m1g-i.md`.
 

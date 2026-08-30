@@ -486,7 +486,7 @@ not grant a persistent Hosted identity or runtime permission. Readiness remains
 provider/model or real-data permission was added. Detailed evidence is in
 `documentation/communication-note-preview-hosted-runner-terminal-identity-m1g-h.md`.
 
-### Communication Note Preview terminal ACCEPTED usage alignment M1g-i (current source/local; prior Hosted separately attributed)
+### Communication Note Preview terminal ACCEPTED usage alignment M1g-i (current source/local/Hosted)
 
 M1g-i does not widen the M1g-g/M1g-h permission surface. The existing
 `careslink_v1_preview_runner_terminal_caller` retains only private-schema
@@ -534,14 +534,24 @@ check and the 64/64-page Webpack build. Fresh isolated PostgreSQL 16.15 passed
 39/39; migrations 37 and 38 deliberately succeeded statement by statement
 without an ad hoc outer wrapper, A03 passed, and the final posture had zero
 terminal rows and zero residual `SET` membership edges. The earlier 172
-files / 2,315 tests and deleted r20 Hosted evidence belong only to artifact set
-`4e84823`. That r20 run did create the temporary one-time LOGIN, complete signed
-`ACCEPTED`/replay/conflict, and remove the LOGIN and sessions; it cannot be
-attributed to the current transaction hashes, policy `.6`, identity policy `.2`
-or v5 bindings. Exact-current Hosted/native-CLI proof requires a separately
-authorized fresh disposable Preview. No persistent identity, broader grant,
-runtime permission or Production authority may be inferred; readiness and
-approval remain closed.
+files / 2,315 tests and deleted r20 Hosted evidence remain attributed only to
+artifact set `4e84823`.
+
+Exact-current execution source `02949d1a666fa8aa0496d3e995f1dd88c52a29a0`
+then passed the deleted no-data PostgreSQL 17 Preview
+`careslink-note-terminal-m1g-i-v5-r2-20260830` (id
+`0e63cac9-d1dc-4096-9f65-c36de91c85fa`; ref `yrsgxbxislyenblphfdl`). The
+strict envelope bound the same healthy non-default/non-persistent child,
+Production parent, direct host and pooler identity before connection. The gate
+passed transactional 39/39 policy `.6`, A01–A18, identity `.2`, signed
+`ACCEPTED`/replay/`IDEMPOTENCY_CONFLICT`, `[1,0,1,1,1,1]`, the corrected
+independent 39-row/zero-role/session postcheck and final Advisors with no ERROR
+and zero Communication/generation-schema security findings. The temporary
+LOGIN was dropped; the Preview was deleted and three listings showed only
+healthy default Production. This evidence creates no persistent identity,
+broader grant, runtime permission or Production authority. Native Supabase CLI
+migration apply remains an unproved transport; readiness and approval remain
+closed.
 
 ## Intended V1 matrix (partly codified, not available at runtime)
 

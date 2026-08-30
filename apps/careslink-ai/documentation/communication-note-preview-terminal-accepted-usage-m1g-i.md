@@ -11,12 +11,14 @@ receipt comparison. The current source also gives migrations 37 and 38 their
 own explicit outer `BEGIN`/`COMMIT`, so their lock, temporary grants and cleanup
 remain atomic under a statement-by-statement migration transport.
 
-This now includes current-source and local PostgreSQL 16.15 evidence. Deleted
-disposable Hosted PostgreSQL 17 r19/r20 evidence remains a historical checkpoint
-for the prior artifact set later committed as `4e84823`; it is not exact-current
-evidence for the new migration bytes or v5 pins. This work does not activate a
-retained runtime identity, credential resolver, provider transport, model call,
-deployment or Production database change.
+This now includes current-source, local PostgreSQL 16.15 and deleted
+exact-current Hosted PostgreSQL 17 evidence. The Hosted gate ran from execution
+source `02949d1a666fa8aa0496d3e995f1dd88c52a29a0` and proves the current
+migration bytes, transactional policy `.6`, identity policy `.2` and v5 pins.
+Deleted r19/r20 remain historical checkpoints for the prior artifact set later
+committed as `4e84823`. This work does not activate a retained runtime identity,
+credential resolver, provider transport, model call, deployment or Production
+database change.
 
 | Boundary | M1g-i result |
 |---|---|
@@ -34,7 +36,8 @@ deployment or Production database change.
 | Activation preflight | `preflight.communication.openai.synthetic-preview.2026-08-29.m1g-i.v5`; digest `0e2582040995753efe95baa071fee4e0b58fa105c79db8bfa673abd66e2d01a1` |
 | Coordinator | `coordinator.communication.openai.synthetic-preview.2026-08-29.m1g-i.v5`; digest `1f93fa2c0ba207a28cb706d922acc10bba8305f16c83c7973c70ae4d7ac7e5c2` |
 | Current local database gate | PostgreSQL 16.15 applied 39/39; migrations 37/38 passed a deliberate statement-by-statement sequence without a harness-supplied outer wrapper; A03 passed; zero terminal rows and zero temporary SET edges remained; the disposable cluster was removed |
-| Historical PostgreSQL 17 / Hosted gate | r20 on the prior `4e84823` artifact set applied 39/39 through transactional policy `.5`, passed A01–A18 and completed the signed `ACCEPTED` temporary-LOGIN E2E; this does not prove current native Supabase CLI apply, policy `.6`, identity `.2` or v5 pins |
+| Historical PostgreSQL 17 / Hosted gate | r20 on the prior `4e84823` artifact set applied 39/39 through transactional policy `.5`, passed A01–A18 and completed the signed `ACCEPTED` temporary-LOGIN E2E; it remains attributed only to that prior artifact set |
+| Exact-current Hosted PostgreSQL 17 gate | deleted no-data, non-default, non-persistent `careslink-note-terminal-m1g-i-v5-r2-20260830` (id `0e63cac9-d1dc-4096-9f65-c36de91c85fa`; ref `yrsgxbxislyenblphfdl`) passed the 19-row baseline pin, transactional 39/39 manifest `.6`, A01–A18, identity `.2`, signed `ACCEPTED`/replay/`IDEMPOTENCY_CONFLICT`, independent 39-row/ledger/role/session postcheck and final Advisors; native Supabase CLI migration apply remains a separate unproved transport |
 | Activation | denied; readiness remains `false` and approved values remain `undefined` |
 
 ## Usage contract
@@ -95,6 +98,44 @@ A03 passed, final terminal rows and temporary SET edges were both zero, and the
 cluster was deleted. The earlier 172-file / 2,315-test result remains only the
 historical `4e84823` checkpoint.
 
+The exact-current Hosted gate used two hard-stop disposable attempts. The first,
+`careslink-note-terminal-m1g-i-v5-20260830` (id
+`0a6ec996-1480-468f-87f2-7c4f8a57b9db`; ref `inpgstykhnkuqmifeevb`), passed
+the 39/39 transaction, A01–A18, identity and signed valid chain, then was
+deleted before Advisors when an external independent checker incorrectly used
+the 19-row baseline's first version `20260625130340` as the 39-row chain's first
+version. Three listings showed only healthy Production; no evidence below
+depends on that attempt.
+
+The fresh replacement `careslink-note-terminal-m1g-i-v5-r2-20260830` (id
+`0e63cac9-d1dc-4096-9f65-c36de91c85fa`; ref `yrsgxbxislyenblphfdl`) was a
+no-data, non-default, non-persistent PostgreSQL 17 child of Production. The
+pinned CA SHA-256 was
+`700723581420dd1ac98fd7e9ac529f0ef210eadcaf87fc868a3ad7d114c2f3b7`.
+It matched the exact 19-row baseline digest
+`b742d12dee926ccfe76158cf524e503bcdc576a08e928a7147741faf4a314424`,
+then applied all 39 current migrations in one transaction through manifest
+`60314eb32f7ac26027862e30b27e60460cf4d17d49061126f4366b08a0cbd3a2`.
+A01–A18 passed 18/18 with manifest
+`f200ccd7da5fce6c14d6b532cf205f22e2f21b934824cc9027f061e48b610034`.
+Identity policy `.2` proved the exact RPC-only SET membership and zero-residue
+LOGIN lifecycle. The signed valid chain returned fresh `ACCEPTED`, write-free
+exact replay and `IDEMPOTENCY_CONFLICT`, retained the nine-key usage statement,
+proved the six-fact receipt projection and ended with ledger counts
+`[1,0,1,1,1,1]` plus no temporary login.
+
+The corrected independent postcheck found 39 migration rows from
+`20260625125102` through `20260829041316`, the same ledger counts, exactly one
+nine-key `ACCEPTED` terminal and zero temporary roles or sessions. Final
+Supabase Advisors returned security 21 INFO / 20 WARN / 0 ERROR, with zero
+Communication/generation-schema security findings, and performance 105 INFO /
+24 WARN / 0 ERROR. The generation-schema performance subset was 18 INFO / 13
+WARN / 0 ERROR across `auth_rls_initplan`, `unindexed_foreign_keys` and
+`unused_index`; global totals matched the recorded r20 totals. The replacement
+Preview was deleted and three independent listings showed only default
+Production `ACTIVE_HEALTHY`. The confirmed Micro rate was US$0.01344/hour; no
+exact accrued invoice total is inferred.
+
 The deleted Hosted sequence also belongs only to that prior artifact set:
 
 - r19: id `17627f14-b3ef-4d94-834e-8adde3850a2f`; ref
@@ -126,9 +167,10 @@ it would change A03, the rollback manifest and the derived preflight/coordinator
 pins and therefore requires another separately authorized disposable Preview
 rerun.
 
-Current-source native Supabase CLI apply and exact-current Hosted PostgreSQL 17
-evidence remain unproved. Remaining release work also includes live
-trust/custody and caller-credential resolution, separately authorized
+Exact-current Hosted PostgreSQL 17 evidence is now closed through the pinned
+single-transaction repository runner. Native Supabase CLI migration apply
+remains unproved as a separate transport. Remaining release work also includes
+live trust/custody and caller-credential resolution, separately authorized
 provider/model evaluation plus human review, final activation approval and
 deployment verification. Readiness therefore remains `false`. M1g-i used only
 local or disposable Preview writes and made no provider/model call, paid model
