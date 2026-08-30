@@ -35,7 +35,7 @@ import {
 import { CaresLinkV1ContractError } from "./shared-contracts";
 
 export const CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_COORDINATOR_VERSION =
-  "coordinator.communication.openai.synthetic-preview.2026-08-29.m1g-i.v5" as const;
+  "coordinator.communication.openai.synthetic-preview.2026-08-30.m1l.v1" as const;
 
 const SHA256_PATTERN = /^[a-f0-9]{64}$/;
 const UUID_PATTERN =
@@ -85,6 +85,9 @@ const COORDINATOR_POLICY_CORE = deepFreeze({
       "PRESENT_SOURCE_ONLY_NOT_RUNTIME_EVIDENCE",
     runnerTerminalLedger:
       "PRESENT_SIGNED_SOURCE_CONTRACT_CALLER_SHELL_NO_RUNTIME_IDENTITY",
+    runtimeCredentialBrokerMigration:
+      "PRESENT_SOURCE_ONLY_NO_APPROVED_RUNTIME_RESOLVER",
+    runnerTerminalActiveFence: "PRESENT_SOURCE_ONLY_DEFAULT_OFF",
     runnerTerminalPolicyVersion:
       CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RUNNER_TERMINAL_POLICY_VERSION,
     runnerTerminalPolicyDigest:
@@ -197,7 +200,7 @@ export type CaresLinkV1CommunicationNotePreviewCoordinatorPolicy =
   typeof COORDINATOR_POLICY_CORE & Readonly<{ policyDigest: string }>;
 
 export const CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_COORDINATOR_POLICY_DIGEST =
-  "1f93fa2c0ba207a28cb706d922acc10bba8305f16c83c7973c70ae4d7ac7e5c2" as const;
+  "570544bf700997a0ba90e06422019c237a01835ba8b75ff70bed5348cdf4bf02" as const;
 
 if (
   createCanonicalSha256(COORDINATOR_POLICY_CORE) !==

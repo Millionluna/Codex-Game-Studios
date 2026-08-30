@@ -520,10 +520,13 @@ describe("Communication Note M1g-g signed terminal caller migration contract", (
     );
   });
 
-  it("upgrades the rollback-only lifecycle proof to the signed caller", () => {
-    expect(assertion).toContain(
+  it("upgrades the rollback-only lifecycle proof to the inherited runtime caller", () => {
+    expect(assertion).not.toContain(
       "set local role careslink_v1_preview_runner_terminal_caller",
     );
+    expect(assertion).toContain("_assert_terminal_static_posture");
+    expect(assertion).toContain("_assert_runtime_privilege_posture");
+    expect(assertion).toContain("runtime_credential_not_active");
     expect(assertion).toContain("malformed terminal signature was accepted");
     expect(assertion).toContain(
       "authorization signing key reuse was accepted",

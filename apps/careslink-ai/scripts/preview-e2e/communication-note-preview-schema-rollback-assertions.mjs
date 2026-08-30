@@ -5,12 +5,12 @@ import {
   COMMUNICATION_NOTE_PREVIEW_RUNNER_TERMINAL_IDENTITY_ERROR_CODES as IDENTITY_ERRORS,
   COMMUNICATION_NOTE_PREVIEW_RUNNER_TERMINAL_IDENTITY_POLICY as IDENTITY_POLICY,
   CommunicationNotePreviewRunnerTerminalIdentityPolicyError,
-  extractCommunicationNotePreviewBranchDatabaseTarget,
+  extractCommunicationNoteDisposablePreviewResetDatabaseTarget,
   parseCommunicationNotePreviewRunnerTerminalIdentityArguments,
 } from "./communication-note-preview-runner-terminal-identity-policy.mjs";
 
 const ASSERTION_MANIFEST_SHA256 =
-  "f200ccd7da5fce6c14d6b532cf205f22e2f21b934824cc9027f061e48b610034";
+  "e0b5f30f9a4c33bf04020a4d11453c87a52321b69c6edd74982446b0fadd58fe";
 const ASSERTION_APPLICATION_NAME =
   "careslink-preview-schema-rollback-assertions";
 const ASSERTION_TRANSPORT_ROLE_PREFIX =
@@ -61,7 +61,7 @@ const ASSERTION_MANIFEST = Object.freeze([
   Object.freeze({
     stage: "A03",
     path: "supabase/assertions/communication_note_preview_runner_terminal_shadow_assertions.sql",
-    sha256: "addcc0524c5ae1a20ab0797ae5d005cff846105da61b4100d0db2a60c9e5c1e6",
+    sha256: "0f8192bccf46101103c301fcfd2b00cb818dd6725425a952777f697db8ea8172",
   }),
   Object.freeze({
     stage: "A04",
@@ -149,7 +149,7 @@ export const COMMUNICATION_NOTE_PREVIEW_SCHEMA_ROLLBACK_ASSERTION_STAGE_CODES =
 
 export const COMMUNICATION_NOTE_PREVIEW_SCHEMA_ROLLBACK_ASSERTION_POLICY =
   Object.freeze({
-    version: "2026-08-29.preview-schema-rollback-assertions.4",
+    version: "2026-08-30.preview-schema-rollback-assertions.5",
     fileCount: ASSERTION_MANIFEST.length,
     manifestSha256: ASSERTION_MANIFEST_SHA256,
     applicationName: ASSERTION_APPLICATION_NAME,
@@ -1467,7 +1467,10 @@ async function readBoundedStdin() {
 }
 
 async function main() {
-  // Private pipe contract: `supabase branches get ... -o json | node ...`.
+  // Canonical private pipe contract:
+  // `supabase branches get ... -o json |`
+  // `communication-note-preview-disposable-branch-envelope.mjs ... |`
+  // `communication-note-preview-schema-rollback-assertions.mjs ...`.
   const args = parseCommunicationNotePreviewRunnerTerminalIdentityArguments(
     process.argv.slice(2),
   );
@@ -1486,7 +1489,7 @@ async function main() {
     );
   }
   const branchJson = await readBoundedStdin();
-  const target = extractCommunicationNotePreviewBranchDatabaseTarget(
+  const target = extractCommunicationNoteDisposablePreviewResetDatabaseTarget(
     branchJson,
     { expectedBranchRef: args.expectedBranchRef },
   );

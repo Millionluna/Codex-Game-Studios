@@ -270,6 +270,76 @@ environment value can replace the still-absent live trust/custody and caller
 credential resolvers. Readiness remains `false` and approved values remain
 `undefined`.
 
+Communication Note M1j adds no product, deployment or test environment
+variable, no secret name and no `.env.example` entry. Version
+`binding.communication.openai.synthetic-preview.2026-08-30.m1j.v1` and policy
+digest `6e33f6a6c061f539b75808afc27abfe6f33fedfcf28de5f7b2a5fdeed5faee04`
+are source-integrity constants, not configuration. The public factory remains
+unconditionally unavailable, and the approved target, custody resolver,
+caller-credential resolver and runtime port remain `undefined`. The TestOnly
+factories accept injected, content-free descriptors and function capabilities
+only inside the server-only source/test boundary; they do not read a DSN,
+password, signing key, CA body, Supabase ref or provider key from the
+environment. A future live adapter must introduce its own separately reviewed
+secret transport and rotation contract rather than assigning an environment
+variable to these approval constants.
+
+Communication Note M1k likewise adds no product, deployment or test
+environment variable, no secret name and no `.env.example` entry. Version
+`resolver.communication.openai.synthetic-preview.2026-08-30.m1k.v1` and digest
+`67fb2065c23c1cd99a8e1c1a396509edefd7e7614fa476e2ee95839eafea5a7c`
+are source-integrity constants only. Its executable TestOnly factory requires
+explicit injected broker/session/audit/clock/entropy capabilities; neither the
+resolver nor the local harness reads a DSN, password, Supabase ref, CA body or
+provider key from an application environment. The harness constructs its own
+temporary local connection material in process, prints only fixed content-free
+results and destroys the cluster afterward. Do not create an environment
+variable that points product code at this isolated broker. Production secret
+transport, target binding, rotation and revocation remain a separate reviewed
+design.
+
+Communication Note M1l also adds no product/deployment environment variable,
+secret name or `.env.example` entry. Runtime binding version
+`binding.communication.openai.synthetic-preview.2026-08-30.m1l.v1`, digest
+`cfb9f27b63f1a623950b3033fc04300149bcba26389994aa04eb2d2213ea1115`,
+resolver version `resolver.communication.openai.synthetic-preview.2026-08-30.m1l.v2`, digest
+`e53114d9d247ffcdb20ed83b4724fa5b8b09eeab31e4f2fc1a868ade13a2f43e`
+and status `SOURCE_CONTRACT_WITH_UNAPPLIED_DURABLE_BROKER_NOT_APPROVED` are
+source-integrity facts, not configuration or approval. The formal migration's
+`productionMigrationPresent=true` flag means only that a reviewed migration
+source exists; that source is Production-unapplied/default-off and does not make a live
+credential endpoint available.
+
+The frozen M1l source-integrity set likewise adds no configuration: migration
+`64dcb8c57f2c73d3fbd5adc99e3261f8e2e0ddd8e8efcf5cca52c12ca34ba5aa`;
+transactional `2026-08-30.preview-transactional-migrations.7` with 40 entries,
+20 wrappers and manifest
+`6590eed19602c4d7931355f18dafde699b1c47012a3fe09f9d040c179e11792d`;
+ordered basenames/entries `f9905d27a907045dfd6e7677e54c50af84be06a194535682bcf9dc4859657d4f` /
+`7006c0ef8cb62d9596fdd236ffd3357d16338370e9d1437f54a58eb668b4b250`;
+A03 `0f8192bccf46101103c301fcfd2b00cb818dd6725425a952777f697db8ea8172`;
+rollback `2026-08-30.preview-schema-rollback-assertions.5` manifest
+`e0b5f30f9a4c33bf04020a4d11453c87a52321b69c6edd74982446b0fadd58fe`;
+preflight `preflight.communication.openai.synthetic-preview.2026-08-30.m1l.v1` /
+`4447c071fa37ab21f23624a4d3d4d28b2ee9ba2e1ef4c9be969bf9a0481de2f3`;
+coordinator `coordinator.communication.openai.synthetic-preview.2026-08-30.m1l.v1` /
+`570544bf700997a0ba90e06422019c237a01835ba8b75ff70bed5348cdf4bf02`.
+These values passed 53/53 focused pin checks but do not authorize environment,
+database, network or deployment access.
+
+The database boundary uses fixed internal `application_name` values and
+database-created short-lived role state, not application environment variables.
+The resolver still receives broker, exclusive-session, audit, clock and entropy
+ports by explicit injection; its new `cancelInFlight()` must be bound to the
+owned connection. Do not add a DSN, raw password, SCRAM verifier, Supabase ref,
+CA body or provider key variable to bypass the absent approved target/custody/
+secret-transport adapters. Deleted same-revision Hosted PostgreSQL 17 Preview r5
+proved pinned-CA TLS and anonymous-FD/process-memory-only test credential transport
+without adding a product variable; the Preview and its ephemeral material were
+removed. That is database-gate evidence, not Production, deployment or product
+configuration evidence, and readiness remains `false`. See
+`documentation/communication-note-preview-runtime-credential-broker-m1l.md`.
+
 ## Current auth, URL and feature variables
 
 | Variable | Class | Purpose | Boundary |

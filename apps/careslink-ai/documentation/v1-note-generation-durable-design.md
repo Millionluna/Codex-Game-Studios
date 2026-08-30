@@ -1646,3 +1646,257 @@ absent; readiness is still false and approved values are undefined. No
 provider/model, real-data, deployment or Production write is part of M1g-i.
 Full evidence is in
 `documentation/communication-note-preview-terminal-accepted-usage-m1g-i.md`.
+
+## 25. Communication resolved custody/caller runtime binding M1j — 2026-08-30
+
+M1j is the source-only successor to M1g-i's accepted terminal evidence. It does
+not create the missing live custody or credential services. Instead,
+`communication-note-preview-runner-terminal-resolved-runtime-binding.server.ts`
+defines the production-shaped boundary those future services must satisfy,
+under version
+`binding.communication.openai.synthetic-preview.2026-08-30.m1j.v1` and policy
+digest `6e33f6a6c061f539b75808afc27abfe6f33fedfcf28de5f7b2a5fdeed5faee04`.
+
+The public constructor unconditionally fails without inspecting its input.
+Readiness is `false`, and the approved disposable target, custody resolver,
+caller-credential resolver and resolved runtime port remain `undefined`. The
+executable constructor and all resolver/session constructors are explicitly
+TestOnly. Module-local WeakSet/WeakMap provenance prevents a plain or spread
+object from standing in for those test objects; lease reference, session
+binding, runtime role and query-function identity are synchronously claimed for
+single consumption within the module.
+
+The TestOnly sequence is:
+
+1. validate a content-free, no-data, non-default, non-persistent,
+   Production-excluded PostgreSQL 17 target descriptor;
+2. resolve the M1g-c/M1g-g custody and trust composition without accepting raw
+   private keys or credentials;
+3. acquire the exact fifth-caller lease on one physical, dedicated, single-use
+   session whose adapter normalizes every result to exact `{rows}`;
+4. begin one `READ COMMITTED` read-write transaction, apply separate statement,
+   lock, idle-in-transaction and transaction timeouts, attest the base runtime,
+   then use `SET LOCAL ROLE` for the fifth caller;
+5. attest the same backend PID and transaction ID, database clock, caller and
+   SECURITY DEFINER executor attributes/membership edges,
+   schema/relation/column/sequence posture and exact signed-terminal RPC
+   metadata/ACL before and after the one parameterized persistence call;
+6. commit once, or attempt rollback for every unacknowledged BEGIN/COMMIT path,
+   prove the role reset on the same backend when transport state permits, and
+   never retry the RPC; and
+7. request idempotent cleanup by acquisition digest even if credential acquire
+   lost its response, then validate a request-bound TestOnly release report
+   whose paired disposition is either destroyed/revoked or, only without a
+   returned binding, not-acquired/not-issued; every accepted report must also
+   claim that the acquisition digest is tombstoned and future issuance blocked
+   before returning success.
+
+Clock observations must be monotonic. Authorization expiry caps trust expiry;
+trust and target expiry cap the lease; the lease requires 30 seconds remaining
+before database use, while PostgreSQL 17 `transaction_timeout` limits the whole
+transaction to ten seconds. `VALID UNTIL` is treated only as login posture, not
+as a mechanism that kills an existing session. Custody/acquire operations have
+a 5-second settlement bound, every main-transaction database operation a
+12-second bound, and rollback/reset/revoke independent 5-second bounds. Each receives a fresh
+AbortSignal, but the JS watchdog alone cannot prove remote cancellation; a live
+adapter must bind abort to driver cancel/session destruction. Errors expose
+only fixed domain codes/messages.
+
+This boundary deliberately calls its cleanup artifact a TestOnly report. Its
+tombstone and future-issuance fields are resolver self-report, not independent
+proof that a live administrator durably fenced the acquisition digest, dropped
+the LOGIN, revoked the credential and terminated every backend. Activation therefore still requires
+an approved control-plane target verifier, real custody and caller/session
+adapters, TLS endpoint-to-target binding, an administrative zero-role/session
+postcheck, durable cross-process replay prevention and acquisition-digest
+tombstoning that wins against late issuance, and a same-revision
+disposable PostgreSQL 17 gate. M1j adds no
+migration, environment variable, network/SDK client, product importer,
+provider/model call, Preview, deployment or Production write. The M1g-i
+preflight/coordinator pins remain unchanged because their false/absent resolver
+claims are still true.
+
+Detailed handoff is in
+`documentation/communication-note-preview-live-custody-caller-resolver-m1j.md`.
+
+## 26. Communication durable caller-credential resolver M1k — 2026-08-30
+
+M1k implements the first local TestOnly database-backed lifecycle proof of
+M1j's fifth-caller credential boundary, using a TestOnly server adapter plus an
+isolated local PostgreSQL broker.
+Its policy version is
+`resolver.communication.openai.synthetic-preview.2026-08-30.m1k.v1` and its
+policy digest is
+`67fb2065c23c1cd99a8e1c1a396509edefd7e7614fa476e2ee95839eafea5a7c`.
+The public factory is still unconditionally disabled, readiness is `false` and
+the approved resolver export is `undefined`.
+
+The resolver generates a short-lived SCRAM credential, sends the verifier only
+to an injected management broker, opens one injected physical session with the
+password, binds its backend PID, and returns a secret-free M1j lease. Revocation
+is fixed as a durable tombstone, local session destruction, separate-transaction
+database finalization, independent inspection and only then the M1j release
+receipt. A locally known session or complete M1j binding cannot be represented
+by a false never-issued audit result.
+
+The broker ledger is metadata-only and monotonic:
+`RESERVED -> ISSUED_UNBOUND -> ACTIVE -> TOMBSTONED -> REVOKED`, with a direct
+never-issued `RESERVED -> TOMBSTONED` path. All operations for one acquisition
+digest share an advisory transaction lock. Tombstone records its XID and must
+commit before finalization. The TypeScript resolver requests at most 90 seconds;
+the isolated SQL broker accepts 30 seconds–10 minutes for independent testing,
+and the PG16 harness uses five-minute fixtures. An issued runtime role has
+`CONNECTION LIMIT 1`, no inheritance/dangerous attributes and exactly one
+SET-only edge to the terminal caller. Binding requires the expected role,
+backend start, PID, idle state and fixed application name. The tombstone
+transaction verifies the stored role name/OID and atomically
+commits `NOLOGIN` plus an expired `VALID UNTIL` with the ledger fence.
+Finalization requires that login fence, terminates/drains matching name/OID
+backends, revokes membership, drops the role and persists a paired release
+receipt. Independent postcheck verifies the terminal row, zero role/session/
+membership residue, zero raw-credential columns and zero API/PUBLIC ACL.
+
+The disposable private-socket PostgreSQL 16.15 gate passed six scenario groups,
+including a proven advisory-lock waiter for concurrent tombstone/acquire,
+wrong-PID/application bind rejection, ACTIVE replay, simultaneous acquire,
+acquire-response-loss, committed-`NOLOGIN` late-reconnect rejection,
+simultaneous revoke and active-session cleanup. Before teardown,
+postcheck observed three metadata tombstones—two issued and one never issued—
+and zero runtime roles, sessions and memberships. The exact temporary server
+was then stopped and its directory deleted. This evidence is not PostgreSQL 17,
+Hosted, TLS or pinned-CA evidence.
+
+M1k intentionally adds no migration. The existing 39-entry manifest and M1g-i
+Hosted evidence therefore remain unchanged and cannot be attributed to M1k.
+The production successor must add the broker in a separately authorized
+additive migration batch and atomically repin every affected artifact, place
+the broker beside the terminal ledger under the same locking authority, and
+make the terminal RPC revalidate an ACTIVE acquisition fence bound to the
+session user/backend/expiry. It must also add approved target/custody/secret
+transport, the other four caller purposes and an explicitly authorized
+same-revision PostgreSQL 17 no-data Preview gate before provider evaluation or
+activation.
+
+Detailed handoff is in
+`documentation/communication-note-preview-durable-caller-credential-resolver-m1k.md`.
+
+## 27. Communication formal runtime-credential broker M1l — 2026-08-30
+
+M1l adds the production-shaped database source that M1k deliberately deferred:
+the additive 40th migration
+`20260830065750_add_communication_note_preview_runtime_credential_broker.sql`.
+It remains Production-unapplied and default-off. Resolver version is
+`resolver.communication.openai.synthetic-preview.2026-08-30.m1l.v2`, policy
+digest is
+`e53114d9d247ffcdb20ed83b4724fa5b8b09eeab31e4f2fc1a868ade13a2f43e`.
+The inherited runtime binding is
+`binding.communication.openai.synthetic-preview.2026-08-30.m1l.v1` with digest
+`cfb9f27b63f1a623950b3033fc04300149bcba26389994aa04eb2d2213ea1115`;
+status is `SOURCE_CONTRACT_WITH_UNAPPLIED_DURABLE_BROKER_NOT_APPROVED`,
+readiness is `false`, and the approved resolver remains `undefined`.
+
+The migration requires the Supabase Hosted management shape: exact `postgres`
+session/current user and database,
+`NOSUPERUSER`, `CREATEROLE`, `BYPASSRLS`, plus `pg_signal_backend` and
+`pg_read_all_stats`. It creates private forced-RLS
+`careslink_v1_runtime_broker` with a monotonic hash/digest-only acquisition
+ledger and invoker lifecycle APIs. No raw password, SCRAM verifier, DSN or
+connection string is persisted. API roles have zero broker capability.
+
+The runtime role is derived from the acquisition digest, uses SCRAM, is bounded
+to 45–90 seconds and one connection, and is `INHERIT=true`. Its outbound fifth-
+caller edge is `ADMIN=false`, `INHERIT=true`, `SET=false`. PostgreSQL 16/17
+`CREATEROLE` also creates a distinct inbound inert creator edge with
+`member=postgres`, superuser grantor, `ADMIN=true`, `INHERIT=false`,
+`SET=false`. The client transaction sends no `SET ROLE`: outside the wrapper
+`current_user=session_user=runtime role`; inside the `SECURITY DEFINER` wrapper
+`current_user=terminal executor` and `session_user=runtime role`. SQL `SET ROLE`
+and `set_config('role',...)` are forbidden.
+
+The migration uses cluster-wide `pg_shdepend` to require zero static-caller
+ownership dependencies and exact ACL dependencies only for the current
+database generation schema and terminal wrapper. Acquire, bind and wrapper
+runtime paths revalidate this proof, reject generation-column capability via
+`has_any_column_privilege`, and re-attest both wrapper and inner as exact
+executor-owned `SECURITY DEFINER` functions with empty `search_path` and exact
+ACL. The runtime
+inherits only the terminal wrapper and has no generation table, sequence,
+column or other-function privilege. Acquire records role/OID and hashed
+lease/session/credential identities. Bind requires exact PID, backend start and
+fixed runtime application, then immediately makes the role `NOLOGIN`.
+Lifecycle mutations serialize on one exclusive acquisition-digest transaction
+lock.
+
+The public database interface remains the exact three-argument
+`persist_verified_communication_note_preview_runner_terminal(jsonb,text,text)`.
+The former implementation becomes a private unfenced inner function. The
+wrapper takes a shared transaction lock in the same namespace, reloads the row
+and rechecks ACTIVE state, role name/OID, PID/backend start, fixed application,
+authorization digest, run hash, caller-identity HMAC, expiry, `NOLOGIN` and the
+exact outbound caller plus inbound inert creator membership postures before
+delegating. Tombstone/finalize need the
+exclusive lock, which makes terminal-first wait for commit and makes
+tombstone-first fail closed before the old implementation can write.
+
+The resolver session contract now includes connection-owned
+`cancelInFlight()`. On Abort it waits at most 250 ms for both cancellation and
+the underlying query to settle. Confirmed settlement permits reuse; any
+unconfirmed barrier permanently quarantines the driver, preventing later SQL
+through that capability while the independent management path performs the
+durable cleanup.
+
+An owned, no-TCP, private-Unix-socket PostgreSQL 16.15 harness applied the
+formal migration under a non-superuser `postgres` with the exact required role
+memberships and passed six scenarios with four issued-and-revoked acquisitions.
+Final residue counts were zero for runtime roles, sessions, memberships and API
+privileges. In the second-database runtime-owned large-object case, the first
+finalize returned SQLSTATE `2BP01`, routine `DropRole`, while TOMBSTONED ledger,
+`NOLOGIN` role, membership and remote residue survived rollback. Removing the
+unique owner dependency allowed finalize and inspect to succeed with zero
+residue.
+
+The SQL sequence is independently designed to fail closed: durable tombstone and
+`NOLOGIN` precede `DROP ROLE`, and `REVOKED` follows only successful deletion.
+The same-revision Hosted/PG17 proof is now closed by deleted no-data,
+non-default, non-persistent Preview r5 (branch ID
+`5f088eac-ac66-4625-8f4c-c9e7d9b02c2a`, ref `ucdmoxqzruohiqmsokfv`). It passed
+40/40 migrations in one transaction, A01–A18, pinned-CA child execution and an
+independent postcheck. Its terminal state was `ACCEPTED`; exact replay was
+write-free, a valid conflict was rejected, direct-login inherited caller
+identity issued no `SET ROLE`, and bind established `NOLOGIN`. Two acquisitions
+reached `REVOKED`, final ledgers were `[1,0,1,1,1,1]`, and runtime role/session/
+membership/API/verifier/temporary-database residue was zero.
+
+The cross-database case proved the exact PostgreSQL 17 large-object ACL and
+current-database plus cluster-wide owner dependency using `aclexplode` and
+`pg_shdepend`, retained the tombstone/fence/residue after the expected
+`2BP01`/`DropRole` rollback, and converged to zero only after controlled owner
+cleanup. Security and Performance Advisors had zero broker-scoped findings;
+global findings and pre-existing generation lint errors remain, so this is not a
+global zero-warning claim. r5 was deleted and three independent branch lists
+left only healthy default Production, which was never the SQL target. This is
+Hosted Preview evidence, not Production, deployment or provider/model evidence.
+
+Moving from 39 to 40 migrations makes M1g-i's old pins and deleted Preview
+evidence historical for their exact revision. The atomic M1l set passed 53/53
+focused checks and is frozen as migration
+`64dcb8c57f2c73d3fbd5adc99e3261f8e2e0ddd8e8efcf5cca52c12ca34ba5aa`;
+transactional `2026-08-30.preview-transactional-migrations.7` with 40 entries,
+20 wrappers and manifest
+`6590eed19602c4d7931355f18dafde699b1c47012a3fe09f9d040c179e11792d`;
+ordered basenames/entries `f9905d27a907045dfd6e7677e54c50af84be06a194535682bcf9dc4859657d4f` /
+`7006c0ef8cb62d9596fdd236ffd3357d16338370e9d1437f54a58eb668b4b250`;
+A03 `0f8192bccf46101103c301fcfd2b00cb818dd6725425a952777f697db8ea8172`;
+rollback `2026-08-30.preview-schema-rollback-assertions.5` manifest
+`e0b5f30f9a4c33bf04020a4d11453c87a52321b69c6edd74982446b0fadd58fe`;
+and preflight/coordinator
+`4447c071fa37ab21f23624a4d3d4d28b2ee9ba2e1ef4c9be969bf9a0481de2f3` /
+`570544bf700997a0ba90e06422019c237a01835ba8b75ff70bed5348cdf4bf02`.
+These pins are source integrity, not approval. The disposable PostgreSQL 17
+Hosted gate is complete; the remaining target/custody/secret-transport/product-
+driver/provider/human/merge/deployment gates still require separate evidence and
+authorization. Until they close, no product route or Production traffic may use
+this broker.
+
+Detailed handoff is in
+`documentation/communication-note-preview-runtime-credential-broker-m1l.md`.

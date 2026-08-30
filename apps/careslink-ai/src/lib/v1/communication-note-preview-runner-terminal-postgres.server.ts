@@ -281,7 +281,9 @@ function mapPostgresError(value: unknown) {
     message === "RESERVATION_NOT_FOUND" ||
     message === "RECEIPT_NOT_FOUND" ||
     message === "RUNNER_TERMINAL_SIGNER_NOT_INDEPENDENT" ||
-    message === "RUNNER_TERMINAL_BINDING_INVALID"
+    message === "RUNNER_TERMINAL_BINDING_INVALID" ||
+    message === "RUNTIME_CREDENTIAL_NOT_ACTIVE" ||
+    code === "55P03"
   ) {
     return new CaresLinkV1ContractError(
       "INVALID_STATE_TRANSITION",

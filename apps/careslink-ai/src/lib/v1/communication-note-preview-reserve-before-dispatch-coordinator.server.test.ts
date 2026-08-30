@@ -80,15 +80,15 @@ import { CARESLINK_V1_OPENAI_COMMUNICATION_NOTE_PROVIDER_READY } from "./communi
 const NOW = "2026-08-28T02:00:00.000Z";
 const PREFLIGHT_OBSERVED_AT = "2026-08-28T01:59:00.000Z";
 
-describe("Communication Note M1g-g reserve-before-dispatch coordinator transcript", () => {
+describe("Communication Note M1l reserve-before-dispatch coordinator transcript", () => {
   it("literal-pins a source-only policy and preserves every existing readiness and approval latch", () => {
     expect(CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_COORDINATOR_VERSION).toBe(
-      "coordinator.communication.openai.synthetic-preview.2026-08-29.m1g-i.v5",
+      "coordinator.communication.openai.synthetic-preview.2026-08-30.m1l.v1",
     );
     expect(
       CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_COORDINATOR_POLICY_DIGEST,
     ).toBe(
-      "1f93fa2c0ba207a28cb706d922acc10bba8305f16c83c7973c70ae4d7ac7e5c2",
+      "570544bf700997a0ba90e06422019c237a01835ba8b75ff70bed5348cdf4bf02",
     );
     expect(
       CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_COORDINATOR_POLICY,
@@ -105,6 +105,9 @@ describe("Communication Note M1g-g reserve-before-dispatch coordinator transcrip
           "PRESENT_SOURCE_ONLY_NOT_RUNTIME_EVIDENCE",
         runnerTerminalLedger:
           "PRESENT_SIGNED_SOURCE_CONTRACT_CALLER_SHELL_NO_RUNTIME_IDENTITY",
+        runtimeCredentialBrokerMigration:
+          "PRESENT_SOURCE_ONLY_NO_APPROVED_RUNTIME_RESOLVER",
+        runnerTerminalActiveFence: "PRESENT_SOURCE_ONLY_DEFAULT_OFF",
         runnerTerminalPolicyVersion:
           CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RUNNER_TERMINAL_POLICY_VERSION,
         runnerTerminalPolicyDigest:
@@ -1466,6 +1469,8 @@ function createPreflightCandidate(
       runnerTerminalRuntimeMembershipPresent: false,
       runnerTerminalCredentialResolverPresent: false,
       runnerTerminalRuntimeExecute: false,
+      brokerMigrationPresent: true,
+      terminalActiveFencePresent: true,
       apiRoleExecute: false,
       fixtureRowCount: 0,
       callerBindings:

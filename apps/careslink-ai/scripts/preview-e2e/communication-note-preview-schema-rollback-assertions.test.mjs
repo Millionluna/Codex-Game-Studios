@@ -27,6 +27,7 @@ const RUNNER_URL = new URL(
   "./communication-note-preview-schema-rollback-assertions.mjs",
   import.meta.url,
 );
+const PRODUCTION_REF = "adocsnwnslxhxcjgbyee";
 const EXPECTED_ASSERTION_STAGE_MAPPING = Object.freeze([
   ["A01", "communication_note_preview_custody_callers_shadow_assertions.sql"],
   ["A02", "communication_note_preview_execution_authority_shadow_assertions.sql"],
@@ -67,6 +68,46 @@ function candidates() {
       password: SECRET,
     }),
   });
+}
+
+function disposableEnvelope(overrides = {}) {
+  const metadata = {
+    ref: BRANCH_REF,
+    parent_project_ref: PRODUCTION_REF,
+    is_default: false,
+    persistent: false,
+    with_data: false,
+    status: "ACTIVE_HEALTHY",
+    ...(overrides.metadata ?? {}),
+  };
+  const credentials = {
+    REF: BRANCH_REF,
+    STATUS: "ACTIVE_HEALTHY",
+    POSTGRES_URL_NON_POOLING:
+      `postgresql://postgres:${SECRET}@db.${BRANCH_REF}.supabase.co:5432/postgres?sslmode=require`,
+    POSTGRES_URL:
+      `postgresql://postgres.${BRANCH_REF}:${SECRET}@aws-0-ap-southeast-2.pooler.supabase.com:6543/postgres?connect_timeout=10`,
+    ...(overrides.credentials ?? {}),
+  };
+  return JSON.stringify({ metadata, credentials });
+}
+
+function runRollbackCli(input) {
+  return spawnSync(
+    process.execPath,
+    [
+      fileURLToPath(RUNNER_URL),
+      `--expected-branch-ref=${BRANCH_REF}`,
+      "--expected-pg-major=17",
+      `--ssl-root-cert-path=/private/${SECRET}.pem`,
+      `--expected-ssl-root-cert-sha256=${"0".repeat(64)}`,
+    ],
+    {
+      encoding: "utf8",
+      env: { PATH: process.env.PATH ?? "" },
+      input,
+    },
+  );
 }
 
 function fakeClientClass(behaviors) {
@@ -561,7 +602,7 @@ describe("Communication Note Preview schema rollback assertion runner", () => {
     expect(bundle).toMatchObject({
       fileCount: 18,
       manifestSha256:
-        "f200ccd7da5fce6c14d6b532cf205f22e2f21b934824cc9027f061e48b610034",
+        "e0b5f30f9a4c33bf04020a4d11453c87a52321b69c6edd74982446b0fadd58fe",
     });
     expect(bundle.scripts).toHaveLength(18);
     expect(STAGES).toEqual({
@@ -578,7 +619,7 @@ describe("Communication Note Preview schema rollback assertion runner", () => {
       bundle.scripts.filter((script) => script.migrationEntryRole),
     ).toHaveLength(1);
     expect(bundle.scripts[2].diagnosticPrefixes.length).toBeGreaterThan(30);
-    expect(bundle.scripts[2].diagnosticPrefixes[47]).toBe(
+    expect(bundle.scripts[2].diagnosticPrefixes[62]).toBe(
       "receipt evidence drift did not fail binding: ",
     );
     expect(bundle.scripts[2].sql).toContain(
@@ -600,19 +641,19 @@ describe("Communication Note Preview schema rollback assertion runner", () => {
     expect(classifyCommunicationNotePreviewRollbackAssertionMessage(
       new Error(`${keyReusePrefix}ASSERTION_EXPECTED_REJECTION`),
       bundle.scripts[2].diagnosticPrefixes,
-    )).toBe("D040A");
+    )).toBe("D055A");
     expect(classifyCommunicationNotePreviewRollbackAssertionMessage(
       new Error(`${keyReusePrefix}VALIDATION_ERROR`),
       bundle.scripts[2].diagnosticPrefixes,
-    )).toBe("D040V");
+    )).toBe("D055V");
     expect(classifyCommunicationNotePreviewRollbackAssertionMessage(
       new Error(`${keyReusePrefix}permission denied for relation ledger`),
       bundle.scripts[2].diagnosticPrefixes,
-    )).toBe("D040P");
+    )).toBe("D055P");
     expect(classifyCommunicationNotePreviewRollbackAssertionMessage(
       new Error(`${keyReusePrefix}${SECRET}`),
       bundle.scripts[2].diagnosticPrefixes,
-    )).toBe("D040U");
+    )).toBe("D055U");
     const overlappingPrefixes = [
       "shared assertion failed",
       "shared assertion failed: ",
@@ -795,15 +836,27 @@ describe("Communication Note Preview schema rollback assertion runner", () => {
   it("keeps the CLI contract and successful stdout evidence minimal", async () => {
     const source = await readFile(RUNNER_URL, "utf8");
     expect(POLICY).toEqual({
-      version: "2026-08-29.preview-schema-rollback-assertions.4",
+      version: "2026-08-30.preview-schema-rollback-assertions.5",
       fileCount: 18,
       manifestSha256:
-        "f200ccd7da5fce6c14d6b532cf205f22e2f21b934824cc9027f061e48b610034",
+        "e0b5f30f9a4c33bf04020a4d11453c87a52321b69c6edd74982446b0fadd58fe",
       applicationName: "careslink-preview-schema-rollback-assertions",
       transportRolePrefix: "careslink_m1gh_assert_transport_",
       actorRolePrefix: "careslink_m1gh_assert_actor_",
     });
-    expect(source).toContain("supabase branches get ... -o json");
+    expect(source).toContain("supabase branches get ... -o json |");
+    expect(source).toContain(
+      "communication-note-preview-disposable-branch-envelope.mjs ... |",
+    );
+    expect(source).toContain(
+      "communication-note-preview-schema-rollback-assertions.mjs ...",
+    );
+    expect(source).toContain(
+      "extractCommunicationNoteDisposablePreviewResetDatabaseTarget",
+    );
+    expect(source).not.toContain(
+      "extractCommunicationNotePreviewBranchDatabaseTarget",
+    );
     expect(source).not.toContain("--output-format");
     expect(source).not.toContain("console.log");
     expect(source).not.toContain("console.error");
@@ -882,6 +935,53 @@ describe("Communication Note Preview schema rollback assertion runner", () => {
       "SQLSTATE",
     ]) {
       expect(cli.stderr).not.toContain(forbidden);
+    }
+  });
+
+  it("accepts only the canonical disposable envelope at the CLI boundary", () => {
+    const accepted = runRollbackCli(disposableEnvelope());
+    expect(accepted.status).toBe(1);
+    expect(accepted.signal).toBeNull();
+    expect(accepted.stdout).toBe("");
+    expect(accepted.stderr).toBe(
+      `{"stage":"R00","errorType":"${ERRORS.caFailed}"}\n`,
+    );
+
+    const rawCredentials = JSON.stringify(
+      JSON.parse(disposableEnvelope()).credentials,
+    );
+    const denied = [
+      [
+        rawCredentials,
+        "RUNNER_TERMINAL_IDENTITY_BRANCH_JSON_INVALID",
+      ],
+      [
+        disposableEnvelope({ metadata: { ref: PRODUCTION_REF } }),
+        "RUNNER_TERMINAL_IDENTITY_PRODUCTION_TARGET_DENIED",
+      ],
+      [
+        disposableEnvelope({ metadata: { persistent: true } }),
+        "RUNNER_TERMINAL_IDENTITY_BRANCH_NOT_DISPOSABLE",
+      ],
+    ];
+    for (const [input, errorType] of denied) {
+      const result = runRollbackCli(input);
+      expect(result.status).toBe(1);
+      expect(result.signal).toBeNull();
+      expect(result.stdout).toBe("");
+      expect(result.stderr).toBe(
+        `{"stage":"R00","errorType":"${errorType}"}\n`,
+      );
+      expect(result.stderr.trim().split("\n")).toHaveLength(1);
+      for (const forbidden of [
+        SECRET,
+        "/private/",
+        "postgresql://",
+        "password",
+        "SQLSTATE",
+      ]) {
+        expect(result.stderr).not.toContain(forbidden);
+      }
     }
   });
 

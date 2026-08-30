@@ -20,6 +20,20 @@ committed as `4e84823`. This work does not activate a retained runtime identity,
 credential resolver, provider transport, model call, deployment or Production
 database change.
 
+Successor note (M1j, 2026-08-30):
+`communication-note-preview-runner-terminal-resolved-runtime-binding.server.ts`
+now supplies a production-shaped but explicitly TestOnly/source-only contract
+for resolving the disposable target, custody/trust and fifth-caller session.
+Its public factory remains unconditionally disabled, readiness remains
+`false`, and all four approved target/resolver/port values remain `undefined`.
+M1j therefore narrows the future adapter contract but does not retroactively
+turn the M1g-i Hosted run into live resolver evidence or change any migration,
+Preview, provider/model, deployment or Production claim below. See the
+[M1j handoff](communication-note-preview-live-custody-caller-resolver-m1j.md).
+Its TestOnly cleanup receipt requires acquisition-digest tombstone and
+future-issuance-blocked claims, but durable broker fencing against late acquire
+settlement remains unproved and is still an activation blocker.
+
 | Boundary | M1g-i result |
 |---|---|
 | Migration count | 39 |

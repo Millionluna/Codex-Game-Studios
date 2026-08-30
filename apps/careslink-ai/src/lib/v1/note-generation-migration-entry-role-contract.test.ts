@@ -55,6 +55,16 @@ const migrationCases = [
       "careslink_v1_generation_owner",
     ],
   },
+  {
+    name: "runtime credential broker and terminal fence",
+    path: "supabase/migrations/20260830065750_add_communication_note_preview_runtime_credential_broker.sql",
+    roles: [
+      "careslink_v1_generation_owner",
+      "careslink_v1_preview_runner_terminal_executor",
+      "careslink_v1_generation_owner",
+    ],
+    sessionUserRequired: true,
+  },
 ] as const;
 
 const migrations = migrationCases.map((migrationCase) => ({
@@ -187,7 +197,8 @@ const assertionSetRolePattern = /^set(?: local)? role ([a-z0-9_]+);$/gm;
 describe("V1 Note migration entry-role restoration contract", () => {
   it.each(migrations)(
     "$name captures its entry actor once without trusting the transport login",
-    ({ source }) => {
+    (migration) => {
+      const { source } = migration;
       const captures = matches(source, capturePattern);
       const roleSwitches = matches(source, setRolePattern);
 
@@ -196,7 +207,9 @@ describe("V1 Note migration entry-role restoration contract", () => {
       expect(captures[0].index).toBeLessThan(roleSwitches[0].index);
       expect(source).not.toMatch(resetRolePattern);
       expect(source).not.toMatch(/^set role postgres;$/gm);
-      expect(source).not.toContain("session_user");
+      if (!("sessionUserRequired" in migration)) {
+        expect(source).not.toContain("session_user");
+      }
     },
   );
 
@@ -219,7 +232,7 @@ describe("V1 Note migration entry-role restoration contract", () => {
       }
 
       const firstTemporaryMembershipRevoke = source.search(
-        /^revoke careslink_v1_generation_[a-z0-9_]+\s+from current_user(?:\s+granted by current_user)?;$/m,
+        /^revoke careslink_v1_[a-z0-9_]+\s+from current_user(?:\s+granted by current_user)?;$/m,
       );
       expect(firstTemporaryMembershipRevoke).toBeGreaterThan(
         restores.at(-1)?.index ?? -1,

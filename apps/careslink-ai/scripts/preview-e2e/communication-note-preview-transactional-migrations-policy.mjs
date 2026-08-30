@@ -7,12 +7,12 @@ const NON_TRANSACTIONAL_SQL_PATTERN = /^(?:create\s+(?:unique\s+)?index\s+concur
 
 export const COMMUNICATION_NOTE_PREVIEW_TRANSACTIONAL_MIGRATION_POLICY =
   Object.freeze({
-    version: "2026-08-29.preview-transactional-migrations.6",
+    version: "2026-08-30.preview-transactional-migrations.7",
     productionProjectRef: "adocsnwnslxhxcjgbyee",
     expectedCliVersion: "2.115.0",
     manifestSha256:
-      "60314eb32f7ac26027862e30b27e60460cf4d17d49061126f4366b08a0cbd3a2",
-    migrationCount: 39,
+      "6590eed19602c4d7931355f18dafde699b1c47012a3fe09f9d040c179e11792d",
+    migrationCount: 40,
     disposablePreviewBaselineMigrationCount: 19,
     disposablePreviewBaselineHistorySha256:
       "b742d12dee926ccfe76158cf524e503bcdc576a08e928a7147741faf4a314424",
@@ -129,6 +129,7 @@ export const COMMUNICATION_NOTE_PREVIEW_TRANSACTIONAL_MIGRATION_POLICY =
       "careslink_portal_private",
       "careslink_v1_generation",
       "careslink_v1_internal",
+      "careslink_v1_runtime_broker",
     ]),
     applicationRoles: Object.freeze([
       "careslink_v1_generation_executor",
@@ -215,6 +216,7 @@ export const COMMUNICATION_NOTE_PREVIEW_TRANSACTIONAL_MIGRATION_MANIFEST =
     ["20260828235426_harden_communication_note_preview_reservation_runner_terminal_shadow.sql", "09e69476de4b5b1b925a281f2943ef541e289aab6bef60ad92aace14d0c6d432"],
     ["20260829011323_add_communication_note_preview_signed_terminal_caller_shadow.sql", "4c13bf50d7866a4b948475b598bb1c103fb625e59824be98c4e272c659da283f"],
     ["20260829041316_align_communication_note_preview_terminal_accepted_usage.sql", "3d2cc53df3cf17ea21a4f93aaf673f8e911fcc9a35b5309cf7c633c6802e448e"],
+    ["20260830065750_add_communication_note_preview_runtime_credential_broker.sql", "64dcb8c57f2c73d3fbd5adc99e3261f8e2e0ddd8e8efcf5cca52c12ca34ba5aa"],
   ].map(([basename, sha256]) => Object.freeze({ basename, sha256 })));
 
 const OUTER_TRANSACTION_MIGRATIONS = new Set([
@@ -237,6 +239,7 @@ const OUTER_TRANSACTION_MIGRATIONS = new Set([
   "20260828235426_harden_communication_note_preview_reservation_runner_terminal_shadow.sql",
   "20260829011323_add_communication_note_preview_signed_terminal_caller_shadow.sql",
   "20260829041316_align_communication_note_preview_terminal_accepted_usage.sql",
+  "20260830065750_add_communication_note_preview_runtime_credential_broker.sql",
 ]);
 
 const FIXED_ERROR_CODES = new Set([

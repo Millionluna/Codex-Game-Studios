@@ -24,20 +24,32 @@ const RUNNER_PATH = fileURLToPath(new URL(
 ));
 
 describe("Communication Note Preview transactional migration policy", () => {
-  it("pins all 39 repository migrations and removes only 19 known wrappers in memory", async () => {
+  it("pins all 40 repository migrations and removes only 20 known wrappers in memory", async () => {
     const bundle = await loadPinnedCommunicationNotePreviewMigrations();
     expect(bundle).toMatchObject({
       manifestSha256: POLICY.manifestSha256,
-      outerTransactionCount: 19,
+      outerTransactionCount: 20,
     });
-    expect(bundle.migrations).toHaveLength(39);
+    expect(bundle.migrations).toHaveLength(40);
     expect(bundle.migrations.at(-1)).toMatchObject({
       basename:
-        "20260829041316_align_communication_note_preview_terminal_accepted_usage.sql",
-      version: "20260829041316",
+        "20260830065750_add_communication_note_preview_runtime_credential_broker.sql",
+      version: "20260830065750",
       outerTransactionRemoved: true,
     });
-    const accepted = bundle.migrations.at(-1);
+    const runtimeBroker = bundle.migrations.at(-1);
+    expect(runtimeBroker.statements[0]).toMatch(/\bbegin$/i);
+    expect(runtimeBroker.statements.at(-1)).toMatch(/^commit$/i);
+    expect(runtimeBroker.executionSql.trim().toLowerCase()).not.toMatch(
+      /^begin\b|\bcommit;$/,
+    );
+    expect(runtimeBroker.executionSql).toMatch(
+      /careslink_v1_runtime_broker/,
+    );
+
+    const accepted = bundle.migrations.find((migration) =>
+      migration.version === "20260829041316"
+    );
     expect(accepted.statements[0]).toMatch(/\bbegin$/i);
     expect(accepted.statements.at(-1)).toMatch(/^commit$/i);
     expect(accepted.executionSql.trim().toLowerCase()).not.toMatch(/^begin\b/);

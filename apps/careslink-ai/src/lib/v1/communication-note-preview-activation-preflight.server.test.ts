@@ -65,17 +65,17 @@ vi.mock("server-only", () => ({}));
 
 const NOW = "2026-08-28T02:00:00.000Z";
 
-describe("Communication Note M1g-i activation preflight", () => {
+describe("Communication Note M1l activation preflight", () => {
   it("literal-pins a source-only policy while preserving all existing readiness and approval latches", () => {
     expect(
       CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_ACTIVATION_PREFLIGHT_VERSION,
     ).toBe(
-      "preflight.communication.openai.synthetic-preview.2026-08-29.m1g-i.v5",
+      "preflight.communication.openai.synthetic-preview.2026-08-30.m1l.v1",
     );
     expect(
       CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_ACTIVATION_PREFLIGHT_POLICY_DIGEST,
     ).toBe(
-      "0e2582040995753efe95baa071fee4e0b58fa105c79db8bfa673abd66e2d01a1",
+      "4447c071fa37ab21f23624a4d3d4d28b2ee9ba2e1ef4c9be969bf9a0481de2f3",
     );
     expect(
       CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_ACTIVATION_PREFLIGHT_POLICY,
@@ -114,6 +114,8 @@ describe("Communication Note M1g-i activation preflight", () => {
         runnerTerminalRuntimeMembershipPresent: false,
         runnerTerminalCredentialResolverPresent: false,
         runnerTerminalRuntimeExecute: false,
+        brokerMigrationPresent: true,
+        terminalActiveFencePresent: true,
       },
     });
     expect(Object.isFrozen(
@@ -177,6 +179,17 @@ describe("Communication Note M1g-i activation preflight", () => {
         (caller) => caller.identityHmac,
       ),
     );
+    expect(result.candidate.database).toMatchObject({
+      migrationCount: 40,
+      runtimeCredentialBrokerMigrationSha256:
+        CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_DATABASE_EVIDENCE_PINS
+          .runtimeCredentialBrokerMigrationSha256,
+      runnerTerminalRuntimeIdentityPresent: false,
+      runnerTerminalRuntimeMembershipPresent: false,
+      runnerTerminalCredentialResolverPresent: false,
+      brokerMigrationPresent: true,
+      terminalActiveFencePresent: true,
+    });
     expect(result.candidate.provider).toMatchObject({
       observedAt: fixture.candidate.observedAt,
       projectStatus: "ACTIVE",
@@ -225,7 +238,7 @@ describe("Communication Note M1g-i activation preflight", () => {
     }
   });
 
-  it("pins the exact 39-migration manifest and eight M1g-b through M1g-i database artifacts", () => {
+  it("pins the exact 40-migration manifest and nine M1g-b through M1l database artifacts", () => {
     const migrationsDirectory = join(process.cwd(), "supabase/migrations");
     const migrationNames = readdirSync(migrationsDirectory)
       .filter((name) => name.endsWith(".sql"))
@@ -286,6 +299,11 @@ describe("Communication Note M1g-i activation preflight", () => {
         "supabase/migrations/20260829041316_align_communication_note_preview_terminal_accepted_usage.sql",
         CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_DATABASE_EVIDENCE_PINS
           .runnerTerminalAcceptedUsageMigrationSha256,
+      ],
+      [
+        "supabase/migrations/20260830065750_add_communication_note_preview_runtime_credential_broker.sql",
+        CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_DATABASE_EVIDENCE_PINS
+          .runtimeCredentialBrokerMigrationSha256,
       ],
       [
         "supabase/assertions/communication_note_preview_runner_terminal_shadow_assertions.sql",
@@ -479,7 +497,7 @@ describe("Communication Note M1g-i activation preflight", () => {
         candidate.database.productionExcluded = false;
       },
       (candidate) => {
-        (candidate.database as { migrationCount: number }).migrationCount = 36;
+        (candidate.database as { migrationCount: number }).migrationCount = 39;
       },
       (candidate) => {
         candidate.database.fixtureRowCount = 1;
@@ -538,6 +556,13 @@ describe("Communication Note M1g-i activation preflight", () => {
       },
       (candidate) => {
         (
+          candidate.database as {
+            runtimeCredentialBrokerMigrationSha256: string;
+          }
+        ).runtimeCredentialBrokerMigrationSha256 = hex("f");
+      },
+      (candidate) => {
+        (
           candidate.database as { runnerTerminalAssertionSha256: string }
         ).runnerTerminalAssertionSha256 = hex("f");
       },
@@ -565,6 +590,37 @@ describe("Communication Note M1g-i activation preflight", () => {
         (
           candidate.database as { runnerTerminalRuntimeExecute: boolean }
         ).runnerTerminalRuntimeExecute = true;
+      },
+      (candidate) => {
+        (
+          candidate.database as {
+            runnerTerminalRuntimeIdentityPresent: boolean;
+          }
+        ).runnerTerminalRuntimeIdentityPresent = true;
+      },
+      (candidate) => {
+        (
+          candidate.database as {
+            runnerTerminalRuntimeMembershipPresent: boolean;
+          }
+        ).runnerTerminalRuntimeMembershipPresent = true;
+      },
+      (candidate) => {
+        (
+          candidate.database as {
+            runnerTerminalCredentialResolverPresent: boolean;
+          }
+        ).runnerTerminalCredentialResolverPresent = true;
+      },
+      (candidate) => {
+        (
+          candidate.database as { brokerMigrationPresent: boolean }
+        ).brokerMigrationPresent = false;
+      },
+      (candidate) => {
+        (
+          candidate.database as { terminalActiveFencePresent: boolean }
+        ).terminalActiveFencePresent = false;
       },
       (candidate) => {
         candidate.database.callerBindings[0].loginIdentityHmac = hex("f");
@@ -1207,6 +1263,8 @@ function createCandidate(
       runnerTerminalRuntimeMembershipPresent: false,
       runnerTerminalCredentialResolverPresent: false,
       runnerTerminalRuntimeExecute: false,
+      brokerMigrationPresent: true,
+      terminalActiveFencePresent: true,
       apiRoleExecute: false,
       fixtureRowCount: 0,
       callerBindings:

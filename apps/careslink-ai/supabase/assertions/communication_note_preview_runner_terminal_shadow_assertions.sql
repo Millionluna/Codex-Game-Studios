@@ -23,6 +23,22 @@ declare
   v_function oid := to_regprocedure(
     'careslink_v1_generation.persist_verified_communication_note_preview_runner_terminal(jsonb,text,text)'
   );
+  v_inner oid := to_regprocedure(
+    'careslink_v1_generation._persist_verified_communication_note_preview_terminal_unfenced(jsonb,text,text)'
+  );
+  v_broker_schema oid := to_regnamespace('careslink_v1_runtime_broker');
+  v_acquisitions oid := to_regclass(
+    'careslink_v1_runtime_broker.acquisitions'
+  );
+  v_backend_identity oid := to_regprocedure(
+    'careslink_v1_runtime_broker._current_runtime_backend_start()'
+  );
+  v_static_posture oid := to_regprocedure(
+    'careslink_v1_runtime_broker._assert_terminal_static_posture()'
+  );
+  v_runtime_posture oid := to_regprocedure(
+    'careslink_v1_runtime_broker._assert_runtime_privilege_posture(oid)'
+  );
   v_reserve oid := to_regprocedure(
     'careslink_v1_generation.reserve_communication_note_preview_dispatch(uuid,text,uuid,integer,text,integer,text,integer,text,text)'
   );
@@ -48,7 +64,10 @@ begin
   end if;
   if v_schema is null or v_owner is null or v_executor is null or v_caller is null
     or v_relation is null or v_type is null
-    or v_function is null or v_reserve is null
+    or v_function is null or v_inner is null or v_reserve is null
+    or v_broker_schema is null or v_acquisitions is null
+    or v_backend_identity is null
+    or v_static_posture is null or v_runtime_posture is null
     or v_guard is null or v_canonical_json is null
     or v_content_sha256 is null or v_digest is null
   then
@@ -442,6 +461,36 @@ begin
   select pg_catalog.pg_get_functiondef(v_function) into v_definition;
   if v_definition !~* 'security definer'
     or v_definition !~* 'set search_path to '''''
+    or v_definition !~* 'session_user'
+    or v_definition !~* 'pg_advisory_xact_lock_shared'
+    or v_definition !~* '836492741'
+    or v_definition !~* 'state <> ''ACTIVE'''
+    or v_definition !~* 'future_issuance_blocked'
+    or v_definition !~* 'bound_backend_pid'
+    or v_definition !~* 'bound_backend_start'
+    or v_definition !~* 'authorization_digest'
+    or v_definition !~* 'run_id_hash'
+    or v_definition !~* 'caller_identity_hmac'
+    or v_definition !~* 'role_record[.]rolinherit'
+    or v_definition !~* 'membership[.]inherit_option'
+    or v_definition !~* 'not membership[.]set_option'
+    or v_definition !~* 'grantor_role[.]rolsuper'
+    or v_definition !~* 'membership[.]admin_option'
+    or v_definition !~* 'pg_has_role'
+    or v_definition !~* '_assert_runtime_privilege_posture'
+    or v_definition !~* 'RUNTIME_CREDENTIAL_NOT_ACTIVE'
+    or v_definition !~* '_persist_verified_communication_note_preview_terminal_unfenced'
+    or v_definition ~* (
+      'set[[:space:]]+(local[[:space:]]+)?role[[:space:]]+' ||
+      'careslink_v1_preview_runner_terminal_caller'
+    )
+  then
+    raise exception 'M1l terminal ACTIVE fence drifted';
+  end if;
+
+  select pg_catalog.pg_get_functiondef(v_inner) into v_definition;
+  if v_definition !~* 'security definer'
+    or v_definition !~* 'set search_path to '''''
     or v_definition !~* 'p_signature_base64url text'
     or v_definition !~* 'CARESLINK_RUNNER_TERMINAL'
     or v_definition !~* 'signerKeyIdHash'
@@ -468,6 +517,45 @@ begin
     )
   then
     raise exception 'M1g-g signed terminal RPC contract drifted';
+  end if;
+  if (
+      select count(*)
+      from pg_catalog.pg_proc procedure
+      cross join lateral pg_catalog.aclexplode(
+        coalesce(
+          procedure.proacl,
+          pg_catalog.acldefault('f', procedure.proowner)
+        )
+      ) acl
+      where procedure.oid = v_inner
+        and acl.privilege_type = 'EXECUTE'
+        and acl.grantee = to_regrole(
+          'careslink_v1_preview_runner_terminal_executor'
+        )
+        and acl.grantor = to_regrole(
+          'careslink_v1_preview_runner_terminal_executor'
+        )
+        and not acl.is_grantable
+    ) <> 1
+    or (
+      select count(*)
+      from pg_catalog.pg_proc procedure
+      cross join lateral pg_catalog.aclexplode(
+        coalesce(
+          procedure.proacl,
+          pg_catalog.acldefault('f', procedure.proowner)
+        )
+      ) acl
+      where procedure.oid = v_inner
+        and acl.privilege_type = 'EXECUTE'
+    ) <> 1
+    or has_function_privilege(
+      'careslink_v1_preview_runner_terminal_caller',
+      v_inner,
+      'EXECUTE'
+    )
+  then
+    raise exception 'M1l unfenced terminal ACL drifted';
   end if;
   if not exists (
     select 1
@@ -496,6 +584,363 @@ begin
     )
   then
     raise exception 'M1g-f reserve RPC contract drifted';
+  end if;
+end
+$$;
+
+do $$
+declare
+  v_schema oid := to_regnamespace('careslink_v1_runtime_broker');
+  v_relation oid := to_regclass('careslink_v1_runtime_broker.acquisitions');
+  v_type oid := to_regtype('careslink_v1_runtime_broker.acquisitions');
+  v_executor oid := to_regrole('careslink_v1_preview_runner_terminal_executor');
+  v_caller oid := to_regrole('careslink_v1_preview_runner_terminal_caller');
+  v_database oid := (
+    select database_record.oid
+    from pg_catalog.pg_database database_record
+    where database_record.datname = pg_catalog.current_database()
+  );
+  v_generation_schema oid := to_regnamespace('careslink_v1_generation');
+  v_wrapper oid := to_regprocedure(
+    'careslink_v1_generation.persist_verified_communication_note_preview_runner_terminal(jsonb,text,text)'
+  );
+  v_helper oid := to_regprocedure(
+    'careslink_v1_runtime_broker._current_runtime_backend_start()'
+  );
+  v_static_posture oid := to_regprocedure(
+    'careslink_v1_runtime_broker._assert_terminal_static_posture()'
+  );
+  v_runtime_posture oid := to_regprocedure(
+    'careslink_v1_runtime_broker._assert_runtime_privilege_posture(oid)'
+  );
+  v_helper_definition text;
+  v_lifecycle_definition text;
+  v_role text;
+begin
+  if (
+      select count(*)
+      from pg_catalog.pg_namespace namespace
+      where namespace.oid = v_schema
+        and namespace.nspowner = to_regrole('postgres')
+    ) <> 1
+    or (
+      select count(*)
+      from pg_catalog.pg_class relation
+      where relation.oid = v_relation
+        and relation.relowner = to_regrole('postgres')
+        and relation.relkind = 'r'
+        and relation.relrowsecurity
+        and relation.relforcerowsecurity
+    ) <> 1
+  then
+    raise exception 'M1l broker schema/table posture drifted';
+  end if;
+
+  if not has_schema_privilege(v_executor, v_schema, 'USAGE')
+    or has_schema_privilege(v_executor, v_schema, 'CREATE')
+    or not has_table_privilege(v_executor, v_relation, 'SELECT')
+    or has_table_privilege(
+      v_executor, v_relation,
+      'INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER'
+    )
+    or not has_type_privilege(v_executor, v_type, 'USAGE')
+  then
+    raise exception 'M1l broker executor ACL drifted';
+  end if;
+
+  foreach v_role in array array[
+    'anon', 'authenticated', 'service_role', 'authenticator',
+    'careslink_v1_preview_runner_terminal_caller'
+  ] loop
+    if has_schema_privilege(v_role, v_schema, 'USAGE,CREATE')
+      or has_table_privilege(
+        v_role, v_relation,
+        'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER'
+      )
+      or has_any_column_privilege(
+        v_role, v_relation, 'SELECT,INSERT,UPDATE,REFERENCES'
+      )
+      or has_type_privilege(v_role, v_type, 'USAGE')
+    then
+      raise exception 'M1l broker leaked to %', v_role;
+    end if;
+  end loop;
+
+  if exists (
+    select 1
+    from pg_catalog.pg_namespace namespace
+    cross join lateral pg_catalog.aclexplode(
+      coalesce(
+        namespace.nspacl,
+        pg_catalog.acldefault('n', namespace.nspowner)
+      )
+    ) acl
+    where namespace.oid = v_schema
+      and acl.grantee = 0
+      and acl.privilege_type in ('USAGE', 'CREATE')
+  ) or exists (
+    select 1
+    from pg_catalog.pg_class relation
+    cross join lateral pg_catalog.aclexplode(
+      coalesce(
+        relation.relacl,
+        pg_catalog.acldefault('r', relation.relowner)
+      )
+    ) acl
+    where relation.oid = v_relation
+      and acl.grantee = 0
+  ) then
+    raise exception 'M1l broker leaked to PUBLIC';
+  end if;
+
+  if (
+      select count(*)
+      from pg_catalog.pg_policy policy
+      where policy.polrelid = v_relation
+        and policy.polname =
+          'runtime_credential_broker_terminal_session_select'
+        and policy.polcmd = 'r'
+        and policy.polroles = array[v_executor]
+        and policy.polwithcheck is null
+        and pg_catalog.regexp_replace(
+          pg_catalog.lower(
+            pg_catalog.pg_get_expr(policy.polqual, policy.polrelid)
+          ),
+          '[[:space:]()]', '', 'g'
+        ) in ('runtime_role=session_user',
+          'runtime_role=(session_user)::text')
+    ) <> 1
+  then
+    raise exception 'M1l broker RLS policy drifted';
+  end if;
+
+  if (
+      select count(*)
+      from pg_catalog.pg_proc procedure
+      where procedure.oid = v_helper
+        and procedure.proowner = to_regrole('postgres')
+        and procedure.prosecdef
+        and procedure.provolatile = 'v'
+        and procedure.proconfig is not null
+        and pg_catalog.cardinality(procedure.proconfig) = 1
+        and procedure.proconfig[1] in ('search_path=', 'search_path=""')
+    ) <> 1
+    or not has_function_privilege(v_executor, v_helper, 'EXECUTE')
+  then
+    raise exception 'M1l backend identity helper posture drifted';
+  end if;
+
+  if v_caller is null or v_database is null
+    or v_generation_schema is null or v_wrapper is null
+    or v_static_posture is null or v_runtime_posture is null
+    or exists (
+      select 1
+      from pg_catalog.pg_shdepend dependency
+      where dependency.refclassid = 'pg_catalog.pg_authid'::regclass
+        and dependency.refobjid = v_caller
+        and dependency.deptype = 'o'
+    )
+    or (
+      select count(*)
+      from pg_catalog.pg_shdepend dependency
+      where dependency.refclassid = 'pg_catalog.pg_authid'::regclass
+        and dependency.refobjid = v_caller
+        and dependency.deptype = 'a'
+        and dependency.dbid = v_database
+        and dependency.classid = 'pg_catalog.pg_namespace'::regclass
+        and dependency.objid = v_generation_schema
+        and dependency.objsubid = 0
+    ) <> 1
+    or (
+      select count(*)
+      from pg_catalog.pg_shdepend dependency
+      where dependency.refclassid = 'pg_catalog.pg_authid'::regclass
+        and dependency.refobjid = v_caller
+        and dependency.deptype = 'a'
+        and dependency.dbid = v_database
+        and dependency.classid = 'pg_catalog.pg_proc'::regclass
+        and dependency.objid = v_wrapper
+        and dependency.objsubid = 0
+    ) <> 1
+    or exists (
+      select 1
+      from pg_catalog.pg_shdepend dependency
+      where dependency.refclassid = 'pg_catalog.pg_authid'::regclass
+        and dependency.refobjid = v_caller
+        and not (
+          dependency.deptype = 'a'
+          and dependency.dbid = v_database
+          and dependency.objsubid = 0
+          and (
+            (
+              dependency.classid = 'pg_catalog.pg_namespace'::regclass
+              and dependency.objid = v_generation_schema
+            )
+            or (
+              dependency.classid = 'pg_catalog.pg_proc'::regclass
+              and dependency.objid = v_wrapper
+            )
+          )
+        )
+    )
+  then
+    raise exception 'M1l static caller shared dependency set drifted';
+  end if;
+
+  if exists (
+      select 1
+      from pg_catalog.pg_namespace namespace
+      cross join lateral pg_catalog.aclexplode(
+        coalesce(
+          namespace.nspacl,
+          pg_catalog.acldefault('n', namespace.nspowner)
+        )
+      ) acl
+      where namespace.oid = v_generation_schema
+        and (acl.grantee = v_caller or acl.grantor = v_caller)
+        and not (
+          acl.grantee = v_caller
+          and acl.grantor = to_regrole('careslink_v1_generation_owner')
+          and acl.privilege_type = 'USAGE'
+          and not acl.is_grantable
+        )
+    )
+    or (
+      select count(*)
+      from pg_catalog.pg_proc procedure
+      where procedure.oid in (v_static_posture, v_runtime_posture)
+        and procedure.proowner = to_regrole('postgres')
+        and procedure.prosecdef
+        and procedure.provolatile = 'v'
+        and procedure.proconfig is not null
+        and pg_catalog.cardinality(procedure.proconfig) = 1
+        and procedure.proconfig[1] in ('search_path=', 'search_path=""')
+    ) <> 2
+    or exists (
+      select 1
+      from pg_catalog.pg_proc procedure
+      cross join lateral pg_catalog.aclexplode(
+        coalesce(
+          procedure.proacl,
+          pg_catalog.acldefault('f', procedure.proowner)
+        )
+      ) acl
+      where procedure.oid in (v_static_posture, v_runtime_posture)
+        and acl.privilege_type = 'EXECUTE'
+        and (
+          acl.grantee not in (to_regrole('postgres'), v_executor)
+          or acl.grantor <> to_regrole('postgres')
+          or acl.is_grantable
+        )
+    )
+    or (
+      select count(*)
+      from pg_catalog.pg_proc procedure
+      cross join lateral pg_catalog.aclexplode(
+        coalesce(
+          procedure.proacl,
+          pg_catalog.acldefault('f', procedure.proowner)
+        )
+      ) acl
+      where procedure.oid in (v_static_posture, v_runtime_posture)
+        and acl.privilege_type = 'EXECUTE'
+    ) <> 4
+    or not has_function_privilege(v_executor, v_static_posture, 'EXECUTE')
+    or not has_function_privilege(v_executor, v_runtime_posture, 'EXECUTE')
+    or has_function_privilege(v_caller, v_static_posture, 'EXECUTE')
+    or has_function_privilege(v_caller, v_runtime_posture, 'EXECUTE')
+  then
+    raise exception 'M1l posture helper or caller ACL drifted';
+  end if;
+
+  select pg_catalog.pg_get_functiondef(v_static_posture)
+  into v_helper_definition;
+  if v_helper_definition !~* 'pg_shdepend'
+    or v_helper_definition !~* 'has_any_column_privilege'
+    or v_helper_definition !~* 'acl[.]grantee = v_caller'
+    or v_helper_definition !~* 'acl[.]grantor = v_caller'
+    or v_helper_definition !~* '_persist_verified_communication_note_preview_terminal_unfenced'
+  then
+    raise exception 'M1l static posture helper contract drifted';
+  end if;
+
+  select pg_catalog.pg_get_functiondef(v_runtime_posture)
+  into v_helper_definition;
+  if v_helper_definition !~* '_assert_terminal_static_posture'
+    or v_helper_definition !~* 'pg_shdepend'
+    or v_helper_definition !~* 'has_any_column_privilege'
+    or v_helper_definition !~* 'membership[.]inherit_option'
+    or v_helper_definition !~* 'not membership[.]set_option'
+  then
+    raise exception 'M1l runtime posture helper contract drifted';
+  end if;
+
+  select pg_catalog.pg_get_functiondef(v_helper)
+  into v_helper_definition;
+  if v_helper_definition !~* 'pg_stat_clear_snapshot'
+    or v_helper_definition !~* 'pg_backend_pid'
+    or v_helper_definition !~* 'backend_start'
+    or v_helper_definition !~* 'candidate[.]usesysid'
+    or v_helper_definition !~* 'candidate[.]usename'
+    or v_helper_definition !~* 'count[(][*][)]'
+  then
+    raise exception 'M1l backend identity helper contract drifted';
+  end if;
+
+  select pg_catalog.string_agg(
+    pg_catalog.pg_get_functiondef(procedure.oid),
+    E'\n' order by procedure.proname
+  )
+  into v_lifecycle_definition
+  from pg_catalog.pg_proc procedure
+  where procedure.pronamespace = v_schema
+    and procedure.proname in ('acquire', 'bind', 'finalize');
+  if v_lifecycle_definition !~* (
+      'grant careslink_v1_preview_runner_terminal_caller to %I' ||
+      ' with admin false, inherit true, set false'
+    )
+    or v_lifecycle_definition !~* 'role_record[.]rolinherit'
+    or v_lifecycle_definition !~* 'membership[.]inherit_option'
+    or v_lifecycle_definition !~* 'not membership[.]set_option'
+    or v_lifecycle_definition !~* 'grantor_role[.]rolsuper'
+    or v_lifecycle_definition !~* 'membership[.]admin_option'
+    or v_lifecycle_definition !~* 'pg_has_role'
+    or v_lifecycle_definition !~* 'drop role %I'
+  then
+    raise exception 'M1l inherited caller lifecycle drifted';
+  end if;
+
+  if exists (
+      select 1
+      from pg_catalog.pg_proc procedure
+      where procedure.pronamespace = v_schema
+        and procedure.proname in (
+          'acquire', 'bind', 'tombstone', 'finalize', 'inspect'
+        )
+        and (
+          procedure.prosecdef
+          or procedure.proconfig is null
+          or pg_catalog.cardinality(procedure.proconfig) <> 1
+          or procedure.proconfig[1] not in ('search_path=', 'search_path=""')
+        )
+    )
+    or (
+      select count(*)
+      from pg_catalog.pg_proc procedure
+      where procedure.pronamespace = v_schema
+        and procedure.proname in (
+          'acquire', 'bind', 'tombstone', 'finalize', 'inspect'
+        )
+    ) <> 5
+    or exists (
+      select 1
+      from pg_catalog.pg_roles role_record
+      where role_record.rolname ~
+        '^careslink_v1_preview_runner_terminal_runtime_[a-f0-9]{16}$'
+    )
+    or exists (select 1 from careslink_v1_runtime_broker.acquisitions)
+  then
+    raise exception 'M1l broker lifecycle or zero-state posture drifted';
   end if;
 end
 $$;
@@ -717,7 +1162,7 @@ begin
 end $$;
 
 select set_config('role',current_setting('careslink.assertion_entry_role'),false);
-set local role careslink_v1_preview_runner_terminal_caller;
+set local role careslink_v1_preview_runner_terminal_executor;
 do $$
 declare
   s pg_temp.m1gf_state%rowtype;
@@ -762,7 +1207,7 @@ begin
     'observedAt',to_char(date_trunc('milliseconds',clock_timestamp()) at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'));
 
   rejected:=false; begin
-    perform careslink_v1_generation.persist_verified_communication_note_preview_runner_terminal(
+    perform careslink_v1_generation._persist_verified_communication_note_preview_terminal_unfenced(
       st,repeat('E',85),repeat('0',63)||'a');
     raise exception 'ASSERTION_EXPECTED_REJECTION';
   exception when others then get stacked diagnostics m=message_text;
@@ -776,7 +1221,7 @@ begin
     st,'{signerKeyIdHash}',to_jsonb(s.authorization_statement->>'signerKeyIdHash'),false
   );
   rejected:=false; begin
-    perform careslink_v1_generation.persist_verified_communication_note_preview_runner_terminal(
+    perform careslink_v1_generation._persist_verified_communication_note_preview_terminal_unfenced(
       bad,repeat('E',86),repeat('0',63)||'a');
     raise exception 'ASSERTION_EXPECTED_REJECTION';
   exception when others then get stacked diagnostics m=message_text;
@@ -791,7 +1236,7 @@ begin
 
   bad := jsonb_set(st,'{preflightInputTokens}',to_jsonb('120'::text),false);
   rejected:=false; begin
-    perform careslink_v1_generation.persist_verified_communication_note_preview_runner_terminal(
+    perform careslink_v1_generation._persist_verified_communication_note_preview_terminal_unfenced(
       bad,repeat('E',86),repeat('0',63)||'a');
     raise exception 'ASSERTION_EXPECTED_REJECTION';
   exception when others then get stacked diagnostics m=message_text; rejected:=m<>'ASSERTION_EXPECTED_REJECTION'; end;
@@ -801,7 +1246,7 @@ begin
 
   bad := jsonb_set(st,'{usage}',s.receipt_usage,false);
   rejected:=false; begin
-    perform careslink_v1_generation.persist_verified_communication_note_preview_runner_terminal(
+    perform careslink_v1_generation._persist_verified_communication_note_preview_terminal_unfenced(
       bad,repeat('E',86),repeat('0',63)||'a');
     raise exception 'ASSERTION_EXPECTED_REJECTION';
   exception when others then get stacked diagnostics m=message_text; rejected:=m<>'ASSERTION_EXPECTED_REJECTION'; end;
@@ -813,7 +1258,7 @@ begin
     st,'{usage}',(st->'usage') - 'totalTokensReconciliation',false
   );
   rejected:=false; begin
-    perform careslink_v1_generation.persist_verified_communication_note_preview_runner_terminal(
+    perform careslink_v1_generation._persist_verified_communication_note_preview_terminal_unfenced(
       bad,repeat('E',86),repeat('0',63)||'a');
     raise exception 'ASSERTION_EXPECTED_REJECTION';
   exception when others then get stacked diagnostics m=message_text; rejected:=m<>'ASSERTION_EXPECTED_REJECTION'; end;
@@ -825,7 +1270,7 @@ begin
     st,'{usage}',(st->'usage') || jsonb_build_object('unexpected',true),false
   );
   rejected:=false; begin
-    perform careslink_v1_generation.persist_verified_communication_note_preview_runner_terminal(
+    perform careslink_v1_generation._persist_verified_communication_note_preview_terminal_unfenced(
       bad,repeat('E',86),repeat('0',63)||'a');
     raise exception 'ASSERTION_EXPECTED_REJECTION';
   exception when others then get stacked diagnostics m=message_text; rejected:=m<>'ASSERTION_EXPECTED_REJECTION'; end;
@@ -837,7 +1282,7 @@ begin
     st,'{usage,totalTokensReconciliation}',to_jsonb('ASSUMED'::text),false
   );
   rejected:=false; begin
-    perform careslink_v1_generation.persist_verified_communication_note_preview_runner_terminal(
+    perform careslink_v1_generation._persist_verified_communication_note_preview_terminal_unfenced(
       bad,repeat('E',86),repeat('0',63)||'a');
     raise exception 'ASSERTION_EXPECTED_REJECTION';
   exception when others then get stacked diagnostics m=message_text; rejected:=m<>'ASSERTION_EXPECTED_REJECTION'; end;
@@ -850,7 +1295,7 @@ begin
     to_jsonb('ASSUMED_ZERO'::text),false
   );
   rejected:=false; begin
-    perform careslink_v1_generation.persist_verified_communication_note_preview_runner_terminal(
+    perform careslink_v1_generation._persist_verified_communication_note_preview_terminal_unfenced(
       bad,repeat('E',86),repeat('0',63)||'a');
     raise exception 'ASSERTION_EXPECTED_REJECTION';
   exception when others then get stacked diagnostics m=message_text; rejected:=m<>'ASSERTION_EXPECTED_REJECTION'; end;
@@ -863,7 +1308,7 @@ begin
     to_jsonb('UNAVAILABLE'::text),false
   );
   rejected:=false; begin
-    perform careslink_v1_generation.persist_verified_communication_note_preview_runner_terminal(
+    perform careslink_v1_generation._persist_verified_communication_note_preview_terminal_unfenced(
       bad,repeat('E',86),repeat('0',63)||'a');
     raise exception 'ASSERTION_EXPECTED_REJECTION';
   exception when others then get stacked diagnostics m=message_text; rejected:=m<>'ASSERTION_EXPECTED_REJECTION'; end;
@@ -875,7 +1320,7 @@ begin
     st,'{usage,cachedInputTokens}',to_jsonb(21),false
   );
   rejected:=false; begin
-    perform careslink_v1_generation.persist_verified_communication_note_preview_runner_terminal(
+    perform careslink_v1_generation._persist_verified_communication_note_preview_terminal_unfenced(
       bad,repeat('E',86),repeat('0',63)||'a');
     raise exception 'ASSERTION_EXPECTED_REJECTION';
   exception when others then get stacked diagnostics m=message_text; rejected:=m<>'ASSERTION_EXPECTED_REJECTION'; end;
@@ -885,7 +1330,7 @@ begin
 
   bad := jsonb_set(st,'{preflightInputTokens}',to_jsonb(119),false);
   rejected:=false; begin
-    perform careslink_v1_generation.persist_verified_communication_note_preview_runner_terminal(
+    perform careslink_v1_generation._persist_verified_communication_note_preview_terminal_unfenced(
       bad,repeat('E',86),repeat('0',63)||'a');
     raise exception 'ASSERTION_EXPECTED_REJECTION';
   exception when others then get stacked diagnostics m=message_text; rejected:=m<>'ASSERTION_EXPECTED_REJECTION'; end;
@@ -893,9 +1338,9 @@ begin
     raise exception 'preflight token underestimate did not fail binding: %',m;
   end if;
 
-  result := careslink_v1_generation.persist_verified_communication_note_preview_runner_terminal(
+  result := careslink_v1_generation._persist_verified_communication_note_preview_terminal_unfenced(
     st,repeat('E',86),repeat('0',63)||'a');
-  replay := careslink_v1_generation.persist_verified_communication_note_preview_runner_terminal(
+  replay := careslink_v1_generation._persist_verified_communication_note_preview_terminal_unfenced(
     st,repeat('E',86),repeat('0',63)||'a');
   if result->'created' is distinct from 'true'::jsonb
     or result->'continuationEligible' is distinct from 'true'::jsonb
@@ -905,7 +1350,7 @@ begin
     raise exception 'ACCEPTED terminal create/replay drifted: %, %',result,replay;
   end if;
   rejected:=false; begin
-    perform careslink_v1_generation.persist_verified_communication_note_preview_runner_terminal(
+    perform careslink_v1_generation._persist_verified_communication_note_preview_terminal_unfenced(
       st,repeat('D',86),repeat('0',63)||'a');
     raise exception 'ASSERTION_EXPECTED_REJECTION';
   exception when others then get stacked diagnostics m=message_text;
@@ -932,7 +1377,7 @@ begin
     'receiptSignatureSha256',null,'fixtureDigest',null,'preflightInputTokens',null,'providerRequestIdHash',null,'candidateDigest',null,
     'usage',null,'calculatedCostUpperBoundMicroUsd',null,'criticalChecks',null,'humanReviews',null,'receiptProviderCorrelation',null,
     'observedAt',to_char(date_trunc('milliseconds',clock_timestamp()) at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'));
-  result := careslink_v1_generation.persist_verified_communication_note_preview_runner_terminal(
+  result := careslink_v1_generation._persist_verified_communication_note_preview_terminal_unfenced(
     st,repeat('F',86),repeat('0',63)||'a');
   if result->>'state' is distinct from 'FAILED' or result->'continuationEligible' is distinct from 'false'::jsonb then
     raise exception 'FAILED terminal drifted: %',result;
@@ -952,7 +1397,7 @@ begin
     'humanReviews',jsonb_build_array(jsonb_build_object('locale','en','passed',true),jsonb_build_object('locale','zh-Hans','passed',true),jsonb_build_object('locale','zh-Hant','passed',true)),
     'receiptProviderCorrelation','UNATTESTED_NO_SHARED_IDENTIFIER');
   rejected:=false; begin
-    perform careslink_v1_generation.persist_verified_communication_note_preview_runner_terminal(
+    perform careslink_v1_generation._persist_verified_communication_note_preview_terminal_unfenced(
       bad,repeat('G',86),repeat('0',63)||'a');
     raise exception 'ASSERTION_EXPECTED_REJECTION';
   exception when others then get stacked diagnostics m=message_text; rejected:=m='RUNNER_TERMINAL_CONFLICT'; end;

@@ -553,6 +553,184 @@ broader grant, runtime permission or Production authority. Native Supabase CLI
 migration apply remains an unproved transport; readiness and approval remain
 closed.
 
+### Communication Note Preview resolved custody/caller runtime binding M1j (source-only/TestOnly)
+
+M1j adds no database grant and does not widen the M1g-i Hosted permission
+result. Its public runtime factory always throws the fixed disabled error
+without reading the supplied object. The approved disposable target, custody
+resolver, caller-credential resolver and resolved runtime port remain literal
+`undefined`; the readiness latch remains `false`. Only an explicitly named
+TestOnly factory accepts module-branded target/resolver/session objects.
+
+The TestOnly session contract is deliberately narrower than a generic database
+client. It requires one physical, single-use normalized-query session and a
+short-lived, lease-bound runtime LOGIN with only one exact `SET=true`,
+`INHERIT=false`, `ADMIN=false` edge to
+`careslink_v1_preview_runner_terminal_caller`. Before the terminal RPC, catalog
+checks require the runtime to have no private-schema usage/create, function,
+table, column or sequence capability. After `SET LOCAL ROLE`, the caller must
+have schema `USAGE`, no `CREATE`, no relation/column/sequence authority and
+execution of exactly the signed terminal function. The function must remain
+executor-owned, `SECURITY DEFINER`, `VOLATILE`, `plpgsql`, scalar `jsonb`,
+non-variadic, with exact named arguments, empty `search_path` and an exact
+non-grantable two-grantee EXECUTE ACL for the caller and executor. API/service
+roles may neither execute the RPC nor switch into the runtime/caller roles.
+The executor itself must remain `NOLOGIN`, non-superuser, non-inheriting,
+without create-role/create-db/replication/BYPASSRLS flags, outbound membership
+or any active inbound `SET`/`INHERIT` edge. This posture is re-attested before
+and after the RPC.
+
+Stable PostgreSQL backend PID and transaction ID are compared before and after
+the write. A monotonic clock, database clock, authorization/trust/target/lease
+expiry ceilings, 30-second minimum lease window and PostgreSQL 17
+`transaction_timeout` constrain use. BEGIN/COMMIT response ambiguity causes a
+single rollback attempt and never an RPC retry. Resolver, database and cleanup
+calls have 5-second, 12-second and 5-second bounded settlement respectively,
+each with a fresh AbortSignal; an approved adapter must bind abort to real
+driver cancellation and exclusive-session destruction. Every credential-acquisition
+attempt sends an acquisition-digest-bound cleanup request; no success can be
+returned until its TestOnly release report is validated. With no returned
+binding, only paired destroyed/revoked or paired not-acquired/not-issued
+dispositions are accepted; every accepted report must additionally claim that
+the acquisition digest is tombstoned and future issuance is blocked. These are
+contract claims, not independent evidence of a durable broker fence, a dropped
+live role or termination of every session.
+
+No migration, login, grant, credential, environment variable, network client,
+product importer, Hosted action, model call, deployment or Production change is
+part of M1j. Activation still requires independently approved control-plane
+target evidence, real custody and caller/session adapters, pinned TLS/target
+binding, durable cross-process lease/session/runtime replay prevention, an
+acquisition-digest tombstone that prevents late issuance, and an administrative
+post-release check proving the temporary role and sessions are actually zero. See
+`documentation/communication-note-preview-live-custody-caller-resolver-m1j.md`.
+
+### Communication Note Preview durable caller-credential resolver M1k (TestOnly/local)
+
+M1k adds no product or Hosted permission. Its approved resolver remains
+`undefined`, readiness remains `false`, and the public factory always returns
+the fixed disabled error. Only the exact TestOnly factory may receive injected
+broker, exclusive-session, independent-audit, clock and entropy ports. Runtime
+and product modules do not import it.
+
+The isolated local broker schema is owned by `postgres`, forced-RLS and denied
+to `PUBLIC`, `anon`, `authenticated`, `service_role` and `authenticator` at
+schema, relation, sequence, column and function boundaries. All broker
+functions are `SECURITY INVOKER` with an empty `search_path`; the five lifecycle
+API functions `acquire`, `bind`, `tombstone`, `finalize` and `inspect` require
+the fixed management session and `application_name`. A temporary runtime LOGIN has no direct
+generation/schema/table/sequence/function authority and only one
+`ADMIN=false`, `INHERIT=false`, `SET=true` edge to the existing terminal caller.
+The caller's exact terminal permission remains the M1g-i posture; M1k does not
+widen it.
+
+The broker ledger stores the acquisition digest, immutable identity hashes,
+runtime-role identity and lifecycle metadata. It does not have password,
+verifier, DSN, connection-string or database-URL columns. The actual SCRAM
+verifier exists only long enough for role creation and `pg_authid` until the
+role is dropped; only its SHA-256 is retained in the ledger. The resolver does
+not expose the raw password through the lease, receipt, error, environment or
+log. Mutable byte buffers are overwritten, while JavaScript string memory
+cannot be reliably zeroized and therefore remains a production-adapter blocker.
+
+The disposable local PostgreSQL 16.15 gate proved an uncommitted tombstone
+holding the digest advisory lock, exactly one waiting late acquire, commit-time
+`NOLOGIN`, rejection of both that late issue and an old-password reconnect,
+one-winner concurrent acquire, digest-only response-loss recovery, idempotent
+concurrent revoke and independent zero role/session/membership residue. That is
+local TestOnly evidence, not a grant
+on the 39-migration target schema and not PostgreSQL 17, Supabase Hosted, TLS,
+pinned-CA or Production evidence. A production broker must be added and
+re-pinned as its own authorized migration batch, and the terminal RPC must
+fresh-check the same ACTIVE acquisition fence before writing.
+
+See
+`documentation/communication-note-preview-durable-caller-credential-resolver-m1k.md`.
+
+### Communication Note Preview formal runtime-credential broker M1l (Production-unapplied/default-off)
+
+M1l adds a formal 40th migration source, not an applied grant. It requires the
+Hosted-shaped management actor to be exact database/session role `postgres`,
+`NOSUPERUSER`, `CREATEROLE`, `BYPASSRLS`, and a member of
+`pg_signal_backend` plus `pg_read_all_stats`, under an exact management
+`application_name`. A mismatched actor, database, PostgreSQL major, dependency
+or pre-existing broker schema fails before creation.
+
+Private schema `careslink_v1_runtime_broker` is owned by `postgres`; its ledger
+has RLS plus FORCE RLS and stores digest/hash lifecycle metadata only. `PUBLIC`,
+`anon`, `authenticated`, `service_role` and `authenticator` receive no broker
+schema/table/sequence/type/lifecycle-function privilege. Management lifecycle
+functions are `SECURITY INVOKER` with empty `search_path`. The terminal executor
+gets only the narrow schema/type/read posture required for the session-user RLS
+check and the private terminal implementation; the existing fifth caller keeps
+only execution of the public three-argument wrapper. It cannot execute the
+renamed private unfenced implementation or backend-identity helper.
+
+A runtime identity is digest-derived, SCRAM-only, one connection, 45–90 seconds
+and `INHERIT=true`. Its outbound terminal-caller edge is exactly `ADMIN=false`,
+`INHERIT=true`, `SET=false`. Separately, PostgreSQL 16/17 `CREATEROLE` creates
+an inbound inert creator edge with `member=postgres`, a superuser grantor and
+`ADMIN=true`, `INHERIT=false`, `SET=false`; this is not a second usable caller
+path. The client transaction sends no `SET ROLE`: outside the wrapper
+`current_user=session_user=runtime`; inside the `SECURITY DEFINER` wrapper
+`current_user=executor` and `session_user=runtime`. SQL `SET ROLE` and
+`set_config('role',...)` are forbidden.
+
+Cluster-wide `pg_shdepend` checks require the static caller to have zero
+ownership dependencies and exact ACL dependencies only for the current
+database generation schema and terminal wrapper. Migration plus acquire, bind
+and wrapper runtime paths revalidate that posture, reject any generation-column
+privilege through `has_any_column_privilege`, and re-attest both wrapper and
+inner as exact executor-owned `SECURITY DEFINER` functions with empty
+`search_path` and exact ACL. The runtime inherits
+only that terminal wrapper and receives no generation table, sequence, column
+or other-function privilege. Bind rechecks role/OID/PID/`backend_start`/fixed application
+and immediately applies `NOLOGIN`. Every terminal write then holds a shared
+transaction lock and rechecks ACTIVE state, authorization digest, run hash,
+caller-identity HMAC, current role/OID/backend and expiry; tombstone/finalize
+require the matching exclusive lock. The resolver must cancel through the
+owned physical connection and confirm both cancel and query settlement within
+250 ms, or quarantine that driver permanently.
+
+The current disposable private-socket PostgreSQL 16.15 harness passed six
+scenarios with four issued-and-revoked acquisitions and zero runtime role,
+session, membership and API-privilege residue. In its second-database runtime-
+owned large-object case, the first finalize returned SQLSTATE `2BP01`, routine
+`DropRole`, while preserving TOMBSTONED ledger, `NOLOGIN` role, membership and
+remote residue. Removing the unique owner dependency allowed finalize and
+inspect to complete with zero residue. The SQL sequence is independently designed to fail
+closed—tombstone and `NOLOGIN` precede `DROP ROLE`, while `REVOKED` follows only
+successful deletion. Same-revision Hosted/PG17 permission and cross-database
+proof is now closed on deleted no-data/non-default/non-persistent Preview r5
+(`5f088eac-ac66-4625-8f4c-c9e7d9b02c2a` / `ucdmoxqzruohiqmsokfv`): 40/40,
+A01–A18, direct inherited runtime without `SET ROLE`, `NOLOGIN` bind fence,
+expected `2BP01` owner-dependency failure and controlled cleanup all passed, with
+zero runtime role/session/membership/API/verifier/temporary-database residue.
+This evidence did not grant any Production, deployment, product-driver or
+provider/model permission. The Preview was deleted and final branch probes left
+only healthy default Production, which was never the SQL target.
+Binding version/digest are
+`binding.communication.openai.synthetic-preview.2026-08-30.m1l.v1` /
+`cfb9f27b63f1a623950b3033fc04300149bcba26389994aa04eb2d2213ea1115`;
+resolver version/digest are `resolver.communication.openai.synthetic-preview.2026-08-30.m1l.v2` /
+`e53114d9d247ffcdb20ed83b4724fa5b8b09eeab31e4f2fc1a868ade13a2f43e`.
+The migration remains Production-unapplied and default-off. The frozen 53/53-green pin set
+binds migration `64dcb8c57f2c73d3fbd5adc99e3261f8e2e0ddd8e8efcf5cca52c12ca34ba5aa`;
+transactional `2026-08-30.preview-transactional-migrations.7` at 40 entries/
+20 wrappers with manifest
+`6590eed19602c4d7931355f18dafde699b1c47012a3fe09f9d040c179e11792d`;
+ordered basenames/entries `f9905d27a907045dfd6e7677e54c50af84be06a194535682bcf9dc4859657d4f` /
+`7006c0ef8cb62d9596fdd236ffd3357d16338370e9d1437f54a58eb668b4b250`;
+A03 `0f8192bccf46101103c301fcfd2b00cb818dd6725425a952777f697db8ea8172`;
+rollback `2026-08-30.preview-schema-rollback-assertions.5` manifest
+`e0b5f30f9a4c33bf04020a4d11453c87a52321b69c6edd74982446b0fadd58fe`;
+and preflight/coordinator
+`4447c071fa37ab21f23624a4d3d4d28b2ee9ba2e1ef4c9be969bf9a0481de2f3` /
+`570544bf700997a0ba90e06422019c237a01835ba8b75ff70bed5348cdf4bf02`.
+These pins do not grant database or deployment authority; readiness is `false`
+and approved adapters remain `undefined`. See
+`documentation/communication-note-preview-runtime-credential-broker-m1l.md`.
+
 ## Intended V1 matrix (partly codified, not available at runtime)
 
 | Target resource | Owner | Admin/support | Service/backend | Required control |
