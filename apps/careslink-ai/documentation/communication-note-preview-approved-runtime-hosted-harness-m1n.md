@@ -52,6 +52,44 @@ TypeScript、全仓 ESLint、73-file Codex adapter sync、`git diff --check` 与
 Webpack 64/64-page build。它仍是未激活的本地候选；下一次完整 Hosted rerun 必须先完成新
 revision review，再取得新的付费 Preview 价格确认与创建授权。
 
+## M1p Hosted 修正版完整 gate 通过 — 2026-08-31
+
+PR #18 合并并完成同 revision review 后，再次以实时 Micro Compute 价格
+`US$0.01344/hour` 单独授权创建了无数据、非默认、非持久 Preview
+`m1p-communication-note-full-hosted-r4-20260831`（branch id
+`f9679387-37fa-483a-aad8-e0e53c0f2854`，child ref `eumbhzfkrfssekoihozi`）。控制面确认
+parent 为 Production `adocsnwnslxhxcjgbyee`、`ACTIVE_HEALTHY`、PostgreSQL 17；Dashboard
+当前 Server root certificate 与固定 CA 的 SHA-256 均为
+`700723581420dd1ac98fd7e9ac529f0ef210eadcaf87fc868a3ad7d114c2f3b7`。
+
+同一 child 先通过 40/40 单事务 migration gate：19 条 baseline migration history 与各项固定
+baseline fingerprints 全部匹配，
+40 条 migration 与 manifest `6590eed19602c4d7931355f18dafde699b1c47012a3fe09f9d040c179e11792d`
+全等，application objects 被重建，ledgers 为空且临时角色不存在。随后使用 fresh anonymous
+credential envelope 和 source revision
+`fa7e7a00fdd7fc908bc233f40a009043b1f70b807337b9440a7f4138198b8ceb`
+执行完整 Hosted runner并通过。固定 evidence 证明：
+
+- 真实 `pg@8.23.0`、Direct 5432、client-side pinned-CA verify-full 与 PG17；
+- control-plane observation、ephemeral process HMAC project-ref binding、source manifest/pin；
+- 真实 M1m composition 驱动并得到 `ACCEPTED` terminal；
+- factory-scope cross-open delivery replay-protection contract 与五次 fresh delivery；
+- 终态 runtime role/session/membership/API privilege 均为零；
+- 恰好一个 hash-only credential verifier tombstone，evidence 与 durable ledger 均无 raw
+  credential material。
+
+该成功证据仍明确保留边界：source revision 不声称完整 transitive dependency attestation；
+underlying Supabase branch-admin password 仍是静态凭据，不声称短期、轮换或进程内存清零；
+raw branch-admin password 在运行期间存在于进程内存；Abort、timeout、adversarial old-envelope
+replay 与 Session Pooler fallback 本轮未 live-test；服务端 SSL enforcement 未证明，证据只覆盖
+client-side pinned-CA verify-full；runner 本身不验证 branch deletion；
+`activationApproved=false`、`ready=false`，approved export 仍不存在。
+
+成功后 caller 已立即删除 exact branch；三次顺序独立 branch listing 均只返回唯一健康的
+default Production `main`，从而撤销静态管理凭据并停止继续产生该 branch 的费用。没有连接或
+修改 Production 数据库，没有真实数据、provider/model 调用或部署；Production parent 只发生
+disposable branch create/get/list/delete 控制面交互。实际费用以 Supabase 最终计量为准。
+
 ## 本批次解决的凭据语义问题
 
 Supabase Preview 的 `postgres` 密码是静态分支管理凭据；它只能通过密码重置或删除分支

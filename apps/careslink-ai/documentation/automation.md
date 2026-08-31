@@ -651,6 +651,34 @@ data, deployment or provider/model call occurred. The candidate remains
 default-off and requires same-revision review plus a new paid-Preview approval
 before another full Hosted run.
 
+### Approved runtime adapters M1p — corrected Hosted positive-path pass
+
+After PR #18 merged, the reviewed source revision
+`fa7e7a00fdd7fc908bc233f40a009043b1f70b807337b9440a7f4138198b8ceb`
+ran on a second separately authorized no-data, non-default, non-persistent PG17
+Preview at the confirmed `US$0.01344/hour` Micro price. The exact 40/40
+single-transaction migration gate passed first. A fresh anonymous credential
+delivery then drove the complete Hosted runner successfully over a Direct 5432
+connection with actual `pg@8.23.0` and client-pinned CA verify-full TLS.
+
+The fixed evidence records real M1m composition, an `ACCEPTED` terminal, the
+factory-scope cross-open replay-protection contract with five fresh deliveries,
+zero terminal runtime
+role/session/membership/API privileges and one hash-only verifier tombstone.
+It also remains explicit that Abort, timeout, adversarial replay and Session
+Pooler fallback paths were not live-tested; server-side SSL enforcement was not
+attested; the static branch-admin password was present in process memory during
+the run and is not attested short-lived or rotated; process-memory zeroization
+and complete transitive dependency integrity are not attested; and
+activation/readiness remain false.
+
+The caller immediately deleted the exact Preview after success. Three
+sequential independent branch listings showed only the healthy default
+Production branch, revoking the Preview credential. No Production connection
+or mutation at the database layer, real-data access, deployment, provider/model
+call or automation activation occurred. Production parent interaction was
+limited to disposable branch create/get/list/delete control-plane operations.
+
 Supabase CLI 2.115.0 has since generated source-only migration `20260823213144_harden_v1_note_generation_registration_retention.sql`. It adds `attempts_registration_digest_idx` and the named `attempts_registration_catalog_fk` from `attempts.registration_digest` to `worker_registrations.registration_digest`, with update/delete `RESTRICT`, `NOT VALID` creation and explicit validation. It creates no seed, caller grant, runtime surface or Production change. Its local gate passed 39/39 focused contracts, the full 125-file / 1,381-test suite, lint, TypeScript, the 63/63-page production build, the 73-file Codex-adapter sync check and `git diff --check`. Deleted disposable `r22` then clean-applied the current manifest 15/15 and passed the seven rollback suites; the hosted registration-retention gate is now closed without enabling any runtime automation.
 
 ### PostgreSQL 16.15 local isolated gate — 2026-08-24
