@@ -151,19 +151,22 @@ describe("Communication Note M1m approved runtime adapters", () => {
     expect(
       CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_APPROVED_RUNTIME_ADAPTERS_VERSION,
     ).toBe(
-      "adapters.communication.openai.synthetic-preview.2026-08-31.m1m.v1",
+      "adapters.communication.openai.synthetic-preview.2026-08-31.m1m.v2",
     );
     expect(
       CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_APPROVED_RUNTIME_ADAPTERS_POLICY_DIGEST,
     ).toBe(
-      "7dd9bdc893147146a2e519b59f71cb958b9afdf2117589bf8ca42239a1ac1dc5",
+      "8fe10547d33732388f5e6b97afc76da9679d63ae1d45eb04447ae21ac2462e31",
     );
     expect(
       CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_APPROVED_RUNTIME_ADAPTERS_POLICY,
     ).toMatchObject({
       ready: false,
       sameSealedTargetRequired: true,
-      managementCredentialTransport: "ONE_USE_DELIVERY_CALLBACK_ONLY",
+      managementCredentialTransport:
+        "FACTORY_NONCE_BOUND_ONE_USE_DELIVERY_CALLBACK_ONLY",
+      managementDeliveryCrossOpenReplayProtection: true,
+      managementDeliveryReplayRegistryScope: "FACTORY",
       managementConnectionProfileDerivedFromSealedTarget: true,
       managementSessionPolicyDigest:
         CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_APPROVED_RUNTIME_MANAGEMENT_SESSION_POLICY_DIGEST,
@@ -602,6 +605,7 @@ function createFactoryHarness(options: {
       credentialClass: request.credentialClass,
       sourceExpiresAt: request.sourceExpiresAt,
       sourceRevocation: request.sourceRevocation,
+      deliveryNonce: request.deliveryNonce,
       password: MANAGEMENT_PASSWORD,
       deliveryIssuedAt: NOW,
       deliveryExpiresAt: "2026-08-31T12:00:30.000Z",

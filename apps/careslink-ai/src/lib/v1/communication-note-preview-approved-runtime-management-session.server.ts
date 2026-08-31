@@ -1,6 +1,6 @@
 import "server-only";
 
-import { createHash } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { performance } from "node:perf_hooks";
 import { types as nodeTypes } from "node:util";
 
@@ -23,12 +23,14 @@ const MAXIMUM_CA_BYTES = 64 * 1_024;
 const MAXIMUM_TARGET_LIFETIME_MS = 5 * 60 * 1_000;
 const MAXIMUM_DELIVERY_LIFETIME_MS = 60 * 1_000;
 const MAXIMUM_DELIVERY_AGE_MS = 30 * 1_000;
+const DELIVERY_NONCE_BYTES = 32;
+const MAXIMUM_TRACKED_DELIVERY_NONCES = 256;
 const OPEN_OPERATION_TIMEOUT_MS = 5_000;
 const QUERY_OPERATION_TIMEOUT_MS = 5_000;
 const CLOSE_OPERATION_TIMEOUT_MS = 1_000;
 
 export const CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_APPROVED_RUNTIME_MANAGEMENT_SESSION_VERSION =
-  "management-session.communication.openai.synthetic-preview.2026-08-31.m1m.v2" as const;
+  "management-session.communication.openai.synthetic-preview.2026-08-31.m1m.v3" as const;
 export const CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_APPROVED_RUNTIME_MANAGEMENT_SESSION_READY =
   false as const;
 export const CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_APPROVED_RUNTIME_MANAGEMENT_APPLICATION_NAME =
@@ -88,12 +90,23 @@ const APPROVED_RUNTIME_MANAGEMENT_SESSION_POLICY_CORE = deepFreeze({
   requiredApplicationName:
     CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_APPROVED_RUNTIME_MANAGEMENT_APPLICATION_NAME,
   requiredRowSecurity: "on",
-  credentialTransport: "ONE_USE_DELIVERY_CALLBACK",
+  credentialTransport: "FACTORY_NONCE_BOUND_ONE_USE_DELIVERY_CALLBACK",
   credentialClass: "STATIC_SUPABASE_BRANCH_ADMIN_PASSWORD",
   sourceCredentialSingleUse: false,
   sourceExpiresAt: null,
   sourceRevocation: "BRANCH_DELETE_OR_PASSWORD_RESET",
   deliveryEnvelopeSingleUse: true,
+  deliveryNonceSource: "FACTORY_CRYPTO_RANDOM_256_BIT",
+  deliveryNonceFormat: "LOWERCASE_HEX_64",
+  deliveryReplayRegistryScope: "FACTORY",
+  deliveryReplayRegistryStoredFields: [
+    "deliveryNonceSha256",
+    "expiresAtMonotonicMilliseconds",
+  ],
+  deliveryReplayRegistryRawNonceRetained: false,
+  deliveryReplayRegistryMaximumEntries: MAXIMUM_TRACKED_DELIVERY_NONCES,
+  deliveryReplayRegistryCleanup: "PRUNE_EXPIRED_BEFORE_ATOMIC_RESERVE",
+  crossOpenDeliveryReplayProtection: true,
   credentialBindingFields: [
     "targetDescriptorSha256",
     "tlsRootCertificateSha256",
@@ -102,6 +115,7 @@ const APPROVED_RUNTIME_MANAGEMENT_SESSION_POLICY_CORE = deepFreeze({
     "credentialClass",
     "sourceExpiresAt",
     "sourceRevocation",
+    "deliveryNonce",
   ],
   maximumDeliveryAgeMs: MAXIMUM_DELIVERY_AGE_MS,
   maximumDeliveryLifetimeMs: MAXIMUM_DELIVERY_LIFETIME_MS,
@@ -125,7 +139,7 @@ const APPROVED_RUNTIME_MANAGEMENT_SESSION_POLICY_CORE = deepFreeze({
 } as const);
 
 export const CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_APPROVED_RUNTIME_MANAGEMENT_SESSION_POLICY_DIGEST =
-  "2dc462675834a2741941e5b11a0f277cfbc6d08c6a0b4edc04346aa97dd59ce3" as const;
+  "b52fae0bc088dc2d2ba6cfd298fc3da56426044c89d5fd4223295f1ca0acbaed" as const;
 
 if (
   canonicalSha256(APPROVED_RUNTIME_MANAGEMENT_SESSION_POLICY_CORE) !==
@@ -171,6 +185,7 @@ export type CaresLinkV1CommunicationNotePreviewApprovedRuntimeManagementCredenti
     credentialClass: "STATIC_SUPABASE_BRANCH_ADMIN_PASSWORD";
     sourceExpiresAt: null;
     sourceRevocation: "BRANCH_DELETE_OR_PASSWORD_RESET";
+    deliveryNonce: string;
     deliveryExpiresNoLaterThan: string;
     maximumDeliveryLifetimeMs: typeof MAXIMUM_DELIVERY_LIFETIME_MS;
   }>;
@@ -245,8 +260,9 @@ export function createCaresLinkV1CommunicationNotePreviewApprovedRuntimeManageme
 /**
  * Creates a source-only management connection boundary. It discovers neither
  * endpoints nor credentials: both arrive through already scoped, injected
- * ports. The static branch-admin password may remain reusable at its source;
- * only one short-lived delivery envelope may cross each callback boundary.
+ * ports. The static branch-admin password may remain reusable at its source,
+ * while each delivery is bound to one factory-generated nonce. The factory
+ * retains only a bounded SHA-256/monotonic-expiry registry for replay denial.
  */
 export function createTestOnlyCaresLinkV1CommunicationNotePreviewApprovedRuntimeManagementSessionFactory(
   value: unknown,
@@ -274,6 +290,7 @@ export function createTestOnlyCaresLinkV1CommunicationNotePreviewApprovedRuntime
     );
     const Client =
       options.Client as CaresLinkV1CommunicationNotePreviewApprovedRuntimeManagementClientConstructor;
+    const deliveryReplayRegistry = createDeliveryReplayRegistry();
 
     return Object.freeze({
       open(context: CaresLinkV1CommunicationNotePreviewDurableCredentialCallContext) {
@@ -281,6 +298,7 @@ export function createTestOnlyCaresLinkV1CommunicationNotePreviewApprovedRuntime
           connectionProfile,
           credentialTransport,
           Client,
+          deliveryReplayRegistry,
           context,
         );
       },
@@ -294,6 +312,7 @@ async function openManagementSession(
   profile: ValidatedManagementConnectionProfile,
   credentialTransport: CaresLinkV1CommunicationNotePreviewApprovedRuntimeManagementCredentialTransport,
   Client: CaresLinkV1CommunicationNotePreviewApprovedRuntimeManagementClientConstructor,
+  deliveryReplayRegistry: DeliveryReplayRegistry,
   contextValue: unknown,
 ): Promise<CaresLinkV1CommunicationNotePreviewRuntimeBrokerManagementSession> {
   const context = validateContext(contextValue);
@@ -310,6 +329,7 @@ async function openManagementSession(
       "STATIC_SUPABASE_BRANCH_ADMIN_PASSWORD" as const,
     sourceExpiresAt: null,
     sourceRevocation: "BRANCH_DELETE_OR_PASSWORD_RESET" as const,
+    deliveryNonce: createDeliveryNonce(),
     deliveryExpiresNoLaterThan: profile.expiresAt,
     maximumDeliveryLifetimeMs: MAXIMUM_DELIVERY_LIFETIME_MS,
   });
@@ -420,8 +440,21 @@ async function openManagementSession(
       callbackCount += 1;
       callbackPromise = (async () => {
         let rawCredential: unknown = credentialValue;
-        password = validateCredential(rawCredential, request, profile);
+        let validatedCredential:
+          | ReturnType<typeof validateCredential>
+          | undefined;
+        validatedCredential = validateCredential(
+          rawCredential,
+          request,
+          profile,
+        );
         rawCredential = undefined;
+        deliveryReplayRegistry.reserve(
+          validatedCredential.deliveryNonceSha256,
+          validatedCredential.expiresAtMonotonicMilliseconds,
+        );
+        password = validatedCredential.password;
+        validatedCredential = undefined;
         requireFreshTarget(profile);
         requireNotAborted(context.signal);
 
@@ -655,6 +688,7 @@ function validateCredential(
     "credentialClass",
     "sourceExpiresAt",
     "sourceRevocation",
+    "deliveryNonce",
     "password",
     "deliveryIssuedAt",
     "deliveryExpiresAt",
@@ -670,6 +704,7 @@ function validateCredential(
     object.credentialClass !== expected.credentialClass ||
     object.sourceExpiresAt !== expected.sourceExpiresAt ||
     object.sourceRevocation !== expected.sourceRevocation ||
+    object.deliveryNonce !== expected.deliveryNonce ||
     object.deliveryOneUse !== true ||
     object.rawDsnPresent !== false ||
     typeof object.password !== "string" ||
@@ -687,17 +722,78 @@ function validateCredential(
     requireTimestamp(object.deliveryExpiresAt),
   );
   const now = trustedWallClockMilliseconds(profile);
+  const monotonicNow = performance.now();
   if (
     deliveryIssuedAt > now ||
     now - deliveryIssuedAt > MAXIMUM_DELIVERY_AGE_MS ||
     deliveryExpiresAt <= now ||
     deliveryExpiresAt > Date.parse(profile.expiresAt) ||
     deliveryExpiresAt <= deliveryIssuedAt ||
-    deliveryExpiresAt - deliveryIssuedAt > MAXIMUM_DELIVERY_LIFETIME_MS
+    deliveryExpiresAt - deliveryIssuedAt > MAXIMUM_DELIVERY_LIFETIME_MS ||
+    !Number.isFinite(monotonicNow)
   ) {
     throw unavailable();
   }
-  return object.password;
+  return Object.freeze({
+    password: object.password,
+    deliveryNonceSha256: bytesSha256(
+      Buffer.from(requireSha256(object.deliveryNonce), "utf8"),
+    ),
+    expiresAtMonotonicMilliseconds:
+      monotonicNow + (deliveryExpiresAt - now),
+  });
+}
+
+type DeliveryReplayRegistry = Readonly<{
+  reserve: (
+    deliveryNonceSha256: string,
+    expiresAtMonotonicMilliseconds: number,
+  ) => void;
+}>;
+
+function createDeliveryReplayRegistry(): DeliveryReplayRegistry {
+  const consumed = new Map<string, number>();
+  return Object.freeze({
+    reserve(
+      deliveryNonceSha256: string,
+      expiresAtMonotonicMilliseconds: number,
+    ) {
+      const now = performance.now();
+      if (
+        !SHA256_PATTERN.test(deliveryNonceSha256) ||
+        !Number.isFinite(now) ||
+        !Number.isFinite(expiresAtMonotonicMilliseconds) ||
+        expiresAtMonotonicMilliseconds <= now ||
+        expiresAtMonotonicMilliseconds > now + MAXIMUM_DELIVERY_LIFETIME_MS
+      ) {
+        throw unavailable();
+      }
+      for (const [digest, expiresAt] of consumed) {
+        if (expiresAt <= now) consumed.delete(digest);
+      }
+      if (
+        consumed.has(deliveryNonceSha256) ||
+        consumed.size >= MAXIMUM_TRACKED_DELIVERY_NONCES
+      ) {
+        throw unavailable();
+      }
+      consumed.set(deliveryNonceSha256, expiresAtMonotonicMilliseconds);
+    },
+  });
+}
+
+function createDeliveryNonce() {
+  let bytes: Buffer | undefined;
+  try {
+    bytes = randomBytes(DELIVERY_NONCE_BYTES);
+    const nonce = bytes.toString("hex");
+    if (!SHA256_PATTERN.test(nonce)) throw unavailable();
+    return nonce;
+  } catch {
+    throw unavailable();
+  } finally {
+    bytes?.fill(0);
+  }
 }
 
 function createClientConfig(

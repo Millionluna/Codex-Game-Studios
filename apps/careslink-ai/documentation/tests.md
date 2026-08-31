@@ -2783,6 +2783,40 @@ whitespace/diff checks, the 73-file Codex adapter sync, and the Next.js 16.2.9
 Webpack production build with 64/64 pages. Independent review ended at P0=0,
 P1=0. These remain local/default-off results, not Hosted live evidence.
 
+### Communication Note approved runtime adapters M1o — post-review hardening
+
+M1o provides candidate fixes for the three source-review findings without
+enabling the live-only test. These fixes remain subject to same-revision final
+review and are not recorded here as already closed. Management deliveries now
+carry a factory-generated 64-hex nonce. Tests prove exact echo binding,
+distinct nonces, old-envelope replay rejection before a second Client,
+sequential and truly concurrent atomic repeated-nonce rejection, fail-closed
+behavior at the 256-entry registry bound, and monotonic-expiry pruning. The
+registry keeps only nonce SHA-256 and expiry; the static branch-admin source
+password is still explicitly not one-use.
+
+Outer-runner tests cover graceful, rejected and never-settling admin close,
+exact TLS stream destruction, missing/throwing/no-op-destroy refusal before a second
+Client, timer cleanup, Direct to Session Pooler fallback only after confirmed
+close/destruction, and fixed final cleanup failure. Shared-channel tests inject
+synchronous `.end(payload)` failures on every input position, including the
+secret FD, and cover `child.kill()` returning false or throwing. They prove
+handle-owned SIGKILL attempts, late input/status/child error absorption, destroy
+invocation on all streams, no secret/raw-error serialization, and bounded
+data/exit/stateful-listener cleanup after child close or the independent
+one-second deadline. Static content-free error sinks remain until actual close;
+raw PID signalling is forbidden. Existing M1l FD3/FD4 behavior remains in the
+same focused gate.
+
+The final-review M1o candidate source revision is
+`7a0f19f782670acf663fd087a3e460df92048e2d2406b05efe20d900a182e011`.
+The exact local focused gate passed 10 files / 169 tests and the full suite
+passed 187 files / 2,565 tests. TypeScript, full ESLint, three Node syntax
+checks, whitespace/diff, the 73-file adapter sync and the Next.js 16.2.9
+Webpack 64/64-page build are the same-revision closeout. No Hosted PG17, TLS,
+PID, live cleanup, branch deletion, Preview creation, deployment or Production
+operation ran in this batch.
+
 ### Current live/read-only evidence
 
 - Supabase migrations, tables, RLS flags, policies, grants, function grants and aggregate row counts were checked read-only.

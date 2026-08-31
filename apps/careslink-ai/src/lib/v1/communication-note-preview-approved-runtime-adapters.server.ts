@@ -61,7 +61,7 @@ const MAXIMUM_TARGET_AGE_MS = 5 * 60 * 1_000;
 const MAXIMUM_CA_BYTES = 64 * 1_024;
 
 export const CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_APPROVED_RUNTIME_ADAPTERS_VERSION =
-  "adapters.communication.openai.synthetic-preview.2026-08-31.m1m.v1" as const;
+  "adapters.communication.openai.synthetic-preview.2026-08-31.m1m.v2" as const;
 export const CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_APPROVED_RUNTIME_ADAPTERS_READY =
   false as const;
 
@@ -95,7 +95,10 @@ const APPROVED_RUNTIME_ADAPTERS_POLICY_CORE = deepFreeze({
   resolvedRuntimeBindingPolicyDigest:
     CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RESOLVED_RUNTIME_BINDING_POLICY_DIGEST,
   sameSealedTargetRequired: true,
-  managementCredentialTransport: "ONE_USE_DELIVERY_CALLBACK_ONLY",
+  managementCredentialTransport:
+    "FACTORY_NONCE_BOUND_ONE_USE_DELIVERY_CALLBACK_ONLY",
+  managementDeliveryCrossOpenReplayProtection: true,
+  managementDeliveryReplayRegistryScope: "FACTORY",
   separateManagementAndRuntimeClients: true,
   managementConnectionProfileDerivedFromSealedTarget: true,
   runtimeOpenRequestCrossBindingRequired: true,
@@ -104,7 +107,7 @@ const APPROVED_RUNTIME_ADAPTERS_POLICY_CORE = deepFreeze({
 } as const);
 
 export const CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_APPROVED_RUNTIME_ADAPTERS_POLICY_DIGEST =
-  "7dd9bdc893147146a2e519b59f71cb958b9afdf2117589bf8ca42239a1ac1dc5" as const;
+  "8fe10547d33732388f5e6b97afc76da9679d63ae1d45eb04447ae21ac2462e31" as const;
 
 if (
   canonicalSha256(APPROVED_RUNTIME_ADAPTERS_POLICY_CORE) !==
