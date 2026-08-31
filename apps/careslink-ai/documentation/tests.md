@@ -2878,6 +2878,72 @@ mutation, real data, deployment or provider/model call occurred; Production
 parent interaction was limited to disposable branch create/get/list/delete
 control-plane operations.
 
+### Communication Note approved runtime adapters M1q — Hosted timeout/Abort pass
+
+On 2026-08-31, after a fresh explicit authorization at the then-current Micro
+Compute price of `US$0.01344/hour`, the caller created the no-data,
+non-default, non-persistent PG17 Preview
+`m1q-communication-note-hosted-negative-paths-r1-20260831` (branch id
+`c1c404d3-e45d-44a2-b474-af3b52b7c13a`, child ref
+`htylsaspsskufkgjginz`) under parent `adocsnwnslxhxcjgbyee`. It was reported as
+`with_data=false` and `ACTIVE_HEALTHY`. The pinned Server root certificate
+SHA-256 was
+`700723581420dd1ac98fd7e9ac529f0ef210eadcaf87fc868a3ad7d114c2f3b7`.
+
+The exact 40/40 single-transaction migration gate passed with manifest
+`6590eed19602c4d7931355f18dafde699b1c47012a3fe09f9d040c179e11792d`.
+The first two full-runner attempts failed before the first scenario setup due to
+setup SQL syntax errors. Each failure rolled back the complete transaction, and
+independent postchecks found zero generation/broker ledger rows and zero
+temporary runtime roles. The correction completed five `DO` blocks with
+`END;` and parenthesized the top-level `CASE` expression used by an `IF`. A PG17
+parse-only diagnostic then returned `{"parsed":true}` and rolled back its
+transaction; two independent reviews ended at P0=0, P1=0 and P2=0.
+
+The corrected fixed source revision
+`8b84b0aa633892a2da9bf157702f005c06b48d3b98a2f1aef2bff78082b552b7`
+then passed
+`COMMUNICATION_NOTE_M1Q_APPROVED_RUNTIME_ADAPTERS_HOSTED_NEGATIVE_PATHS` over
+Direct 5432 with actual `pg@8.23.0` and client-side pinned-CA verify-full TLS.
+The live gate ran exactly three domain-separated scenarios with fresh M1m
+composition/runtime and monitor/admin connections: positive, PostgreSQL
+statement timeout and runtime-watchdog Abort. The evidence proves:
+
+- one positive `ACCEPTED` terminal and no terminal writes for either negative
+  scenario, with cumulative ledger `[3,0,3,3,3,1]`;
+- a real SQLSTATE `57014` statement timeout while the exact backend was in
+  transaction, followed by `ROLLBACK` and session reset on the same live client;
+- the targeted sixth 12-second watchdog callback and hard-close of the exact TLS
+  stream/client before the broker tombstone query, with exact
+  `(PID, backend_start)` durable binding and all three runtime PIDs drained;
+- three revoked acquisitions, three 64-hex hash-only verifier tombstones, and
+  zero terminal runtime roles, sessions, memberships or API privileges.
+
+The evidence retains `sourceRevisionTransitiveClosureAttested=false`,
+`underlyingCredentialShortLived=false`,
+`underlyingCredentialExpiryAttested=false`, `rotationTested=false`,
+`highLevelDatabaseSettlementDeadlineWallClockTested=false`,
+`externalCallerAbortLiveTested=false`,
+`processMemoryZeroizationAttested=false` and
+`branchDeletionVerifiedByRunner=false`; caller-side deletion is recorded
+separately below. Three hash-only verifier residues are allowed; raw password,
+SCRAM verifier and DSN residue remain forbidden.
+
+The setup-SQL hotfix at this exact final source revision passed 2 focused files /
+29 tests and the complete 187-file / 2,571-test suite. TypeScript, full ESLint,
+three Node runner syntax checks, the 73-file adapter sync, `git diff --check` and
+the Next.js 16.2.9 Webpack build with 64/64 pages also passed.
+
+`activationApproved=false`, `ready=false`, and approved exports remain absent. The
+caller deleted the exact branch after the successful gate. Three independent
+sequential listings each returned only default `main` in `ACTIVE_HEALTHY`,
+revoking the branch credential and stopping further branch charges; actual
+accrued cost remains subject to Supabase billing. There was no Production SQL
+or data access, Vercel deployment, real-data flow or provider/model call. The
+historical M1p revision
+`fa7e7a00fdd7fc908bc233f40a009043b1f70b807337b9440a7f4138198b8ceb`
+and its positive-only, Abort/timeout-false evidence remain unchanged.
+
 ### Current live/read-only evidence
 
 - Supabase migrations, tables, RLS flags, policies, grants, function grants and aggregate row counts were checked read-only.

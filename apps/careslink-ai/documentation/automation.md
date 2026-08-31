@@ -679,6 +679,64 @@ or mutation at the database layer, real-data access, deployment, provider/model
 call or automation activation occurred. Production parent interaction was
 limited to disposable branch create/get/list/delete control-plane operations.
 
+### Approved runtime adapters M1q — Hosted timeout/Abort negative-path pass
+
+On 2026-08-31, after a fresh explicit authorization at the then-current Micro
+Compute price of `US$0.01344/hour`, the caller created the no-data,
+non-default, non-persistent PG17 Preview
+`m1q-communication-note-hosted-negative-paths-r1-20260831` (branch id
+`c1c404d3-e45d-44a2-b474-af3b52b7c13a`, child ref
+`htylsaspsskufkgjginz`) under parent `adocsnwnslxhxcjgbyee`. Control-plane
+metadata reported `with_data=false` and `ACTIVE_HEALTHY`. The pinned Server root
+certificate SHA-256 was
+`700723581420dd1ac98fd7e9ac529f0ef210eadcaf87fc868a3ad7d114c2f3b7`.
+
+The exact 40/40 single-transaction migration gate passed with manifest
+`6590eed19602c4d7931355f18dafde699b1c47012a3fe09f9d040c179e11792d`.
+The first two full-runner attempts then failed before the first scenario setup
+because the setup SQL did not parse. Both attempts rolled back their complete
+transactions and independent postchecks found zero generation/broker ledger
+rows and zero temporary runtime roles. The source fix completed five `DO`
+blocks with `END;` and parenthesized the top-level `CASE` expression used by an
+`IF`. A PG17 parse-only diagnostic subsequently returned `{"parsed":true}` and
+rolled back its transaction; two independent reviews ended at P0=0, P1=0 and
+P2=0.
+
+The corrected, source-pinned revision
+`8b84b0aa633892a2da9bf157702f005c06b48d3b98a2f1aef2bff78082b552b7`
+then passed gate
+`COMMUNICATION_NOTE_M1Q_APPROVED_RUNTIME_ADAPTERS_HOSTED_NEGATIVE_PATHS` over a
+Direct 5432 connection with actual `pg@8.23.0`. The live evidence covers exactly
+three domain-separated scenarios: positive, PostgreSQL statement timeout and
+runtime-watchdog Abort. It proves no terminal writes for either negative
+scenario; a real SQLSTATE `57014` timeout while the backend was in transaction,
+followed by rollback and session reset on the same live client; the targeted
+watchdog callback and an exact-stream hard close before the broker tombstone;
+three revoked acquisitions, three drained PIDs, three hash-only verifier
+tombstones and zero terminal runtime roles, sessions, memberships or API
+privileges. Hash-only verifier residue is not zero credential residue; raw
+password, SCRAM verifier and DSN residue remained forbidden.
+
+The evidence deliberately keeps
+`sourceRevisionTransitiveClosureAttested=false`,
+`underlyingCredentialShortLived=false`,
+`underlyingCredentialExpiryAttested=false`, `rotationTested=false`,
+`highLevelDatabaseSettlementDeadlineWallClockTested=false`,
+`externalCallerAbortLiveTested=false`,
+`processMemoryZeroizationAttested=false` and
+`branchDeletionVerifiedByRunner=false`; caller-side deletion is recorded
+separately below. It also preserves `activationApproved=false`, `ready=false`
+and absent approved exports. It does not authorize a scheduled automation,
+Product API importer, deployment or Production activation.
+
+After the gate, the caller deleted the exact branch successfully. Three
+sequential independent listings each showed only default `main` in
+`ACTIVE_HEALTHY`, which revoked the branch credential and stopped further
+branch charges; actual accrued cost remains subject to Supabase billing. No
+Production SQL or data access, Vercel deployment, provider/model call or real
+care data was involved. The historical M1p revision and its positive-only
+Abort/timeout-false evidence remain unchanged.
+
 Supabase CLI 2.115.0 has since generated source-only migration `20260823213144_harden_v1_note_generation_registration_retention.sql`. It adds `attempts_registration_digest_idx` and the named `attempts_registration_catalog_fk` from `attempts.registration_digest` to `worker_registrations.registration_digest`, with update/delete `RESTRICT`, `NOT VALID` creation and explicit validation. It creates no seed, caller grant, runtime surface or Production change. Its local gate passed 39/39 focused contracts, the full 125-file / 1,381-test suite, lint, TypeScript, the 63/63-page production build, the 73-file Codex-adapter sync check and `git diff --check`. Deleted disposable `r22` then clean-applied the current manifest 15/15 and passed the seven rollback suites; the hosted registration-retention gate is now closed without enabling any runtime automation.
 
 ### PostgreSQL 16.15 local isolated gate — 2026-08-24

@@ -122,13 +122,59 @@ enforcement、底层短期凭据、轮换、全进程内存清零或 transitive 
 branch-admin password 在运行期间存在于进程内存。它也不改变 readiness/activation 的
 false/undefined 状态。
 
+### M1q Hosted timeout/Abort negative-path 完整 gate 通过 — 2026-08-31
+
+经新的费用确认与明确授权，caller 按实时 Micro Compute 价格 `US$0.01344/hour` 创建了无数据、
+非默认、非持久 PG17 Preview `m1q-communication-note-hosted-negative-paths-r1-20260831`
+（branch id `c1c404d3-e45d-44a2-b474-af3b52b7c13a`，child ref
+`htylsaspsskufkgjginz`）。控制面确认 parent 为 `adocsnwnslxhxcjgbyee`、`with_data=false`、
+`ACTIVE_HEALTHY`；Dashboard Server root certificate 与 pinned CA 的 SHA-256 均为
+`700723581420dd1ac98fd7e9ac529f0ef210eadcaf87fc868a3ad7d114c2f3b7`。
+
+同一 child 先通过 40/40 migration 单事务 gate，数据库 migration history 与 manifest
+`6590eed19602c4d7931355f18dafde699b1c47012a3fe09f9d040c179e11792d` 全等。前两次 full runner
+随后都在第一条 scenario setup 之前因 setup SQL 语法错误失败；两次均完整事务 rollback，独立
+postcheck 均证明 generation/broker ledger 和临时 runtime roles 为零。修复补齐五个 `DO` 块的
+`END;`，并给顶层 `IF` 使用的 `CASE` 表达式加括号。修复后 PG17 parse-only diagnostic 返回
+`{"parsed":true}` 并回滚其 transaction；两轮独立复核均为 P0=0、P1=0、P2=0。
+
+最终 source revision
+`8b84b0aa633892a2da9bf157702f005c06b48d3b98a2f1aef2bff78082b552b7` 随后通过 gate
+`COMMUNICATION_NOTE_M1Q_APPROVED_RUNTIME_ADAPTERS_HOSTED_NEGATIVE_PATHS`。真实连接为 Direct
+5432、`pg@8.23.0` 和 client-side pinned-CA verify-full。最终 evidence 覆盖三条域隔离
+synthetic chain：positive、PostgreSQL statement timeout 与 runtime watchdog Abort，并证明：
+
+- 两个 negative scenario 都没有 terminal write，最终 ledger 为 `[3,0,3,3,3,1]`，只有
+  positive chain 有一个 `ACCEPTED` terminal；
+- statement-timeout path 在事务中由 PostgreSQL 返回 SQLSTATE `57014`，随后在同一个 live
+  client 完成 `ROLLBACK` 与 session reset；
+- watchdog-Abort path 定向触发第六个 12 秒 callback，并在 broker tombstone query 开始前
+  hard-close exact TLS stream/client；monitor 的 `(PID, backend_start)` 与 durable acquisition
+  tuple 绑定，三个 runtime PID 最终全部 drain；
+- 三次 acquisition 全部 `REVOKED`，保留三个 64-hex hash-only credential-verifier
+  tombstone；终态 runtime role/session/membership/API privilege 为零。
+
+evidence 保持 `sourceRevisionTransitiveClosureAttested=false`、
+`underlyingCredentialShortLived=false`、`underlyingCredentialExpiryAttested=false`、
+`rotationTested=false`、`highLevelDatabaseSettlementDeadlineWallClockTested=false`、
+`externalCallerAbortLiveTested=false`、`processMemoryZeroizationAttested=false` 与
+`branchDeletionVerifiedByRunner=false`；caller-side 删除单独记录如下。三个 hash-only verifier
+residue 不等于“零 credential residue”；raw password、SCRAM verifier 与 DSN 仍不得进入 evidence
+或 durable ledger。
+
+`activationApproved=false`、`ready=false`，approved export 仍为 `undefined`。成功后 caller 精确
+删除该 branch；三次顺序独立 listing 均只返回 `ACTIVE_HEALTHY` 的 default `main`，从而撤销
+branch credential 并停止后续分支费用，实际已产生费用以 Supabase 账单为准。没有 Production
+SQL/数据访问、Vercel deployment、provider/model 调用或真实护理数据。M1p revision
+`fa7e7a00fdd7fc908bc233f40a009043b1f70b807337b9440a7f4138198b8ceb` 的历史 positive-only、
+`Abort=false`、`timeout=false` evidence 保持不变。
+
 若要实际接通 AI 应用，后续仍需分别取得：
 
-1. Abort/timeout negative path 的独立 live 证据；
-2. approved target resolver、控制面身份、KMS/Vault credential transport、部署身份与
+1. approved target resolver、控制面身份、KMS/Vault credential transport、部署身份与
    runtime dependency 的审查；
-3. Production migration、部署与 activation 的独立授权；
-4. provider/model evaluation、费用与产品流量的独立授权。
+2. Production migration、部署与 activation 的独立授权；
+3. provider/model evaluation、费用与产品流量的独立授权。
 
 在这些 gate 完成前，M1m 不启用 Product API route，不产生模型调用，不写 Production，
 readiness/approval 保持 false/undefined。

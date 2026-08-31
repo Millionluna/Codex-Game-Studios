@@ -475,11 +475,14 @@ export function createCommunicationNotePreviewApprovedRuntimeAdaptersHostedEvide
   }
   return deepFreeze({
     ok: true,
-    gate: "communication-note-approved-runtime-adapters-hosted-pg17",
+    gate:
+      "COMMUNICATION_NOTE_M1Q_APPROVED_RUNTIME_ADAPTERS_HOSTED_NEGATIVE_PATHS",
     postgresMajor: 17,
     actualPgPackageVersion: EXPECTED_PG_PACKAGE_VERSION,
     actualConnectionMode: connectionMode,
     terminalState: "ACCEPTED",
+    scenarioCount: 3,
+    negativeTerminalWritesAbsentVerified: true,
     m1mCompositionDriven: true,
     callerProvidedSourceRevisionPinVerified: true,
     sourceManifestValidated: true,
@@ -496,14 +499,22 @@ export function createCommunicationNotePreviewApprovedRuntimeAdaptersHostedEvide
     underlyingCredentialShortLived: false,
     underlyingCredentialExpiryAttested: false,
     rotationTested: false,
-    abortPathLiveTested: false,
-    timeoutPathLiveTested: false,
+    abortPathLiveTested: true,
+    timeoutPathLiveTested: true,
+    postgresStatementTimeoutSqlstate57014Verified: true,
+    postgresStatementTimeoutInTransactionVerified: true,
+    postgresStatementTimeoutRollbackAndResetVerified: true,
+    highLevelDatabaseSettlementDeadlineTargetedTimerTested: true,
+    highLevelDatabaseSettlementDeadlineWallClockTested: false,
+    externalCallerAbortLiveTested: false,
+    connectionBoundAbortHardCloseLiveTested: true,
+    watchdogAbortInFlightTransactionVerified: true,
     processMemoryZeroizationAttested: false,
     runtimeRoleCount: 0,
     runtimeSessionCount: 0,
     runtimeMembershipCount: 0,
     apiPrivilegeCount: 0,
-    credentialVerifierHashOnlyCount: 1,
+    credentialVerifierHashOnlyCount: 3,
     rawCredentialMaterialInEvidence: false,
     rawCredentialMaterialInDurableLedger: false,
     rawCredentialMaterialInProcessDuringRun: true,
@@ -868,7 +879,7 @@ export const COMMUNICATION_NOTE_PREVIEW_APPROVED_RUNTIME_ADAPTERS_HOSTED_TEST_ON
 async function verifyPostcondition(admin) {
   try {
     const result = await admin.query(`select
-      (select pg_catalog.count(*) = 1
+      (select pg_catalog.count(*) = 3
         and pg_catalog.count(*) filter (
           where state = 'REVOKED'
             and future_issuance_blocked
@@ -880,8 +891,17 @@ async function verifyPostcondition(admin) {
             and tombstoned_at is not null
             and revoked_at is not null
             and credential_verifier_sha256 ~ '^[a-f0-9]{64}$'
-        ) = 1
+        ) = 3
         from careslink_v1_runtime_broker.acquisitions) as acquisition_ok,
+      (select pg_catalog.count(*) = 3
+        from careslink_v1_runtime_broker.acquisitions as acquisition
+        where acquisition.bound_backend_pid is not null
+          and acquisition.bound_backend_start is not null
+          and not exists (
+            select 1 from pg_catalog.pg_stat_activity as activity
+            where activity.pid = acquisition.bound_backend_pid
+              and activity.backend_start = acquisition.bound_backend_start
+          )) as exact_pids_drained,
       not exists (
         select 1 from pg_catalog.pg_roles
         where rolname ~ '^careslink_v1_preview_runner_terminal_runtime_[a-f0-9]{16}$'
@@ -943,12 +963,13 @@ async function verifyPostcondition(admin) {
       result.rowCount !== 1 ||
       !row ||
       row.acquisition_ok !== true ||
+      row.exact_pids_drained !== true ||
       row.roles_absent !== true ||
       row.sessions_absent !== true ||
       row.memberships_absent !== true ||
       Number(row.api_privilege_count) !== 0 ||
-      Number(row.verifier_hash_only_count) !== 1 ||
-      JSON.stringify(row.ledger_counts) !== "[1,0,1,1,1,1]"
+      Number(row.verifier_hash_only_count) !== 3 ||
+      JSON.stringify(row.ledger_counts) !== "[3,0,3,3,3,1]"
     ) {
       fail("M1N_APPROVED_RUNTIME_ADAPTERS_HOSTED_POSTCHECK_FAILED");
     }

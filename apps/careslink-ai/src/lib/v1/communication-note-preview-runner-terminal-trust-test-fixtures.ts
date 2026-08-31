@@ -42,16 +42,63 @@ import {
 
 export const M1GH_TEST_NOW = "2026-08-28T02:00:00.000Z";
 
+export type M1ghRunnerTerminalTrustFixtureScenario =
+  | "M1Q_HOSTED_POSITIVE"
+  | "M1Q_HOSTED_STATEMENT_TIMEOUT"
+  | "M1Q_HOSTED_WATCHDOG_ABORT";
+
+const FIXTURE_SCENARIO_BINDINGS = Object.freeze({
+  M1Q_HOSTED_POSITIVE: Object.freeze({
+    authorizationId: "10000000-0000-4000-8000-000000000001",
+    authorizationNonceHash: hex("1"),
+    runIdHash: hex("4"),
+  }),
+  M1Q_HOSTED_STATEMENT_TIMEOUT: Object.freeze({
+    authorizationId: "10000000-0000-4000-8000-000000000002",
+    authorizationNonceHash: sha256(
+      "CARESLINK_M1Q_TIMEOUT_AUTHORIZATION_NONCE_V1",
+    ),
+    runIdHash: sha256("CARESLINK_M1Q_TIMEOUT_RUN_ID_V1"),
+  }),
+  M1Q_HOSTED_WATCHDOG_ABORT: Object.freeze({
+    authorizationId: "10000000-0000-4000-8000-000000000003",
+    authorizationNonceHash: sha256(
+      "CARESLINK_M1Q_ABORT_AUTHORIZATION_NONCE_V1",
+    ),
+    runIdHash: sha256("CARESLINK_M1Q_ABORT_RUN_ID_V1"),
+  }),
+} satisfies Readonly<Record<M1ghRunnerTerminalTrustFixtureScenario, Readonly<{
+  authorizationId: string;
+  authorizationNonceHash: string;
+  runIdHash: string;
+}>>>);
+
 export function createM1ghRunnerTerminalTrustFixture(
-  options: Readonly<{ now?: string }> = {},
+  options: Readonly<{
+    now?: string;
+    scenario?: M1ghRunnerTerminalTrustFixtureScenario;
+  }> = {},
 ) {
   const now = requireTimestamp(options.now ?? M1GH_TEST_NOW);
+  const scenario = options.scenario === undefined
+    ? "M1Q_HOSTED_POSITIVE"
+    : options.scenario;
+  if (
+    !Object.prototype.hasOwnProperty.call(
+      FIXTURE_SCENARIO_BINDINGS,
+      scenario,
+    )
+  ) {
+    throw new Error("M1GH_TEST_FIXTURE_SCENARIO_INVALID");
+  }
+  const scenarioBinding = FIXTURE_SCENARIO_BINDINGS[scenario];
   const ownerSigner = createSigner("OWNER_AUTHORIZATION", now);
   const receiptSigner = createSigner("CARESLINK_DISPATCH_RECEIPT", now);
   const runnerTerminalSigner = createRunnerTerminalSigner(now);
   const authorizationStatement = createAuthorizationStatement(
     ownerSigner.trustedKey,
     now,
+    scenarioBinding,
   );
   const authorizationSignature = signStatement(
     authorizationStatement,
@@ -382,15 +429,20 @@ export function createM1giAcceptedRunnerTerminalEnvelope(
 function createAuthorizationStatement(
   trustedKey: CaresLinkV1CommunicationNotePreviewTrustedSigningKey,
   now: string,
+  scenarioBinding: Readonly<{
+    authorizationId: string;
+    authorizationNonceHash: string;
+    runIdHash: string;
+  }>,
 ): CaresLinkV1CommunicationNotePreviewAuthorizationStatement {
   return {
     domain: CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_AUTHORIZATION_DOMAIN,
     version: CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_AUTHORIZATION_VERSION,
-    authorizationId: "10000000-0000-4000-8000-000000000001",
-    authorizationNonceHash: hex("1"),
+    authorizationId: scenarioBinding.authorizationId,
+    authorizationNonceHash: scenarioBinding.authorizationNonceHash,
     ownerSubjectHmac: hex("2"),
     tenantScopeHmac: hex("3"),
-    runIdHash: hex("4"),
+    runIdHash: scenarioBinding.runIdHash,
     signerKeyIdHash: sha256(trustedKey.keyId),
     signerPublicKeySha256: trustedKey.publicKeySha256,
     issuedAt: shiftTimestamp(now, -60_000),

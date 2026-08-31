@@ -694,6 +694,7 @@ describe("V1 shadow runtime boundary", () => {
         relativePath:
           "src/lib/v1/communication-note-preview-approved-runtime-broker.server.ts",
         expectedImporterPaths: [
+          "src/lib/v1/communication-note-preview-approved-runtime-adapters-hosted.live.test.ts",
           "src/lib/v1/communication-note-preview-approved-runtime-adapters.server.ts",
           "src/lib/v1/communication-note-preview-approved-runtime-broker.server.test.ts",
           "src/lib/v1/communication-note-preview-approved-runtime-management-session.server.test.ts",
