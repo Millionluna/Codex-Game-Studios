@@ -111,10 +111,20 @@ M1p 的本地修复候选使用 Node `createRequire` 加载已经固定版本和
 adapter sync 与 64/64-page Webpack build。失败 Preview 已删除并三次确认只剩健康的 default
 Production；这仍不是完整 Hosted gate pass，旧 revision review 和旧费用授权均不能复用。
 
-下一 gate 是 M1o 同 revision source review/merge。随后若要实际接通 AI 应用，仍需分别取得：
+PR #18 合并后，修正版 source revision
+`fa7e7a00fdd7fc908bc233f40a009043b1f70b807337b9440a7f4138198b8ceb` 已在第二个单独授权的
+no-data、non-default、non-persistent PG17 Preview 上通过完整 Hosted positive-path gate。
+40/40 migration 单事务 gate、真实 `pg@8.23.0` Direct/pinned-CA TLS、M1m composition、
+`ACCEPTED` terminal、factory replay protection 与终态零 role/session/membership/API privilege
+均得到 live evidence；caller 随后删除 exact branch 并三次确认只剩健康 Production。该结论
+不覆盖 Abort/timeout/adversarial replay negative path、Session Pooler fallback、服务端 SSL
+enforcement、底层短期凭据、轮换、全进程内存清零或 transitive dependency attestation；raw
+branch-admin password 在运行期间存在于进程内存。它也不改变 readiness/activation 的
+false/undefined 状态。
 
-1. disposable no-data PostgreSQL 17 Preview、真实 `pg` driver 和 pinned-CA/Abort 行为的
-   明确授权与 same-revision 证据；
+若要实际接通 AI 应用，后续仍需分别取得：
+
+1. Abort/timeout negative path 的独立 live 证据；
 2. approved target resolver、控制面身份、KMS/Vault credential transport、部署身份与
    runtime dependency 的审查；
 3. Production migration、部署与 activation 的独立授权；

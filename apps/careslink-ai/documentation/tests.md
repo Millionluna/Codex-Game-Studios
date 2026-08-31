@@ -2847,6 +2847,37 @@ These are local/default-off results, not a Hosted runtime pass. A rerun requires
 same-revision review and a new paid Preview authorization; the failed run's
 price confirmation cannot be reused.
 
+### Communication Note approved runtime adapters M1p — corrected Hosted pass
+
+After PR #18 merged, a new separately authorized no-data PG17 Preview ran the
+same reviewed source revision
+`fa7e7a00fdd7fc908bc233f40a009043b1f70b807337b9440a7f4138198b8ceb`.
+The 40/40 migration gate passed in one transaction with the exact manifest,
+empty ledgers and no temporary roles. A fresh credential envelope then passed
+the complete Hosted positive-path runner with:
+
+- actual `pg@8.23.0`, Direct 5432 and pinned-CA verify-full TLS;
+- validated child control-plane identity, project-ref binding and source pin;
+- real M1m composition and an `ACCEPTED` terminal;
+- the factory-scope cross-open replay-protection contract with five fresh
+  deliveries;
+- zero terminal runtime role/session/membership/API privileges;
+- one hash-only credential-verifier tombstone and no raw credential in evidence
+  or durable ledger.
+
+The success evidence deliberately reports Abort and timeout live coverage as
+false. Adversarial replay and Session Pooler fallback were not live-tested;
+server-side SSL enforcement was not attested. The static branch-admin password
+was present in process memory during the run, and the evidence does not attest
+an underlying short-lived or rotated password, process-memory zeroization or
+complete transitive dependency integrity. It does not approve activation:
+readiness remains false and approved exports stay absent. The caller deleted
+the exact Preview immediately afterward; three sequential listings showed only
+the healthy default Production branch. No Production database connection or
+mutation, real data, deployment or provider/model call occurred; Production
+parent interaction was limited to disposable branch create/get/list/delete
+control-plane operations.
+
 ### Current live/read-only evidence
 
 - Supabase migrations, tables, RLS flags, policies, grants, function grants and aggregate row counts were checked read-only.
