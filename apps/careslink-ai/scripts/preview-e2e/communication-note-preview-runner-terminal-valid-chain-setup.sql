@@ -192,24 +192,27 @@ begin
       v_authorization_signature ~ '^[A-Za-z0-9_-]{86}$', false
     )
     or v_scenario_ordinal is null
-    or v_authorization_statement->>'authorizationId' is distinct from
+    or v_authorization_statement->>'authorizationId' is distinct from (
       case v_scenario_ordinal
         when 1 then '10000000-0000-4000-8000-000000000001'
         when 2 then '10000000-0000-4000-8000-000000000002'
         when 3 then '10000000-0000-4000-8000-000000000003'
       end
-    or v_authorization_statement->>'authorizationNonceHash' is distinct from
+    )
+    or v_authorization_statement->>'authorizationNonceHash' is distinct from (
       case v_scenario_ordinal
         when 1 then pg_catalog.repeat('1', 64)
         when 2 then 'a752af8167c5055788e9418f7de92129280044acfcddcfec8d78486fb32c233f'
         when 3 then 'cc06141d74a0cf18361ef1196eaaf274c26cfdbd5829eabf1e7e071be80a6d78'
       end
-    or v_authorization_statement->>'runIdHash' is distinct from
+    )
+    or v_authorization_statement->>'runIdHash' is distinct from (
       case v_scenario_ordinal
         when 1 then pg_catalog.repeat('4', 64)
         when 2 then '51346eb930b3263624d5b46aa5b3df899bd27b4d987815acfa6f33138a22de93'
         when 3 then '2e8491c130d41e6d64d89f60f1a9a0ebb0fcdf65e4b8aa300c96c4c9100dfa68'
       end
+    )
   then
     raise exception 'RUNNER_TERMINAL_VALID_SETUP_FIXTURE_UNSAFE';
   end if;
@@ -230,7 +233,7 @@ begin
       v_scenario_ordinal - 1
     or (select pg_catalog.count(*) from
       careslink_v1_generation.communication_note_preview_runner_terminals) <>
-      case when v_scenario_ordinal = 1 then 0 else 1 end
+      (case when v_scenario_ordinal = 1 then 0 else 1 end)
     or exists (
       (
         select
@@ -439,7 +442,7 @@ begin
   ) then
     raise exception 'RUNNER_TERMINAL_VALID_SETUP_MANAGEMENT_MEMBERSHIP_DRIFT';
   end if;
-end
+end;
 $careslink_runner_terminal_valid_setup$;
 
 create temporary table m1gh_valid_management_membership_snapshot
@@ -546,7 +549,7 @@ begin
     pg_catalog.repeat('0', 64),
     v_reservation_id
   );
-end
+end;
 $careslink_runner_terminal_valid_authorization$;
 
 reset role;
@@ -606,7 +609,7 @@ begin
   end if;
   update pg_temp.m1gh_valid_chain_state
   set claim_token = v_claim->>'claimToken';
-end
+end;
 $careslink_runner_terminal_valid_dispatch$;
 
 reset role;
@@ -715,7 +718,7 @@ begin
   end if;
   update pg_temp.m1gh_valid_chain_state
   set receipt_digest = v_result->>'receiptDigest';
-end
+end;
 $careslink_runner_terminal_valid_receipt$;
 
 reset role;
@@ -761,7 +764,7 @@ begin
       v_scenario_ordinal
     or (select pg_catalog.count(*) from
       careslink_v1_generation.communication_note_preview_runner_terminals) <>
-      case when v_scenario_ordinal = 1 then 0 else 1 end
+      (case when v_scenario_ordinal = 1 then 0 else 1 end)
     or exists (
       (
         select * from pg_temp.m1gh_valid_chain_projection
@@ -859,5 +862,5 @@ begin
   then
     raise exception 'RUNNER_TERMINAL_VALID_SETUP_POSTCHECK_FAILED';
   end if;
-end
+end;
 $careslink_runner_terminal_valid_setup_postcheck$;

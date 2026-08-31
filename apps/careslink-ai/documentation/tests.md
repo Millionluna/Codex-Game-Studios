@@ -2878,64 +2878,71 @@ mutation, real data, deployment or provider/model call occurred; Production
 parent interaction was limited to disposable branch create/get/list/delete
 control-plane operations.
 
-### Communication Note approved runtime adapters M1q — timeout/Abort source candidate
+### Communication Note approved runtime adapters M1q — Hosted timeout/Abort pass
 
-The M1q candidate keeps the Hosted test default-off and adds source-level
-coverage for exactly three domain-separated fixture scenarios: positive,
-PostgreSQL statement timeout and runtime watchdog Abort. Fixture tests require
-independent auth identities, authorization nonces and run/client/provider ids,
-reject unknown scenario keys and lock the setup SQL to the ordered cumulative
-ledger states ending at `[3,0,3,3,3,1]`: authorizations, authorization
-revocations, claims, dispatch reservations, dispatch receipts and runner
-terminals. Static source assertions also prevent
-the two negative chains from gaining terminal rows and preserve the one positive
-`ACCEPTED` terminal.
+On 2026-08-31, after a fresh explicit authorization at the then-current Micro
+Compute price of `US$0.01344/hour`, the caller created the no-data,
+non-default, non-persistent PG17 Preview
+`m1q-communication-note-hosted-negative-paths-r1-20260831` (branch id
+`c1c404d3-e45d-44a2-b474-af3b52b7c13a`, child ref
+`htylsaspsskufkgjginz`) under parent `adocsnwnslxhxcjgbyee`. It was reported as
+`with_data=false` and `ACTIVE_HEALTHY`. The pinned Server root certificate
+SHA-256 was
+`700723581420dd1ac98fd7e9ac529f0ef210eadcaf87fc868a3ad7d114c2f3b7`.
 
-The live-child unit boundary uses an injected fake `pg` Client to prove that
-`pg_catalog.pg_sleep(30)` can replace only the exact `BASE_IDENTITY` statement
-after the runtime transaction's `BEGIN` plus four fixed `SET LOCAL` statements.
-It separately records the expected SQLSTATE `57014`, rollback/reset calls,
-stream destruction and client close behavior without claiming any of those are
-Hosted observations. Timer tests capture only the sixth exact 12-second runtime
-watchdog callback while the first five and all unrelated clocks keep their real
-implementations; they prove targeted callback ownership and restoration, not a
-real 12-second wall-clock wait or an external caller Abort.
+The exact 40/40 single-transaction migration gate passed with manifest
+`6590eed19602c4d7931355f18dafde699b1c47012a3fe09f9d040c179e11792d`.
+The first two full-runner attempts failed before the first scenario setup due to
+setup SQL syntax errors. Each failure rolled back the complete transaction, and
+independent postchecks found zero generation/broker ledger rows and zero
+temporary runtime roles. The correction completed five `DO` blocks with
+`END;` and parenthesized the top-level `CASE` expression used by an `IF`. A PG17
+parse-only diagnostic then returned `{"parsed":true}` and rolled back its
+transaction; two independent reviews ended at P0=0, P1=0 and P2=0.
 
-The enabled future gate is designed to use fresh M1m composition/runtime and
-monitor connections for each scenario. A successful statement-timeout scenario
-must observe the real PostgreSQL five-second timeout, `57014`, an in-transaction
-backend and one successful `ROLLBACK` plus one reset. A successful watchdog
-scenario must first observe the exact `(PID, backend_start)` executing the
-injected sleep, then trigger the targeted callback and hard-close the exact TLS
-socket/client before the broker tombstone query begins. The child must bind that
-monitor tuple to the durable acquisition tuple, drain the PID and prove the
-session was not reused; this excludes normal post-tombstone cleanup as the source
-of the claimed close. The destroyed Abort client is not
-required to send rollback/reset queries. Both negative scenarios must leave no
-terminal write.
+The corrected fixed source revision
+`8b84b0aa633892a2da9bf157702f005c06b48d3b98a2f1aef2bff78082b552b7`
+then passed
+`COMMUNICATION_NOTE_M1Q_APPROVED_RUNTIME_ADAPTERS_HOSTED_NEGATIVE_PATHS` over
+Direct 5432 with actual `pg@8.23.0` and client-side pinned-CA verify-full TLS.
+The live gate ran exactly three domain-separated scenarios with fresh M1m
+composition/runtime and monitor/admin connections: positive, PostgreSQL
+statement timeout and runtime-watchdog Abort. The evidence proves:
 
-No paid Preview was created or contacted and no live-only branch ran for M1q.
-The historical M1p revision
+- one positive `ACCEPTED` terminal and no terminal writes for either negative
+  scenario, with cumulative ledger `[3,0,3,3,3,1]`;
+- a real SQLSTATE `57014` statement timeout while the exact backend was in
+  transaction, followed by `ROLLBACK` and session reset on the same live client;
+- the targeted sixth 12-second watchdog callback and hard-close of the exact TLS
+  stream/client before the broker tombstone query, with exact
+  `(PID, backend_start)` durable binding and all three runtime PIDs drained;
+- three revoked acquisitions, three 64-hex hash-only verifier tombstones, and
+  zero terminal runtime roles, sessions, memberships or API privileges.
+
+The evidence retains `sourceRevisionTransitiveClosureAttested=false`,
+`underlyingCredentialShortLived=false`,
+`underlyingCredentialExpiryAttested=false`, `rotationTested=false`,
+`highLevelDatabaseSettlementDeadlineWallClockTested=false`,
+`externalCallerAbortLiveTested=false`,
+`processMemoryZeroizationAttested=false` and
+`branchDeletionVerifiedByRunner=false`; caller-side deletion is recorded
+separately below. Three hash-only verifier residues are allowed; raw password,
+SCRAM verifier and DSN residue remain forbidden.
+
+The setup-SQL hotfix at this exact final source revision passed 2 focused files /
+29 tests and the complete 187-file / 2,571-test suite. TypeScript, full ESLint,
+three Node runner syntax checks, the 73-file adapter sync, `git diff --check` and
+the Next.js 16.2.9 Webpack build with 64/64 pages also passed.
+
+`activationApproved=false`, `ready=false`, and approved exports remain absent. The
+caller deleted the exact branch after the successful gate. Three independent
+sequential listings each returned only default `main` in `ACTIVE_HEALTHY`,
+revoking the branch credential and stopping further branch charges; actual
+accrued cost remains subject to Supabase billing. There was no Production SQL
+or data access, Vercel deployment, real-data flow or provider/model call. The
+historical M1p revision
 `fa7e7a00fdd7fc908bc233f40a009043b1f70b807337b9440a7f4138198b8ceb`
-therefore remains the latest Hosted evidence and continues to report Abort and
-timeout coverage as false. Candidate evidence fields for three chains, three
-revoked acquisitions, three drained PIDs and three hash-only verifier
-tombstones are future-success assertions only; they become reportable only
-after the complete same-revision child and parent postchecks pass. Three
-hash-only verifiers are allowed residue, while raw password, SCRAM verifier and
-DSN residue remain forbidden.
-
-Readiness remains false and approved exports remain absent. These tests neither
-apply a Production migration nor create a deployment, model/provider call or
-real-data flow. The fixed M1q source revision is
-`5e39ecc8be35fcf48f0a88fac08a30e5afffcad882bc3bc604de1dc34fa4fb90`.
-Its exact same-revision closeout passed 13 focused files / 224 tests and the full
-187-file / 2,571-test suite, plus TypeScript, full ESLint, three Node runner
-syntax checks, 73-file adapter sync, `git diff --check` and the Next.js 16.2.9
-Webpack 64/64-page build. Independent security review ended at P0=0 and P1=0.
-A future paid Hosted run requires a fresh source/security review, a new check of
-the then-current Preview price and new explicit creation authorization; the M1p
-price confirmation and authorization cannot be reused.
+and its positive-only, Abort/timeout-false evidence remain unchanged.
 
 ### Current live/read-only evidence
 

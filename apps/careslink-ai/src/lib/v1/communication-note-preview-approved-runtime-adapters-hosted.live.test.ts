@@ -579,6 +579,11 @@ describe("Communication Note M1n approved runtime adapters Hosted gate", () => {
     expect(setupSql).toContain("scenario_record.scenario_ordinal < v_scenario_ordinal");
     expect(setupSql).toContain("scenario_record.scenario_ordinal <= v_scenario_ordinal");
     expect(setupSql).toContain("terminal_record.terminal_state = 'ACCEPTED'");
+    expect(setupSql.match(
+      /end;\n\$careslink_runner_terminal_valid_(?:setup|authorization|dispatch|receipt|setup_postcheck)\$;/g,
+    )).toHaveLength(5);
+    expect(setupSql.match(/is distinct from \(\n\s+case /g)).toHaveLength(3);
+    expect(setupSql.match(/<>\n\s+\(case when /g)).toHaveLength(2);
     expect(setupSql).not.toContain("nullif(");
     expect(setupSql).not.toMatch(/\b(?:truncate|delete\s+from|on\s+conflict)\b/i);
   });
