@@ -14,6 +14,8 @@ const ALLOWED_BASE_ENVIRONMENT_KEYS = new Set([
   "NO_COLOR",
 ]);
 const ENVIRONMENT_KEY_PATTERN = /^[A-Z][A-Z0-9_]*$/;
+const SYNCHRONOUS_PIPE_FAILURE_LATE_ERROR_RETENTION_MS = 1_000;
+const ABSORB_TERMINAL_CHANNEL_ERROR = () => undefined;
 
 export class CommunicationNotePreviewHostedChildChannelError extends Error {
   constructor(code, childStatus = undefined) {
@@ -174,15 +176,14 @@ export async function runCommunicationNotePreviewHostedChild({
   let statusBytes = 0;
   let statusOverflow = false;
   const statusChunks = [];
-  for (const stream of inputStreams) {
-    stream.on("error", () => {
-      pipeFailed = true;
-    });
-  }
-  statusPipe.on("error", () => {
+  const markPipeFailed = () => {
     pipeFailed = true;
-  });
-  statusPipe.on("data", (chunk) => {
+  };
+  for (const stream of inputStreams) {
+    stream.on("error", markPipeFailed);
+  }
+  statusPipe.on("error", markPipeFailed);
+  const collectStatus = (chunk) => {
     const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
     statusBytes += buffer.length;
     if (statusBytes > maximumStatusBytes) {
@@ -191,11 +192,16 @@ export async function runCommunicationNotePreviewHostedChild({
       return;
     }
     if (!statusOverflow) statusChunks.push(buffer);
-  });
+  };
+  statusPipe.on("data", collectStatus);
 
+  let exitErrorListener;
+  let exitCloseListener;
   const exit = new Promise((resolve, reject) => {
-    child.once("error", reject);
-    child.once("close", (code, signal) => resolve({ code, signal }));
+    exitErrorListener = reject;
+    exitCloseListener = (code, signal) => resolve({ code, signal });
+    child.once("error", exitErrorListener);
+    child.once("close", exitCloseListener);
   });
   let timedOut = false;
   let killTimer;
@@ -204,11 +210,118 @@ export async function runCommunicationNotePreviewHostedChild({
     child.kill("SIGTERM");
     killTimer = setTimeout(() => child.kill("SIGKILL"), killGraceMs);
   }, timeoutMs);
-  for (let index = 0; index < inputs.length; index += 1) {
-    const input = inputs[index];
-    const payload = input.payload;
-    input.payload = undefined;
-    inputStreams[index].end(payload);
+
+  const clearChildTimers = () => {
+    clearTimeout(timeout);
+    if (killTimer) clearTimeout(killTimer);
+  };
+  let lateErrorCleanupCloseListener;
+  let lateErrorCleanupTimer;
+  let resolveLateErrorCleanup;
+  const detachChildChannelListeners = ({
+    retainTerminalErrorSink = false,
+  } = {}) => {
+    if (lateErrorCleanupTimer) {
+      clearTimeout(lateErrorCleanupTimer);
+      lateErrorCleanupTimer = undefined;
+    }
+    for (const stream of inputStreams) {
+      stream.removeListener?.("error", markPipeFailed);
+      if (!retainTerminalErrorSink) {
+        stream.removeListener?.("error", ABSORB_TERMINAL_CHANNEL_ERROR);
+      }
+    }
+    statusPipe.removeListener?.("error", markPipeFailed);
+    if (!retainTerminalErrorSink) {
+      statusPipe.removeListener?.("error", ABSORB_TERMINAL_CHANNEL_ERROR);
+    }
+    statusPipe.removeListener?.("data", collectStatus);
+    if (exitErrorListener) child.removeListener?.("error", exitErrorListener);
+    if (exitCloseListener) child.removeListener?.("close", exitCloseListener);
+    if (!retainTerminalErrorSink) {
+      child.removeListener?.("error", ABSORB_TERMINAL_CHANNEL_ERROR);
+      if (lateErrorCleanupCloseListener) {
+        child.removeListener?.("close", lateErrorCleanupCloseListener);
+        lateErrorCleanupCloseListener = undefined;
+      }
+    }
+    if (resolveLateErrorCleanup) {
+      const resolve = resolveLateErrorCleanup;
+      resolveLateErrorCleanup = undefined;
+      resolve();
+    }
+  };
+  const retainBoundedLateErrorSinks = () => {
+    for (const stream of inputStreams) {
+      stream.removeListener?.("error", markPipeFailed);
+      stream.on("error", ABSORB_TERMINAL_CHANNEL_ERROR);
+    }
+    statusPipe.removeListener?.("error", markPipeFailed);
+    statusPipe.on("error", ABSORB_TERMINAL_CHANNEL_ERROR);
+    statusPipe.removeListener?.("data", collectStatus);
+    child.on("error", ABSORB_TERMINAL_CHANNEL_ERROR);
+    const cleanup = new Promise((resolve) => {
+      resolveLateErrorCleanup = resolve;
+    });
+    lateErrorCleanupCloseListener = () => {
+      queueMicrotask(detachChildChannelListeners);
+    };
+    child.once("close", lateErrorCleanupCloseListener);
+    lateErrorCleanupTimer = setTimeout(
+      () => {
+        requestChildHardKill();
+        destroyChildChannelStreams();
+        try {
+          child.unref?.();
+        } catch {
+          // The bounded listener cleanup and fixed failure still follow.
+        }
+        detachChildChannelListeners({ retainTerminalErrorSink: true });
+      },
+      SYNCHRONOUS_PIPE_FAILURE_LATE_ERROR_RETENTION_MS,
+    );
+    return cleanup;
+  };
+  const requestChildHardKill = () => {
+    try {
+      return child.kill("SIGKILL") === true;
+    } catch {
+      return false;
+    }
+  };
+  const destroyChildChannelStreams = () => {
+    for (const stream of [...inputStreams, statusPipe]) {
+      try {
+        stream.destroy?.();
+      } catch {
+        // The fixed pipe failure remains authoritative.
+      }
+    }
+  };
+  const clearInputPayloadReferences = () => {
+    for (const input of inputs) input.payload = undefined;
+    inputs = [];
+  };
+  const abandonChildAfterSynchronousPipeFailure = async () => {
+    clearChildTimers();
+    clearInputPayloadReferences();
+    void exit.catch(() => undefined);
+    const cleanup = retainBoundedLateErrorSinks();
+    requestChildHardKill();
+    destroyChildChannelStreams();
+    await cleanup;
+  };
+
+  try {
+    for (let index = 0; index < inputs.length; index += 1) {
+      const input = inputs[index];
+      const payload = input.payload;
+      input.payload = undefined;
+      inputStreams[index].end(payload);
+    }
+  } catch {
+    await abandonChildAfterSynchronousPipeFailure();
+    fail("HOSTED_CHILD_CHANNEL_PIPE_FAILED", pipeFailureStatus);
   }
   inputs = [];
 
@@ -216,13 +329,11 @@ export async function runCommunicationNotePreviewHostedChild({
   try {
     result = await exit;
   } catch {
-    clearTimeout(timeout);
-    if (killTimer) clearTimeout(killTimer);
+    clearChildTimers();
     child.kill("SIGKILL");
     fail("HOSTED_CHILD_CHANNEL_FAILED", fallbackStatus);
   }
-  clearTimeout(timeout);
-  if (killTimer) clearTimeout(killTimer);
+  clearChildTimers();
   if (pipeFailed) {
     fail("HOSTED_CHILD_CHANNEL_PIPE_FAILED", pipeFailureStatus);
   }

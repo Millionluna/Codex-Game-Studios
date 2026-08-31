@@ -1,6 +1,19 @@
 import { createHash } from "node:crypto";
+import { EventEmitter } from "node:events";
 
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+const childProcessMock = vi.hoisted(() => ({
+  actualSpawn: undefined,
+  spawn: vi.fn(),
+}));
+
+vi.mock("node:child_process", async (importOriginal) => {
+  const actual = await importOriginal();
+  childProcessMock.actualSpawn = actual.spawn;
+  childProcessMock.spawn.mockImplementation(actual.spawn);
+  return { ...actual, spawn: childProcessMock.spawn };
+});
 
 import {
   CommunicationNotePreviewHostedChildChannelError,
@@ -24,6 +37,13 @@ const LEGACY_INPUT_BINDINGS = Object.freeze([
 const LEGACY_STATUS_BINDING = Object.freeze({
   environmentKey: "CARESLINK_TEST_STATUS_FD",
   fd: 4,
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.useRealTimers();
+  childProcessMock.spawn.mockReset();
+  childProcessMock.spawn.mockImplementation(childProcessMock.actualSpawn);
 });
 
 describe("Communication Note hosted child channel", () => {
@@ -223,6 +243,174 @@ describe("Communication Note hosted child channel", () => {
     });
   });
 
+  it("hard-kills and cleans every channel when the first input end throws", async () => {
+    vi.useFakeTimers();
+    const secret = "first-fd-secret-must-not-escape";
+    const harness = createSynchronousEndFailureHarness({
+      throwAtIndex: 0,
+      secret,
+    });
+    childProcessMock.spawn.mockReturnValue(harness.child);
+
+    const outcome = runCommunicationNotePreviewHostedChild(
+      synchronousEndFailureRunOptions(secret),
+    ).catch((value) => value);
+
+    expect(harness.child.kill).toHaveBeenCalledTimes(1);
+    expect(harness.child.kill).toHaveBeenCalledWith("SIGKILL");
+    expect(harness.inputStreams[0].end).toHaveBeenCalledTimes(1);
+    expect(harness.inputStreams[1].end).not.toHaveBeenCalled();
+    expect(harness.inputStreams[2].end).not.toHaveBeenCalled();
+    expectSynchronousEndFailureLateErrorSinks(harness);
+    expect(vi.getTimerCount()).toBe(1);
+    emitLateChannelErrors(harness);
+    harness.child.emit("close", null, "SIGKILL");
+    const error = await outcome;
+    expect(error).toMatchObject({
+      code: "HOSTED_CHILD_CHANNEL_PIPE_FAILED",
+      childStatus: PIPE_FAILURE_STATUS,
+    });
+    expect(String(error)).not.toContain(secret);
+    expect(JSON.stringify(error)).not.toContain(secret);
+    expect(String(error)).not.toContain(harness.originalError.message);
+    expect(JSON.stringify(error)).not.toContain(harness.originalError.message);
+    expectSynchronousEndFailureCleanup(harness);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("hard-kills and cleans every channel when a later input end throws", async () => {
+    vi.useFakeTimers();
+    const secret = "later-fd-secret-must-not-escape";
+    const harness = createSynchronousEndFailureHarness({
+      throwAtIndex: 1,
+      secret,
+    });
+    childProcessMock.spawn.mockReturnValue(harness.child);
+
+    const outcome = runCommunicationNotePreviewHostedChild(
+      synchronousEndFailureRunOptions(secret),
+    ).catch((value) => value);
+
+    expect(harness.child.kill).toHaveBeenCalledTimes(1);
+    expect(harness.child.kill).toHaveBeenCalledWith("SIGKILL");
+    expect(harness.inputStreams[0].end).toHaveBeenCalledTimes(1);
+    expect(harness.inputStreams[1].end).toHaveBeenCalledTimes(1);
+    expect(harness.inputStreams[2].end).not.toHaveBeenCalled();
+    expectSynchronousEndFailureLateErrorSinks(harness);
+    expect(vi.getTimerCount()).toBe(1);
+    emitLateChannelErrors(harness);
+    harness.child.emit("close", null, "SIGKILL");
+    const error = await outcome;
+    expect(error).toMatchObject({
+      code: "HOSTED_CHILD_CHANNEL_PIPE_FAILED",
+      childStatus: PIPE_FAILURE_STATUS,
+    });
+    expect(String(error)).not.toContain(secret);
+    expect(JSON.stringify(error)).not.toContain(secret);
+    expect(String(error)).not.toContain(harness.originalError.message);
+    expect(JSON.stringify(error)).not.toContain(harness.originalError.message);
+    expectSynchronousEndFailureCleanup(harness);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("bounds late-error listener retention when a killed child never closes", async () => {
+    vi.useFakeTimers();
+    const secret = "never-close-secret-must-not-escape";
+    const harness = createSynchronousEndFailureHarness({
+      throwAtIndex: 0,
+      secret,
+    });
+    childProcessMock.spawn.mockReturnValue(harness.child);
+
+    const outcome = runCommunicationNotePreviewHostedChild(
+      synchronousEndFailureRunOptions(secret),
+    ).catch((value) => value);
+
+    expectSynchronousEndFailureLateErrorSinks(harness);
+    expect(vi.getTimerCount()).toBe(1);
+    await vi.advanceTimersByTimeAsync(999);
+    emitLateChannelErrors(harness);
+    expect(harness.child.listenerCount("error")).toBe(1);
+    expect(vi.getTimerCount()).toBe(1);
+    await vi.advanceTimersByTimeAsync(1);
+    const error = await outcome;
+    expect(error).toMatchObject({
+      code: "HOSTED_CHILD_CHANNEL_PIPE_FAILED",
+      childStatus: PIPE_FAILURE_STATUS,
+    });
+    expect(String(error)).not.toContain(secret);
+    expect(JSON.stringify(error)).not.toContain(secret);
+    expect(harness.child.kill).toHaveBeenCalledTimes(2);
+    expect(harness.child.unref).toHaveBeenCalledTimes(1);
+    expectSynchronousEndFailureTerminalSink(harness);
+    emitLateChannelErrors(harness);
+    harness.child.emit("close", null, "SIGKILL");
+    await Promise.resolve();
+    expectSynchronousEndFailureCleanup(harness);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("returns the fixed failure when child.kill returns false", async () => {
+    vi.useFakeTimers();
+    const secret = "kill-false-secret-must-not-escape";
+    const harness = createSynchronousEndFailureHarness({
+      throwAtIndex: 0,
+      secret,
+      killBehavior: "false",
+    });
+    childProcessMock.spawn.mockReturnValue(harness.child);
+
+    const outcome = runCommunicationNotePreviewHostedChild(
+      synchronousEndFailureRunOptions(secret),
+    ).catch((value) => value);
+    expect(harness.child.kill).toHaveBeenCalledWith("SIGKILL");
+    expectSynchronousEndFailureLateErrorSinks(harness);
+    harness.child.emit("close", null, "SIGKILL");
+
+    const error = await outcome;
+    expect(error).toMatchObject({
+      code: "HOSTED_CHILD_CHANNEL_PIPE_FAILED",
+      childStatus: PIPE_FAILURE_STATUS,
+    });
+    expect(String(error)).not.toContain(secret);
+    expect(JSON.stringify(error)).not.toContain(secret);
+    expectSynchronousEndFailureCleanup(harness);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("falls back after child.kill throws without leaking the third FD", async () => {
+    vi.useFakeTimers();
+    const secret = "third-fd-and-kill-error-secret-must-not-escape";
+    const harness = createSynchronousEndFailureHarness({
+      throwAtIndex: 2,
+      secret,
+      killBehavior: "throw",
+    });
+    childProcessMock.spawn.mockReturnValue(harness.child);
+
+    const outcome = runCommunicationNotePreviewHostedChild(
+      synchronousEndFailureRunOptions(secret),
+    ).catch((value) => value);
+    expect(harness.inputStreams[0].end).toHaveBeenCalledTimes(1);
+    expect(harness.inputStreams[1].end).toHaveBeenCalledTimes(1);
+    expect(harness.inputStreams[2].end).toHaveBeenCalledTimes(1);
+    expect(harness.child.kill).toHaveBeenCalledWith("SIGKILL");
+    emitLateChannelErrors(harness);
+    harness.child.emit("close", null, "SIGKILL");
+
+    const error = await outcome;
+    expect(error).toMatchObject({
+      code: "HOSTED_CHILD_CHANNEL_PIPE_FAILED",
+      childStatus: PIPE_FAILURE_STATUS,
+    });
+    expect(String(error)).not.toContain(secret);
+    expect(JSON.stringify(error)).not.toContain(secret);
+    expect(String(error)).not.toContain(harness.originalError.message);
+    expect(String(error)).not.toContain(harness.originalKillError.message);
+    expectSynchronousEndFailureCleanup(harness);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
   it("rejects duplicate FDs and oversized input before spawning", async () => {
     expect(() =>
       createCommunicationNotePreviewHostedChildEnvironment({
@@ -295,6 +483,108 @@ function legacyInputPipes() {
       maximumBytes: 1_024,
     }),
   ]);
+}
+
+function synchronousEndFailureRunOptions(secret) {
+  return {
+    ...baseRunOptions({
+      childSource: "setInterval(() => {}, 1_000);",
+      environment: {},
+      statusFd: 6,
+    }),
+    inputPipes: Object.freeze([
+      Object.freeze({ fd: 3, payload: "public-config", maximumBytes: 1_024 }),
+      Object.freeze({ fd: 4, payload: "public-ca", maximumBytes: 1_024 }),
+      Object.freeze({ fd: 5, payload: secret, maximumBytes: 1_024 }),
+    ]),
+    timeoutMs: 60_000,
+  };
+}
+
+function createSynchronousEndFailureHarness({
+  throwAtIndex,
+  secret,
+  killBehavior = "true",
+}) {
+  const child = new EventEmitter();
+  const originalError = new Error(
+    `raw-pipe-error-${throwAtIndex}-${secret}`,
+  );
+  const inputStreams = Array.from({ length: 3 }, (_value, index) => {
+    const stream = new EventEmitter();
+    stream.end = index === throwAtIndex
+      ? vi.fn(() => {
+        throw originalError;
+      })
+      : vi.fn();
+    stream.destroy = vi.fn();
+    return stream;
+  });
+  const statusPipe = new EventEmitter();
+  statusPipe.destroy = vi.fn();
+  child.stdio = [undefined, undefined, undefined, ...inputStreams, statusPipe];
+  child.pid = 424_242;
+  child.exitCode = null;
+  child.signalCode = null;
+  const originalKillError = new Error(`raw-kill-error-${secret}`);
+  child.kill = killBehavior === "throw"
+    ? vi.fn(() => {
+      throw originalKillError;
+    })
+    : vi.fn(() => killBehavior !== "false");
+  child.unref = vi.fn();
+  return {
+    child,
+    inputStreams,
+    statusPipe,
+    originalError,
+    originalKillError,
+  };
+}
+
+function expectSynchronousEndFailureLateErrorSinks(harness) {
+  for (const stream of harness.inputStreams) {
+    expect(stream.destroy).toHaveBeenCalledTimes(1);
+    expect(stream.listenerCount("error")).toBe(1);
+  }
+  expect(harness.statusPipe.destroy).toHaveBeenCalledTimes(1);
+  expect(harness.statusPipe.listenerCount("error")).toBe(1);
+  expect(harness.statusPipe.listenerCount("data")).toBe(0);
+  expect(harness.child.listenerCount("error")).toBe(2);
+  expect(harness.child.listenerCount("close")).toBe(2);
+}
+
+function emitLateChannelErrors(harness) {
+  expect(() => {
+    for (const stream of harness.inputStreams) {
+      stream.emit("error", harness.originalError);
+      stream.emit("error", harness.originalError);
+    }
+    harness.statusPipe.emit("error", harness.originalError);
+    harness.statusPipe.emit("error", harness.originalError);
+    harness.child.emit("error", harness.originalError);
+    harness.child.emit("error", harness.originalError);
+  }).not.toThrow();
+}
+
+function expectSynchronousEndFailureCleanup(harness) {
+  for (const stream of harness.inputStreams) {
+    expect(stream.listenerCount("error")).toBe(0);
+  }
+  expect(harness.statusPipe.listenerCount("error")).toBe(0);
+  expect(harness.statusPipe.listenerCount("data")).toBe(0);
+  expect(harness.child.listenerCount("error")).toBe(0);
+  expect(harness.child.listenerCount("close")).toBe(0);
+}
+
+function expectSynchronousEndFailureTerminalSink(harness) {
+  for (const stream of harness.inputStreams) {
+    expect(stream.listenerCount("error")).toBe(1);
+  }
+  expect(harness.statusPipe.listenerCount("error")).toBe(1);
+  expect(harness.statusPipe.listenerCount("data")).toBe(0);
+  expect(harness.child.listenerCount("error")).toBe(1);
+  expect(harness.child.listenerCount("close")).toBe(1);
 }
 
 function baseEnvironment() {

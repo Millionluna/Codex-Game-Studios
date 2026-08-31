@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { performance } from "node:perf_hooks";
 import { readFileSync as readTextFileSync } from "node:fs";
 
 import { describe, expect, it, vi } from "vitest";
@@ -22,6 +23,16 @@ import {
 import { CARESLINK_PRODUCTION_SUPABASE_REF } from "./ndis-shadow-guard";
 
 vi.mock("server-only", () => ({}));
+const cryptoTestDoubles = vi.hoisted(() => ({
+  randomBytes: vi.fn<(size: number) => Buffer>(),
+}));
+vi.mock("node:crypto", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("node:crypto")>();
+  cryptoTestDoubles.randomBytes.mockImplementation((size) =>
+    actual.randomBytes(size),
+  );
+  return { ...actual, randomBytes: cryptoTestDoubles.randomBytes };
+});
 
 const PROJECT_REF = "abcdefghijklmnopqrst";
 const DESCRIPTOR_SHA256 = "d".repeat(64);
@@ -95,6 +106,7 @@ function credential(
     credentialClass: request.credentialClass,
     sourceExpiresAt: request.sourceExpiresAt,
     sourceRevocation: request.sourceRevocation,
+    deliveryNonce: request.deliveryNonce,
     password: PASSWORD,
     deliveryIssuedAt: new Date(now - 1_000).toISOString(),
     deliveryExpiresAt: new Date(now + 30_000).toISOString(),
@@ -264,12 +276,12 @@ describe("Communication Note approved runtime management session", () => {
     expect(
       CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_APPROVED_RUNTIME_MANAGEMENT_SESSION_VERSION,
     ).toBe(
-      "management-session.communication.openai.synthetic-preview.2026-08-31.m1m.v2",
+      "management-session.communication.openai.synthetic-preview.2026-08-31.m1m.v3",
     );
     expect(
       CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_APPROVED_RUNTIME_MANAGEMENT_SESSION_POLICY_DIGEST,
     ).toBe(
-      "2dc462675834a2741941e5b11a0f277cfbc6d08c6a0b4edc04346aa97dd59ce3",
+      "b52fae0bc088dc2d2ba6cfd298fc3da56426044c89d5fd4223295f1ca0acbaed",
     );
     const { policyDigest, ...policyCore } =
       CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_APPROVED_RUNTIME_MANAGEMENT_SESSION_POLICY;
@@ -298,12 +310,23 @@ describe("Communication Note approved runtime management session", () => {
       allowedProfileConnectionModes: ["DIRECT", "SESSION_POOLER"],
       tlsMode: "VERIFY_FULL_PINNED_CA",
       rejectUnauthorized: true,
-      credentialTransport: "ONE_USE_DELIVERY_CALLBACK",
+      credentialTransport: "FACTORY_NONCE_BOUND_ONE_USE_DELIVERY_CALLBACK",
       credentialClass: "STATIC_SUPABASE_BRANCH_ADMIN_PASSWORD",
       sourceCredentialSingleUse: false,
       sourceExpiresAt: null,
       sourceRevocation: "BRANCH_DELETE_OR_PASSWORD_RESET",
       deliveryEnvelopeSingleUse: true,
+      deliveryNonceSource: "FACTORY_CRYPTO_RANDOM_256_BIT",
+      deliveryNonceFormat: "LOWERCASE_HEX_64",
+      deliveryReplayRegistryScope: "FACTORY",
+      deliveryReplayRegistryStoredFields: [
+        "deliveryNonceSha256",
+        "expiresAtMonotonicMilliseconds",
+      ],
+      deliveryReplayRegistryRawNonceRetained: false,
+      deliveryReplayRegistryMaximumEntries: 256,
+      deliveryReplayRegistryCleanup: "PRUNE_EXPIRED_BEFORE_ATOMIC_RESERVE",
+      crossOpenDeliveryReplayProtection: true,
       maximumDeliveryAgeMs: 30_000,
       maximumDeliveryLifetimeMs: 60_000,
       retryCount: 0,
@@ -337,6 +360,7 @@ describe("Communication Note approved runtime management session", () => {
       "credentialClass",
       "sourceExpiresAt",
       "sourceRevocation",
+      "deliveryNonce",
     ]);
     expect(
       Object.isFrozen(
@@ -369,6 +393,7 @@ describe("Communication Note approved runtime management session", () => {
         credentialClass: "STATIC_SUPABASE_BRANCH_ADMIN_PASSWORD",
         sourceExpiresAt: null,
         sourceRevocation: "BRANCH_DELETE_OR_PASSWORD_RESET",
+        deliveryNonce: expect.stringMatching(/^[a-f0-9]{64}$/),
         deliveryExpiresNoLaterThan: expect.any(String),
         maximumDeliveryLifetimeMs: 60_000,
       },
@@ -419,12 +444,148 @@ describe("Communication Note approved runtime management session", () => {
     expect(harness.clients).toHaveLength(2);
     expect(harness.requests).toHaveLength(2);
     expect(harness.requests[0]).not.toBe(harness.requests[1]);
+    expect(harness.requests[0].deliveryNonce).toMatch(/^[a-f0-9]{64}$/);
+    expect(harness.requests[1].deliveryNonce).toMatch(/^[a-f0-9]{64}$/);
+    expect(harness.requests[0].deliveryNonce).not.toBe(
+      harness.requests[1].deliveryNonce,
+    );
     expect(harness.requests[0].credentialClass).toBe(
       "STATIC_SUPABASE_BRANCH_ADMIN_PASSWORD",
     );
     expect(harness.requests[1].sourceRevocation).toBe(
       "BRANCH_DELETE_OR_PASSWORD_RESET",
     );
+  });
+
+  it("denies a consumed delivery replayed across open calls before creating another client", async () => {
+    let delivered: ReturnType<typeof credential> | undefined;
+    const requests: CaresLinkV1CommunicationNotePreviewApprovedRuntimeManagementCredentialRequest[] =
+      [];
+    const harness = createHarness({
+      consume: async (request, _callContext, consumer) => {
+        requests.push(request);
+        if (!delivered) delivered = credential(request);
+        await consumer(delivered);
+      },
+    });
+
+    const first = await openSession(harness.factory);
+    await first.end();
+    await expect(openSession(harness.factory)).rejects.toMatchObject({
+      code: "PRODUCT_API_DISABLED",
+    });
+
+    expect(requests).toHaveLength(2);
+    expect(requests[0].deliveryNonce).not.toBe(requests[1].deliveryNonce);
+    expect(harness.clients).toHaveLength(1);
+  });
+
+  it("atomically denies a repeated nonce across open calls after exact envelope validation", async () => {
+    const repeatedNonceBytes = Buffer.alloc(32, 0xa5);
+    cryptoTestDoubles.randomBytes
+      .mockReturnValueOnce(Buffer.from(repeatedNonceBytes))
+      .mockReturnValueOnce(Buffer.from(repeatedNonceBytes));
+    const harness = createHarness();
+
+    const first = await openSession(harness.factory);
+    await first.end();
+    await expect(openSession(harness.factory)).rejects.toMatchObject({
+      code: "PRODUCT_API_DISABLED",
+    });
+
+    expect(harness.requests).toHaveLength(2);
+    expect(harness.requests[0].deliveryNonce).toBe(
+      harness.requests[1].deliveryNonce,
+    );
+    expect(harness.clients).toHaveLength(1);
+  });
+
+  it("atomically reserves one repeated nonce across concurrent open calls", async () => {
+    const repeatedNonceBytes = Buffer.alloc(32, 0xb6);
+    cryptoTestDoubles.randomBytes
+      .mockReturnValueOnce(Buffer.from(repeatedNonceBytes))
+      .mockReturnValueOnce(Buffer.from(repeatedNonceBytes));
+    const requests: CaresLinkV1CommunicationNotePreviewApprovedRuntimeManagementCredentialRequest[] =
+      [];
+    let arrivals = 0;
+    let releaseBoth: (() => void) | undefined;
+    const bothArrived = new Promise<void>((resolve) => {
+      releaseBoth = resolve;
+    });
+    const harness = createHarness({
+      consume: async (request, _callContext, consumer) => {
+        requests.push(request);
+        arrivals += 1;
+        if (arrivals === 2) releaseBoth?.();
+        await bothArrived;
+        await consumer(credential(request));
+      },
+    });
+
+    const results = await Promise.allSettled([
+      openSession(harness.factory),
+      openSession(harness.factory),
+    ]);
+    const fulfilled = results.find((result) => result.status === "fulfilled");
+    const rejected = results.find((result) => result.status === "rejected");
+
+    expect(results.map((result) => result.status).sort()).toEqual([
+      "fulfilled",
+      "rejected",
+    ]);
+    expect(requests).toHaveLength(2);
+    expect(requests[0].deliveryNonce).toBe(requests[1].deliveryNonce);
+    expect(harness.clients).toHaveLength(1);
+    expect(fulfilled).toBeDefined();
+    expect(rejected).toBeDefined();
+    expectDisabled(rejected?.status === "rejected" ? rejected.reason : null);
+    if (fulfilled?.status === "fulfilled") {
+      await (fulfilled.value as TestSession).end();
+    }
+  });
+
+  it("fails closed at the bounded factory replay-registry limit", async () => {
+    const harness = createHarness();
+    const maximumEntries =
+      CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_APPROVED_RUNTIME_MANAGEMENT_SESSION_POLICY
+        .deliveryReplayRegistryMaximumEntries;
+
+    for (let index = 0; index < maximumEntries; index += 1) {
+      const session = await openSession(harness.factory);
+      await session.end();
+    }
+    await expect(openSession(harness.factory)).rejects.toMatchObject({
+      code: "PRODUCT_API_DISABLED",
+    });
+
+    expect(harness.consume).toHaveBeenCalledTimes(maximumEntries + 1);
+    expect(harness.clients).toHaveLength(maximumEntries);
+  });
+
+  it("prunes expired delivery hashes before reserving a fresh nonce", async () => {
+    vi.useFakeTimers();
+    const monotonicNow = vi.spyOn(performance, "now").mockReturnValue(0);
+    try {
+      const harness = createHarness();
+      const maximumEntries =
+        CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_APPROVED_RUNTIME_MANAGEMENT_SESSION_POLICY
+          .deliveryReplayRegistryMaximumEntries;
+
+      for (let index = 0; index < maximumEntries; index += 1) {
+        const session = await openSession(harness.factory);
+        await session.end();
+      }
+      monotonicNow.mockReturnValue(30_001);
+      await vi.advanceTimersByTimeAsync(30_001);
+      const fresh = await openSession(harness.factory);
+      await fresh.end();
+
+      expect(harness.consume).toHaveBeenCalledTimes(maximumEntries + 1);
+      expect(harness.clients).toHaveLength(maximumEntries + 1);
+    } finally {
+      monotonicNow.mockRestore();
+      vi.useRealTimers();
+    }
   });
 
   it("derives the Supavisor session-pooler management user without changing posture", async () => {
@@ -604,6 +765,7 @@ describe("Communication Note approved runtime management session", () => {
     ["pinned CA", { tlsRootCertificateSha256: "e".repeat(64) }],
     ["derived user", { user: "postgres.wrongprojectref000" }],
     ["application name", { applicationName: "unapproved-management" }],
+    ["delivery nonce", { deliveryNonce: "e".repeat(64) }],
   ])("rejects %s credential binding mismatch before client creation", async (_label, mismatch) => {
     const harness = createHarness({
       consume: async (request, _callContext, consumer) => {

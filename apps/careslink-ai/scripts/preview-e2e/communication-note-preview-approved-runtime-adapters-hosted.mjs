@@ -33,6 +33,7 @@ const SECRET_MAXIMUM_BYTES = 1_067;
 const STATUS_MAXIMUM_BYTES = 256;
 const CHILD_TIMEOUT_MS = 135_000;
 const CHILD_KILL_GRACE_MS = 2_000;
+const ADMIN_CLOSE_TIMEOUT_MS = 2_000;
 const CONFIG_SCHEMA_VERSION =
   "config.communication-note-approved-runtime-adapters-hosted.2026-08-31.m1n.v1";
 const DELIVERY_BINDING_DOMAIN =
@@ -489,6 +490,8 @@ export function createCommunicationNotePreviewApprovedRuntimeAdaptersHostedEvide
     managementCredentialClass:
       "STATIC_SUPABASE_BRANCH_ADMIN_PASSWORD",
     deliveryTransport: "ANONYMOUS_FD_SINGLE_READ",
+    managementDeliveryCrossOpenReplayProtected: true,
+    managementDeliveryReplayRegistryScope: "FACTORY",
     deliveryLifetimeMaximumMs: 60_000,
     underlyingCredentialShortLived: false,
     underlyingCredentialExpiryAttested: false,
@@ -539,11 +542,55 @@ function safeOwnErrorCode(error) {
     : "";
 }
 
-async function closeQuietly(client) {
+function hardDestroyClientStream(client) {
   try {
-    await client?.end();
+    const stream = client?.connection?.stream;
+    if (typeof stream?.destroy !== "function") return false;
+    stream.destroy();
+    return stream.destroyed === true;
   } catch {
-    // Branch deletion remains the terminal recovery boundary.
+    return false;
+  }
+}
+
+function assertHardDestroyableVerifiedPreviewTlsConnection(client) {
+  assertVerifiedPreviewTlsConnection(client);
+  if (typeof client?.connection?.stream?.destroy !== "function") {
+    fail("M1N_APPROVED_RUNTIME_ADAPTERS_HOSTED_CONNECTION_FAILED");
+  }
+}
+
+async function closeQuietly(client) {
+  if (!client) return "GRACEFUL";
+  let timer;
+  try {
+    const timeout = new Promise((_, reject) => {
+      timer = setTimeout(
+        () =>
+          reject(
+            new Error("M1N_APPROVED_RUNTIME_ADAPTERS_HOSTED_CLOSE_TIMEOUT"),
+          ),
+        ADMIN_CLOSE_TIMEOUT_MS,
+      );
+    });
+    await Promise.race([
+      Promise.resolve().then(() => client.end()),
+      timeout,
+    ]);
+    return "GRACEFUL";
+  } catch {
+    return hardDestroyClientStream(client)
+      ? "HARD_DESTROYED"
+      : "UNCONFIRMED";
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+async function closeFinalAdmin(client) {
+  if ((await closeQuietly(client)) !== "GRACEFUL") {
+    // The caller must continue with the terminal branch-delete recovery.
+    fail("M1N_APPROVED_RUNTIME_ADAPTERS_HOSTED_CLEANUP_FAILED");
   }
 }
 
@@ -556,12 +603,15 @@ async function connectPreferredAdmin(Client, candidates, certificate) {
   direct.on("error", () => {});
   try {
     await direct.connect();
-    assertVerifiedPreviewTlsConnection(direct);
+    assertHardDestroyableVerifiedPreviewTlsConnection(direct);
     return Object.freeze({ client: direct, candidate: candidates.direct });
   } catch (error) {
-    await closeQuietly(direct);
+    const directCloseOutcome = await closeQuietly(direct);
     direct = undefined;
-    if (!DIRECT_UNREACHABLE_CODES.has(safeOwnErrorCode(error))) {
+    if (
+      directCloseOutcome === "UNCONFIRMED" ||
+      !DIRECT_UNREACHABLE_CODES.has(safeOwnErrorCode(error))
+    ) {
       fail("M1N_APPROVED_RUNTIME_ADAPTERS_HOSTED_CONNECTION_FAILED");
     }
   }
@@ -573,7 +623,7 @@ async function connectPreferredAdmin(Client, candidates, certificate) {
   session.on("error", () => {});
   try {
     await session.connect();
-    assertVerifiedPreviewTlsConnection(session);
+    assertHardDestroyableVerifiedPreviewTlsConnection(session);
     return Object.freeze({
       client: session,
       candidate: candidates.sessionPooler,
@@ -807,6 +857,8 @@ async function verifyCleanupResidueAbsent(admin) {
 
 export const COMMUNICATION_NOTE_PREVIEW_APPROVED_RUNTIME_ADAPTERS_HOSTED_TEST_ONLY =
   Object.freeze({
+    closeFinalAdmin,
+    connectPreferredAdmin,
     cleanupAllAcquisitions,
     verifyCleanupResidueAbsent,
     verifyPostcondition,
@@ -1079,7 +1131,11 @@ async function main() {
     } catch (error) {
       cleanupFailure = error;
     }
-    await closeQuietly(connected.client);
+    try {
+      await closeFinalAdmin(connected.client);
+    } catch (error) {
+      if (!cleanupFailure) cleanupFailure = error;
+    }
   }
   if (cleanupFailure) throw cleanupFailure;
   if (primaryFailure) throw primaryFailure;

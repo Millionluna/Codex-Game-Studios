@@ -3,7 +3,7 @@
 ## 状态与结论
 
 M1m 为 M1l 的 durable runtime credential broker 补齐一组可审计的源码适配器：
-受控 Supabase Preview 目标解析、一次性管理凭据传输、独占管理连接、独占 runtime
+受控 Supabase Preview 目标解析、nonce-bound 一次性管理 delivery、独占管理连接、独占 runtime
 PostgreSQL 连接，以及把这些边界组合进 M1l resolver/runner 的 TestOnly composition。
 
 这仍不是已上线能力。所有正式 `READY` latch 均为 `false`，approved export 均为
@@ -15,9 +15,9 @@ PostgreSQL 连接，以及把这些边界组合进 M1l resolver/runner 的 TestO
 |---|---|---|
 | target | `18f77b59a92c65b58fac4090fa3b16e8c6281dedca8b11903cf09f7cf2e361d2` | `f2317b112215df56ec344a9910b8c1ff092c49900a5c813c08852f364c622cb1` |
 | broker | `1498ea8e26014afcfc02a6f418f5eec783dd58a7485673d51edb04bef965fb0e` | `5a12b9d4c28fc963383dfa3643bdd2cf1d9fcec681e534750ef0324f9c901daa` |
-| management session | `2dc462675834a2741941e5b11a0f277cfbc6d08c6a0b4edc04346aa97dd59ce3` | `9413f751c9f41941f2444792c56072c86d20fff2d2947af87cd82aac31add2e7` |
+| management session | `b52fae0bc088dc2d2ba6cfd298fc3da56426044c89d5fd4223295f1ca0acbaed` | `f2bc1365d5cf030a6399f3da4e06c49017bcde9b579aab7fe80ca46709940aaa` |
 | runtime PostgreSQL session | `75d7aae46d34a6de369b68e57d448f6aa0a8267d14b4ed097081bd306c131f09` | `9b60786fc55c83df578885076ea2199a4b88106144c1899aa7005ee6940fda07` |
-| composition | `7dd9bdc893147146a2e519b59f71cb958b9afdf2117589bf8ca42239a1ac1dc5` | `74f1fde8e1dcbaff3106e327197e93a0da508d0d2523c615e037f2de0373260d` |
+| composition | `8fe10547d33732388f5e6b97afc76da9679d63ae1d45eb04447ae21ac2462e31` | `071d1c5e8fb625695c6bd3918c319994779ddec0402e5a2f2a4eb79e60e0a040` |
 
 ## 适配器边界
 
@@ -25,7 +25,7 @@ PostgreSQL 连接，以及把这些边界组合进 M1l resolver/runner 的 TestO
 |---|---|
 | target resolver | 仅接受无数据、非默认、非持久、非 Production、`ACTIVE_HEALTHY` 的 PostgreSQL 17 Preview；端口固定 5432，连接模式只允许 direct 或 Supavisor session；控制面观察、project-ref HMAC 与 pinned CA loader 必须是三个独立注入端口 |
 | sealed target | 公共 descriptor 不含 project ref、hostname 或证书；私有 project ref、endpoint 与 CA bytes 保存在 `WeakMap` capability 中，并与 descriptor canonical SHA-256、受信 resolver clock 和单调读取顺序绑定 |
-| management credential transport | 密码只能穿过一次性 delivery callback；credential 必须绑定 target descriptor、CA digest、派生 user 与固定 application name。Supabase branch admin source 明确为静态、非一次性且只能通过 branch delete/password reset 撤销；不超过 60 秒且不晚于 target 的限制只属于 delivery envelope |
+| management credential transport | 每次 open 由 factory 生成 256-bit nonce，credential 必须精确回显，并绑定 target descriptor、CA digest、派生 user 与固定 application name。Factory 只保存 nonce SHA-256 与单调 expiry，过期先清理，重复或 256-entry registry 已满均 fail closed。Supabase branch admin source 仍明确为静态、非一次性且只能通过 branch delete/password reset 撤销；不超过 60 秒且不晚于 target 的限制只属于 delivery envelope |
 | management session | 每次 broker operation 打开新的独占 injected `Client`；固定 `postgres` database、pinned-CA `verify-full`、5 秒 connect/statement、1 秒 lock、5 秒 idle-in-transaction timeout，并验证 PostgreSQL 17、`current_user=session_user=postgres`、application name 与 `row_security=on` |
 | broker adapter | `acquire`、`bind`、`tombstone`、`finalize` 与独立 `inspect` 使用固定 parameterized SQL；每个 operation 使用单独 session、零 retry，query/close 任一失败都权威拒绝 |
 | runtime session | 一个 credential 只建立一个独占 injected `Client`；禁止 Pool、DSN、环境发现和连接复用；固定 runtime application name 与 RLS/timeout 配置，TLS 与数据库 PID 必须匹配；Abort/cancel 通过 hard-close 精确原 client 并永久禁止复用 |
@@ -50,7 +50,9 @@ server-only composition 与测试文件；未来 approved 产品版应只暴露�
 原先容易把 delivery lifetime 误读成 source credential lifetime 的语义：
 `STATIC_SUPABASE_BRANCH_ADMIN_PASSWORD` 的 `sourceExpiresAt=null`、
 `sourceCredentialSingleUse=false`，撤销方式固定为 branch delete/password reset；只有
-`deliveryIssuedAt`、`deliveryExpiresAt`、`deliveryOneUse` 证明 callback 的单次短时交付。
+`deliveryIssuedAt`、`deliveryExpiresAt`、`deliveryOneUse` 与 factory 生成的 64-hex
+`deliveryNonce` 证明 callback 的单次短时交付。Nonce 原值不进入 registry；同一 factory
+仅保留 nonce SHA-256 和单调 expiry，因而旧 envelope 跨 open 重放会在 Client 构造前拒绝。
 适配器还证明绑定字段、已知密码引用清除、错误脱敏以及精确 client 关闭语义；它不声称
 已经有 KMS/Vault、部署身份、secret rotation、底层短期密码或全进程内存清零证据。
 Runtime credential 仍由 M1l durable broker contract 签发，并在 bind 后由数据库提交
@@ -68,6 +70,12 @@ session 的 Abort、query timeout、driver error、close timeout 或 close failu
 exact stream；broker 生命周期 mutation 继续由独立的新管理连接完成，因此不会依赖已
 隔离的 runtime connection。
 
+M1o 还为 Hosted outer admin Client 增加两秒有界 close：`end()` 拒绝或悬挂时尝试
+hard-destroy 已验证的 exact TLS stream；Direct 网络失败只有在优雅关闭成功或 destroy
+确认未抛错且 `stream.destroyed === true` 后才可回退 Session Pooler，missing、throwing
+或 silent no-op destroy 会在构造第二个 Client 前 fail closed。最终 admin close 失败固定
+映射为 cleanup failure，并要求 caller 继续 exact branch-delete recovery。
+
 Management/runtime query 都会在起点复验 target/lease，数据库 statement timeout 固定
 为五秒，因此一条已经开始的语句最多可能跨过 expiry 这一个 timeout 窗口；M1l 的
 terminal/persist/commit freshness fence 会拒绝过期结果。若未来要求 expiry 瞬间之后
@@ -82,20 +90,20 @@ terminal/persist/commit freshness fence 会拒绝过期结果。若未来要求 
   dependency。
 - M1m 没有修改 M1l migration、preflight/coordinator pins 或数据库 readiness；第 40
   条 migration 仍未应用到 Production。
-- M1n 已增加 source-pinned、default-off 的 Hosted harness，但本批次没有创建新的
+- M1n 已增加 source-pinned、default-off 的 Hosted harness；M1o 又补齐 factory nonce
+  防重放、有界 admin close 与同步 pipe failure 收敛，但本批次没有创建新的
   Preview，也没有执行它。真实 PostgreSQL 17 driver/TLS/PID/cleanup gate 仍留给得到
   独立授权的后续 disposable no-data Preview；详见
   `documentation/communication-note-preview-approved-runtime-hosted-harness-m1n.md`。
 
 ## 验证与后续 gate
 
-最终同一源码通过 M1m/M1n 十文件聚焦 151/151（含 runtime boundary 12/12）、完整
-Vitest 187 files / 2,547 tests、`tsc --noEmit`、全仓 ESLint、Node runner syntax、tracked
-与全部新增文件 whitespace check、73-file Codex adapter sync，以及 Next.js 16.2.9 Webpack
-production build（64/64 pages）。独立复核最终为 P0=0、P1=0。这些本地结果只能证明
-source contract 一致，不表示部署或 Production greenlight。
+M1o 当前同一源码通过 M1m/M1n 十文件聚焦 169/169（含 runtime boundary 12/12）和完整
+Vitest 187 files / 2,565 tests、TypeScript、全仓 ESLint、三个 Node runner syntax、
+whitespace/diff、73-file Codex adapter sync 与 Next.js 16.2.9 Webpack 64/64-page build。
+这些本地结果只能证明 source contract 一致，不表示部署或 Production greenlight。
 
-下一 gate 是同 revision source review/merge。随后若要实际接通 AI 应用，仍需分别取得：
+下一 gate 是 M1o 同 revision source review/merge。随后若要实际接通 AI 应用，仍需分别取得：
 
 1. disposable no-data PostgreSQL 17 Preview、真实 `pg` driver 和 pinned-CA/Abort 行为的
    明确授权与 same-revision 证据；

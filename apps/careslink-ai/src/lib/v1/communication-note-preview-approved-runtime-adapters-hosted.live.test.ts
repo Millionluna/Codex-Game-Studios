@@ -425,6 +425,8 @@ describe("Communication Note M1n approved runtime adapters Hosted gate", () => {
       sourceRevocation: "BRANCH_DELETE_OR_PASSWORD_RESET",
       secretFdSingleRead: true,
       managementDeliveryEnvelopeOneUse: true,
+      managementDeliveryCrossOpenReplayProtected: true,
+      managementDeliveryReplayRegistryScope: "FACTORY",
       managementDeliveryLifetimeMaximumMs: 60_000,
       underlyingCredentialShortLived: false,
       underlyingCredentialExpiryAttested: false,
@@ -530,6 +532,7 @@ async function runHostedLiveGate() {
           request.sourceExpiresAt !== null ||
           request.sourceRevocation !==
             "BRANCH_DELETE_OR_PASSWORD_RESET" ||
+          !SHA256_PATTERN.test(request.deliveryNonce) ||
           request.maximumDeliveryLifetimeMs !== 60_000 ||
           request.deliveryExpiresNoLaterThan !== config.target.expiresAt ||
           typeof managementPassword !== "string"
@@ -555,6 +558,7 @@ async function runHostedLiveGate() {
           credentialClass: request.credentialClass,
           sourceExpiresAt: request.sourceExpiresAt,
           sourceRevocation: request.sourceRevocation,
+          deliveryNonce: request.deliveryNonce,
           password: managementPassword,
           deliveryIssuedAt,
           deliveryExpiresAt,
@@ -1833,6 +1837,8 @@ function createEvidence() {
     sourceRevocation: "BRANCH_DELETE_OR_PASSWORD_RESET" as const,
     secretFdSingleRead: true as const,
     managementDeliveryEnvelopeOneUse: true as const,
+    managementDeliveryCrossOpenReplayProtected: true as const,
+    managementDeliveryReplayRegistryScope: "FACTORY" as const,
     managementDeliveryLifetimeMaximumMs: 60_000 as const,
     underlyingCredentialShortLived: false as const,
     underlyingCredentialExpiryAttested: false as const,

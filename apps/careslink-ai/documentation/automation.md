@@ -582,6 +582,45 @@ the 73-file adapter sync and the 64/64-page Webpack production build; final
 independent review reported P0=0 and P1=0. None of those checks scheduled work
 or contacted Hosted PostgreSQL.
 
+### Approved runtime adapters M1o — post-review hardening source
+
+M1o provides candidate fixes for the three findings recorded during PR #16
+review without activating the Hosted gate. The fixes still require
+same-revision final review and are not yet recorded as closed. Each management
+open now generates a cryptographic
+256-bit delivery nonce; the injected transport must echo it exactly, and the
+factory atomically reserves only its SHA-256 plus monotonic expiry in a bounded
+256-entry registry. Expired entries are pruned before reserve, while duplicate
+or full-registry delivery fails before another Client is constructed. The
+underlying Supabase branch-admin password remains static and reusable at its
+source; this protection applies only to one delivery envelope inside one
+factory process.
+
+The outer runner now bounds admin `Client.end()` to two seconds and attempts to
+destroy the exact verified TLS stream on rejection or timeout. Direct network
+fallback can continue only after graceful close or a destroy call that returns
+without throwing and synchronously leaves `stream.destroyed === true`; a
+missing, throwing or silent no-op destroy fails closed before a Session Pooler
+Client is constructed. Final close failure maps to the fixed cleanup failure
+and still requires caller-owned exact branch deletion.
+The shared child channel also converts any synchronous input `.end(payload)`
+throw into one fixed pipe failure, immediately clears payload/timers, requests
+SIGKILL through the owned ChildProcess handle and invokes destroy on every
+channel. It waits for child close or an independent one-second cleanup deadline;
+the deadline retries handle-owned hard kill and channel destruction, unrefs the
+child and removes data, exit and stateful listeners before returning the fixed
+failure. Content-free terminal error sinks remain until actual child close so a
+late emitter error cannot escape the fixed boundary; no raw PID signal is used.
+
+Readiness remains false, approved exports remain absent, and no Preview,
+Hosted database, deployment, Production mutation, provider/model call or
+automation ran. The final M1o candidate source revision is
+`7a0f19f782670acf663fd087a3e460df92048e2d2406b05efe20d900a182e011`.
+It passed 10 focused files / 169 tests and the complete 187-file / 2,565-test
+suite. TypeScript, full ESLint, three Node syntax checks, whitespace, the
+73-file adapter sync and the 64/64-page Webpack build also passed; independent
+same-revision source review remains the final handoff gate.
+
 Supabase CLI 2.115.0 has since generated source-only migration `20260823213144_harden_v1_note_generation_registration_retention.sql`. It adds `attempts_registration_digest_idx` and the named `attempts_registration_catalog_fk` from `attempts.registration_digest` to `worker_registrations.registration_digest`, with update/delete `RESTRICT`, `NOT VALID` creation and explicit validation. It creates no seed, caller grant, runtime surface or Production change. Its local gate passed 39/39 focused contracts, the full 125-file / 1,381-test suite, lint, TypeScript, the 63/63-page production build, the 73-file Codex-adapter sync check and `git diff --check`. Deleted disposable `r22` then clean-applied the current manifest 15/15 and passed the seven rollback suites; the hosted registration-retention gate is now closed without enabling any runtime automation.
 
 ### PostgreSQL 16.15 local isolated gate — 2026-08-24

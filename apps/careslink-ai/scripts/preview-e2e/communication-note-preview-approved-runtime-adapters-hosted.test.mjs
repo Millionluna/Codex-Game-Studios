@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   COMMUNICATION_NOTE_PREVIEW_APPROVED_RUNTIME_ADAPTERS_HOSTED_FAILURE_STATUSES,
@@ -46,6 +46,20 @@ function commonMaterial(candidate = directCandidate()) {
     observedAt: OBSERVED_AT,
     password: PASSWORD,
   };
+}
+
+function connectionCandidates() {
+  return Object.freeze({
+    direct: directCandidate(),
+    sessionPooler: Object.freeze({
+      mode: "session_pooler",
+      host: "aws-0-ap-southeast-2.pooler.supabase.com",
+      port: 5432,
+      database: "postgres",
+      user: `postgres.${BRANCH_REF}`,
+      password: PASSWORD,
+    }),
+  });
 }
 
 describe("Communication Note M1n approved runtime Hosted runner policy", () => {
@@ -214,6 +228,8 @@ describe("Communication Note M1n approved runtime Hosted runner policy", () => {
       managementCredentialClass:
         "STATIC_SUPABASE_BRANCH_ADMIN_PASSWORD",
       deliveryTransport: "ANONYMOUS_FD_SINGLE_READ",
+      managementDeliveryCrossOpenReplayProtected: true,
+      managementDeliveryReplayRegistryScope: "FACTORY",
       underlyingCredentialShortLived: false,
       underlyingCredentialExpiryAttested: false,
       rotationTested: false,
@@ -421,6 +437,239 @@ describe("Communication Note M1n approved runtime Hosted runner policy", () => {
     ).rejects.toThrowError(
       "M1N_APPROVED_RUNTIME_ADAPTERS_HOSTED_POSTCHECK_FAILED",
     );
+  });
+
+  it("hard-destroys a stuck Direct client and continues the Session Pooler fallback", async () => {
+    const neverEnding = new Promise(() => undefined);
+    const instances = [];
+    class Client {
+      constructor(config) {
+        this.config = config;
+        const stream = {
+          encrypted: true,
+          authorized: true,
+          authorizationError: null,
+          destroyed: false,
+        };
+        stream.destroy = vi.fn(() => {
+          stream.destroyed = true;
+        });
+        this.connection = {
+          stream,
+        };
+        this.on = vi.fn();
+        this.connect = vi.fn(async () => {
+          if (instances.indexOf(this) === 0) {
+            throw Object.assign(new Error("direct unreachable"), {
+              code: "ETIMEDOUT",
+            });
+          }
+        });
+        this.end = vi.fn(() =>
+          instances.indexOf(this) === 0 ? neverEnding : Promise.resolve()
+        );
+        instances.push(this);
+      }
+    }
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    try {
+      const connecting =
+        COMMUNICATION_NOTE_PREVIEW_APPROVED_RUNTIME_ADAPTERS_HOSTED_TEST_ONLY
+          .connectPreferredAdmin(Client, connectionCandidates(), "pinned-ca");
+      await vi.waitFor(() => expect(instances).toHaveLength(1));
+      await vi.waitFor(() => expect(instances[0].end).toHaveBeenCalledTimes(1));
+      await vi.advanceTimersByTimeAsync(2_001);
+      const connected = await connecting;
+      expect(instances).toHaveLength(2);
+      expect(instances[0].connection.stream.destroy).toHaveBeenCalledTimes(1);
+      expect(instances[1].connect).toHaveBeenCalledTimes(1);
+      expect(connected).toEqual({
+        client: instances[1],
+        candidate: connectionCandidates().sessionPooler,
+      });
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.clearAllTimers();
+      vi.useRealTimers();
+    }
+  });
+
+  it.each(["missing", "noop", "throwing"])(
+    "fails closed before Session Pooler when a stuck Direct close has a %s destroy boundary",
+    async (destroyMode) => {
+      const neverEnding = new Promise(() => undefined);
+      const instances = [];
+      class Client {
+        constructor() {
+          const stream = {
+            encrypted: true,
+            authorized: true,
+            authorizationError: null,
+          };
+          if (destroyMode === "noop") {
+            stream.destroy = vi.fn();
+          } else if (destroyMode === "throwing") {
+            stream.destroy = vi.fn(() => {
+              throw new Error("destroy failed");
+            });
+          }
+          this.connection = { stream };
+          this.on = vi.fn();
+          this.connect = vi.fn(async () => {
+            throw Object.assign(new Error("direct unreachable"), {
+              code: "ETIMEDOUT",
+            });
+          });
+          this.end = vi.fn(() => neverEnding);
+          instances.push(this);
+        }
+      }
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+      try {
+        const connecting =
+          COMMUNICATION_NOTE_PREVIEW_APPROVED_RUNTIME_ADAPTERS_HOSTED_TEST_ONLY
+            .connectPreferredAdmin(Client, connectionCandidates(), "pinned-ca");
+        const denied = expect(connecting).rejects.toThrowError(
+          "M1N_APPROVED_RUNTIME_ADAPTERS_HOSTED_CONNECTION_FAILED",
+        );
+        await vi.waitFor(() => expect(instances).toHaveLength(1));
+        await vi.waitFor(() => expect(instances[0].end).toHaveBeenCalledTimes(1));
+        await vi.advanceTimersByTimeAsync(2_001);
+        await denied;
+
+        expect(instances).toHaveLength(1);
+        if (destroyMode !== "missing") {
+          expect(instances[0].connection.stream.destroy).toHaveBeenCalledTimes(1);
+        } else {
+          expect(instances[0].connection.stream).not.toHaveProperty("destroy");
+        }
+        expect(vi.getTimerCount()).toBe(0);
+      } finally {
+        vi.clearAllTimers();
+        vi.useRealTimers();
+      }
+    },
+  );
+
+  it("rejects a verified TLS client without the hard-destroy boundary", async () => {
+    const instances = [];
+    class Client {
+      constructor() {
+        this.connection = {
+          stream: {
+            encrypted: true,
+            authorized: true,
+            authorizationError: null,
+          },
+        };
+        this.on = vi.fn();
+        this.connect = vi.fn(async () => undefined);
+        this.end = vi.fn(async () => undefined);
+        instances.push(this);
+      }
+    }
+    await expect(
+      COMMUNICATION_NOTE_PREVIEW_APPROVED_RUNTIME_ADAPTERS_HOSTED_TEST_ONLY
+        .connectPreferredAdmin(Client, connectionCandidates(), "pinned-ca"),
+    ).rejects.toThrowError(
+      "M1N_APPROVED_RUNTIME_ADAPTERS_HOSTED_CONNECTION_FAILED",
+    );
+    expect(instances).toHaveLength(1);
+    expect(instances[0].end).toHaveBeenCalledTimes(1);
+  });
+
+  it("maps stuck and rejected final closes to the fixed cleanup boundary", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    try {
+      const graceful = {
+        end: vi.fn(async () => undefined),
+        connection: { stream: { destroy: vi.fn() } },
+      };
+      await expect(
+        COMMUNICATION_NOTE_PREVIEW_APPROVED_RUNTIME_ADAPTERS_HOSTED_TEST_ONLY
+          .closeFinalAdmin(graceful),
+      ).resolves.toBeUndefined();
+      expect(graceful.end).toHaveBeenCalledTimes(1);
+      expect(graceful.connection.stream.destroy).not.toHaveBeenCalled();
+      expect(vi.getTimerCount()).toBe(0);
+
+      const stuck = {
+        end: vi.fn(() => new Promise(() => undefined)),
+        connection: { stream: { destroy: vi.fn() } },
+      };
+      const closing =
+        COMMUNICATION_NOTE_PREVIEW_APPROVED_RUNTIME_ADAPTERS_HOSTED_TEST_ONLY
+          .closeFinalAdmin(stuck);
+      const denied = expect(closing).rejects.toThrowError(
+        "M1N_APPROVED_RUNTIME_ADAPTERS_HOSTED_CLEANUP_FAILED",
+      );
+      await vi.advanceTimersByTimeAsync(2_001);
+      await denied;
+      expect(stuck.end).toHaveBeenCalledTimes(1);
+      expect(stuck.connection.stream.destroy).toHaveBeenCalledTimes(1);
+      expect(vi.getTimerCount()).toBe(0);
+
+      const rejected = {
+        end: vi.fn(async () => {
+          throw new Error("close rejected");
+        }),
+        connection: {
+          stream: {
+            destroy: vi.fn(() => {
+              throw new Error("destroy rejected");
+            }),
+          },
+        },
+      };
+      await expect(
+        COMMUNICATION_NOTE_PREVIEW_APPROVED_RUNTIME_ADAPTERS_HOSTED_TEST_ONLY
+          .closeFinalAdmin(rejected),
+      ).rejects.toThrowError(
+        "M1N_APPROVED_RUNTIME_ADAPTERS_HOSTED_CLEANUP_FAILED",
+      );
+      expect(rejected.end).toHaveBeenCalledTimes(1);
+      expect(rejected.connection.stream.destroy).toHaveBeenCalledTimes(1);
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.clearAllTimers();
+      vi.useRealTimers();
+    }
+  });
+
+  it("absorbs a client.end rejection that arrives after the close timeout", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    const unhandledRejection = vi.fn();
+    process.on("unhandledRejection", unhandledRejection);
+    let rejectEnd;
+    const lateEnd = new Promise((_resolve, reject) => {
+      rejectEnd = reject;
+    });
+    const client = {
+      end: vi.fn(() => lateEnd),
+      connection: { stream: { destroy: vi.fn() } },
+    };
+    try {
+      const closing =
+        COMMUNICATION_NOTE_PREVIEW_APPROVED_RUNTIME_ADAPTERS_HOSTED_TEST_ONLY
+          .closeFinalAdmin(client);
+      const denied = expect(closing).rejects.toThrowError(
+        "M1N_APPROVED_RUNTIME_ADAPTERS_HOSTED_CLEANUP_FAILED",
+      );
+      await vi.advanceTimersByTimeAsync(2_001);
+      await denied;
+      rejectEnd(new Error("late client.end rejection"));
+      await Promise.resolve();
+      await new Promise((resolve) => setImmediate(resolve));
+
+      expect(unhandledRejection).not.toHaveBeenCalled();
+      expect(client.end).toHaveBeenCalledTimes(1);
+      expect(client.connection.stream.destroy).toHaveBeenCalledTimes(1);
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      process.removeListener("unhandledRejection", unhandledRejection);
+      vi.clearAllTimers();
+      vi.useRealTimers();
+    }
   });
 
   it("rejects Production, transaction-pooler and mismatched secret inputs", () => {
