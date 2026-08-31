@@ -8,6 +8,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 import {
+  COMMUNICATION_NOTE_PREVIEW_RUNTIME_BROKER_HOSTED_TEST_ONLY,
   createCommunicationNotePreviewRuntimeBrokerHostedChildEnvironment,
   createCommunicationNotePreviewRuntimeBrokerHostedEvidence,
   createCommunicationNotePreviewRuntimeBrokerHostedMaterial,
@@ -400,6 +401,29 @@ describe("Communication Note M1l Hosted runtime broker runner policy", () => {
     },
   );
 
+  it(
+    "exercises the shared M1l FD3/FD4 wrapper on a bounded child failure",
+    { timeout: 15_000 },
+    async () => {
+      const baseEnvironment = Object.fromEntries(
+        ["PATH", "TMPDIR", "LANG", "LC_ALL", "LC_CTYPE", "TZ"]
+          .flatMap((key) => typeof process.env[key] === "string"
+            ? [[key, process.env[key]]]
+            : []),
+      );
+      const pipeConfig =
+        createCommunicationNotePreviewRuntimeBrokerHostedPipeConfig({
+          ...COMMON,
+          candidate: directCandidate(),
+          sslRootCertPath: "/dev/null",
+        });
+      await expect(
+        COMMUNICATION_NOTE_PREVIEW_RUNTIME_BROKER_HOSTED_TEST_ONLY
+          .runHostedChild(pipeConfig, baseEnvironment),
+      ).rejects.toThrowError("RUNTIME_BROKER_HOSTED_LIVE_TLS_INVALID");
+    },
+  );
+
   it("pins strict envelope, anonymous pipes and cleanup in source", () => {
     const runnerSource = readFileSync(new URL(
       "./communication-note-preview-runtime-credential-broker-hosted.mjs",
@@ -408,9 +432,7 @@ describe("Communication Note M1l Hosted runtime broker runner policy", () => {
     expect(runnerSource).toContain(
       "extractCommunicationNoteDisposablePreviewResetDatabaseTarget",
     );
-    expect(runnerSource).toContain(
-      'stdio: ["ignore", "ignore", "ignore", "pipe", "pipe"]',
-    );
+    expect(runnerSource).toContain("runCommunicationNotePreviewHostedChild");
     expect(runnerSource).toContain("cleanupAcquisition");
     expect(runnerSource).toContain("CHILD_STATUS_MAXIMUM_BYTES");
     expect(runnerSource).toContain("typeof process.env.NODE_OPTIONS");

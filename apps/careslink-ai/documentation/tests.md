@@ -2735,6 +2735,54 @@ ESLint, tracked plus new-file whitespace checks and the Next.js 16.2.9 Webpack
 production build with 64/64 pages. These are local source results, not Preview,
 deployment or Production evidence.
 
+### Communication Note approved runtime adapters M1n — Hosted harness source
+
+M1n adds local/default-off coverage for the future real-driver gate without
+running that gate. The new policy tests pin exact public control-plane config,
+Direct and Supavisor Session port 5432 shapes, CA and source-revision digests,
+the FD5 binary secret frame, a minimal child environment, fixed bounded status
+codes and content-free evidence. A shared child-channel suite also locks
+multiple parent-to-child input pipes, timeout/termination behavior and the
+unchanged M1l FD3/FD4 contract.
+
+Source pinning now uses one canonical 66-path manifest: the manifest itself,
+package/pnpm lock/tsconfig, outer runner/channel, current static import closure,
+setup SQL and all 40 migrations are framed into the digest. Tests require exact
+schema, byte-order sorting, uniqueness, regular non-symlink files, all 40 disk
+migrations and an independently recomputed digest. The caller must provide the
+reviewed digest before stdin/database access and the child recomputes it. This
+does not attest the complete Node/Vitest/node_modules transitive closure.
+
+The live test stays default-off in ordinary Vitest. Its static assertions keep
+M1m/M1n readiness false and approved exports absent, parse/recompute one exact
+source revision, reject expanded/replayed secret frames, and lock evidence that
+states the underlying Supabase branch password is static, not attested
+short-lived, not rotation-tested and present in process memory during the run.
+Runtime-boundary coverage adds this one test-only importer to the exact target,
+management, runtime-session, composition, durable-resolver, resolved-binding and
+trust-fixture graphs while keeping `src/app` and `src/components` at zero.
+
+The enabled branch of the same file is designed to inject the real
+resolved `pg@8.23.0` constructor (checked from the actual package in both
+parent and child) and call only the high-level M1m
+`bundle.runtimePort.persist(envelope)` path after a synthetic ledger setup. It
+then requires exactly five fresh management deliveries and an independent zero-
+residue postcheck. Parent tests also lock the exact ordered 40-version preflight
+parameter plus cleanup/finalize/inspect of all acquisitions, including already
+revoked rows, before a separate ACL/session/role and verifier-state query. The
+success contract requires one issued/revoked 64-hex verifier hash-only tombstone;
+only never-issued rows may retain null, and raw password/SCRAM material remains
+forbidden. None of
+those Hosted assertions ran in this source batch:
+there is no PG17/TLS/PID/Abort/live-cleanup/branch-delete pass to report yet.
+The reviewed source revision is
+`5bf672d6819b6d6129f806e2fc7ab62c661a57cffbbc5403fcfa7967d39cfc31`;
+the exact local closeout passed 10 focused files / 151 tests, the full 187-file /
+2,547-test suite, TypeScript, full ESLint, three Node runner syntax checks,
+whitespace/diff checks, the 73-file Codex adapter sync, and the Next.js 16.2.9
+Webpack production build with 64/64 pages. Independent review ended at P0=0,
+P1=0. These remain local/default-off results, not Hosted live evidence.
+
 ### Current live/read-only evidence
 
 - Supabase migrations, tables, RLS flags, policies, grants, function grants and aggregate row counts were checked read-only.

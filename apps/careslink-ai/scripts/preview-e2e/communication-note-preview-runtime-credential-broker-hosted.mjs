@@ -1,4 +1,3 @@
-import { spawn } from "node:child_process";
 import {
   createHash,
   createHmac,
@@ -19,6 +18,12 @@ import {
 import {
   assertVerifiedPreviewTlsConnection,
 } from "./communication-note-preview-runner-terminal-identity.mjs";
+import {
+  CommunicationNotePreviewHostedChildChannelError,
+  createCommunicationNotePreviewHostedChildEnvironment,
+  parseCommunicationNotePreviewHostedChildStatus,
+  runCommunicationNotePreviewHostedChild,
+} from "./communication-note-preview-hosted-child-channel.mjs";
 
 const ENABLE_ENV = "CARESLINK_V1_M1L_HOSTED_LIVE_ENABLED";
 const CONFIG_FD_ENV = "CARESLINK_V1_M1L_HOSTED_LIVE_CONFIG_FD";
@@ -27,6 +32,7 @@ const CONFIG_FD = 3;
 const STATUS_FD = 4;
 const CHILD_TIMEOUT_MS = 120_000;
 const CHILD_KILL_GRACE_MS = 2_000;
+const CHILD_CONFIG_MAXIMUM_BYTES = 65_536;
 const CHILD_STATUS_MAXIMUM_BYTES = 512;
 const HOSTED_CHILD_SUCCESS = "RUNTIME_BROKER_HOSTED_LIVE_PASSED";
 const MANAGEMENT_APPLICATION_NAME =
@@ -340,43 +346,29 @@ export function createCommunicationNotePreviewRuntimeBrokerHostedChildEnvironmen
   if (!baseEnvironment || typeof baseEnvironment !== "object") {
     fail("RUNTIME_BROKER_HOSTED_ARGUMENT_INVALID");
   }
-  const environment = Object.create(null);
-  const allowedKeys = new Set([
-    "PATH",
-    "TMPDIR",
-    "LANG",
-    "LC_ALL",
-    "LC_CTYPE",
-    "TZ",
-    "CI",
-    "NO_COLOR",
-  ]);
-  for (const [key, value] of Object.entries(baseEnvironment)) {
-    if (typeof value === "string" && allowedKeys.has(key)) {
-      environment[key] = value;
-    }
-  }
-  environment[ENABLE_ENV] = "1";
-  environment[CONFIG_FD_ENV] = String(CONFIG_FD);
-  environment[STATUS_FD_ENV] = String(STATUS_FD);
-  return Object.freeze(environment);
+  return createCommunicationNotePreviewHostedChildEnvironment({
+    baseEnvironment,
+    enableEnvironmentKey: ENABLE_ENV,
+    inputPipeBindings: Object.freeze([
+      Object.freeze({ environmentKey: CONFIG_FD_ENV, fd: CONFIG_FD }),
+    ]),
+    statusPipeBinding: Object.freeze({
+      environmentKey: STATUS_FD_ENV,
+      fd: STATUS_FD,
+    }),
+  });
 }
 
 export function parseCommunicationNotePreviewRuntimeBrokerHostedChildStatus(
   value,
 ) {
-  if (
-    typeof value !== "string" ||
-    Buffer.byteLength(value, "utf8") > CHILD_STATUS_MAXIMUM_BYTES ||
-    !value.endsWith("\n")
-  ) {
-    return "RUNTIME_BROKER_HOSTED_CHILD_FAILED";
-  }
-  const code = value.slice(0, -1);
-  if (code === HOSTED_CHILD_SUCCESS) return code;
-  return CHILD_FAILURE_CODES.has(code)
-    ? code
-    : "RUNTIME_BROKER_HOSTED_CHILD_FAILED";
+  return parseCommunicationNotePreviewHostedChildStatus({
+    value,
+    successStatus: HOSTED_CHILD_SUCCESS,
+    failureStatuses: CHILD_FAILURE_CODES,
+    fallbackStatus: "RUNTIME_BROKER_HOSTED_CHILD_FAILED",
+    maximumBytes: CHILD_STATUS_MAXIMUM_BYTES,
+  });
 }
 
 export function createCommunicationNotePreviewRuntimeBrokerHostedEvidence() {
@@ -504,96 +496,51 @@ async function runHostedChild(pipeConfig, baseEnvironment = process.env) {
     "../../src/lib/v1/communication-note-preview-runtime-credential-broker-hosted.live.test.ts",
     import.meta.url,
   ));
-  const child = spawn(
-    process.execPath,
-    [
-      vitestCli,
-      "run",
-      liveTest,
-      "--pool=threads",
-      "--maxWorkers=1",
-      "--reporter=dot",
-    ],
-    {
-      cwd: appDirectory,
-      env: createCommunicationNotePreviewRuntimeBrokerHostedChildEnvironment(
-        baseEnvironment,
-      ),
-      shell: false,
-      stdio: ["ignore", "ignore", "ignore", "pipe", "pipe"],
-    },
-  );
-  const configPipe = child.stdio[CONFIG_FD];
-  const statusPipe = child.stdio[STATUS_FD];
-  if (
-    !configPipe ||
-    typeof configPipe.end !== "function" ||
-    !statusPipe ||
-    typeof statusPipe.on !== "function"
-  ) {
-    child.kill("SIGTERM");
-    fail("RUNTIME_BROKER_HOSTED_CHILD_PIPE_FAILED");
-  }
-  let pipeFailed = false;
-  let statusBytes = 0;
-  let statusOverflow = false;
-  const statusChunks = [];
-  configPipe.on("error", () => {
-    pipeFailed = true;
-  });
-  statusPipe.on("error", () => {
-    pipeFailed = true;
-  });
-  statusPipe.on("data", (chunk) => {
-    const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
-    statusBytes += buffer.length;
-    if (statusBytes > CHILD_STATUS_MAXIMUM_BYTES) {
-      statusOverflow = true;
-      statusChunks.length = 0;
-      return;
-    }
-    if (!statusOverflow) statusChunks.push(buffer);
-  });
-  const exit = new Promise((resolve, reject) => {
-    child.once("error", reject);
-    child.once("close", (code, signal) => resolve({ code, signal }));
-  });
-  let timedOut = false;
-  let killTimer;
-  const timeout = setTimeout(() => {
-    timedOut = true;
-    child.kill("SIGTERM");
-    killTimer = setTimeout(() => child.kill("SIGKILL"), CHILD_KILL_GRACE_MS);
-  }, CHILD_TIMEOUT_MS);
-  configPipe.end(JSON.stringify(pipeConfig));
-  let result;
   try {
-    result = await exit;
-  } catch {
-    clearTimeout(timeout);
-    if (killTimer) clearTimeout(killTimer);
-    child.kill("SIGKILL");
-    fail("RUNTIME_BROKER_HOSTED_CHILD_FAILED");
-  }
-  clearTimeout(timeout);
-  if (killTimer) clearTimeout(killTimer);
-  if (pipeFailed) fail("RUNTIME_BROKER_HOSTED_CHILD_PIPE_FAILED");
-  const childStatus = statusOverflow
-    ? "RUNTIME_BROKER_HOSTED_CHILD_FAILED"
-    : parseCommunicationNotePreviewRuntimeBrokerHostedChildStatus(
-      Buffer.concat(statusChunks, statusBytes).toString("utf8"),
-    );
-  if (timedOut || result.signal !== null) {
-    fail("RUNTIME_BROKER_HOSTED_CHILD_FAILED");
-  }
-  if (result.code !== 0) {
-    fail(
-      childStatus === HOSTED_CHILD_SUCCESS
-        ? "RUNTIME_BROKER_HOSTED_CHILD_FAILED"
-        : childStatus,
-    );
-  }
-  if (childStatus !== HOSTED_CHILD_SUCCESS) {
+    // The shared channel owns this exact legacy shape:
+    // stdio: ["ignore", "ignore", "ignore", "pipe", "pipe"]
+    await runCommunicationNotePreviewHostedChild({
+      executable: process.execPath,
+      args: Object.freeze([
+        vitestCli,
+        "run",
+        liveTest,
+        "--pool=threads",
+        "--maxWorkers=1",
+        "--reporter=dot",
+      ]),
+      cwd: appDirectory,
+      environment:
+        createCommunicationNotePreviewRuntimeBrokerHostedChildEnvironment(
+          baseEnvironment,
+        ),
+      inputPipes: Object.freeze([
+        Object.freeze({
+          fd: CONFIG_FD,
+          payload: JSON.stringify(pipeConfig),
+          maximumBytes: CHILD_CONFIG_MAXIMUM_BYTES,
+        }),
+      ]),
+      statusFd: STATUS_FD,
+      successStatus: HOSTED_CHILD_SUCCESS,
+      failureStatuses: CHILD_FAILURE_CODES,
+      fallbackStatus: "RUNTIME_BROKER_HOSTED_CHILD_FAILED",
+      pipeFailureStatus: "RUNTIME_BROKER_HOSTED_CHILD_PIPE_FAILED",
+      timeoutMs: CHILD_TIMEOUT_MS,
+      killGraceMs: CHILD_KILL_GRACE_MS,
+      maximumStatusBytes: CHILD_STATUS_MAXIMUM_BYTES,
+    });
+  } catch (error) {
+    if (
+      error instanceof CommunicationNotePreviewHostedChildChannelError
+    ) {
+      if (error.code === "HOSTED_CHILD_CHANNEL_PIPE_FAILED") {
+        fail("RUNTIME_BROKER_HOSTED_CHILD_PIPE_FAILED");
+      }
+      if (CHILD_FAILURE_CODES.has(error.childStatus)) {
+        fail(error.childStatus);
+      }
+    }
     fail("RUNTIME_BROKER_HOSTED_CHILD_FAILED");
   }
 }
@@ -784,6 +731,9 @@ async function verifyPostcondition(admin, acquisitions) {
     fail("RUNTIME_BROKER_HOSTED_POSTCHECK_FAILED");
   }
 }
+
+export const COMMUNICATION_NOTE_PREVIEW_RUNTIME_BROKER_HOSTED_TEST_ONLY =
+  Object.freeze({ runHostedChild });
 
 async function main() {
   assertCommunicationNotePreviewRunnerTerminalIdentityPolicyRegression();

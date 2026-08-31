@@ -156,14 +156,14 @@ describe("Communication Note M1m approved runtime adapters", () => {
     expect(
       CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_APPROVED_RUNTIME_ADAPTERS_POLICY_DIGEST,
     ).toBe(
-      "f8ee0df473161d6acb3c6e601a96014c97c2e460e1d6004f5d7c1d8c56583abc",
+      "7dd9bdc893147146a2e519b59f71cb958b9afdf2117589bf8ca42239a1ac1dc5",
     );
     expect(
       CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_APPROVED_RUNTIME_ADAPTERS_POLICY,
     ).toMatchObject({
       ready: false,
       sameSealedTargetRequired: true,
-      managementCredentialTransport: "ONE_USE_CALLBACK_ONLY",
+      managementCredentialTransport: "ONE_USE_DELIVERY_CALLBACK_ONLY",
       managementConnectionProfileDerivedFromSealedTarget: true,
       managementSessionPolicyDigest:
         CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_APPROVED_RUNTIME_MANAGEMENT_SESSION_POLICY_DIGEST,
@@ -255,8 +255,11 @@ describe("Communication Note M1m approved runtime adapters", () => {
       user: "postgres",
       applicationName:
         "careslink-preview-runtime-credential-broker-management",
-      credentialExpiresNoLaterThan: bundle.databaseTarget.expiresAt,
-      maximumCredentialLifetimeMs: 60_000,
+      credentialClass: "STATIC_SUPABASE_BRANCH_ADMIN_PASSWORD",
+      sourceExpiresAt: null,
+      sourceRevocation: "BRANCH_DELETE_OR_PASSWORD_RESET",
+      deliveryExpiresNoLaterThan: bundle.databaseTarget.expiresAt,
+      maximumDeliveryLifetimeMs: 60_000,
     });
     expect(FakeManagementClient.constructed).toBe(1);
     expect(FakeManagementClient.passwordObservedAtConstruction).toBe(
@@ -596,10 +599,13 @@ function createFactoryHarness(options: {
       tlsRootCertificateSha256: request.tlsRootCertificateSha256,
       user: request.user,
       applicationName: request.applicationName,
+      credentialClass: request.credentialClass,
+      sourceExpiresAt: request.sourceExpiresAt,
+      sourceRevocation: request.sourceRevocation,
       password: MANAGEMENT_PASSWORD,
-      issuedAt: NOW,
-      expiresAt: "2026-08-31T12:00:30.000Z",
-      oneUse: true,
+      deliveryIssuedAt: NOW,
+      deliveryExpiresAt: "2026-08-31T12:00:30.000Z",
+      deliveryOneUse: true,
       rawDsnPresent: false,
       ...options.managementCredentialMutation,
     });

@@ -21,14 +21,14 @@ const TIMESTAMP_PATTERN =
   /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
 const MAXIMUM_CA_BYTES = 64 * 1_024;
 const MAXIMUM_TARGET_LIFETIME_MS = 5 * 60 * 1_000;
-const MAXIMUM_CREDENTIAL_LIFETIME_MS = 60 * 1_000;
-const MAXIMUM_CREDENTIAL_AGE_MS = 30 * 1_000;
+const MAXIMUM_DELIVERY_LIFETIME_MS = 60 * 1_000;
+const MAXIMUM_DELIVERY_AGE_MS = 30 * 1_000;
 const OPEN_OPERATION_TIMEOUT_MS = 5_000;
 const QUERY_OPERATION_TIMEOUT_MS = 5_000;
 const CLOSE_OPERATION_TIMEOUT_MS = 1_000;
 
 export const CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_APPROVED_RUNTIME_MANAGEMENT_SESSION_VERSION =
-  "management-session.communication.openai.synthetic-preview.2026-08-31.m1m.v1" as const;
+  "management-session.communication.openai.synthetic-preview.2026-08-31.m1m.v2" as const;
 export const CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_APPROVED_RUNTIME_MANAGEMENT_SESSION_READY =
   false as const;
 export const CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_APPROVED_RUNTIME_MANAGEMENT_APPLICATION_NAME =
@@ -88,15 +88,23 @@ const APPROVED_RUNTIME_MANAGEMENT_SESSION_POLICY_CORE = deepFreeze({
   requiredApplicationName:
     CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_APPROVED_RUNTIME_MANAGEMENT_APPLICATION_NAME,
   requiredRowSecurity: "on",
-  credentialTransport: "ONE_USE_CALLBACK",
+  credentialTransport: "ONE_USE_DELIVERY_CALLBACK",
+  credentialClass: "STATIC_SUPABASE_BRANCH_ADMIN_PASSWORD",
+  sourceCredentialSingleUse: false,
+  sourceExpiresAt: null,
+  sourceRevocation: "BRANCH_DELETE_OR_PASSWORD_RESET",
+  deliveryEnvelopeSingleUse: true,
   credentialBindingFields: [
     "targetDescriptorSha256",
     "tlsRootCertificateSha256",
     "user",
     "applicationName",
+    "credentialClass",
+    "sourceExpiresAt",
+    "sourceRevocation",
   ],
-  maximumCredentialAgeMs: MAXIMUM_CREDENTIAL_AGE_MS,
-  maximumCredentialLifetimeMs: MAXIMUM_CREDENTIAL_LIFETIME_MS,
+  maximumDeliveryAgeMs: MAXIMUM_DELIVERY_AGE_MS,
+  maximumDeliveryLifetimeMs: MAXIMUM_DELIVERY_LIFETIME_MS,
   credentialReturned: false,
   rawDsnAllowed: false,
   connectionTimeoutMs: 5_000,
@@ -117,7 +125,7 @@ const APPROVED_RUNTIME_MANAGEMENT_SESSION_POLICY_CORE = deepFreeze({
 } as const);
 
 export const CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_APPROVED_RUNTIME_MANAGEMENT_SESSION_POLICY_DIGEST =
-  "32e1d14783da7613b9be10d8445707b5621d9c11fab3b8b59006d5fe377016f3" as const;
+  "2dc462675834a2741941e5b11a0f277cfbc6d08c6a0b4edc04346aa97dd59ce3" as const;
 
 if (
   canonicalSha256(APPROVED_RUNTIME_MANAGEMENT_SESSION_POLICY_CORE) !==
@@ -160,8 +168,11 @@ export type CaresLinkV1CommunicationNotePreviewApprovedRuntimeManagementCredenti
     tlsRootCertificateSha256: string;
     user: string;
     applicationName: typeof CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_APPROVED_RUNTIME_MANAGEMENT_APPLICATION_NAME;
-    credentialExpiresNoLaterThan: string;
-    maximumCredentialLifetimeMs: typeof MAXIMUM_CREDENTIAL_LIFETIME_MS;
+    credentialClass: "STATIC_SUPABASE_BRANCH_ADMIN_PASSWORD";
+    sourceExpiresAt: null;
+    sourceRevocation: "BRANCH_DELETE_OR_PASSWORD_RESET";
+    deliveryExpiresNoLaterThan: string;
+    maximumDeliveryLifetimeMs: typeof MAXIMUM_DELIVERY_LIFETIME_MS;
   }>;
 
 export type CaresLinkV1CommunicationNotePreviewApprovedRuntimeManagementCredentialTransport =
@@ -234,7 +245,8 @@ export function createCaresLinkV1CommunicationNotePreviewApprovedRuntimeManageme
 /**
  * Creates a source-only management connection boundary. It discovers neither
  * endpoints nor credentials: both arrive through already scoped, injected
- * ports, and the password can cross the boundary only inside a one-use callback.
+ * ports. The static branch-admin password may remain reusable at its source;
+ * only one short-lived delivery envelope may cross each callback boundary.
  */
 export function createTestOnlyCaresLinkV1CommunicationNotePreviewApprovedRuntimeManagementSessionFactory(
   value: unknown,
@@ -294,8 +306,12 @@ async function openManagementSession(
     user,
     applicationName:
       CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_APPROVED_RUNTIME_MANAGEMENT_APPLICATION_NAME,
-    credentialExpiresNoLaterThan: profile.expiresAt,
-    maximumCredentialLifetimeMs: MAXIMUM_CREDENTIAL_LIFETIME_MS,
+    credentialClass:
+      "STATIC_SUPABASE_BRANCH_ADMIN_PASSWORD" as const,
+    sourceExpiresAt: null,
+    sourceRevocation: "BRANCH_DELETE_OR_PASSWORD_RESET" as const,
+    deliveryExpiresNoLaterThan: profile.expiresAt,
+    maximumDeliveryLifetimeMs: MAXIMUM_DELIVERY_LIFETIME_MS,
   });
   const deadline = performance.now() + OPEN_OPERATION_TIMEOUT_MS;
   let client:
@@ -636,10 +652,13 @@ function validateCredential(
     "tlsRootCertificateSha256",
     "user",
     "applicationName",
+    "credentialClass",
+    "sourceExpiresAt",
+    "sourceRevocation",
     "password",
-    "issuedAt",
-    "expiresAt",
-    "oneUse",
+    "deliveryIssuedAt",
+    "deliveryExpiresAt",
+    "deliveryOneUse",
     "rawDsnPresent",
   ]);
   if (
@@ -648,7 +667,10 @@ function validateCredential(
       expected.tlsRootCertificateSha256 ||
     object.user !== expected.user ||
     object.applicationName !== expected.applicationName ||
-    object.oneUse !== true ||
+    object.credentialClass !== expected.credentialClass ||
+    object.sourceExpiresAt !== expected.sourceExpiresAt ||
+    object.sourceRevocation !== expected.sourceRevocation ||
+    object.deliveryOneUse !== true ||
     object.rawDsnPresent !== false ||
     typeof object.password !== "string" ||
     object.password.length < 16 ||
@@ -658,16 +680,20 @@ function validateCredential(
   ) {
     throw unavailable();
   }
-  const issuedAt = Date.parse(requireTimestamp(object.issuedAt));
-  const expiresAt = Date.parse(requireTimestamp(object.expiresAt));
+  const deliveryIssuedAt = Date.parse(
+    requireTimestamp(object.deliveryIssuedAt),
+  );
+  const deliveryExpiresAt = Date.parse(
+    requireTimestamp(object.deliveryExpiresAt),
+  );
   const now = trustedWallClockMilliseconds(profile);
   if (
-    issuedAt > now ||
-    now - issuedAt > MAXIMUM_CREDENTIAL_AGE_MS ||
-    expiresAt <= now ||
-    expiresAt > Date.parse(profile.expiresAt) ||
-    expiresAt <= issuedAt ||
-    expiresAt - issuedAt > MAXIMUM_CREDENTIAL_LIFETIME_MS
+    deliveryIssuedAt > now ||
+    now - deliveryIssuedAt > MAXIMUM_DELIVERY_AGE_MS ||
+    deliveryExpiresAt <= now ||
+    deliveryExpiresAt > Date.parse(profile.expiresAt) ||
+    deliveryExpiresAt <= deliveryIssuedAt ||
+    deliveryExpiresAt - deliveryIssuedAt > MAXIMUM_DELIVERY_LIFETIME_MS
   ) {
     throw unavailable();
   }
