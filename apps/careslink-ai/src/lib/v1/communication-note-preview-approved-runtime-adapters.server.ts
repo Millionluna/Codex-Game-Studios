@@ -95,7 +95,7 @@ const APPROVED_RUNTIME_ADAPTERS_POLICY_CORE = deepFreeze({
   resolvedRuntimeBindingPolicyDigest:
     CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RESOLVED_RUNTIME_BINDING_POLICY_DIGEST,
   sameSealedTargetRequired: true,
-  managementCredentialTransport: "ONE_USE_CALLBACK_ONLY",
+  managementCredentialTransport: "ONE_USE_DELIVERY_CALLBACK_ONLY",
   separateManagementAndRuntimeClients: true,
   managementConnectionProfileDerivedFromSealedTarget: true,
   runtimeOpenRequestCrossBindingRequired: true,
@@ -104,7 +104,7 @@ const APPROVED_RUNTIME_ADAPTERS_POLICY_CORE = deepFreeze({
 } as const);
 
 export const CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_APPROVED_RUNTIME_ADAPTERS_POLICY_DIGEST =
-  "f8ee0df473161d6acb3c6e601a96014c97c2e460e1d6004f5d7c1d8c56583abc" as const;
+  "7dd9bdc893147146a2e519b59f71cb958b9afdf2117589bf8ca42239a1ac1dc5" as const;
 
 if (
   canonicalSha256(APPROVED_RUNTIME_ADAPTERS_POLICY_CORE) !==

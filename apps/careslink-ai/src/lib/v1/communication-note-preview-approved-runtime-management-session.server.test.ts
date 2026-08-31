@@ -92,10 +92,13 @@ function credential(
     tlsRootCertificateSha256: request.tlsRootCertificateSha256,
     user: request.user,
     applicationName: request.applicationName,
+    credentialClass: request.credentialClass,
+    sourceExpiresAt: request.sourceExpiresAt,
+    sourceRevocation: request.sourceRevocation,
     password: PASSWORD,
-    issuedAt: new Date(now - 1_000).toISOString(),
-    expiresAt: new Date(now + 30_000).toISOString(),
-    oneUse: true,
+    deliveryIssuedAt: new Date(now - 1_000).toISOString(),
+    deliveryExpiresAt: new Date(now + 30_000).toISOString(),
+    deliveryOneUse: true,
     rawDsnPresent: false,
     ...overrides,
   };
@@ -258,6 +261,16 @@ describe("Communication Note approved runtime management session", () => {
   });
 
   it("self-checks an immutable canonical source-off policy", () => {
+    expect(
+      CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_APPROVED_RUNTIME_MANAGEMENT_SESSION_VERSION,
+    ).toBe(
+      "management-session.communication.openai.synthetic-preview.2026-08-31.m1m.v2",
+    );
+    expect(
+      CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_APPROVED_RUNTIME_MANAGEMENT_SESSION_POLICY_DIGEST,
+    ).toBe(
+      "2dc462675834a2741941e5b11a0f277cfbc6d08c6a0b4edc04346aa97dd59ce3",
+    );
     const { policyDigest, ...policyCore } =
       CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_APPROVED_RUNTIME_MANAGEMENT_SESSION_POLICY;
     expect(policyDigest).toBe(
@@ -285,8 +298,14 @@ describe("Communication Note approved runtime management session", () => {
       allowedProfileConnectionModes: ["DIRECT", "SESSION_POOLER"],
       tlsMode: "VERIFY_FULL_PINNED_CA",
       rejectUnauthorized: true,
-      credentialTransport: "ONE_USE_CALLBACK",
-      maximumCredentialLifetimeMs: 60_000,
+      credentialTransport: "ONE_USE_DELIVERY_CALLBACK",
+      credentialClass: "STATIC_SUPABASE_BRANCH_ADMIN_PASSWORD",
+      sourceCredentialSingleUse: false,
+      sourceExpiresAt: null,
+      sourceRevocation: "BRANCH_DELETE_OR_PASSWORD_RESET",
+      deliveryEnvelopeSingleUse: true,
+      maximumDeliveryAgeMs: 30_000,
+      maximumDeliveryLifetimeMs: 60_000,
       retryCount: 0,
       concurrentQueryAllowed: false,
       cancellationMode: "EXACT_CLIENT_HARD_CLOSE",
@@ -306,6 +325,18 @@ describe("Communication Note approved runtime management session", () => {
       "sslRootCertificateSha256",
       "targetDescriptorSha256",
       "expiresAt",
+    ]);
+    expect(
+      CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_APPROVED_RUNTIME_MANAGEMENT_SESSION_POLICY
+        .credentialBindingFields,
+    ).toEqual([
+      "targetDescriptorSha256",
+      "tlsRootCertificateSha256",
+      "user",
+      "applicationName",
+      "credentialClass",
+      "sourceExpiresAt",
+      "sourceRevocation",
     ]);
     expect(
       Object.isFrozen(
@@ -335,8 +366,11 @@ describe("Communication Note approved runtime management session", () => {
         user: "postgres",
         applicationName:
           CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_APPROVED_RUNTIME_MANAGEMENT_APPLICATION_NAME,
-        credentialExpiresNoLaterThan: expect.any(String),
-        maximumCredentialLifetimeMs: 60_000,
+        credentialClass: "STATIC_SUPABASE_BRANCH_ADMIN_PASSWORD",
+        sourceExpiresAt: null,
+        sourceRevocation: "BRANCH_DELETE_OR_PASSWORD_RESET",
+        deliveryExpiresNoLaterThan: expect.any(String),
+        maximumDeliveryLifetimeMs: 60_000,
       },
     ]);
     expect(Object.isFrozen(harness.requests[0])).toBe(true);
@@ -373,6 +407,26 @@ describe("Communication Note approved runtime management session", () => {
     expect(harness.clients[0].end).toHaveBeenCalledTimes(1);
   });
 
+  it("uses distinct one-use deliveries for the same static branch-admin source password", async () => {
+    const harness = createHarness();
+    const first = await openSession(harness.factory);
+    await first.end();
+    const second = await openSession(harness.factory);
+    await second.end();
+
+    expect(harness.consume).toHaveBeenCalledTimes(2);
+    expect(harness.callbackCalls).toBe(2);
+    expect(harness.clients).toHaveLength(2);
+    expect(harness.requests).toHaveLength(2);
+    expect(harness.requests[0]).not.toBe(harness.requests[1]);
+    expect(harness.requests[0].credentialClass).toBe(
+      "STATIC_SUPABASE_BRANCH_ADMIN_PASSWORD",
+    );
+    expect(harness.requests[1].sourceRevocation).toBe(
+      "BRANCH_DELETE_OR_PASSWORD_RESET",
+    );
+  });
+
   it("derives the Supavisor session-pooler management user without changing posture", async () => {
     const harness = createHarness({
       connectionProfile: profile({
@@ -391,7 +445,7 @@ describe("Communication Note approved runtime management session", () => {
     await session.end();
   });
 
-  it("makes the credential callback one-use and closes the client on replay", async () => {
+  it("makes each delivery callback one-use and closes the client on replay", async () => {
     const harness = createHarness({
       consume: async (request, _callContext, consumer) => {
         await consumer(credential(request));
@@ -490,24 +544,46 @@ describe("Communication Note approved runtime management session", () => {
   });
 
   it.each([
-    ["non-one-use claim", () => ({ oneUse: false })],
+    ["non-one-use delivery claim", () => ({ deliveryOneUse: false })],
     ["raw DSN claim", () => ({ rawDsnPresent: true })],
     [
-      "stale issuance",
-      () => ({
-        issuedAt: new Date(Date.now() - 30_001).toISOString(),
-      }),
+      "different credential class",
+      () => ({ credentialClass: "EPHEMERAL_DATABASE_PASSWORD" }),
     ],
     [
-      "overlong credential lifetime",
+      "invented source expiry",
+      () => ({ sourceExpiresAt: new Date(Date.now() + 60_000).toISOString() }),
+    ],
+    [
+      "different source revocation",
+      () => ({ sourceRevocation: "DELIVERY_EXPIRY" }),
+    ],
+    [
+      "legacy ambiguous lifetime fields",
       () => ({
         issuedAt: new Date(Date.now() - 1_000).toISOString(),
-        expiresAt: new Date(Date.now() + 60_001).toISOString(),
+        expiresAt: new Date(Date.now() + 30_000).toISOString(),
+        oneUse: true,
       }),
     ],
     [
-      "credential beyond target",
-      () => ({ expiresAt: new Date(Date.now() + 3 * 60_000).toISOString() }),
+      "stale delivery issuance",
+      () => ({
+        deliveryIssuedAt: new Date(Date.now() - 30_001).toISOString(),
+      }),
+    ],
+    [
+      "overlong delivery lifetime",
+      () => ({
+        deliveryIssuedAt: new Date(Date.now() - 1_000).toISOString(),
+        deliveryExpiresAt: new Date(Date.now() + 60_001).toISOString(),
+      }),
+    ],
+    [
+      "delivery beyond target",
+      () => ({
+        deliveryExpiresAt: new Date(Date.now() + 3 * 60_000).toISOString(),
+      }),
     ],
     ["DSN in password slot", () => ({ password: "postgresql://secret" })],
   ])("rejects %s before client creation", async (_label, makeMismatch) => {

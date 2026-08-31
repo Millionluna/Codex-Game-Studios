@@ -450,6 +450,10 @@ describe("V1 shadow runtime boundary", () => {
       process.cwd(),
       "src/lib/v1/communication-note-preview-runtime-credential-broker-hosted.live.test.ts",
     );
+    const approvedRuntimeAdaptersHostedLiveTest = join(
+      process.cwd(),
+      "src/lib/v1/communication-note-preview-approved-runtime-adapters-hosted.live.test.ts",
+    );
     const hostedLiveImportPattern =
       /(?:from\s+|import\s*\(|require\s*\()\s*["'][^"']*communication-note-preview-runner-terminal-hosted-live\.server(?:\.(?:[cm]?[jt]s|[jt]sx))?["']/;
     const hostedLiveImporters = walkControlledScriptFiles().filter((file) =>
@@ -535,6 +539,7 @@ describe("V1 shadow runtime boundary", () => {
       signedRuntimeTest,
     ].sort());
     expect(trustCompositionImporters).toEqual([
+      approvedRuntimeAdaptersHostedLiveTest,
       hostedLiveModule,
       postgresModule,
       postgresTest,
@@ -545,6 +550,7 @@ describe("V1 shadow runtime boundary", () => {
       trustTestFixtures,
     ].sort());
     expect(trustTestFixtureImporters).toEqual([
+      approvedRuntimeAdaptersHostedLiveTest,
       join(
         process.cwd(),
         "src/lib/v1/communication-note-preview-approved-runtime-adapters.server.test.ts",
@@ -561,6 +567,7 @@ describe("V1 shadow runtime boundary", () => {
       runtimeBrokerHostedLiveTest,
     ].sort());
     expect(resolvedRuntimeBindingImporters).toEqual([
+      approvedRuntimeAdaptersHostedLiveTest,
       join(
         process.cwd(),
         "src/lib/v1/communication-note-preview-approved-runtime-adapters.server.test.ts",
@@ -582,6 +589,7 @@ describe("V1 shadow runtime boundary", () => {
       resolvedRuntimeBindingTest,
     ].sort());
     expect(durableCredentialResolverImporters).toEqual([
+      approvedRuntimeAdaptersHostedLiveTest,
       join(
         process.cwd(),
         "src/lib/v1/communication-note-preview-approved-runtime-adapters.server.test.ts",
@@ -666,6 +674,7 @@ describe("V1 shadow runtime boundary", () => {
         relativePath:
           "src/lib/v1/communication-note-preview-approved-runtime-target.server.ts",
         expectedImporterPaths: [
+          "src/lib/v1/communication-note-preview-approved-runtime-adapters-hosted.live.test.ts",
           "src/lib/v1/communication-note-preview-approved-runtime-adapters.server.test.ts",
           "src/lib/v1/communication-note-preview-approved-runtime-adapters.server.ts",
           "src/lib/v1/communication-note-preview-approved-runtime-target.server.test.ts",
@@ -675,6 +684,7 @@ describe("V1 shadow runtime boundary", () => {
         relativePath:
           "src/lib/v1/communication-note-preview-approved-runtime-management-session.server.ts",
         expectedImporterPaths: [
+          "src/lib/v1/communication-note-preview-approved-runtime-adapters-hosted.live.test.ts",
           "src/lib/v1/communication-note-preview-approved-runtime-adapters.server.test.ts",
           "src/lib/v1/communication-note-preview-approved-runtime-adapters.server.ts",
           "src/lib/v1/communication-note-preview-approved-runtime-management-session.server.test.ts",
@@ -694,6 +704,7 @@ describe("V1 shadow runtime boundary", () => {
         relativePath:
           "src/lib/v1/communication-note-preview-approved-runtime-postgres-session.server.ts",
         expectedImporterPaths: [
+          "src/lib/v1/communication-note-preview-approved-runtime-adapters-hosted.live.test.ts",
           "src/lib/v1/communication-note-preview-approved-runtime-adapters.server.test.ts",
           "src/lib/v1/communication-note-preview-approved-runtime-adapters.server.ts",
           "src/lib/v1/communication-note-preview-approved-runtime-postgres-session.server.test.ts",
@@ -703,6 +714,7 @@ describe("V1 shadow runtime boundary", () => {
         relativePath:
           "src/lib/v1/communication-note-preview-approved-runtime-adapters.server.ts",
         expectedImporterPaths: [
+          "src/lib/v1/communication-note-preview-approved-runtime-adapters-hosted.live.test.ts",
           "src/lib/v1/communication-note-preview-approved-runtime-adapters.server.test.ts",
         ],
       },

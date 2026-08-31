@@ -541,6 +541,47 @@ runtime-boundary 12/12, the full 184-file / 2,518-test suite, TypeScript, full
 ESLint, whitespace checks and the 64/64-page Next.js Webpack production build.
 This remains source evidence only and schedules no automation.
 
+### Approved runtime adapters M1n — default-off Hosted harness source
+
+M1n adds the missing source-pinned harness that can, after a separate paid
+Preview authorization, drive the high-level M1m
+`bundle.runtimePort.persist(...)` path with a real injected `pg.Client`.
+The outer runner reuses the audited disposable-branch policy and a shared
+anonymous child channel. FD3 carries bounded public config, FD4 the pinned CA,
+FD5 a bound binary static-password delivery and FD6 one fixed status. No
+credential is placed in environment variables, argv, logs or JSON evidence.
+Its canonical 66-path source manifest covers the runner/channel, current static
+import closure, package/pnpm lock/tsconfig, setup SQL and all 40 migrations.
+The caller-provided reviewed SHA-256 must match before stdin is read or any
+database Client is constructed; the child independently recomputes it. The
+manifest is deliberately not described as complete Node/Vitest/node_modules
+transitive-integrity evidence.
+
+The management credential contract now truthfully distinguishes the static
+Supabase branch admin password from its one-read delivery envelope. The source
+password has no asserted expiry, is not single-use, and is revoked only by a
+branch password reset or branch deletion; only the delivery is bounded to
+30-second age and 60-second lifetime. No KMS/Vault, rotation, short-lived
+underlying credential, full process-memory zeroization or server-side SSL
+enforcement claim is made.
+The terminal broker audit row intentionally retains one SHA-256 verifier hash
+after an issued credential is revoked; that hash is not password/SCRAM material.
+Never-issued rows must retain a null verifier hash.
+
+The harness and all formal runtime surfaces remain `READY=false`, with approved
+exports absent and no product importer. This batch did not create a Preview,
+connect Hosted PostgreSQL, deploy, migrate Production, call a model/provider or
+schedule work. The future live runner is intentionally not an automation: its
+caller must separately create/apply/verify an exact no-data PG17 Preview and,
+after success or failure, delete that exact branch and confirm its absence.
+Abort/timeout negative paths are not live-tested by this harness batch. See
+`documentation/communication-note-preview-approved-runtime-hosted-harness-m1n.md`.
+The local/default-off closeout passed 10 focused files / 151 tests, the complete
+187-file / 2,547-test suite, TypeScript, full ESLint, Node syntax, whitespace,
+the 73-file adapter sync and the 64/64-page Webpack production build; final
+independent review reported P0=0 and P1=0. None of those checks scheduled work
+or contacted Hosted PostgreSQL.
+
 Supabase CLI 2.115.0 has since generated source-only migration `20260823213144_harden_v1_note_generation_registration_retention.sql`. It adds `attempts_registration_digest_idx` and the named `attempts_registration_catalog_fk` from `attempts.registration_digest` to `worker_registrations.registration_digest`, with update/delete `RESTRICT`, `NOT VALID` creation and explicit validation. It creates no seed, caller grant, runtime surface or Production change. Its local gate passed 39/39 focused contracts, the full 125-file / 1,381-test suite, lint, TypeScript, the 63/63-page production build, the 73-file Codex-adapter sync check and `git diff --check`. Deleted disposable `r22` then clean-applied the current manifest 15/15 and passed the seven rollback suites; the hosted registration-retention gate is now closed without enabling any runtime automation.
 
 ### PostgreSQL 16.15 local isolated gate — 2026-08-24
