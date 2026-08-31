@@ -91,9 +91,10 @@ terminal/persist/commit freshness fence 会拒绝过期结果。若未来要求 
 - M1m 没有修改 M1l migration、preflight/coordinator pins 或数据库 readiness；第 40
   条 migration 仍未应用到 Production。
 - M1n 已增加 source-pinned、default-off 的 Hosted harness；M1o 又补齐 factory nonce
-  防重放、有界 admin close 与同步 pipe failure 收敛，但本批次没有创建新的
-  Preview，也没有执行它。真实 PostgreSQL 17 driver/TLS/PID/cleanup gate 仍留给得到
-  独立授权的后续 disposable no-data Preview；详见
+  防重放、有界 admin close 与同步 pipe failure 收敛。M1n/M1o source batch 当时没有创建
+  Preview；后续 M1p 首次授权执行已通过 child metadata/TLS/PG17 与 40/40 migration gate，
+  但在 synthetic setup 前因 Vitest 的 `pg` namespace Proxy false negative 固定失败，因此
+  真实 PID/persist/cleanup lifecycle 仍未通过；详见
   `documentation/communication-note-preview-approved-runtime-hosted-harness-m1n.md`。
 
 ## 验证与后续 gate
@@ -102,6 +103,13 @@ M1o 当前同一源码通过 M1m/M1n 十文件聚焦 169/169（含 runtime bound
 Vitest 187 files / 2,565 tests、TypeScript、全仓 ESLint、三个 Node runner syntax、
 whitespace/diff、73-file Codex adapter sync 与 Next.js 16.2.9 Webpack 64/64-page build。
 这些本地结果只能证明 source contract 一致，不表示部署或 Production greenlight。
+
+M1p 的本地修复候选使用 Node `createRequire` 加载已经固定版本和 package-root entry 的
+`pg@8.23.0`，并保留 Client/prototype/method 形状与 Proxy 检查。候选 source revision 为
+`fa7e7a00fdd7fc908bc233f40a009043b1f70b807337b9440a7f4138198b8ceb`；它通过 live 文件
+5/5、五文件聚焦 97/97、全量 187 files / 2,566 tests、TypeScript、全仓 ESLint、73-file
+adapter sync 与 64/64-page Webpack build。失败 Preview 已删除并三次确认只剩健康的 default
+Production；这仍不是完整 Hosted gate pass，旧 revision review 和旧费用授权均不能复用。
 
 下一 gate 是 M1o 同 revision source review/merge。随后若要实际接通 AI 应用，仍需分别取得：
 

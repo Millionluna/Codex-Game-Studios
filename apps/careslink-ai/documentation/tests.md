@@ -2817,6 +2817,36 @@ Webpack 64/64-page build are the same-revision closeout. No Hosted PG17, TLS,
 PID, live cleanup, branch deletion, Preview creation, deployment or Production
 operation ran in this batch.
 
+### Communication Note approved runtime adapters M1p — first Hosted attempt
+
+The separately authorized no-data Preview attempt on 2026-08-31 passed exact
+child metadata, pinned-CA TLS, PostgreSQL 17 and the 40/40 transactional
+migration gate. The full runner did not pass: its child returned
+`M1N_APPROVED_RUNTIME_ADAPTERS_HOSTED_LIVE_DRIVER_INVALID` before synthetic
+setup, runtime-role creation or M1m broker/persist execution. The failed branch
+was deleted immediately; three independent sequential listings showed only the
+healthy default Production branch. No Production database, real data,
+deployment or model/provider was accessed.
+
+An exact Vitest-worker regression proved that Vite wrapped the pinned
+`pg@8.23.0` CommonJS dynamic-import namespace in a Proxy while the underlying
+`default.Client` remained valid and non-Proxy. The fix candidate loads the same
+validated absolute entry with Node `createRequire`, retaining all version,
+package-root, Client/prototype Proxy and `connect/query/end/on` checks. Candidate
+source revision
+`fa7e7a00fdd7fc908bc233f40a009043b1f70b807337b9440a7f4138198b8ceb`
+passes:
+
+- the exact live file: 5/5;
+- the five-file M1m/M1n/M1o focused gate: 97/97;
+- full Vitest: 187 files / 2,566 tests;
+- TypeScript, full ESLint, Node syntax, whitespace/diff and 73-file adapter sync;
+- Next.js 16.2.9 Webpack production build: 64/64 pages.
+
+These are local/default-off results, not a Hosted runtime pass. A rerun requires
+same-revision review and a new paid Preview authorization; the failed run's
+price confirmation cannot be reused.
+
 ### Current live/read-only evidence
 
 - Supabase migrations, tables, RLS flags, policies, grants, function grants and aggregate row counts were checked read-only.
