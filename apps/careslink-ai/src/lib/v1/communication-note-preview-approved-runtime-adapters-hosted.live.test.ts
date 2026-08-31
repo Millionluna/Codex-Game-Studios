@@ -356,6 +356,17 @@ describe("Communication Note M1n approved runtime adapters Hosted gate", () => {
     expect(resolvePgDriver()).toMatchObject({ version: "8.23.0" });
   });
 
+  it("loads the exact pinned pg client inside the Vitest child", async () => {
+    const PgClient = await loadPgClientConstructor();
+    expect(PgClient).toBeTypeOf("function");
+    expect(nodeTypes.isProxy(PgClient)).toBe(false);
+    expect(nodeTypes.isProxy(PgClient.prototype)).toBe(false);
+    expect(PgClient.prototype.connect).toBeTypeOf("function");
+    expect(PgClient.prototype.query).toBeTypeOf("function");
+    expect(PgClient.prototype.end).toBeTypeOf("function");
+    expect(PgClient.prototype.on).toBeTypeOf("function");
+  });
+
   it("parses one exact public config and recomputes its source revision", () => {
     const now = Date.now();
     const config = createUnitConfig(now);
@@ -669,7 +680,12 @@ function assertLiveEnvironment() {
 async function loadPgClientConstructor(): Promise<ApprovedPgClientConstructor> {
   try {
     const driver = resolvePgDriver();
-    const driverValue: unknown = await import(driver.entryUrl);
+    // Load the pinned CommonJS entry with Node's loader. Vitest/Vite wraps an
+    // absolute dynamic import in a Proxy namespace, which would turn the exact
+    // non-Proxy driver check below into a false negative.
+    const driverValue: unknown = createRequire(import.meta.url)(
+      fileURLToPath(driver.entryUrl),
+    );
     if (
       !driverValue ||
       typeof driverValue !== "object" ||

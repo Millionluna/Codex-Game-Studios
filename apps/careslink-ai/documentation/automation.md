@@ -621,6 +621,36 @@ suite. TypeScript, full ESLint, three Node syntax checks, whitespace, the
 73-file adapter sync and the 64/64-page Webpack build also passed; independent
 same-revision source review remains the final handoff gate.
 
+### Approved runtime adapters M1p — first Hosted attempt and driver fix candidate
+
+On 2026-08-31 a separately authorized, no-data, non-default, non-persistent
+Supabase Preview ran the first full-gate attempt at the confirmed Micro price of
+`US$0.01344/hour`. Control-plane identity, pinned-CA TLS, PostgreSQL 17 and the
+exact 40/40 single-transaction migration gate passed. The full child then
+returned fixed status
+`M1N_APPROVED_RUNTIME_ADAPTERS_HOSTED_LIVE_DRIVER_INVALID` before synthetic
+setup, runtime-role creation, broker lifecycle or product work. Consequently,
+there is no Hosted persist/PID/cleanup pass and no runtime automation was
+activated.
+
+The failure was a Vitest 4.1.9/Vite 8 loader false negative: the absolute
+dynamic import of the pinned `pg@8.23.0` CommonJS entry produced a Proxy module
+namespace even though its `default.Client` was a valid non-Proxy constructor.
+The local candidate now uses Node `createRequire` for that already validated
+absolute package entry and retains the exact version, path, constructor,
+prototype and method checks. Its new source revision is
+`fa7e7a00fdd7fc908bc233f40a009043b1f70b807337b9440a7f4138198b8ceb`.
+It passed 5/5 live-file tests, 97/97 focused tests, the full 187-file / 2,566-test
+suite, TypeScript, full ESLint, the 73-file adapter sync and the 64/64-page
+Webpack build.
+
+The exact failed Preview was deleted immediately and three sequential branch
+listings showed only the healthy default Production branch, revoking the
+Preview's static admin credential. No Production connection or mutation, real
+data, deployment or provider/model call occurred. The candidate remains
+default-off and requires same-revision review plus a new paid-Preview approval
+before another full Hosted run.
+
 Supabase CLI 2.115.0 has since generated source-only migration `20260823213144_harden_v1_note_generation_registration_retention.sql`. It adds `attempts_registration_digest_idx` and the named `attempts_registration_catalog_fk` from `attempts.registration_digest` to `worker_registrations.registration_digest`, with update/delete `RESTRICT`, `NOT VALID` creation and explicit validation. It creates no seed, caller grant, runtime surface or Production change. Its local gate passed 39/39 focused contracts, the full 125-file / 1,381-test suite, lint, TypeScript, the 63/63-page production build, the 73-file Codex-adapter sync check and `git diff --check`. Deleted disposable `r22` then clean-applied the current manifest 15/15 and passed the seven rollback suites; the hosted registration-retention gate is now closed without enabling any runtime automation.
 
 ### PostgreSQL 16.15 local isolated gate — 2026-08-24

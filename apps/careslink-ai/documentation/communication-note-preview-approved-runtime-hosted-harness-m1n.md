@@ -2,10 +2,11 @@
 
 ## 状态与结论
 
-M1n 增加了一个 source-pinned、default-off 的 Hosted Live harness，用来在未来得到
-单独授权的 disposable no-data Supabase Preview 上，真实驱动 M1m composition。当前批次
+M1n 增加了一个 source-pinned、default-off 的 Hosted Live harness，用来在得到单独授权的
+disposable no-data Supabase Preview 上，真实驱动 M1m composition。M1n/M1o source batch 当时
 只完成源码、边界和本地 default-off 验证；没有创建 Preview、没有连接 Hosted 数据库、
-没有部署、没有调用 provider/model，也没有读取或写入 Production。
+没有部署、没有调用 provider/model，也没有读取或写入 Production。后续 M1p 首次 Hosted
+执行的结果单独记录如下，不能反向改写这项历史 source-only 结论。
 
 PR #16 合并后的 M1o source-only hardening 正在为三项 review finding 提供候选修复：跨
 open delivery replay、outer admin close 悬挂，以及 child input pipe 同步异常。候选修复仍须
@@ -15,6 +16,41 @@ live 权限或 readiness。
 正式状态没有改变：所有 `READY` latch 仍为 `false`，approved export 仍为
 `undefined`，产品代码没有 importer。即使未来 live gate 通过，也只形成 TestOnly
 empirical evidence，不会自动批准 Production migration、部署或 activation。
+
+## M1p Hosted 首次执行与修复候选 — 2026-08-31
+
+经单独费用确认，以实时 Micro Compute 价格 `US$0.01344/hour` 创建了无数据、非默认、
+非持久 Preview `m1p-communication-note-full-hosted-r3-20260831`（branch id
+`2e717d9a-d5ee-4eb7-974c-9820f5ab2321`，child ref `mnhzzwimwdgqdhtxewcz`）。控制面确认
+parent 为 Production `adocsnwnslxhxcjgbyee`、状态为 `ACTIVE_HEALTHY`、PostgreSQL 17，
+并使用 Dashboard 当前 Server root certificate；其 SHA-256 为
+`700723581420dd1ac98fd7e9ac529f0ef210eadcaf87fc868a3ad7d114c2f3b7`。
+
+同一 child 上的匿名、显式 Production-ref 防护迁移 gate 通过 40/40 migration：单事务
+apply 成功，40 个数据库 version 与 manifest 全等，application schema 被重建，初始 broker
+ledgers 为空，临时角色不存在。随后用已审查 source revision
+`7a0f19f782670acf663fd087a3e460df92048e2d2406b05efe20d900a182e011`
+启动完整 Hosted runner；child 在任何 synthetic chain setup、runtime role/broker lifecycle 或
+业务调用之前，以固定码 `M1N_APPROVED_RUNTIME_ADAPTERS_HOSTED_LIVE_DRIVER_INVALID` 失败。
+因此这次执行只证明 control-plane/TLS/PG17 preflight 与 40/40 migration gate，**不构成完整
+M1n/M1o Hosted runtime gate 通过**。
+
+根因是 Vitest 4.1.9/Vite 8 会把对固定 `pg@8.23.0` CommonJS entry 的绝对动态 import 包装成
+Proxy module namespace；原 child 在读取其中有效且非 Proxy 的 `default.Client` 前就拒绝了
+namespace，形成 driver false negative。修复候选改用 Node `createRequire(import.meta.url)`
+加载已校验 package root 下的同一绝对 entry，不放宽版本、路径、Client/prototype Proxy 或
+`connect/query/end/on` 方法检查，并增加真实 Vitest child 回归。候选 source revision 为
+`fa7e7a00fdd7fc908bc233f40a009043b1f70b807337b9440a7f4138198b8ceb`；旧 revision 的审查和
+付费执行授权不能复用。
+
+失败后已立即删除 exact branch；三次顺序独立 branch listing 均只返回唯一 default
+Production `main`（`ACTIVE_HEALTHY`），从而撤销该 Preview 的静态管理凭据。没有连接或修改
+Production，没有真实数据、provider/model 调用或部署。实际费用仍以 Supabase 最终计量为准。
+
+本地修复候选已通过 live 文件 5/5、五文件聚焦 97/97、全量 187 files / 2,566 tests、
+TypeScript、全仓 ESLint、73-file Codex adapter sync、`git diff --check` 与 Next.js 16.2.9
+Webpack 64/64-page build。它仍是未激活的本地候选；下一次完整 Hosted rerun 必须先完成新
+revision review，再取得新的付费 Preview 价格确认与创建授权。
 
 ## 本批次解决的凭据语义问题
 
