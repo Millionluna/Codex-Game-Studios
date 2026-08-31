@@ -519,6 +519,28 @@ absent, and no worker, queue, cron, Edge Function, provider/model call or
 product route was enabled. See
 `documentation/communication-note-preview-runtime-credential-broker-m1l.md`.
 
+### Approved runtime adapters M1m — source only
+
+M1m supplies the previously absent adapter composition as server-only,
+default-off source: authenticated disposable-Preview target and pinned-CA
+resolution; one-use callback delivery of a short-lived management credential;
+fresh exclusive management sessions for broker operations; fresh exclusive
+runtime PostgreSQL sessions with connection-bound hard-close cancellation; and
+same-sealed-target composition into the durable resolver/runtime port. The
+management and runtime clients are always separate, no session is pooled or
+retried, and cancellation makes the exact client non-reusable.
+
+This does not schedule or activate a worker. Approved exports remain
+`undefined`, readiness remains `false`, and the concrete database client and
+credential transport are TestOnly injections. There is no product importer,
+environment lookup, DSN, direct `pg`/Supabase/OpenAI SDK import, log sink,
+provider/model traffic, Hosted Preview execution, deployment, Production
+migration or Production data action. Exact importer quarantine and synthetic
+adapter tests are present. Final local closeout passed M1m focused 99/99,
+runtime-boundary 12/12, the full 184-file / 2,518-test suite, TypeScript, full
+ESLint, whitespace checks and the 64/64-page Next.js Webpack production build.
+This remains source evidence only and schedules no automation.
+
 Supabase CLI 2.115.0 has since generated source-only migration `20260823213144_harden_v1_note_generation_registration_retention.sql`. It adds `attempts_registration_digest_idx` and the named `attempts_registration_catalog_fk` from `attempts.registration_digest` to `worker_registrations.registration_digest`, with update/delete `RESTRICT`, `NOT VALID` creation and explicit validation. It creates no seed, caller grant, runtime surface or Production change. Its local gate passed 39/39 focused contracts, the full 125-file / 1,381-test suite, lint, TypeScript, the 63/63-page production build, the 73-file Codex-adapter sync check and `git diff --check`. Deleted disposable `r22` then clean-applied the current manifest 15/15 and passed the seven rollback suites; the hosted registration-retention gate is now closed without enabling any runtime automation.
 
 ### PostgreSQL 16.15 local isolated gate — 2026-08-24
