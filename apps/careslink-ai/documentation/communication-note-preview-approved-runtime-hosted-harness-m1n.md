@@ -14,8 +14,9 @@ open delivery replay、outer admin close 悬挂，以及 child input pipe 同步
 live 权限或 readiness。
 
 正式状态没有改变：所有 `READY` latch 仍为 `false`，approved export 仍为
-`undefined`，产品代码没有 importer。后续已通过的 M1p/M1q live gate 也只形成 TestOnly
-empirical evidence，不会自动批准 Production migration、部署或 activation。
+`undefined`。M1r 后续增加了唯一的 server-only 产品 composition 源 importer，但 App
+Route/Product API importer 仍为零。已通过的 M1p/M1q live gate 也只形成 TestOnly empirical
+evidence，不会自动批准 Production migration、部署或 activation。
 
 ## M1p Hosted 首次执行与修复候选 — 2026-08-31
 
@@ -257,6 +258,7 @@ rollback，ledger/roles postcheck 为零；修复后的 PG17 parse-only rollback
 2,571 full tests、TypeScript、全仓 ESLint、三个 Node runner syntax、73-file adapter sync、
 `git diff --check` 与 64/64-page Webpack build。最终固定 revision
 `8b84b0aa633892a2da9bf157702f005c06b48d3b98a2f1aef2bff78082b552b7` 已通过三场景完整 gate，
-exact branch 随后删除且三次 listing 只剩健康 default `main`。Production migration、Vercel
-deployment、runtime dependency promotion、provider/model evaluation 与产品 activation 仍是后续
-各自独立 gate。
+exact branch 随后删除且三次 listing 只剩健康 default `main`。M1r 后续关闭了固定
+`pg@8.23.0` runtime dependency 与 default-off 产品 composition 的源码门禁；Production
+migration、Product API route/importer wiring、Vercel deployment、provider/model evaluation
+与产品 activation 仍是后续各自独立 gate。

@@ -737,6 +737,32 @@ Production SQL or data access, Vercel deployment, provider/model call or real
 care data was involved. The historical M1p revision and its positive-only
 Abort/timeout-false evidence remain unchanged.
 
+### Product runtime composition M1r — source only
+
+M1r promotes exact `pg@8.23.0` to a production dependency and adds one
+server-only, default-off product composition module. Its static named import
+provides a traceable dependency edge when a future approved Node server entry
+makes the module reachable. The module validates the actual package version,
+constructor/prototype data methods and Proxy posture without constructing a
+Client, then privately injects that constructor into both M1m client slots.
+Downstream M1m operations still create separate management/runtime instances.
+
+The formal factory always rejects with fixed `PRODUCT_API_DISABLED`;
+`READY=false`, the approved export is absent and no route, component, Product
+API or automation imports the module. Cold import and the formal factory perform
+no environment/DSN, credential or target discovery; M1r owns no such lookup and
+its sole TestOnly path delegates only explicit injected resolver/transport ports
+to M1m. This batch invoked no real resolver/credential/database connection, SQL,
+Preview, Production migration, deployment, schedule or provider/model call.
+M1r closes only the runtime-package and product-composition source gate; Product
+API wiring, approved target/control-plane/credential/deployment identities and
+all live Production/provider gates remain separate.
+
+Local closeout passed the 3-file / 36-test M1r/M1m/runtime-boundary focus, the
+complete 188-file / 2,578-test suite, TypeScript, full ESLint, 73-file adapter
+sync, 64/64-page Webpack build and a 24-client-chunk negative leak scan. None of
+those checks schedules work or makes this module a reachable product entry.
+
 Supabase CLI 2.115.0 has since generated source-only migration `20260823213144_harden_v1_note_generation_registration_retention.sql`. It adds `attempts_registration_digest_idx` and the named `attempts_registration_catalog_fk` from `attempts.registration_digest` to `worker_registrations.registration_digest`, with update/delete `RESTRICT`, `NOT VALID` creation and explicit validation. It creates no seed, caller grant, runtime surface or Production change. Its local gate passed 39/39 focused contracts, the full 125-file / 1,381-test suite, lint, TypeScript, the 63/63-page production build, the 73-file Codex-adapter sync check and `git diff --check`. Deleted disposable `r22` then clean-applied the current manifest 15/15 and passed the seven rollback suites; the hosted registration-retention gate is now closed without enabling any runtime automation.
 
 ### PostgreSQL 16.15 local isolated gate — 2026-08-24

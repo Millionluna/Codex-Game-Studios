@@ -2944,6 +2944,36 @@ historical M1p revision
 `fa7e7a00fdd7fc908bc233f40a009043b1f70b807337b9440a7f4138198b8ceb`
 and its positive-only, Abort/timeout-false evidence remain unchanged.
 
+### Communication Note product runtime composition M1r — source only
+
+M1r tests the first production-dependency-backed product composition boundary
+without activating it. The focused suite asserts exact `pg@8.23.0` production
+and `@types/pg@8.23.0` development classification in package and lock files;
+fixed policy version/digest/readiness; frozen and absent approved exports; and
+the exact seven-symbol runtime export surface.
+
+Cold import uses both a counter-backed fake and the actual unmocked `pg` named
+export. It verifies package version, non-Proxy constructor/prototype and
+callable data methods without Client construction, connect, query or end.
+Hostile constructor Proxy and accessor methods are rejected without invoking
+their traps. Formal factory hostile inputs are not inspected; malformed,
+missing, extra, accessor, null-prototype and Proxy TestOnly options fail before
+M1m composition.
+
+Runtime-boundary coverage restricts every non-test `pg` subpath import across
+TypeScript/JavaScript module forms to the M1r server-only module, restricts the
+module itself to its exact test importer and keeps App Route/component importers
+at zero. A post-build check scans `.next/static/chunks` for the M1r
+version/status/digest and secret sentinel. These checks prove only the
+default-off source/build boundary; they do not prove a reachable deployed
+server trace, database connection, Product API wiring, provider/model call or
+Production activation.
+
+The final local run passed 3 focused files / 36 tests and the complete 188-file
+/ 2,578-test suite. TypeScript, full ESLint, 73-file adapter sync,
+`git diff --check`, the 64/64-page Webpack production build and the 24-file
+client-chunk scan also passed.
+
 ### Current live/read-only evidence
 
 - Supabase migrations, tables, RLS flags, policies, grants, function grants and aggregate row counts were checked read-only.
