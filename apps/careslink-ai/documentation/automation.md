@@ -679,6 +679,58 @@ or mutation at the database layer, real-data access, deployment, provider/model
 call or automation activation occurred. Production parent interaction was
 limited to disposable branch create/get/list/delete control-plane operations.
 
+### Approved runtime adapters M1q — timeout/Abort negative-path source candidate
+
+M1q extends the same source-pinned, default-off TestOnly runner with three
+domain-separated synthetic scenarios: one positive control, one PostgreSQL
+statement-timeout path and one runtime-watchdog Abort path. Each scenario uses
+independent auth identity, authorization nonce, run/client/provider ids, M1m
+composition, runtime client, monitor/admin connection and five fresh management
+deliveries. The local source tests lock the scenario mapping, exact query
+injection point, targeted timer selection, fixed evidence shape and ledger
+postcheck. This harness is still an explicitly invoked gate, not a scheduled or
+retained automation.
+
+The timeout candidate injects `pg_catalog.pg_sleep(30)` only for the exact
+`BASE_IDENTITY` query after `BEGIN` and four fixed `SET LOCAL` statements. A
+future Hosted pass must observe the database's real five-second
+`statement_timeout`, SQLSTATE `57014`, an in-transaction backend and one
+successful `ROLLBACK` plus one session reset on the same live client. The
+watchdog candidate waits until a separate monitor observes the exact
+`(PID, backend_start)` inside the injected sleep, then targets only the sixth
+exact 12-second watchdog callback. A future pass must hard-close the exact TLS
+stream/client before the broker tombstone query, bind the observed tuple to the
+durable acquisition tuple, and then prove PID drain. It does not wait 12
+wall-clock seconds and it does not
+represent an external caller Abort; future evidence must keep both claims
+false.
+
+No new paid Preview was created or contacted for M1q, and the live-only branch
+did not run. Therefore the historical M1p source revision
+`fa7e7a00fdd7fc908bc233f40a009043b1f70b807337b9440a7f4138198b8ceb`
+continues to record positive-path evidence only, with Abort and timeout coverage
+false. The M1q builder's future-success schema may report three chains; ledger
+`[3,0,3,3,3,1]` ordered as authorizations, authorization revocations, claims,
+dispatch reservations, dispatch receipts and runner terminals; one positive
+terminal; zero negative terminals; three revoked acquisitions; three drained
+PIDs; and three hash-only credential-verifier
+tombstones only after the complete same-revision Hosted gate and independent
+postchecks pass. Hash-only verifier residue must not be described as zero
+credential residue; raw password, SCRAM verifier and DSN residue remain
+forbidden.
+
+All readiness latches remain false and approved exports remain `undefined`.
+M1q performed no Production migration, connection or mutation, no deployment,
+no provider/model call and no real-data access. Its fixed source revision is
+`5e39ecc8be35fcf48f0a88fac08a30e5afffcad882bc3bc604de1dc34fa4fb90`.
+The same snapshot passed 13 files / 224 focused tests, 187 files / 2,571 full
+tests, TypeScript, full ESLint, three Node runner syntax checks, 73-file adapter
+sync, `git diff --check` and the Next.js 16.2.9 Webpack 64/64-page build;
+independent security review ended at P0=0 and P1=0. Any paid rerun requires a
+fresh same-revision review, a new check of the then-current Preview price and a
+new explicit creation authorization; no M1p price or authorization carries
+forward.
+
 Supabase CLI 2.115.0 has since generated source-only migration `20260823213144_harden_v1_note_generation_registration_retention.sql`. It adds `attempts_registration_digest_idx` and the named `attempts_registration_catalog_fk` from `attempts.registration_digest` to `worker_registrations.registration_digest`, with update/delete `RESTRICT`, `NOT VALID` creation and explicit validation. It creates no seed, caller grant, runtime surface or Production change. Its local gate passed 39/39 focused contracts, the full 125-file / 1,381-test suite, lint, TypeScript, the 63/63-page production build, the 73-file Codex-adapter sync check and `git diff --check`. Deleted disposable `r22` then clean-applied the current manifest 15/15 and passed the seven rollback suites; the hosted registration-retention gate is now closed without enabling any runtime automation.
 
 ### PostgreSQL 16.15 local isolated gate — 2026-08-24

@@ -90,6 +90,58 @@ default Production `main`，从而撤销静态管理凭据并停止继续产生�
 修改 Production 数据库，没有真实数据、provider/model 调用或部署；Production parent 只发生
 disposable branch create/get/list/delete 控制面交互。实际费用以 Supabase 最终计量为准。
 
+## M1q timeout/Abort negative-path 源码候选 — 2026-08-31
+
+M1q 只扩展现有 source-pinned、default-off runner 的 TestOnly gate；没有改变产品 importer、
+readiness 或 activation surface。候选在一个 enabled live test 内顺序构造三个独立 M1m
+composition 与三条域隔离 synthetic chain：`M1Q_HOSTED_POSITIVE`、
+`M1Q_HOSTED_STATEMENT_TIMEOUT`、`M1Q_HOSTED_WATCHDOG_ABORT`。每条 chain 都有独立 auth
+identity、authorization nonce、run/client/provider request/response id；每个 scenario 使用新的
+runtime client、monitor/admin connection 和五次 fresh management delivery，避免前一条 chain
+为后一条提供隐式状态。
+
+这只是源码候选和本地 default-off 测试结果。本批次没有创建或连接新的 Supabase Preview，
+没有运行 Hosted PG17/TLS/PID 分支，也没有产生费用。尤其不能用它修改上一节 M1p revision
+`fa7e7a00fdd7fc908bc233f40a009043b1f70b807337b9440a7f4138198b8ceb` 的历史成功 evidence；
+M1p 仍只证明 positive path，并继续明确记录 `Abort=false`、`timeout=false`。
+
+M1q candidate 的 live contract 分成两个互不替代的 negative path：
+
+- statement-timeout path 只在事务已执行 `BEGIN` 和四条固定 `SET LOCAL` 后的 exact
+  `BASE_IDENTITY` query 注入 `select pg_catalog.pg_sleep(30)`。Future Hosted success 必须由
+  PostgreSQL 的真实 5 秒 `statement_timeout` 返回 SQLSTATE `57014`，证明 exact backend PID
+  当时在事务中，再在同一个仍可管理的 live client 上各完成一次 `ROLLBACK` 与 reset；不得写
+  terminal。
+- watchdog-Abort path 在 monitor 观察 exact `(backend PID, backend_start)` 正在事务内执行同一
+  injected sleep 后，
+  只捕获并触发 runtime query 顺序中的第六个、精确 12 秒 settlement watchdog callback。前五
+  个 12 秒定时器与其他 timer/clock 保持真实。Success 必须观察 exact TLS stream/client 在
+  broker exact tombstone query 开始前 hard-close，并要求 monitor tuple 与 durable acquisition
+  tuple 完全相等、backend PID drain 且 session 不可复用；这会排除常规 tombstone 后 cleanup
+  冒充 Abort close。destroyed client 不要求再发送 `ROLLBACK` 或 reset query。
+
+第二项是对 deadline callback 与真实连接隔离动作的定向测试，**不是实际经过 12 秒的
+wall-clock deadline**，也**不是外部 caller 发出的 Abort**。即使 future Hosted gate 成功，evidence
+也必须同时保留 `highLevelDatabaseSettlementDeadlineWallClockTested=false` 和
+`externalCallerAbortLiveTested=false`，不能把结果扩大成这两个尚未测试的边界。
+
+Future successful evidence 的 gate id 为
+`COMMUNICATION_NOTE_M1Q_APPROVED_RUNTIME_ADAPTERS_HOSTED_NEGATIVE_PATHS`，并且只有在所有
+scenario、cleanup 与 parent/child 独立 postcheck 同时通过时，才可声称：三条 chain；ledger
+按 authorization、authorization revocation、claim、dispatch reservation、dispatch receipt、
+runner terminal 的顺序精确为 `[3,0,3,3,3,1]`；positive chain 恰好一个 `ACCEPTED`
+terminal、两个 negative chain 零 terminal；三次 acquisition 全部 `REVOKED`；三个 64-hex
+hash-only credential-verifier tombstone；三个 runtime PID 全部 drain；终态
+role/session/membership/API privilege 为零。这里
+允许的是三个 hash-only verifier residue，不得简写成“零 credential residue”；raw password、
+SCRAM verifier 与 DSN 仍不得进入 evidence 或 durable ledger。
+
+所有 `READY` latch 继续为 `false`，approved exports 继续为 `undefined`。M1q 没有 Production
+migration/连接/写入、部署、provider/model 调用或真实护理数据。当前固定 source revision 为
+`5e39ecc8be35fcf48f0a88fac08a30e5afffcad882bc3bc604de1dc34fa4fb90`，canonical manifest
+仍为 66 paths / 40 migrations。若要取得上述 Hosted evidence，caller 必须在运行前重新核对实时
+付费 Preview 价格并取得新的创建授权，不能复用 M1p 的价格确认或授权。
+
 ## 本批次解决的凭据语义问题
 
 Supabase Preview 的 `postgres` 密码是静态分支管理凭据；它只能通过密码重置或删除分支
@@ -133,26 +185,31 @@ target/control-plane digest、实际 endpoint mode/hostname、5432、database、
 CA digest、management user 和 delivery timestamps；它不散列密码，避免留下可离线猜测的
 password fingerprint。
 
-成功 evidence 只包含固定枚举和布尔值，不包含 branch ref/id、hostname、CA、password、
+M1p 成功 evidence 只包含固定枚举和布尔值，不包含 branch ref/id、hostname、CA、password、
 runtime role 或 acquisition digest。允许的说法包括 actual connection mode、client-side
 pinned-CA verification、真实 M1m composition、静态 source credential、一次读取 delivery、
 factory-scope cross-open replay protection、PG17、实际 `pg@8.23.0`、caller source pin、
 ACCEPTED terminal 和零 runtime residue。
 不允许把它扩写成完整 transitive dependency attestation、底层短期凭据、KMS/Vault、
-内存零残留、Abort/timeout live proof、两种 endpoint 都已覆盖、Production ready、已部署
+内存零残留、M1q Abort/timeout live proof、两种 endpoint 都已覆盖、Production ready、已部署
 或 AI 功能已上线。
 
-当前 final-review M1o candidate source revision 为
+M1q candidate builder 中出现的 timeout/Abort、SQLSTATE `57014`、in-transaction monitor、
+rollback/reset、targeted watchdog、TLS hard-close、PID drain 与三 tombstone 字段，只定义 future
+success schema；在同 revision live gate 完整通过以前，这些字段不得作为“当前 evidence”引用。
+
+历史 final-review M1o candidate source revision 为
 `7a0f19f782670acf663fd087a3e460df92048e2d2406b05efe20d900a182e011`；manifest 文件自身
 SHA-256 为 `154cc1afe53597f1a2d547e9676b4e3a4aa2415acfe4a90ea2d14225ca235eae`。
 精确 runner 参数为
 `--expected-source-revision-sha256=7a0f19f782670acf663fd087a3e460df92048e2d2406b05efe20d900a182e011`。
-完成同 revision review 后它才可成为 runner 的固定输入。任一 manifest/source byte 改变
-都必须再次 review、重算并更新 handoff，不能在运行时自选新的摘要。
+该值保留为历史记录，不是 M1q 的 runner 输入。M1q 的最终摘要必须在本批次所有 source 和
+handoff 文档冻结后重新计算、review 并更新 handoff；任一 manifest/source byte 改变都必须再次
+review、重算，不能在运行时自选新的摘要。
 
 ## Live 执行前置条件
 
-未来执行必须另行取得 Preview 创建授权，并在同一原子批次内满足：
+未来执行必须先重新核对当时的付费 Preview 价格、另行取得创建授权，并在同一原子批次内满足：
 
 1. 创建 parent 为 `adocsnwnslxhxcjgbyee` 的 no-data、non-default、non-persistent
    PostgreSQL 17 Preview；保留真实 branch id/ref；
@@ -174,20 +231,23 @@ synthetic generation ledger 必须依赖 disposable branch deletion 终结。删
 
 ## 当前验证范围
 
-本批次的 local/default-off gate 覆盖 credential schema、source-pin mechanics/canonical
-66-path manifest、磁盘与数据库 40-version exact policy、实际 `pg@8.23.0` resolution、FD/env/
-status isolation、Direct/Session 5432 config、secret framing、truthful evidence、all-acquisition
-cleanup、hash-only verifier-state policy、factory nonce replay registry、bounded admin close、
-synchronous pipe failure、exact importer graph 和旧 M1l child behavior regression。Hosted PG17、
-真实 TLS/PID、Abort/cancel、live cleanup 与 branch deletion 均尚未执行，因此不能作为本批次
-已通过事实。
+原 M1n/M1o source batch 的 local/default-off gate 覆盖 credential schema、source-pin
+mechanics/canonical 66-path manifest、磁盘与数据库 40-version exact policy、实际 `pg@8.23.0`
+resolution、FD/env/status isolation、Direct/Session 5432 config、secret framing、truthful evidence、
+all-acquisition cleanup、hash-only verifier-state policy、factory nonce replay registry、bounded admin
+close、synchronous pipe failure、exact importer graph 和旧 M1l child behavior regression。Hosted
+PG17、真实 TLS/PID、Abort/cancel、live cleanup 与 branch deletion 均尚未执行，因此不能作为
+该历史 source batch 已通过事实。
 
-当前 M1o candidate 已通过十文件聚焦 169/169 与全量 187 files / 2,565 tests；TypeScript、
+历史 M1o candidate 已通过十文件聚焦 169/169 与全量 187 files / 2,565 tests；TypeScript、
 全仓 ESLint、三个 Node runner syntax、whitespace/diff、73-file Codex adapter sync 与
 Next.js 16.2.9 Webpack 64/64-page build 是同 revision closeout。没有执行 live-only test
 branch。
 
-当前 M1o source batch 完成实现后仍需同 revision review/merge。随后才可根据
-独立授权创建一次短时 Preview，运行 live gate并立即删除。Production migration、Vercel
-deployment、runtime dependency promotion、provider/model evaluation 与产品 activation
-仍是后续各自独立 gate。
+M1q 已完成 source-level 三场景 fixture、exact-query injection、定向第六 timer 与 future evidence/
+postcheck contract 的本地候选；没有启用 live-only test。同 revision closeout 通过 13 files /
+224 focused tests、187 files / 2,571 full tests、TypeScript、全仓 ESLint、三个 Node runner syntax、
+73-file adapter sync、`git diff --check` 与 Next.js 16.2.9 Webpack 64/64-page build；独立安全复核
+为 P0=0、P1=0。随后才可根据新的价格确认和独立授权创建一次短时无数据 Preview，运行完整
+gate 并立即删除。Production migration、Vercel deployment、runtime dependency promotion、
+provider/model evaluation 与产品 activation 仍是后续各自独立 gate。

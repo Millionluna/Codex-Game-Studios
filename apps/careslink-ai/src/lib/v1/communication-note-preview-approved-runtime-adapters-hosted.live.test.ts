@@ -28,12 +28,16 @@ import {
   createTestOnlyCaresLinkV1CommunicationNotePreviewApprovedRuntimeAdapters,
 } from "./communication-note-preview-approved-runtime-adapters.server";
 import {
+  CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_APPROVED_RUNTIME_BROKER_TOMBSTONE_SQL,
+} from "./communication-note-preview-approved-runtime-broker.server";
+import {
   CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_APPROVED_RUNTIME_MANAGEMENT_APPLICATION_NAME,
   CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_APPROVED_RUNTIME_MANAGEMENT_CREDENTIAL_PURPOSE,
   type CaresLinkV1CommunicationNotePreviewApprovedRuntimeManagementClientConstructor,
   type CaresLinkV1CommunicationNotePreviewApprovedRuntimeManagementCredentialRequest,
 } from "./communication-note-preview-approved-runtime-management-session.server";
 import {
+  CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_APPROVED_RUNTIME_POSTGRES_APPLICATION_NAME,
   type CaresLinkV1CommunicationNotePreviewApprovedRuntimePostgresClientConstructor,
 } from "./communication-note-preview-approved-runtime-postgres-session.server";
 import {
@@ -43,6 +47,11 @@ import {
   type CaresLinkV1CommunicationNotePreviewDurableCredentialCallContext,
 } from "./communication-note-preview-durable-caller-credential-resolver.server";
 import {
+  CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RESOLVED_RUNTIME_BASE_IDENTITY_SQL,
+  CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RESOLVED_RUNTIME_BEGIN_SQL,
+  CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RESOLVED_RUNTIME_RESET_IDENTITY_SQL,
+  CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RESOLVED_RUNTIME_ROLLBACK_SQL,
+  CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RESOLVED_RUNTIME_TIMEOUT_SQL,
   createTestOnlyCaresLinkV1CommunicationNotePreviewRunnerTerminalCustodyResolver,
 } from "./communication-note-preview-runner-terminal-resolved-runtime-binding.server";
 import {
@@ -51,6 +60,7 @@ import {
 import {
   createM1ghRunnerTerminalTrustFixture,
   createM1giAcceptedRunnerTerminalEnvelope,
+  type M1ghRunnerTerminalTrustFixtureScenario,
 } from "./communication-note-preview-runner-terminal-trust-test-fixtures";
 import { CARESLINK_PRODUCTION_SUPABASE_REF } from "./ndis-shadow-guard";
 
@@ -68,6 +78,12 @@ const CA_MAXIMUM_BYTES = 64 * 1_024;
 const SECRET_MAXIMUM_BYTES = 8 + 1 + 32 + 2 + 1_024;
 const STATUS_MAXIMUM_BYTES = 256;
 const ADMIN_CLOSE_TIMEOUT_MS = 2_000;
+const DATABASE_SETTLEMENT_TIMEOUT_MS = 12_000;
+const NEGATIVE_PATH_SLEEP_SECONDS = 30;
+const NEGATIVE_PATH_INJECTION_START_TIMEOUT_MS = 30_000;
+const ACTIVE_SLEEP_OBSERVATION_TIMEOUT_MS = 4_000;
+const REAL_SET_TIMEOUT = globalThis.setTimeout.bind(globalThis);
+const REAL_CLEAR_TIMEOUT = globalThis.clearTimeout.bind(globalThis);
 const SECRET_MAGIC = Buffer.from("CLM1NSEC", "ascii");
 const SECRET_VERSION = 1;
 const CONFIG_SCHEMA_VERSION =
@@ -83,17 +99,31 @@ const SETUP_APPLICATION_NAME =
   "careslink-preview-runner-terminal-valid-e2e-management";
 const POSTCHECK_APPLICATION_NAME =
   "careslink-preview-approved-runtime-adapters-m1n-postcheck";
+const NEGATIVE_PATH_MONITOR_APPLICATION_NAME =
+  "careslink-preview-approved-runtime-adapters-m1q-monitor";
+const STATEMENT_TIMEOUT_MINIMUM_ELAPSED_MS = 4_000;
+const STATEMENT_TIMEOUT_MAXIMUM_ELAPSED_MS = 8_000;
+const WATCHDOG_ABORT_MAXIMUM_ELAPSED_MS = 4_800;
 const SHA256_PATTERN = /^[a-f0-9]{64}$/;
 const PROJECT_REF_PATTERN = /^[a-z0-9]{20}$/;
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const TIMESTAMP_PATTERN =
   /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
+const BACKEND_START_PATTERN =
+  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}Z$/;
 const SESSION_POOLER_HOST_PATTERN =
   /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.pooler\.supabase\.com$/;
 const CONTROL_CHARACTER_PATTERN = /[\u0000-\u001f\u007f]/;
 const RUNTIME_ROLE_PATTERN =
   /^careslink_v1_preview_runner_terminal_runtime_[a-f0-9]{16}$/;
+const NEGATIVE_PATH_SLEEP_SQL =
+  `select pg_catalog.pg_sleep(${NEGATIVE_PATH_SLEEP_SECONDS})`;
+
+type HostedScenario =
+  | "M1Q_HOSTED_POSITIVE"
+  | "M1Q_HOSTED_STATEMENT_TIMEOUT"
+  | "M1Q_HOSTED_WATCHDOG_ABORT";
 
 export const CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_APPROVED_RUNTIME_ADAPTERS_HOSTED_LIVE_READY =
   false as const;
@@ -160,8 +190,9 @@ type HostedFixture = ReturnType<
 >;
 
 type HostedPgClient = {
+  processID?: number | null;
   connect(): Promise<unknown>;
-  query(sql: string, values?: unknown[]): Promise<unknown>;
+  query(sql: string, values?: readonly unknown[]): Promise<unknown>;
   end(): Promise<unknown>;
   on(event: "error", listener: (error: unknown) => void): unknown;
   password?: unknown;
@@ -171,7 +202,8 @@ type HostedPgClient = {
       encrypted?: boolean;
       authorized?: boolean;
       authorizationError?: unknown;
-      destroy?: () => unknown;
+      destroyed?: boolean;
+      destroy?: (...args: unknown[]) => unknown;
     };
   };
 };
@@ -284,6 +316,13 @@ const POSTCHECK_SQL = `select
           and activity.backend_start = acquisition.bound_backend_start
       )
   ) as exact_pid_drained_count,
+  (select pg_catalog.count(*)
+    from careslink_v1_runtime_broker.acquisitions as acquisition
+    where acquisition.state = 'REVOKED'
+      and acquisition.issued_at is not null
+      and acquisition.credential_verifier_sha256 ~ '^[a-f0-9]{64}$'
+      and not acquisition.raw_credential_material_present
+  ) as verifier_hash_only_count,
   (select pg_catalog.count(*) from pg_catalog.pg_roles as role_record
     where role_record.rolname ~
       '^careslink_v1_preview_runner_terminal_runtime_[a-f0-9]{16}$'
@@ -336,6 +375,94 @@ const POSTCHECK_SQL = `select
           )
       )
   )::pg_catalog.int4 as api_privilege_count`;
+
+const SCENARIO_POSTCHECK_SQL = `select
+  (select pg_catalog.count(*)
+    from careslink_v1_generation.communication_note_preview_authorizations
+      as authorization_record
+    where authorization_record.authorization_digest =
+      $1::pg_catalog.text) as authorization_count,
+  (select pg_catalog.count(*)
+    from careslink_v1_generation.communication_note_preview_claims
+      as claim_record
+    where claim_record.authorization_digest =
+      $1::pg_catalog.text) as claim_count,
+  (select pg_catalog.count(*)
+    from careslink_v1_generation.communication_note_preview_dispatch_reservations
+      as reservation_record
+    where reservation_record.authorization_digest =
+      $1::pg_catalog.text) as reservation_count,
+  (select pg_catalog.count(*)
+    from careslink_v1_generation.communication_note_preview_dispatch_receipts
+      as receipt_record
+    where receipt_record.authorization_digest =
+      $1::pg_catalog.text) as receipt_count,
+  (select pg_catalog.count(*)
+    from careslink_v1_generation.communication_note_preview_runner_terminals
+      as terminal_record
+    where terminal_record.authorization_digest =
+      $1::pg_catalog.text) as terminal_count,
+  (select pg_catalog.count(*)
+    from careslink_v1_runtime_broker.acquisitions as acquisition
+    where acquisition.authorization_digest =
+      $1::pg_catalog.text) as acquisition_count,
+  (select pg_catalog.count(*)
+    from careslink_v1_runtime_broker.acquisitions as acquisition
+    where acquisition.authorization_digest = $1::pg_catalog.text
+      and acquisition.state = 'REVOKED'
+      and acquisition.issued_at is not null
+      and acquisition.reported_credential_disposition = 'REVOKED'
+      and acquisition.reported_session_disposition = 'DESTROYED'
+      and acquisition.tombstoned_at is not null
+      and acquisition.future_issuance_blocked
+      and acquisition.revoked_at is not null
+      and not acquisition.reusable
+      and not acquisition.raw_credential_material_present
+  ) as revoked_acquisition_count,
+  (select pg_catalog.count(*)
+    from careslink_v1_runtime_broker.acquisitions as acquisition
+    where acquisition.authorization_digest = $1::pg_catalog.text
+      and acquisition.state = 'REVOKED'
+      and acquisition.bound_backend_pid is not null
+      and acquisition.bound_backend_start is not null
+      and (
+        ($2::pg_catalog.int4 is null and $3::pg_catalog.timestamptz is null)
+        or (
+          acquisition.bound_backend_pid = $2::pg_catalog.int4
+          and acquisition.bound_backend_start = $3::pg_catalog.timestamptz
+        )
+      )
+      and not exists (
+        select 1 from pg_catalog.pg_stat_activity as activity
+        where activity.pid = acquisition.bound_backend_pid
+          and activity.backend_start = acquisition.bound_backend_start
+      )
+  ) as exact_pid_drained_count,
+  (select pg_catalog.count(*)
+    from careslink_v1_runtime_broker.acquisitions as acquisition
+    where acquisition.authorization_digest = $1::pg_catalog.text
+      and acquisition.state = 'REVOKED'
+      and acquisition.issued_at is not null
+      and acquisition.credential_verifier_sha256 ~ '^[a-f0-9]{64}$'
+      and not acquisition.raw_credential_material_present
+  ) as verifier_hash_only_count`;
+
+const ACTIVE_RUNTIME_SLEEP_SQL = `select
+  pg_catalog.count(*) = 1 as active_sleep,
+  pg_catalog.to_char(
+    pg_catalog.min(activity.backend_start) at time zone 'UTC',
+    'YYYY-MM-DD"T"HH24:MI:SS.US"Z"'
+  ) as backend_start
+from pg_catalog.pg_stat_activity as activity
+where activity.pid = $1::pg_catalog.int4
+  and activity.application_name = $2::pg_catalog.text
+  and activity.usename ~
+    '^careslink_v1_preview_runner_terminal_runtime_[a-f0-9]{16}$'
+  and activity.backend_type = 'client backend'
+  and activity.state = 'active'
+  and activity.xact_start is not null
+  and activity.wait_event_type = 'Timeout'
+  and activity.wait_event = 'PgSleep'`;
 
 describe("Communication Note M1n approved runtime adapters Hosted gate", () => {
   it("stays default-off and keeps every formal approval latch closed", () => {
@@ -405,11 +532,380 @@ describe("Communication Note M1n approved runtime adapters Hosted gate", () => {
     envelope.fill(0);
   });
 
+  it("domain-separates exactly three ordered Hosted chain fixtures", () => {
+    const scenarios = [
+      "M1Q_HOSTED_POSITIVE",
+      "M1Q_HOSTED_STATEMENT_TIMEOUT",
+      "M1Q_HOSTED_WATCHDOG_ABORT",
+    ] as const;
+    const fixtures = scenarios.map((scenario) =>
+      createM1ghRunnerTerminalTrustFixture({
+        now: "2026-08-31T02:00:00.000Z",
+        scenario,
+      })
+    );
+    expect(new Set(fixtures.map(({ authorizationStatement }) =>
+      authorizationStatement.authorizationId)).size).toBe(3);
+    expect(new Set(fixtures.map(({ authorizationStatement }) =>
+      authorizationStatement.authorizationNonceHash)).size).toBe(3);
+    expect(new Set(fixtures.map(({ authorizationStatement }) =>
+      authorizationStatement.runIdHash)).size).toBe(3);
+    expect(() =>
+      createM1ghRunnerTerminalTrustFixture({
+        scenario: "__proto__" as M1ghRunnerTerminalTrustFixtureScenario,
+      })
+    ).toThrowError("M1GH_TEST_FIXTURE_SCENARIO_INVALID");
+    expect(() =>
+      createM1ghRunnerTerminalTrustFixture({
+        scenario: "" as M1ghRunnerTerminalTrustFixtureScenario,
+      })
+    ).toThrowError("M1GH_TEST_FIXTURE_SCENARIO_INVALID");
+    expect(() =>
+      createM1ghRunnerTerminalTrustFixture({
+        scenario: null as unknown as M1ghRunnerTerminalTrustFixtureScenario,
+      })
+    ).toThrowError("M1GH_TEST_FIXTURE_SCENARIO_INVALID");
+
+    const setupSql = readFileSync(
+      resolve(
+        APP_ROOT,
+        "scripts/preview-e2e/communication-note-preview-runner-terminal-valid-chain-setup.sql",
+      ),
+      "utf8",
+    );
+    expect(setupSql).toContain("m1gh_valid_scenario_catalog");
+    expect(setupSql).toContain("m1gh_valid_chain_projection");
+    expect(setupSql.match(/except all/g)).toHaveLength(6);
+    expect(setupSql).toContain("scenario_record.scenario_ordinal < v_scenario_ordinal");
+    expect(setupSql).toContain("scenario_record.scenario_ordinal <= v_scenario_ordinal");
+    expect(setupSql).toContain("terminal_record.terminal_state = 'ACCEPTED'");
+    expect(setupSql).not.toContain("nullif(");
+    expect(setupSql).not.toMatch(/\b(?:truncate|delete\s+from|on\s+conflict)\b/i);
+  });
+
+  it("injects only the exact runtime BASE_IDENTITY query", async () => {
+    const observedSql: string[] = [];
+    class FakePgClient {
+      processID = 4242;
+      password: unknown = null;
+      connectionParameters = { password: null as unknown };
+      connection = {
+        stream: {
+          encrypted: true,
+          authorized: true,
+          authorizationError: null,
+          destroyed: false,
+          destroy() {
+            this.destroyed = true;
+          },
+        },
+      };
+
+      async connect() {}
+      async query(sql: string) {
+        observedSql.push(sql);
+        if (sql === NEGATIVE_PATH_SLEEP_SQL) {
+          throw Object.assign(new Error("fixed-test-error"), { code: "57014" });
+        }
+        return { rows: [] };
+      }
+      async end() {}
+      on() {}
+    }
+    const probe = createScenarioProbe("M1Q_HOSTED_STATEMENT_TIMEOUT");
+    const ScenarioClient = createScenarioPgClientConstructor(
+      FakePgClient as unknown as ApprovedPgClientConstructor,
+      probe,
+    );
+    const nonRuntimeClient = new ScenarioClient({
+      application_name: "careslink-test-only-wrong-runtime",
+    });
+    await nonRuntimeClient.connect();
+    await nonRuntimeClient.query(
+      CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RESOLVED_RUNTIME_BASE_IDENTITY_SQL,
+    );
+    await nonRuntimeClient.end();
+    const client = new ScenarioClient({
+      application_name:
+        CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_APPROVED_RUNTIME_POSTGRES_APPLICATION_NAME,
+    });
+    await client.connect();
+    await client.query(
+      `${CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RESOLVED_RUNTIME_BASE_IDENTITY_SQL} `,
+    );
+    for (const sql of [
+      CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RESOLVED_RUNTIME_BEGIN_SQL,
+      ...CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RESOLVED_RUNTIME_TIMEOUT_SQL,
+    ]) {
+      await client.query(sql);
+    }
+    await expect(client.query(
+      CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RESOLVED_RUNTIME_BASE_IDENTITY_SQL,
+    )).rejects.toMatchObject({ code: "57014" });
+    await client.query(
+      CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RESOLVED_RUNTIME_ROLLBACK_SQL,
+    );
+    await client.query(
+      CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RESOLVED_RUNTIME_RESET_IDENTITY_SQL,
+    );
+    client.connection?.stream?.destroy?.();
+    await client.end();
+
+    expect(observedSql.filter((sql) => sql === NEGATIVE_PATH_SLEEP_SQL))
+      .toHaveLength(1);
+    expect(probe).toMatchObject({
+      runtimeClientCount: 1,
+      runtimePrefixIndex: 5,
+      runtimeSequenceInvalid: false,
+      baseIdentitySeen: true,
+      injectedQueryCount: 1,
+      injectedQuerySettled: true,
+      statementTimeoutSqlstate57014Observed: true,
+      rollbackAttemptCount: 1,
+      rollbackSucceeded: true,
+      resetAttemptCount: 1,
+      resetSucceeded: true,
+      streamHookInstalled: true,
+      streamDestroyCount: 1,
+      exactStreamDestroyTransitionCount: 1,
+      exactStreamDestroyedObserved: true,
+      runtimeEndCount: 1,
+    });
+
+    const parameterProbe = createScenarioProbe(
+      "M1Q_HOSTED_STATEMENT_TIMEOUT",
+    );
+    const ParameterClient = createScenarioPgClientConstructor(
+      FakePgClient as unknown as ApprovedPgClientConstructor,
+      parameterProbe,
+    );
+    const parameterClient = new ParameterClient({
+      application_name:
+        CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_APPROVED_RUNTIME_POSTGRES_APPLICATION_NAME,
+    });
+    await parameterClient.connect();
+    for (const sql of [
+      CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RESOLVED_RUNTIME_BEGIN_SQL,
+      ...CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RESOLVED_RUNTIME_TIMEOUT_SQL,
+    ]) {
+      await parameterClient.query(sql);
+    }
+    await parameterClient.query(
+      CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RESOLVED_RUNTIME_BASE_IDENTITY_SQL,
+      [],
+    );
+    expect(parameterProbe).toMatchObject({
+      baseIdentitySeen: false,
+      injectedQueryCount: 0,
+      runtimeSequenceInvalid: true,
+    });
+    parameterClient.connection?.stream?.destroy?.();
+    await parameterClient.end();
+  });
+
+  it("attributes runtime hard-close only before the exact broker tombstone", async () => {
+    class OrderingPgClient {
+      processID = 4242;
+      connection = {
+        stream: {
+          destroyed: false,
+          destroy() {
+            this.destroyed = true;
+          },
+        },
+      };
+
+      async connect() {}
+      async query() {
+        return { rows: [] };
+      }
+      async end() {
+        this.connection.stream.destroy();
+      }
+      on() {}
+    }
+
+    const runOrder = async (tombstoneFirst: boolean) => {
+      const probe = createScenarioProbe("M1Q_HOSTED_WATCHDOG_ABORT");
+      const ScenarioClient = createScenarioPgClientConstructor(
+        OrderingPgClient as unknown as ApprovedPgClientConstructor,
+        probe,
+      );
+      const runtime = new ScenarioClient({
+        application_name:
+          CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_APPROVED_RUNTIME_POSTGRES_APPLICATION_NAME,
+      });
+      const management = new ScenarioClient({
+        application_name:
+          CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_APPROVED_RUNTIME_MANAGEMENT_APPLICATION_NAME,
+      });
+      await runtime.connect();
+      await management.connect();
+      probe.deadlineTimerTriggered = true;
+      if (tombstoneFirst) {
+        await management.query(
+          CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_APPROVED_RUNTIME_BROKER_TOMBSTONE_SQL,
+          ["a".repeat(64)],
+        );
+      }
+      runtime.connection?.stream?.destroy?.();
+      if (!tombstoneFirst) {
+        await management.query(
+          CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_APPROVED_RUNTIME_BROKER_TOMBSTONE_SQL,
+          ["a".repeat(64)],
+        );
+      }
+      await runtime.end();
+      await management.end();
+      return probe;
+    };
+
+    await expect(runOrder(false)).resolves.toMatchObject({
+      brokerTombstoneQueryCount: 1,
+      streamDestroyCount: 2,
+      exactStreamDestroyTransitionCount: 1,
+      runtimeStreamDestroyedAfterDeadlineBeforeTombstone: true,
+    });
+    await expect(runOrder(true)).resolves.toMatchObject({
+      brokerTombstoneQueryCount: 1,
+      streamDestroyCount: 2,
+      exactStreamDestroyTransitionCount: 1,
+      runtimeStreamDestroyedAfterDeadlineBeforeTombstone: false,
+    });
+  });
+
+  it("targets only the sixth 12-second database watchdog and restores timers", () => {
+    const probe = createScenarioProbe("M1Q_HOSTED_WATCHDOG_ABORT");
+    const originalSetTimeout = globalThis.setTimeout;
+    const originalClearTimeout = globalThis.clearTimeout;
+    const timerControl = installTargetedDatabaseDeadlineTimer(probe);
+    const callbacks = Array.from({ length: 6 }, () => vi.fn());
+    const handles: Array<number | ReturnType<typeof setTimeout>> = [];
+    try {
+      for (const callback of callbacks) {
+        handles.push(
+          globalThis.setTimeout(callback, DATABASE_SETTLEMENT_TIMEOUT_MS),
+        );
+      }
+      for (const handle of handles.slice(0, 5)) {
+        globalThis.clearTimeout(handle);
+      }
+      expect(probe).toMatchObject({
+        deadlineTimerCandidateCount: 6,
+        deadlineTimerCaptured: true,
+        deadlineTimerTriggered: false,
+      });
+      timerControl.trigger();
+      globalThis.clearTimeout(handles[5]);
+      expect(callbacks.slice(0, 5).every((callback) =>
+        callback.mock.calls.length === 0)).toBe(true);
+      expect(callbacks[5]).toHaveBeenCalledTimes(1);
+      expect(probe).toMatchObject({
+        deadlineTimerTriggered: true,
+        deadlineTimerCleared: true,
+      });
+      expect(timerControl.isClean()).toBe(true);
+    } finally {
+      for (const handle of handles) REAL_CLEAR_TIMEOUT(handle);
+      timerControl.restore();
+    }
+    expect(globalThis.setTimeout).toBe(originalSetTimeout);
+    expect(globalThis.clearTimeout).toBe(originalClearTimeout);
+  });
+
+  it("keeps statement-timeout and targeted-watchdog evidence disjoint", () => {
+    const common = {
+      runtimeClientCount: 1,
+      runtimePrefixIndex: 5,
+      baseIdentitySeen: true,
+      injectedQueryCount: 1,
+      injectedQuerySettled: true,
+      runtimePid: 4242,
+      runtimeBackendStart: "2026-08-31T02:00:00.123456Z",
+      activeSleepObserved: true,
+      streamHookInstalled: true,
+      streamDestroyCount: 1,
+      exactStreamDestroyTransitionCount: 1,
+      exactStreamDestroyedObserved: true,
+      brokerTombstoneQueryCount: 1,
+      runtimeEndCount: 1,
+    } as const;
+    const timeoutProbe = Object.assign(
+      createScenarioProbe("M1Q_HOSTED_STATEMENT_TIMEOUT"),
+      common,
+      {
+        statementTimeoutSqlstate57014Observed: true,
+        injectedQueryElapsedMs: 5_000,
+        rollbackAttemptCount: 1,
+        rollbackSucceeded: true,
+        resetAttemptCount: 1,
+        resetSucceeded: true,
+      },
+    );
+    expect(() =>
+      validateScenarioOutcome(
+        "M1Q_HOSTED_STATEMENT_TIMEOUT",
+        Object.freeze({ status: "REJECTED" }),
+        5,
+        timeoutProbe,
+        undefined,
+      )
+    ).not.toThrow();
+
+    const abortProbe = Object.assign(
+      createScenarioProbe("M1Q_HOSTED_WATCHDOG_ABORT"),
+      common,
+      {
+        injectedQueryElapsedMs: 100,
+        deadlineTimerCandidateCount: 6,
+        deadlineTimerCaptured: true,
+        deadlineTimerTriggered: true,
+        deadlineTimerCleared: true,
+        runtimeStreamDestroyedAfterDeadlineBeforeTombstone: true,
+      },
+    );
+    const cleanTimerControl = Object.freeze({
+      trigger() {},
+      isClean: () => true,
+      restore() {},
+    });
+    expect(() =>
+      validateScenarioOutcome(
+        "M1Q_HOSTED_WATCHDOG_ABORT",
+        Object.freeze({ status: "REJECTED" }),
+        5,
+        abortProbe,
+        cleanTimerControl,
+      )
+    ).not.toThrow();
+    abortProbe.runtimeStreamDestroyedAfterDeadlineBeforeTombstone = false;
+    expect(() =>
+      validateScenarioOutcome(
+        "M1Q_HOSTED_WATCHDOG_ABORT",
+        Object.freeze({ status: "REJECTED" }),
+        5,
+        abortProbe,
+        cleanTimerControl,
+      )
+    ).toThrowError(FAILURE_CODES.persist);
+    abortProbe.runtimeStreamDestroyedAfterDeadlineBeforeTombstone = true;
+    abortProbe.statementTimeoutSqlstate57014Observed = true;
+    expect(() =>
+      validateScenarioOutcome(
+        "M1Q_HOSTED_WATCHDOG_ABORT",
+        Object.freeze({ status: "REJECTED" }),
+        5,
+        abortProbe,
+        cleanTimerControl,
+      )
+    ).toThrowError(FAILURE_CODES.persist);
+  });
+
   it("emits only fixed, explicitly scoped TestOnly evidence", () => {
     const evidence = createEvidence();
     expect(evidence).toEqual({
       ok: true,
-      gate: "COMMUNICATION_NOTE_M1N_APPROVED_RUNTIME_ADAPTERS_HOSTED",
+      gate: "COMMUNICATION_NOTE_M1Q_APPROVED_RUNTIME_ADAPTERS_HOSTED_NEGATIVE_PATHS",
       sourceRevisionChildOuterAgreementVerified: true,
       callerProvidedSourceRevisionPinVerified: true,
       sourceManifestValidated: true,
@@ -421,13 +917,24 @@ describe("Communication Note M1n approved runtime adapters Hosted gate", () => {
       actualPgClientInjected: true,
       clientPinnedCaVerified: true,
       terminalState: "ACCEPTED",
+      scenarioCount: 3,
+      negativeTerminalWritesAbsentVerified: true,
       runtimeBrokerTeardownVerified: true,
       exactRuntimePidDrainVerified: true,
       runtimeBrokerApiPrivilegeAbsenceVerified: true,
+      credentialVerifierHashOnlyCount: 3,
       branchDeletionVerifiedByChild: false,
       callerMustDeleteBranchAfterRun: true,
-      abortPathLiveTested: false,
-      timeoutPathLiveTested: false,
+      abortPathLiveTested: true,
+      timeoutPathLiveTested: true,
+      postgresStatementTimeoutSqlstate57014Verified: true,
+      postgresStatementTimeoutInTransactionVerified: true,
+      postgresStatementTimeoutRollbackAndResetVerified: true,
+      highLevelDatabaseSettlementDeadlineTargetedTimerTested: true,
+      highLevelDatabaseSettlementDeadlineWallClockTested: false,
+      externalCallerAbortLiveTested: false,
+      connectionBoundAbortHardCloseLiveTested: true,
+      watchdogAbortInFlightTransactionVerified: true,
       managementCredentialClass:
         "STATIC_SUPABASE_BRANCH_ADMIN_PASSWORD",
       staticSourceCredential: true,
@@ -489,7 +996,6 @@ async function runHostedLiveGate() {
     FAILURE_CODES.secret,
   );
   let managementPassword: string | undefined;
-  let hmacKey: Buffer | undefined;
   try {
     const config = parseHostedConfig(configBytes, Date.now());
     const tlsRootCertificate = validateCaBytes(
@@ -501,27 +1007,82 @@ async function runHostedLiveGate() {
       config.secretEnvelopeBindingSha256,
     );
     const PgClient = await loadPgClientConstructor();
-    const setup = await setupSyntheticChain(
+    for (const scenario of [
+      "M1Q_HOSTED_POSITIVE",
+      "M1Q_HOSTED_STATEMENT_TIMEOUT",
+      "M1Q_HOSTED_WATCHDOG_ABORT",
+    ] as const) {
+      await runHostedScenario({
+        scenario,
+        config,
+        tlsRootCertificate,
+        managementPassword,
+        PgClient,
+      });
+    }
+    await runIndependentPostcheck(
       config,
       tlsRootCertificate,
       managementPassword,
       PgClient,
     );
-    const clock = createTrustedClock(setup.databaseNow);
-    const deliveryClock = createHostDeliveryClock();
-    hmacKey = randomBytes(32);
+    expect(createEvidence()).toMatchObject({
+      ok: true,
+      terminalState: "ACCEPTED",
+      runtimeBrokerTeardownVerified: true,
+      abortPathLiveTested: true,
+      timeoutPathLiveTested: true,
+      postgresStatementTimeoutSqlstate57014Verified: true,
+      highLevelDatabaseSettlementDeadlineTargetedTimerTested: true,
+      highLevelDatabaseSettlementDeadlineWallClockTested: false,
+      externalCallerAbortLiveTested: false,
+      connectionBoundAbortHardCloseLiveTested: true,
+      underlyingCredentialShortLived: false,
+    });
+  } finally {
+    configBytes.fill(0);
+    caBytes.fill(0);
+    secretBytes.fill(0);
+    managementPassword = undefined;
+  }
+}
+
+async function runHostedScenario(input: Readonly<{
+  scenario: HostedScenario;
+  config: HostedConfig;
+  tlsRootCertificate: Buffer;
+  managementPassword: string;
+  PgClient: ApprovedPgClientConstructor;
+}>) {
+  const setup = await setupSyntheticChain(
+    input.config,
+    input.tlsRootCertificate,
+    input.managementPassword,
+    input.PgClient,
+    input.scenario,
+  );
+  const clock = createTrustedClock(setup.databaseNow);
+  const deliveryClock = createHostDeliveryClock();
+  const hmacKey = randomBytes(32);
+  const probe = createScenarioProbe(input.scenario);
+  const ScenarioClient = createScenarioPgClientConstructor(
+    input.PgClient,
+    probe,
+  );
+  let deliveryCount = 0;
+  let bundle;
+  try {
     const targetResolver = createTargetResolver(
-      config,
-      tlsRootCertificate,
+      input.config,
+      input.tlsRootCertificate,
       hmacKey,
       clock,
     );
     const custodyResolver = createCustodyResolver(
       setup.fixture,
-      config.target.expiresAt,
+      input.config.target.expiresAt,
       clock,
     );
-    let deliveryCount = 0;
     const managementCredentialTransport = Object.freeze({
       async consume(
         request: CaresLinkV1CommunicationNotePreviewApprovedRuntimeManagementCredentialRequest,
@@ -534,8 +1095,8 @@ async function runHostedLiveGate() {
             CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_APPROVED_RUNTIME_MANAGEMENT_CREDENTIAL_PURPOSE ||
           !SHA256_PATTERN.test(request.targetDescriptorSha256) ||
           request.tlsRootCertificateSha256 !==
-            config.tlsRootCertificateSha256 ||
-          request.user !== config.managementUser ||
+            input.config.tlsRootCertificateSha256 ||
+          request.user !== input.config.managementUser ||
           request.applicationName !==
             CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_APPROVED_RUNTIME_MANAGEMENT_APPLICATION_NAME ||
           request.credentialClass !==
@@ -545,8 +1106,8 @@ async function runHostedLiveGate() {
             "BRANCH_DELETE_OR_PASSWORD_RESET" ||
           !SHA256_PATTERN.test(request.deliveryNonce) ||
           request.maximumDeliveryLifetimeMs !== 60_000 ||
-          request.deliveryExpiresNoLaterThan !== config.target.expiresAt ||
-          typeof managementPassword !== "string"
+          request.deliveryExpiresNoLaterThan !==
+            input.config.target.expiresAt
         ) {
           fail(FAILURE_CODES.composition);
         }
@@ -570,7 +1131,7 @@ async function runHostedLiveGate() {
           sourceExpiresAt: request.sourceExpiresAt,
           sourceRevocation: request.sourceRevocation,
           deliveryNonce: request.deliveryNonce,
-          password: managementPassword,
+          password: input.managementPassword,
           deliveryIssuedAt,
           deliveryExpiresAt,
           deliveryOneUse: true as const,
@@ -578,75 +1139,555 @@ async function runHostedLiveGate() {
         }));
       },
     });
-    let bundle;
-    try {
-      bundle =
-        await createTestOnlyCaresLinkV1CommunicationNotePreviewApprovedRuntimeAdapters(
-          {
-            capability: "TEST_ONLY_M1M_APPROVED_RUNTIME_ADAPTERS",
-            targetResolver,
-            targetRequest: Object.freeze({
-              targetProjectRef: config.target.targetProjectRef,
-              tlsRootCertificateSha256:
-                config.tlsRootCertificateSha256,
-            }),
-            verifiedAuthorization: setup.fixture.verifiedAuthorization,
-            custodyResolver,
-            managementCredentialTransport,
-            ManagementClient: PgClient,
-            Client: PgClient,
-            clock,
-            entropy: Object.freeze({
-              bytes(length: number) {
-                if (!Number.isSafeInteger(length) || length <= 0) {
-                  fail(FAILURE_CODES.composition);
-                }
-                return Uint8Array.from(randomBytes(length));
-              },
-            }),
-          },
-          Object.freeze({ signal: new AbortController().signal }),
-        );
-    } catch {
-      fail(FAILURE_CODES.composition);
-    } finally {
-      hmacKey.fill(0);
-      hmacKey = undefined;
+    bundle =
+      await createTestOnlyCaresLinkV1CommunicationNotePreviewApprovedRuntimeAdapters(
+        {
+          capability: "TEST_ONLY_M1M_APPROVED_RUNTIME_ADAPTERS",
+          targetResolver,
+          targetRequest: Object.freeze({
+            targetProjectRef: input.config.target.targetProjectRef,
+            tlsRootCertificateSha256:
+              input.config.tlsRootCertificateSha256,
+          }),
+          verifiedAuthorization: setup.fixture.verifiedAuthorization,
+          custodyResolver,
+          managementCredentialTransport,
+          ManagementClient: ScenarioClient,
+          Client: ScenarioClient,
+          clock,
+          entropy: Object.freeze({
+            bytes(length: number) {
+              if (!Number.isSafeInteger(length) || length <= 0) {
+                fail(FAILURE_CODES.composition);
+              }
+              return Uint8Array.from(randomBytes(length));
+            },
+          }),
+        },
+        Object.freeze({ signal: new AbortController().signal }),
+      );
+  } catch {
+    fail(FAILURE_CODES.composition);
+  } finally {
+    hmacKey.fill(0);
+  }
+
+  let monitor: HostedPgClient | undefined;
+  let timerControl: ReturnType<typeof installTargetedDatabaseDeadlineTimer> |
+    undefined;
+  try {
+    if (input.scenario !== "M1Q_HOSTED_POSITIVE") {
+      monitor = await connectAdmin(
+        input.config,
+        input.tlsRootCertificate,
+        input.managementPassword,
+        NEGATIVE_PATH_MONITOR_APPLICATION_NAME,
+        FAILURE_CODES.persist,
+        input.PgClient,
+      );
     }
-    let result;
-    try {
-      result = await bundle.runtimePort.persist(setup.envelope);
-    } catch {
-      fail(FAILURE_CODES.persist);
+    if (input.scenario === "M1Q_HOSTED_WATCHDOG_ABORT") {
+      timerControl = installTargetedDatabaseDeadlineTimer(probe);
+    }
+    const outcomePromise = Promise.resolve()
+      .then(() => bundle.runtimePort.persist(setup.envelope))
+      .then(
+        (value) => Object.freeze({ status: "FULFILLED" as const, value }),
+        () => Object.freeze({ status: "REJECTED" as const }),
+      );
+    if (monitor) {
+      probe.activeSleepObserved = await observeActiveRuntimeSleep(
+        monitor,
+        probe,
+      );
     }
     if (
-      result.created !== true ||
-      result.state !== "ACCEPTED" ||
-      result.continuationEligible !== true ||
-      result.status !== "RUNNER_TERMINAL_RECORDED" ||
-      deliveryCount !== 5
+      input.scenario === "M1Q_HOSTED_WATCHDOG_ABORT" &&
+      probe.activeSleepObserved
+    ) {
+      timerControl?.trigger();
+    }
+    const outcome = await outcomePromise;
+    validateScenarioOutcome(
+      input.scenario,
+      outcome,
+      deliveryCount,
+      probe,
+      timerControl,
+    );
+  } finally {
+    timerControl?.restore();
+    if (monitor) {
+      await closeAdmin(monitor, FAILURE_CODES.cleanup);
+    }
+  }
+
+  await runScenarioPostcheck(
+    input.config,
+    input.tlsRootCertificate,
+    input.managementPassword,
+    input.PgClient,
+    setup.fixture.verifiedAuthorization.authorizationDigest,
+    input.scenario === "M1Q_HOSTED_POSITIVE" ? 1 : 0,
+    probe.runtimePid,
+    probe.runtimeBackendStart,
+  );
+}
+
+type HostedScenarioProbe = {
+  readonly scenario: HostedScenario;
+  runtimeClientCount: number;
+  runtimePrefixIndex: number;
+  runtimeSequenceInvalid: boolean;
+  baseIdentitySeen: boolean;
+  injectedQueryCount: number;
+  injectedQueryInFlight: boolean;
+  injectedQuerySettled: boolean;
+  runtimePid: number | null;
+  runtimeBackendStart: string | null;
+  activeSleepObserved: boolean;
+  statementTimeoutSqlstate57014Observed: boolean;
+  injectedQueryElapsedMs: number;
+  rollbackAttemptCount: number;
+  rollbackSucceeded: boolean;
+  resetAttemptCount: number;
+  resetSucceeded: boolean;
+  runtimeQueryAfterDeadlineCount: number;
+  streamHookInstalled: boolean;
+  streamDestroyCount: number;
+  exactStreamDestroyTransitionCount: number;
+  exactStreamDestroyedObserved: boolean;
+  brokerTombstoneQueryCount: number;
+  runtimeStreamDestroyedAfterDeadlineBeforeTombstone: boolean;
+  runtimeEndCount: number;
+  deadlineTimerCandidateCount: number;
+  deadlineTimerCaptured: boolean;
+  deadlineTimerTriggered: boolean;
+  deadlineTimerCleared: boolean;
+};
+
+function createScenarioProbe(scenario: HostedScenario): HostedScenarioProbe {
+  return {
+    scenario,
+    runtimeClientCount: 0,
+    runtimePrefixIndex: 0,
+    runtimeSequenceInvalid: false,
+    baseIdentitySeen: false,
+    injectedQueryCount: 0,
+    injectedQueryInFlight: false,
+    injectedQuerySettled: false,
+    runtimePid: null,
+    runtimeBackendStart: null,
+    activeSleepObserved: false,
+    statementTimeoutSqlstate57014Observed: false,
+    injectedQueryElapsedMs: 0,
+    rollbackAttemptCount: 0,
+    rollbackSucceeded: false,
+    resetAttemptCount: 0,
+    resetSucceeded: false,
+    runtimeQueryAfterDeadlineCount: 0,
+    streamHookInstalled: false,
+    streamDestroyCount: 0,
+    exactStreamDestroyTransitionCount: 0,
+    exactStreamDestroyedObserved: false,
+    brokerTombstoneQueryCount: 0,
+    runtimeStreamDestroyedAfterDeadlineBeforeTombstone: false,
+    runtimeEndCount: 0,
+    deadlineTimerCandidateCount: 0,
+    deadlineTimerCaptured: false,
+    deadlineTimerTriggered: false,
+    deadlineTimerCleared: false,
+  };
+}
+
+function createScenarioPgClientConstructor(
+  PgClient: ApprovedPgClientConstructor,
+  probe: HostedScenarioProbe,
+): ApprovedPgClientConstructor {
+  const runtimeToken = Symbol("M1Q_HOSTED_RUNTIME_CLIENT");
+  const expectedPrefix = Object.freeze([
+    CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RESOLVED_RUNTIME_BEGIN_SQL,
+    ...CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RESOLVED_RUNTIME_TIMEOUT_SQL,
+  ]);
+  const BaseClient = PgClient as HostedPgClientConstructor;
+
+  class ScenarioPgClient extends BaseClient {
+    private readonly scenarioRuntimeToken: symbol | null;
+
+    constructor(config: Readonly<Record<string, unknown>>) {
+      super(config);
+      const runtime =
+        config.application_name ===
+        CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_APPROVED_RUNTIME_POSTGRES_APPLICATION_NAME;
+      if (runtime) probe.runtimeClientCount += 1;
+      this.scenarioRuntimeToken =
+        runtime && probe.runtimeClientCount === 1 ? runtimeToken : null;
+    }
+
+    override async connect() {
+      const result = await super.connect();
+      if (this.scenarioRuntimeToken !== runtimeToken) return result;
+      const stream = this.connection?.stream;
+      const originalDestroy = stream?.destroy;
+      if (!stream || typeof originalDestroy !== "function") {
+        probe.runtimeSequenceInvalid = true;
+        return result;
+      }
+      try {
+        stream.destroy = (...args: unknown[]) => {
+          probe.streamDestroyCount += 1;
+          const destroyedBefore = stream.destroyed === true;
+          try {
+            return Reflect.apply(originalDestroy, stream, args);
+          } finally {
+            const destroyedAfter = stream.destroyed === true;
+            if (!destroyedBefore && destroyedAfter) {
+              probe.exactStreamDestroyTransitionCount += 1;
+              if (
+                probe.deadlineTimerTriggered &&
+                probe.brokerTombstoneQueryCount === 0
+              ) {
+                probe.runtimeStreamDestroyedAfterDeadlineBeforeTombstone =
+                  true;
+              }
+            }
+            probe.exactStreamDestroyedObserved ||= destroyedAfter;
+          }
+        };
+        probe.streamHookInstalled = true;
+      } catch {
+        probe.runtimeSequenceInvalid = true;
+      }
+      return result;
+    }
+
+    override async query(sql: string, values?: readonly unknown[]) {
+      if (this.scenarioRuntimeToken !== runtimeToken) {
+        if (
+          sql ===
+            CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_APPROVED_RUNTIME_BROKER_TOMBSTONE_SQL
+        ) {
+          probe.brokerTombstoneQueryCount += 1;
+        }
+        return super.query(sql, values);
+      }
+      if (probe.deadlineTimerTriggered) {
+        probe.runtimeQueryAfterDeadlineCount += 1;
+      }
+      if (
+        probe.runtimePrefixIndex < expectedPrefix.length &&
+        sql === expectedPrefix[probe.runtimePrefixIndex] &&
+        values === undefined
+      ) {
+        probe.runtimePrefixIndex += 1;
+        return super.query(sql, values);
+      }
+      if (
+        probe.runtimePrefixIndex === expectedPrefix.length &&
+        !probe.baseIdentitySeen &&
+        values === undefined &&
+        sql ===
+          CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RESOLVED_RUNTIME_BASE_IDENTITY_SQL
+      ) {
+        probe.baseIdentitySeen = true;
+        if (probe.scenario === "M1Q_HOSTED_POSITIVE") {
+          return super.query(sql, values);
+        }
+        probe.injectedQueryCount += 1;
+        probe.runtimePid = Number.isSafeInteger(this.processID) &&
+            Number(this.processID) > 0
+          ? Number(this.processID)
+          : null;
+        probe.injectedQueryInFlight = true;
+        const startedAt = performance.now();
+        try {
+          return await super.query(NEGATIVE_PATH_SLEEP_SQL);
+        } catch (error) {
+          probe.statementTimeoutSqlstate57014Observed =
+            isPostgresStatementTimeout(error);
+          throw error;
+        } finally {
+          probe.injectedQueryElapsedMs = Math.max(
+            0,
+            performance.now() - startedAt,
+          );
+          probe.injectedQueryInFlight = false;
+          probe.injectedQuerySettled = true;
+        }
+      }
+      if (
+        probe.baseIdentitySeen &&
+        values === undefined &&
+        sql === CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RESOLVED_RUNTIME_ROLLBACK_SQL
+      ) {
+        probe.rollbackAttemptCount += 1;
+        const result = await super.query(sql, values);
+        probe.rollbackSucceeded = true;
+        return result;
+      }
+      if (
+        probe.baseIdentitySeen &&
+        values === undefined &&
+        sql === CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RESOLVED_RUNTIME_RESET_IDENTITY_SQL
+      ) {
+        probe.resetAttemptCount += 1;
+        const result = await super.query(sql, values);
+        probe.resetSucceeded = true;
+        return result;
+      }
+      if (probe.runtimePrefixIndex > 0 && !probe.baseIdentitySeen) {
+        probe.runtimeSequenceInvalid = true;
+      }
+      return super.query(sql, values);
+    }
+
+    override async end() {
+      if (this.scenarioRuntimeToken === runtimeToken) {
+        probe.runtimeEndCount += 1;
+      }
+      return super.end();
+    }
+  }
+
+  return ScenarioPgClient as unknown as ApprovedPgClientConstructor;
+}
+
+function isPostgresStatementTimeout(value: unknown) {
+  return !!value &&
+    typeof value === "object" &&
+    !nodeTypes.isProxy(value) &&
+    (value as Record<string, unknown>).code === "57014";
+}
+
+function installTargetedDatabaseDeadlineTimer(
+  probe: HostedScenarioProbe,
+) {
+  const originalSetTimeout = globalThis.setTimeout;
+  const originalClearTimeout = globalThis.clearTimeout;
+  let capturedCallback: (() => void) | undefined;
+  let syntheticTimer: ReturnType<typeof setTimeout> | undefined;
+  let setTimeoutRestored = false;
+  let clearTimeoutRestored = false;
+
+  const patchedSetTimeout = ((
+    callback: (...args: unknown[]) => void,
+    timeout?: number,
+    ...args: unknown[]
+  ) => {
+    if (timeout === DATABASE_SETTLEMENT_TIMEOUT_MS) {
+      probe.deadlineTimerCandidateCount += 1;
+      if (probe.deadlineTimerCandidateCount === 6) {
+        if (args.length !== 0 || capturedCallback || syntheticTimer) {
+          probe.runtimeSequenceInvalid = true;
+          return Reflect.apply(REAL_SET_TIMEOUT, undefined, [
+            callback,
+            timeout,
+            ...args,
+          ]);
+        }
+        capturedCallback = () => callback();
+        syntheticTimer = REAL_SET_TIMEOUT(
+          () => undefined,
+          DATABASE_SETTLEMENT_TIMEOUT_MS,
+        );
+        syntheticTimer.unref?.();
+        probe.deadlineTimerCaptured = true;
+        return syntheticTimer;
+      }
+    }
+    return Reflect.apply(REAL_SET_TIMEOUT, undefined, [
+      callback,
+      timeout,
+      ...args,
+    ]);
+  }) as typeof globalThis.setTimeout;
+
+  const patchedClearTimeout = ((timer: ReturnType<typeof setTimeout>) => {
+    if (syntheticTimer && timer === syntheticTimer) {
+      REAL_CLEAR_TIMEOUT(syntheticTimer);
+      syntheticTimer = undefined;
+      capturedCallback = undefined;
+      probe.deadlineTimerCleared = true;
+      globalThis.clearTimeout = originalClearTimeout;
+      clearTimeoutRestored = true;
+      return;
+    }
+    REAL_CLEAR_TIMEOUT(timer);
+  }) as typeof globalThis.clearTimeout;
+
+  globalThis.setTimeout = patchedSetTimeout;
+  globalThis.clearTimeout = patchedClearTimeout;
+
+  return Object.freeze({
+    trigger() {
+      if (
+        !capturedCallback ||
+        !syntheticTimer ||
+        probe.deadlineTimerCandidateCount !== 6 ||
+        probe.deadlineTimerTriggered
+      ) {
+        fail(FAILURE_CODES.persist);
+      }
+      probe.deadlineTimerTriggered = true;
+      const callback = capturedCallback;
+      globalThis.setTimeout = originalSetTimeout;
+      setTimeoutRestored = true;
+      callback();
+    },
+    isClean() {
+      return setTimeoutRestored &&
+        clearTimeoutRestored &&
+        syntheticTimer === undefined &&
+        capturedCallback === undefined &&
+        globalThis.setTimeout === originalSetTimeout &&
+        globalThis.clearTimeout === originalClearTimeout;
+    },
+    restore() {
+      if (syntheticTimer) {
+        REAL_CLEAR_TIMEOUT(syntheticTimer);
+        syntheticTimer = undefined;
+      }
+      capturedCallback = undefined;
+      globalThis.setTimeout = originalSetTimeout;
+      globalThis.clearTimeout = originalClearTimeout;
+      setTimeoutRestored = true;
+      clearTimeoutRestored = true;
+    },
+  });
+}
+
+async function observeActiveRuntimeSleep(
+  monitor: HostedPgClient,
+  probe: HostedScenarioProbe,
+) {
+  const injectionStartDeadline =
+    performance.now() + NEGATIVE_PATH_INJECTION_START_TIMEOUT_MS;
+  while (
+    !probe.injectedQueryInFlight &&
+    performance.now() < injectionStartDeadline
+  ) {
+    await new Promise<void>((resolvePromise) => {
+      REAL_SET_TIMEOUT(resolvePromise, 25);
+    });
+  }
+  if (!probe.injectedQueryInFlight || probe.runtimePid === null) return false;
+
+  const activeSleepDeadline =
+    performance.now() + ACTIVE_SLEEP_OBSERVATION_TIMEOUT_MS;
+  while (performance.now() < activeSleepDeadline) {
+    if (
+      probe.injectedQueryInFlight &&
+      probe.runtimePid !== null
+    ) {
+      const row = singleRow(
+        await monitor.query(ACTIVE_RUNTIME_SLEEP_SQL, [
+          probe.runtimePid,
+          CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_APPROVED_RUNTIME_POSTGRES_APPLICATION_NAME,
+        ]),
+        FAILURE_CODES.persist,
+      );
+      if (
+        row.active_sleep === true &&
+        typeof row.backend_start === "string" &&
+        BACKEND_START_PATTERN.test(row.backend_start)
+      ) {
+        probe.runtimeBackendStart = row.backend_start;
+        return true;
+      }
+    }
+    await new Promise<void>((resolvePromise) => {
+      REAL_SET_TIMEOUT(resolvePromise, 25);
+    });
+  }
+  return false;
+}
+
+function validateScenarioOutcome(
+  scenario: HostedScenario,
+  outcome: Readonly<{
+    status: "FULFILLED";
+    value: Readonly<Record<string, unknown>>;
+  }> | Readonly<{ status: "REJECTED" }>,
+  deliveryCount: number,
+  probe: HostedScenarioProbe,
+  timerControl:
+    | ReturnType<typeof installTargetedDatabaseDeadlineTimer>
+    | undefined,
+) {
+  if (
+    deliveryCount !== 5 ||
+    probe.runtimeClientCount !== 1 ||
+    probe.runtimePrefixIndex !== 5 ||
+    probe.runtimeSequenceInvalid ||
+    !probe.baseIdentitySeen ||
+    !probe.streamHookInstalled ||
+    probe.streamDestroyCount < 1 ||
+    probe.exactStreamDestroyTransitionCount !== 1 ||
+    !probe.exactStreamDestroyedObserved ||
+    probe.brokerTombstoneQueryCount !== 1 ||
+    probe.runtimeEndCount !== 1
+  ) {
+    fail(FAILURE_CODES.persist);
+  }
+  if (scenario === "M1Q_HOSTED_POSITIVE") {
+    if (
+      outcome.status !== "FULFILLED" ||
+      outcome.value.created !== true ||
+      outcome.value.state !== "ACCEPTED" ||
+      outcome.value.continuationEligible !== true ||
+      outcome.value.status !== "RUNNER_TERMINAL_RECORDED" ||
+      probe.injectedQueryCount !== 0 ||
+      probe.runtimeBackendStart !== null ||
+      probe.runtimeStreamDestroyedAfterDeadlineBeforeTombstone ||
+      probe.deadlineTimerCandidateCount !== 0
     ) {
       fail(FAILURE_CODES.persist);
     }
-    await runIndependentPostcheck(
-      config,
-      tlsRootCertificate,
-      managementPassword,
-      PgClient,
-    );
-    expect(createEvidence()).toMatchObject({
-      ok: true,
-      terminalState: "ACCEPTED",
-      runtimeBrokerTeardownVerified: true,
-      abortPathLiveTested: false,
-      underlyingCredentialShortLived: false,
-    });
-  } finally {
-    configBytes.fill(0);
-    caBytes.fill(0);
-    secretBytes.fill(0);
-    hmacKey?.fill(0);
-    managementPassword = undefined;
+    return;
+  }
+  if (
+    outcome.status !== "REJECTED" ||
+    probe.injectedQueryCount !== 1 ||
+    !probe.injectedQuerySettled ||
+    !probe.activeSleepObserved ||
+    probe.runtimePid === null ||
+    probe.runtimeBackendStart === null ||
+    probe.runtimeQueryAfterDeadlineCount !== 0
+  ) {
+    fail(FAILURE_CODES.persist);
+  }
+  if (scenario === "M1Q_HOSTED_STATEMENT_TIMEOUT") {
+    if (
+      !probe.statementTimeoutSqlstate57014Observed ||
+      probe.injectedQueryElapsedMs < STATEMENT_TIMEOUT_MINIMUM_ELAPSED_MS ||
+      probe.injectedQueryElapsedMs > STATEMENT_TIMEOUT_MAXIMUM_ELAPSED_MS ||
+      probe.rollbackAttemptCount !== 1 ||
+      !probe.rollbackSucceeded ||
+      probe.resetAttemptCount !== 1 ||
+      !probe.resetSucceeded ||
+      probe.runtimeStreamDestroyedAfterDeadlineBeforeTombstone ||
+      probe.deadlineTimerCandidateCount !== 0 ||
+      timerControl !== undefined
+    ) {
+      fail(FAILURE_CODES.persist);
+    }
+    return;
+  }
+  if (
+    probe.statementTimeoutSqlstate57014Observed ||
+    probe.injectedQueryElapsedMs >= WATCHDOG_ABORT_MAXIMUM_ELAPSED_MS ||
+    probe.rollbackAttemptCount !== 0 ||
+    probe.rollbackSucceeded ||
+    probe.resetAttemptCount !== 0 ||
+    probe.resetSucceeded ||
+    probe.deadlineTimerCandidateCount !== 6 ||
+    !probe.deadlineTimerCaptured ||
+    !probe.deadlineTimerTriggered ||
+    !probe.deadlineTimerCleared ||
+    !probe.runtimeStreamDestroyedAfterDeadlineBeforeTombstone ||
+    !timerControl?.isClean()
+  ) {
+    fail(FAILURE_CODES.persist);
   }
 }
 
@@ -1172,6 +2213,7 @@ async function setupSyntheticChain(
   ca: Buffer,
   password: string,
   PgClient: ApprovedPgClientConstructor,
+  scenario: M1ghRunnerTerminalTrustFixtureScenario = "M1Q_HOSTED_POSITIVE",
 ) {
   const client = await connectAdmin(
     config,
@@ -1188,6 +2230,7 @@ async function setupSyntheticChain(
     );
     const fixture = createM1ghRunnerTerminalTrustFixture({
       now: databaseNow,
+      scenario,
     });
     const dummyRuntimeRole =
       `careslink_v1_preview_runner_terminal_runtime_${randomBytes(8).toString("hex")}`;
@@ -1222,6 +2265,11 @@ async function setupSyntheticChain(
       client,
       "careslink.runner_terminal_valid.authorization_signature",
       fixture.authorizationSignature,
+    );
+    await setLocalConfig(
+      client,
+      "careslink.runner_terminal_valid.scenario",
+      scenario,
     );
     await client.query(
       `create role ${dummyRuntimeRole}
@@ -1533,6 +2581,64 @@ function createCustodyResolver(
   });
 }
 
+async function runScenarioPostcheck(
+  config: HostedConfig,
+  ca: Buffer,
+  password: string,
+  PgClient: ApprovedPgClientConstructor,
+  authorizationDigest: string,
+  expectedTerminalCount: 0 | 1,
+  observedRuntimePid: number | null,
+  observedRuntimeBackendStart: string | null,
+) {
+  if (
+    (observedRuntimePid === null) !==
+      (observedRuntimeBackendStart === null) ||
+    (
+      observedRuntimeBackendStart !== null &&
+      !BACKEND_START_PATTERN.test(observedRuntimeBackendStart)
+    )
+  ) {
+    fail(FAILURE_CODES.postcheck);
+  }
+  const client = await connectAdmin(
+    config,
+    ca,
+    password,
+    POSTCHECK_APPLICATION_NAME,
+    FAILURE_CODES.postcheck,
+    PgClient,
+  );
+  try {
+    const row = singleRow(
+      await client.query(SCENARIO_POSTCHECK_SQL, [
+        authorizationDigest,
+        observedRuntimePid,
+        observedRuntimeBackendStart,
+      ]),
+      FAILURE_CODES.postcheck,
+    );
+    if (
+      Number(row.authorization_count) !== 1 ||
+      Number(row.claim_count) !== 1 ||
+      Number(row.reservation_count) !== 1 ||
+      Number(row.receipt_count) !== 1 ||
+      Number(row.terminal_count) !== expectedTerminalCount ||
+      Number(row.acquisition_count) !== 1 ||
+      Number(row.revoked_acquisition_count) !== 1 ||
+      Number(row.exact_pid_drained_count) !== 1 ||
+      Number(row.verifier_hash_only_count) !== 1
+    ) {
+      fail(FAILURE_CODES.postcheck);
+    }
+    await closeAdmin(client, FAILURE_CODES.cleanup);
+  } catch (error) {
+    await closeAdmin(client, FAILURE_CODES.cleanup).catch(() => undefined);
+    if (error instanceof HostedLiveError) throw error;
+    fail(FAILURE_CODES.postcheck);
+  }
+}
+
 async function runIndependentPostcheck(
   config: HostedConfig,
   ca: Buffer,
@@ -1553,10 +2659,11 @@ async function runIndependentPostcheck(
       FAILURE_CODES.postcheck,
     );
     if (
-      JSON.stringify(row.ledger_counts) !== "[1,0,1,1,1,1]" ||
-      Number(row.acquisition_count) !== 1 ||
-      Number(row.revoked_acquisition_count) !== 1 ||
-      Number(row.exact_pid_drained_count) !== 1 ||
+      JSON.stringify(row.ledger_counts) !== "[3,0,3,3,3,1]" ||
+      Number(row.acquisition_count) !== 3 ||
+      Number(row.revoked_acquisition_count) !== 3 ||
+      Number(row.exact_pid_drained_count) !== 3 ||
+      Number(row.verifier_hash_only_count) !== 3 ||
       Number(row.runtime_role_count) !== 0 ||
       Number(row.runtime_session_count) !== 0 ||
       Number(row.runtime_membership_count) !== 0 ||
@@ -1826,7 +2933,8 @@ function sha256(value: Buffer | Uint8Array | string) {
 function createEvidence() {
   return Object.freeze({
     ok: true as const,
-    gate: "COMMUNICATION_NOTE_M1N_APPROVED_RUNTIME_ADAPTERS_HOSTED" as const,
+    gate:
+      "COMMUNICATION_NOTE_M1Q_APPROVED_RUNTIME_ADAPTERS_HOSTED_NEGATIVE_PATHS" as const,
     sourceRevisionChildOuterAgreementVerified: true as const,
     callerProvidedSourceRevisionPinVerified: true as const,
     sourceManifestValidated: true as const,
@@ -1838,13 +2946,24 @@ function createEvidence() {
     actualPgClientInjected: true as const,
     clientPinnedCaVerified: true as const,
     terminalState: "ACCEPTED" as const,
+    scenarioCount: 3 as const,
+    negativeTerminalWritesAbsentVerified: true as const,
     runtimeBrokerTeardownVerified: true as const,
     exactRuntimePidDrainVerified: true as const,
     runtimeBrokerApiPrivilegeAbsenceVerified: true as const,
+    credentialVerifierHashOnlyCount: 3 as const,
     branchDeletionVerifiedByChild: false as const,
     callerMustDeleteBranchAfterRun: true as const,
-    abortPathLiveTested: false as const,
-    timeoutPathLiveTested: false as const,
+    abortPathLiveTested: true as const,
+    timeoutPathLiveTested: true as const,
+    postgresStatementTimeoutSqlstate57014Verified: true as const,
+    postgresStatementTimeoutInTransactionVerified: true as const,
+    postgresStatementTimeoutRollbackAndResetVerified: true as const,
+    highLevelDatabaseSettlementDeadlineTargetedTimerTested: true as const,
+    highLevelDatabaseSettlementDeadlineWallClockTested: false as const,
+    externalCallerAbortLiveTested: false as const,
+    connectionBoundAbortHardCloseLiveTested: true as const,
+    watchdogAbortInFlightTransactionVerified: true as const,
     managementCredentialClass:
       "STATIC_SUPABASE_BRANCH_ADMIN_PASSWORD" as const,
     staticSourceCredential: true as const,

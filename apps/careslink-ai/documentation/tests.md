@@ -2878,6 +2878,65 @@ mutation, real data, deployment or provider/model call occurred; Production
 parent interaction was limited to disposable branch create/get/list/delete
 control-plane operations.
 
+### Communication Note approved runtime adapters M1q — timeout/Abort source candidate
+
+The M1q candidate keeps the Hosted test default-off and adds source-level
+coverage for exactly three domain-separated fixture scenarios: positive,
+PostgreSQL statement timeout and runtime watchdog Abort. Fixture tests require
+independent auth identities, authorization nonces and run/client/provider ids,
+reject unknown scenario keys and lock the setup SQL to the ordered cumulative
+ledger states ending at `[3,0,3,3,3,1]`: authorizations, authorization
+revocations, claims, dispatch reservations, dispatch receipts and runner
+terminals. Static source assertions also prevent
+the two negative chains from gaining terminal rows and preserve the one positive
+`ACCEPTED` terminal.
+
+The live-child unit boundary uses an injected fake `pg` Client to prove that
+`pg_catalog.pg_sleep(30)` can replace only the exact `BASE_IDENTITY` statement
+after the runtime transaction's `BEGIN` plus four fixed `SET LOCAL` statements.
+It separately records the expected SQLSTATE `57014`, rollback/reset calls,
+stream destruction and client close behavior without claiming any of those are
+Hosted observations. Timer tests capture only the sixth exact 12-second runtime
+watchdog callback while the first five and all unrelated clocks keep their real
+implementations; they prove targeted callback ownership and restoration, not a
+real 12-second wall-clock wait or an external caller Abort.
+
+The enabled future gate is designed to use fresh M1m composition/runtime and
+monitor connections for each scenario. A successful statement-timeout scenario
+must observe the real PostgreSQL five-second timeout, `57014`, an in-transaction
+backend and one successful `ROLLBACK` plus one reset. A successful watchdog
+scenario must first observe the exact `(PID, backend_start)` executing the
+injected sleep, then trigger the targeted callback and hard-close the exact TLS
+socket/client before the broker tombstone query begins. The child must bind that
+monitor tuple to the durable acquisition tuple, drain the PID and prove the
+session was not reused; this excludes normal post-tombstone cleanup as the source
+of the claimed close. The destroyed Abort client is not
+required to send rollback/reset queries. Both negative scenarios must leave no
+terminal write.
+
+No paid Preview was created or contacted and no live-only branch ran for M1q.
+The historical M1p revision
+`fa7e7a00fdd7fc908bc233f40a009043b1f70b807337b9440a7f4138198b8ceb`
+therefore remains the latest Hosted evidence and continues to report Abort and
+timeout coverage as false. Candidate evidence fields for three chains, three
+revoked acquisitions, three drained PIDs and three hash-only verifier
+tombstones are future-success assertions only; they become reportable only
+after the complete same-revision child and parent postchecks pass. Three
+hash-only verifiers are allowed residue, while raw password, SCRAM verifier and
+DSN residue remain forbidden.
+
+Readiness remains false and approved exports remain absent. These tests neither
+apply a Production migration nor create a deployment, model/provider call or
+real-data flow. The fixed M1q source revision is
+`5e39ecc8be35fcf48f0a88fac08a30e5afffcad882bc3bc604de1dc34fa4fb90`.
+Its exact same-revision closeout passed 13 focused files / 224 tests and the full
+187-file / 2,571-test suite, plus TypeScript, full ESLint, three Node runner
+syntax checks, 73-file adapter sync, `git diff --check` and the Next.js 16.2.9
+Webpack 64/64-page build. Independent security review ended at P0=0 and P1=0.
+A future paid Hosted run requires a fresh source/security review, a new check of
+the then-current Preview price and new explicit creation authorization; the M1p
+price confirmation and authorization cannot be reused.
+
 ### Current live/read-only evidence
 
 - Supabase migrations, tables, RLS flags, policies, grants, function grants and aggregate row counts were checked read-only.

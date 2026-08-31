@@ -211,13 +211,15 @@ describe("Communication Note M1n approved runtime Hosted runner policy", () => {
     expect(JSON.stringify(environment)).not.toContain(PASSWORD);
   });
 
-  it("locks truthful content-free source-only evidence", () => {
+  it("locks content-free evidence emitted only after all live scenarios pass", () => {
     const evidence =
       createCommunicationNotePreviewApprovedRuntimeAdaptersHostedEvidence(
         "DIRECT",
       );
     expect(evidence).toMatchObject({
       ok: true,
+      gate:
+        "COMMUNICATION_NOTE_M1Q_APPROVED_RUNTIME_ADAPTERS_HOSTED_NEGATIVE_PATHS",
       postgresMajor: 17,
       actualPgPackageVersion: "8.23.0",
       actualConnectionMode: "DIRECT",
@@ -233,13 +235,23 @@ describe("Communication Note M1n approved runtime Hosted runner policy", () => {
       underlyingCredentialShortLived: false,
       underlyingCredentialExpiryAttested: false,
       rotationTested: false,
-      abortPathLiveTested: false,
-      timeoutPathLiveTested: false,
+      scenarioCount: 3,
+      negativeTerminalWritesAbsentVerified: true,
+      abortPathLiveTested: true,
+      timeoutPathLiveTested: true,
+      postgresStatementTimeoutSqlstate57014Verified: true,
+      postgresStatementTimeoutInTransactionVerified: true,
+      postgresStatementTimeoutRollbackAndResetVerified: true,
+      highLevelDatabaseSettlementDeadlineTargetedTimerTested: true,
+      highLevelDatabaseSettlementDeadlineWallClockTested: false,
+      externalCallerAbortLiveTested: false,
+      connectionBoundAbortHardCloseLiveTested: true,
+      watchdogAbortInFlightTransactionVerified: true,
       processMemoryZeroizationAttested: false,
       rawCredentialMaterialInEvidence: false,
       rawCredentialMaterialInDurableLedger: false,
       rawCredentialMaterialInProcessDuringRun: true,
-      credentialVerifierHashOnlyCount: 1,
+      credentialVerifierHashOnlyCount: 3,
       branchDeletionVerifiedByRunner: false,
       callerMustDeleteBranchAfterRun: true,
       nonSuccessRequiresBranchDeletion: true,
@@ -405,15 +417,16 @@ describe("Communication Note M1n approved runtime Hosted runner policy", () => {
     expect(calls.at(-1).sql).toContain("verifier_state_valid");
   });
 
-  it("requires one issued and revoked verifier hash-only tombstone on success", async () => {
+  it("requires three issued and revoked hash-only tombstones on success", async () => {
     const row = {
       acquisition_ok: true,
+      exact_pids_drained: true,
       roles_absent: true,
       sessions_absent: true,
       memberships_absent: true,
       api_privilege_count: 0,
-      verifier_hash_only_count: 1,
-      ledger_counts: [1, 0, 1, 1, 1, 1],
+      verifier_hash_only_count: 3,
+      ledger_counts: [3, 0, 3, 3, 3, 1],
     };
     await expect(
       COMMUNICATION_NOTE_PREVIEW_APPROVED_RUNTIME_ADAPTERS_HOSTED_TEST_ONLY
@@ -430,7 +443,7 @@ describe("Communication Note M1n approved runtime Hosted runner policy", () => {
           async query() {
             return {
               rowCount: 1,
-              rows: [{ ...row, verifier_hash_only_count: 0 }],
+              rows: [{ ...row, verifier_hash_only_count: 2 }],
             };
           },
         }),

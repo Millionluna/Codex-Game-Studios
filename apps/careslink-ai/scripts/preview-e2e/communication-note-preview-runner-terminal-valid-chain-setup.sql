@@ -3,6 +3,101 @@
 -- statement/signature plus the already-created random runtime role through
 -- transaction-local, parameterized GUCs. No terminal row is written here.
 
+create temporary table m1gh_valid_scenario_catalog (
+  scenario pg_catalog.text primary key,
+  scenario_ordinal pg_catalog.int4 not null unique,
+  authorization_id pg_catalog.uuid not null unique,
+  authorization_nonce_hash pg_catalog.text not null unique,
+  run_id_hash pg_catalog.text not null unique,
+  claim_id pg_catalog.uuid not null unique,
+  reservation_id pg_catalog.uuid not null unique,
+  client_request_id_hmac pg_catalog.text not null unique,
+  openai_request_id_hmac pg_catalog.text not null unique,
+  openai_response_id_hmac pg_catalog.text not null unique,
+  terminal_after_path pg_catalog.bool not null,
+  constraint m1gh_valid_scenario_catalog_ordinal_check check (
+    scenario_ordinal between 1 and 3
+  ),
+  constraint m1gh_valid_scenario_catalog_hashes_check check (
+    authorization_nonce_hash ~ '^[a-f0-9]{64}$'
+    and run_id_hash ~ '^[a-f0-9]{64}$'
+    and client_request_id_hmac ~ '^[a-f0-9]{64}$'
+    and openai_request_id_hmac ~ '^[a-f0-9]{64}$'
+    and openai_response_id_hmac ~ '^[a-f0-9]{64}$'
+  )
+);
+
+insert into pg_temp.m1gh_valid_scenario_catalog values
+  (
+    'M1Q_HOSTED_POSITIVE', 1,
+    '10000000-0000-4000-8000-000000000001',
+    pg_catalog.repeat('1', 64), pg_catalog.repeat('4', 64),
+    'f5200000-0000-4000-8000-000000000001',
+    'f5300000-0000-4000-8000-000000000001',
+    pg_catalog.repeat('a', 64),
+    pg_catalog.repeat('b', 64),
+    pg_catalog.repeat('c', 64),
+    true
+  ),
+  (
+    'M1Q_HOSTED_STATEMENT_TIMEOUT', 2,
+    '10000000-0000-4000-8000-000000000002',
+    'a752af8167c5055788e9418f7de92129280044acfcddcfec8d78486fb32c233f',
+    '51346eb930b3263624d5b46aa5b3df899bd27b4d987815acfa6f33138a22de93',
+    'f5200000-0000-4000-8000-000000000002',
+    'f5300000-0000-4000-8000-000000000002',
+    '968443412ae34d6b10a5104283b22c9c0291de97097ac2fd1c80b234a833b721',
+    '217a3c877b7a4fd481ffc49aea42fbcc384ede98fe42c688d2e3c87def363154',
+    '555fedefb9fc0bce9512a0e8b84c34005a7d8bd0156d836b00c82e5be4ac0563',
+    false
+  ),
+  (
+    'M1Q_HOSTED_WATCHDOG_ABORT', 3,
+    '10000000-0000-4000-8000-000000000003',
+    'cc06141d74a0cf18361ef1196eaaf274c26cfdbd5829eabf1e7e071be80a6d78',
+    '2e8491c130d41e6d64d89f60f1a9a0ebb0fcdf65e4b8aa300c96c4c9100dfa68',
+    'f5200000-0000-4000-8000-000000000003',
+    'f5300000-0000-4000-8000-000000000003',
+    '624e2cfd60d27a1d25df66dc32422093b4f5d7c46d3df155f10070ad477d677f',
+    'f5ad64453cd523fbceface32af9b28e841c1cb01e5a6e62fd51688089ea2854c',
+    '386657889d1f10f925916e81444e13b149a8e1301881db778ed2bed1b56eec1d',
+    false
+  );
+
+create temporary view m1gh_valid_chain_projection as
+select
+  authorization_record.authorization_id,
+  authorization_record.authorization_nonce_hash,
+  authorization_record.run_id_hash,
+  claim_record.claim_id,
+  reservation_record.reservation_id,
+  reservation_record.client_request_id_hmac,
+  receipt_record.openai_request_id_hmac,
+  receipt_record.openai_response_id_hmac,
+  coalesce(terminal_record.terminal_state = 'ACCEPTED', false)
+    as terminal_after_path
+from careslink_v1_generation.communication_note_preview_authorizations
+  as authorization_record
+join careslink_v1_generation.communication_note_preview_claims
+  as claim_record on claim_record.authorization_digest =
+    authorization_record.authorization_digest
+  and claim_record.run_id_hash = authorization_record.run_id_hash
+join careslink_v1_generation.communication_note_preview_dispatch_reservations
+  as reservation_record on reservation_record.claim_id = claim_record.claim_id
+  and reservation_record.authorization_digest =
+    authorization_record.authorization_digest
+  and reservation_record.run_id_hash = authorization_record.run_id_hash
+join careslink_v1_generation.communication_note_preview_dispatch_receipts
+  as receipt_record on receipt_record.reservation_id =
+    reservation_record.reservation_id
+  and receipt_record.claim_id = claim_record.claim_id
+  and receipt_record.authorization_digest =
+    authorization_record.authorization_digest
+  and receipt_record.run_id_hash = authorization_record.run_id_hash
+left join careslink_v1_generation.communication_note_preview_runner_terminals
+  as terminal_record on terminal_record.reservation_id =
+    reservation_record.reservation_id;
+
 do $careslink_runner_terminal_valid_setup$
 declare
   v_runtime_name pg_catalog.text := pg_catalog.current_setting(
@@ -17,11 +112,24 @@ declare
   v_authorization_signature pg_catalog.text := pg_catalog.current_setting(
     'careslink.runner_terminal_valid.authorization_signature', true
   );
+  v_scenario pg_catalog.text := coalesce(
+    pg_catalog.current_setting(
+      'careslink.runner_terminal_valid.scenario', true
+    ),
+    'M1Q_HOSTED_POSITIVE'
+  );
+  v_scenario_ordinal pg_catalog.int4;
   v_runtime pg_catalog.oid := pg_catalog.to_regrole(v_runtime_name);
   v_caller pg_catalog.oid := pg_catalog.to_regrole(
     'careslink_v1_preview_runner_terminal_caller'
   );
 begin
+  v_scenario_ordinal := case v_scenario
+    when 'M1Q_HOSTED_POSITIVE' then 1
+    when 'M1Q_HOSTED_STATEMENT_TIMEOUT' then 2
+    when 'M1Q_HOSTED_WATCHDOG_ABORT' then 3
+    else null
+  end;
   if current_user <> 'postgres'
     or session_user <> 'postgres'
     or pg_catalog.current_database() <> 'postgres'
@@ -83,24 +191,192 @@ begin
     or not coalesce(
       v_authorization_signature ~ '^[A-Za-z0-9_-]{86}$', false
     )
+    or v_scenario_ordinal is null
+    or v_authorization_statement->>'authorizationId' is distinct from
+      case v_scenario_ordinal
+        when 1 then '10000000-0000-4000-8000-000000000001'
+        when 2 then '10000000-0000-4000-8000-000000000002'
+        when 3 then '10000000-0000-4000-8000-000000000003'
+      end
+    or v_authorization_statement->>'authorizationNonceHash' is distinct from
+      case v_scenario_ordinal
+        when 1 then pg_catalog.repeat('1', 64)
+        when 2 then 'a752af8167c5055788e9418f7de92129280044acfcddcfec8d78486fb32c233f'
+        when 3 then 'cc06141d74a0cf18361ef1196eaaf274c26cfdbd5829eabf1e7e071be80a6d78'
+      end
+    or v_authorization_statement->>'runIdHash' is distinct from
+      case v_scenario_ordinal
+        when 1 then pg_catalog.repeat('4', 64)
+        when 2 then '51346eb930b3263624d5b46aa5b3df899bd27b4d987815acfa6f33138a22de93'
+        when 3 then '2e8491c130d41e6d64d89f60f1a9a0ebb0fcdf65e4b8aa300c96c4c9100dfa68'
+      end
   then
     raise exception 'RUNNER_TERMINAL_VALID_SETUP_FIXTURE_UNSAFE';
   end if;
 
-  if exists (
-    select 1 from careslink_v1_generation.communication_note_preview_authorizations
-    union all
-    select 1 from careslink_v1_generation.communication_note_preview_authorization_revocations
-    union all
-    select 1 from careslink_v1_generation.communication_note_preview_claims
-    union all
-    select 1 from careslink_v1_generation.communication_note_preview_dispatch_reservations
-    union all
-    select 1 from careslink_v1_generation.communication_note_preview_dispatch_receipts
-    union all
-    select 1 from careslink_v1_generation.communication_note_preview_runner_terminals
-  ) then
-    raise exception 'RUNNER_TERMINAL_VALID_SETUP_LEDGER_NOT_EMPTY';
+  if (select pg_catalog.count(*) from
+      careslink_v1_generation.communication_note_preview_authorizations) <>
+      v_scenario_ordinal - 1
+    or (select pg_catalog.count(*) from
+      careslink_v1_generation.communication_note_preview_authorization_revocations) <> 0
+    or (select pg_catalog.count(*) from
+      careslink_v1_generation.communication_note_preview_claims) <>
+      v_scenario_ordinal - 1
+    or (select pg_catalog.count(*) from
+      careslink_v1_generation.communication_note_preview_dispatch_reservations) <>
+      v_scenario_ordinal - 1
+    or (select pg_catalog.count(*) from
+      careslink_v1_generation.communication_note_preview_dispatch_receipts) <>
+      v_scenario_ordinal - 1
+    or (select pg_catalog.count(*) from
+      careslink_v1_generation.communication_note_preview_runner_terminals) <>
+      case when v_scenario_ordinal = 1 then 0 else 1 end
+    or exists (
+      (
+        select
+          authorization_record.authorization_id,
+          authorization_record.authorization_nonce_hash,
+          authorization_record.run_id_hash,
+          claim_record.claim_id,
+          reservation_record.reservation_id,
+          reservation_record.client_request_id_hmac,
+          receipt_record.openai_request_id_hmac,
+          receipt_record.openai_response_id_hmac,
+          coalesce(terminal_record.terminal_state = 'ACCEPTED', false)
+        from careslink_v1_generation.communication_note_preview_authorizations
+          as authorization_record
+        join careslink_v1_generation.communication_note_preview_claims
+          as claim_record on claim_record.authorization_digest =
+            authorization_record.authorization_digest
+          and claim_record.run_id_hash = authorization_record.run_id_hash
+        join careslink_v1_generation.communication_note_preview_dispatch_reservations
+          as reservation_record on reservation_record.claim_id =
+            claim_record.claim_id
+          and reservation_record.authorization_digest =
+            authorization_record.authorization_digest
+          and reservation_record.run_id_hash = authorization_record.run_id_hash
+        join careslink_v1_generation.communication_note_preview_dispatch_receipts
+          as receipt_record on receipt_record.reservation_id =
+            reservation_record.reservation_id
+          and receipt_record.claim_id = claim_record.claim_id
+          and receipt_record.authorization_digest =
+            authorization_record.authorization_digest
+          and receipt_record.run_id_hash = authorization_record.run_id_hash
+        left join careslink_v1_generation.communication_note_preview_runner_terminals
+          as terminal_record on terminal_record.reservation_id =
+            reservation_record.reservation_id
+        except all
+        select
+          scenario_record.authorization_id,
+          scenario_record.authorization_nonce_hash,
+          scenario_record.run_id_hash,
+          scenario_record.claim_id,
+          scenario_record.reservation_id,
+          scenario_record.client_request_id_hmac,
+          scenario_record.openai_request_id_hmac,
+          scenario_record.openai_response_id_hmac,
+          scenario_record.terminal_after_path
+        from pg_temp.m1gh_valid_scenario_catalog as scenario_record
+        where scenario_record.scenario_ordinal < v_scenario_ordinal
+      )
+      union all
+      (
+        select
+          scenario_record.authorization_id,
+          scenario_record.authorization_nonce_hash,
+          scenario_record.run_id_hash,
+          scenario_record.claim_id,
+          scenario_record.reservation_id,
+          scenario_record.client_request_id_hmac,
+          scenario_record.openai_request_id_hmac,
+          scenario_record.openai_response_id_hmac,
+          scenario_record.terminal_after_path
+        from pg_temp.m1gh_valid_scenario_catalog as scenario_record
+        where scenario_record.scenario_ordinal < v_scenario_ordinal
+        except all
+        select
+          authorization_record.authorization_id,
+          authorization_record.authorization_nonce_hash,
+          authorization_record.run_id_hash,
+          claim_record.claim_id,
+          reservation_record.reservation_id,
+          reservation_record.client_request_id_hmac,
+          receipt_record.openai_request_id_hmac,
+          receipt_record.openai_response_id_hmac,
+          coalesce(terminal_record.terminal_state = 'ACCEPTED', false)
+        from careslink_v1_generation.communication_note_preview_authorizations
+          as authorization_record
+        join careslink_v1_generation.communication_note_preview_claims
+          as claim_record on claim_record.authorization_digest =
+            authorization_record.authorization_digest
+          and claim_record.run_id_hash = authorization_record.run_id_hash
+        join careslink_v1_generation.communication_note_preview_dispatch_reservations
+          as reservation_record on reservation_record.claim_id =
+            claim_record.claim_id
+          and reservation_record.authorization_digest =
+            authorization_record.authorization_digest
+          and reservation_record.run_id_hash = authorization_record.run_id_hash
+        join careslink_v1_generation.communication_note_preview_dispatch_receipts
+          as receipt_record on receipt_record.reservation_id =
+            reservation_record.reservation_id
+          and receipt_record.claim_id = claim_record.claim_id
+          and receipt_record.authorization_digest =
+            authorization_record.authorization_digest
+          and receipt_record.run_id_hash = authorization_record.run_id_hash
+        left join careslink_v1_generation.communication_note_preview_runner_terminals
+          as terminal_record on terminal_record.reservation_id =
+            reservation_record.reservation_id
+      )
+    )
+    or exists (
+      select 1
+      from pg_temp.m1gh_valid_scenario_catalog as current_scenario
+      where current_scenario.scenario = v_scenario
+        and (
+          exists (
+            select 1
+            from careslink_v1_generation.communication_note_preview_authorizations
+              as authorization_record
+            where authorization_record.authorization_id =
+                current_scenario.authorization_id
+              or authorization_record.authorization_nonce_hash =
+                current_scenario.authorization_nonce_hash
+              or authorization_record.run_id_hash = current_scenario.run_id_hash
+          )
+          or exists (
+            select 1
+            from careslink_v1_generation.communication_note_preview_claims
+              as claim_record
+            where claim_record.claim_id = current_scenario.claim_id
+              or claim_record.run_id_hash = current_scenario.run_id_hash
+          )
+          or exists (
+            select 1
+            from careslink_v1_generation.communication_note_preview_dispatch_reservations
+              as reservation_record
+            where reservation_record.reservation_id =
+                current_scenario.reservation_id
+              or reservation_record.client_request_id_hmac =
+                current_scenario.client_request_id_hmac
+          )
+          or exists (
+            select 1
+            from careslink_v1_generation.communication_note_preview_dispatch_receipts
+              as receipt_record
+            where receipt_record.reservation_id =
+                current_scenario.reservation_id
+              or receipt_record.openai_request_id_hmac =
+                current_scenario.openai_request_id_hmac
+              or receipt_record.openai_response_id_hmac =
+                current_scenario.openai_response_id_hmac
+          )
+        )
+    )
+  then
+    if v_scenario_ordinal = 1 then
+      raise exception 'RUNNER_TERMINAL_VALID_SETUP_LEDGER_NOT_EMPTY';
+    end if;
+    raise exception 'RUNNER_TERMINAL_VALID_SETUP_LEDGER_SEQUENCE_INVALID';
   end if;
 
   if pg_catalog.to_regprocedure(
@@ -216,8 +492,37 @@ declare
   v_statement pg_catalog.jsonb := pg_catalog.current_setting(
     'careslink.runner_terminal_valid.authorization_statement', true
   )::pg_catalog.jsonb;
+  v_scenario pg_catalog.text := coalesce(
+    pg_catalog.current_setting(
+      'careslink.runner_terminal_valid.scenario', true
+    ),
+    'M1Q_HOSTED_POSITIVE'
+  );
+  v_claim_id pg_catalog.uuid;
+  v_reservation_id pg_catalog.uuid;
   v_result pg_catalog.jsonb;
 begin
+  v_claim_id := case v_scenario
+    when 'M1Q_HOSTED_POSITIVE' then
+      'f5200000-0000-4000-8000-000000000001'::pg_catalog.uuid
+    when 'M1Q_HOSTED_STATEMENT_TIMEOUT' then
+      'f5200000-0000-4000-8000-000000000002'::pg_catalog.uuid
+    when 'M1Q_HOSTED_WATCHDOG_ABORT' then
+      'f5200000-0000-4000-8000-000000000003'::pg_catalog.uuid
+    else null
+  end;
+  v_reservation_id := case v_scenario
+    when 'M1Q_HOSTED_POSITIVE' then
+      'f5300000-0000-4000-8000-000000000001'::pg_catalog.uuid
+    when 'M1Q_HOSTED_STATEMENT_TIMEOUT' then
+      'f5300000-0000-4000-8000-000000000002'::pg_catalog.uuid
+    when 'M1Q_HOSTED_WATCHDOG_ABORT' then
+      'f5300000-0000-4000-8000-000000000003'::pg_catalog.uuid
+    else null
+  end;
+  if v_claim_id is null or v_reservation_id is null then
+    raise exception 'RUNNER_TERMINAL_VALID_SETUP_SCENARIO_INVALID';
+  end if;
   v_result := careslink_v1_generation.persist_verified_communication_note_preview_authorization(
     v_statement,
     pg_catalog.current_setting(
@@ -237,9 +542,9 @@ begin
   ) values (
     v_statement,
     v_result->>'authorizationDigest',
-    'f5200000-0000-4000-8000-000000000001',
+    v_claim_id,
     pg_catalog.repeat('0', 64),
-    'f5300000-0000-4000-8000-000000000001'
+    v_reservation_id
   );
 end
 $careslink_runner_terminal_valid_authorization$;
@@ -249,9 +554,27 @@ set local role careslink_v1_preview_dispatch_executor;
 do $careslink_runner_terminal_valid_dispatch$
 declare
   v_state pg_temp.m1gh_valid_chain_state%rowtype;
+  v_scenario pg_catalog.text := coalesce(
+    pg_catalog.current_setting(
+      'careslink.runner_terminal_valid.scenario', true
+    ),
+    'M1Q_HOSTED_POSITIVE'
+  );
+  v_client_request_id_hmac pg_catalog.text;
   v_claim pg_catalog.jsonb;
   v_reservation pg_catalog.jsonb;
 begin
+  v_client_request_id_hmac := case v_scenario
+    when 'M1Q_HOSTED_POSITIVE' then pg_catalog.repeat('a', 64)
+    when 'M1Q_HOSTED_STATEMENT_TIMEOUT' then
+      '968443412ae34d6b10a5104283b22c9c0291de97097ac2fd1c80b234a833b721'
+    when 'M1Q_HOSTED_WATCHDOG_ABORT' then
+      '624e2cfd60d27a1d25df66dc32422093b4f5d7c46d3df155f10070ad477d677f'
+    else null
+  end;
+  if v_client_request_id_hmac is null then
+    raise exception 'RUNNER_TERMINAL_VALID_SETUP_SCENARIO_INVALID';
+  end if;
   select * into strict v_state from pg_temp.m1gh_valid_chain_state;
   v_claim := careslink_v1_generation.claim_communication_note_preview_authorization(
     v_state.authorization_digest,
@@ -272,7 +595,7 @@ begin
     '98d37d028c742a2e05d079a38e0d6b27fb1fe91a71d397a4bdc9ed607af45213',
     2522,
     'f404c8f239c20b49a40836a371e928dd6241e95dca598ae8661193443c7c6a68',
-    pg_catalog.repeat('a', 64)
+    v_client_request_id_hmac
   );
   if v_claim->'created' is distinct from 'true'::pg_catalog.jsonb
     or v_reservation->'created' is distinct from 'true'::pg_catalog.jsonb
@@ -291,6 +614,15 @@ set local role careslink_v1_preview_receipt_executor;
 do $careslink_runner_terminal_valid_receipt$
 declare
   v_state pg_temp.m1gh_valid_chain_state%rowtype;
+  v_scenario pg_catalog.text := coalesce(
+    pg_catalog.current_setting(
+      'careslink.runner_terminal_valid.scenario', true
+    ),
+    'M1Q_HOSTED_POSITIVE'
+  );
+  v_client_request_id_hmac pg_catalog.text;
+  v_openai_request_id_hmac pg_catalog.text;
+  v_openai_response_id_hmac pg_catalog.text;
   v_statement pg_catalog.jsonb;
   v_result pg_catalog.jsonb;
   v_observed_at pg_catalog.text := pg_catalog.to_char(
@@ -299,6 +631,36 @@ declare
     'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'
   );
 begin
+  v_client_request_id_hmac := case v_scenario
+    when 'M1Q_HOSTED_POSITIVE' then pg_catalog.repeat('a', 64)
+    when 'M1Q_HOSTED_STATEMENT_TIMEOUT' then
+      '968443412ae34d6b10a5104283b22c9c0291de97097ac2fd1c80b234a833b721'
+    when 'M1Q_HOSTED_WATCHDOG_ABORT' then
+      '624e2cfd60d27a1d25df66dc32422093b4f5d7c46d3df155f10070ad477d677f'
+    else null
+  end;
+  v_openai_request_id_hmac := case v_scenario
+    when 'M1Q_HOSTED_POSITIVE' then pg_catalog.repeat('b', 64)
+    when 'M1Q_HOSTED_STATEMENT_TIMEOUT' then
+      '217a3c877b7a4fd481ffc49aea42fbcc384ede98fe42c688d2e3c87def363154'
+    when 'M1Q_HOSTED_WATCHDOG_ABORT' then
+      'f5ad64453cd523fbceface32af9b28e841c1cb01e5a6e62fd51688089ea2854c'
+    else null
+  end;
+  v_openai_response_id_hmac := case v_scenario
+    when 'M1Q_HOSTED_POSITIVE' then pg_catalog.repeat('c', 64)
+    when 'M1Q_HOSTED_STATEMENT_TIMEOUT' then
+      '555fedefb9fc0bce9512a0e8b84c34005a7d8bd0156d836b00c82e5be4ac0563'
+    when 'M1Q_HOSTED_WATCHDOG_ABORT' then
+      '386657889d1f10f925916e81444e13b149a8e1301881db778ed2bed1b56eec1d'
+    else null
+  end;
+  if v_client_request_id_hmac is null
+    or v_openai_request_id_hmac is null
+    or v_openai_response_id_hmac is null
+  then
+    raise exception 'RUNNER_TERMINAL_VALID_SETUP_SCENARIO_INVALID';
+  end if;
   select * into strict v_state from pg_temp.m1gh_valid_chain_state;
   v_statement := pg_catalog.jsonb_build_object(
     'domain', 'careslink.communication-note.preview-dispatch-receipt',
@@ -313,12 +675,12 @@ begin
     'requestBodySha256', '98d37d028c742a2e05d079a38e0d6b27fb1fe91a71d397a4bdc9ed607af45213',
     'requestBodyUtf8ByteLength', 2522,
     'semanticCanonicalRequestSha256', 'f404c8f239c20b49a40836a371e928dd6241e95dca598ae8661193443c7c6a68',
-    'clientRequestIdHmac', pg_catalog.repeat('a', 64),
+    'clientRequestIdHmac', v_client_request_id_hmac,
     'outcome', 'COMPLETED',
     'transport', pg_catalog.jsonb_build_object(
       'httpStatus', 200,
-      'openAiRequestIdHmac', pg_catalog.repeat('b', 64),
-      'openAiResponseIdHmac', pg_catalog.repeat('c', 64)
+      'openAiRequestIdHmac', v_openai_request_id_hmac,
+      'openAiResponseIdHmac', v_openai_response_id_hmac
     ),
     'usage', pg_catalog.jsonb_build_object(
       'source', 'PROVIDER',
@@ -365,21 +727,84 @@ revoke careslink_v1_preview_authorization_executor from current_user
   granted by current_user;
 
 do $careslink_runner_terminal_valid_setup_postcheck$
+declare
+  v_scenario pg_catalog.text := coalesce(
+    pg_catalog.current_setting(
+      'careslink.runner_terminal_valid.scenario', true
+    ),
+    'M1Q_HOSTED_POSITIVE'
+  );
+  v_scenario_ordinal pg_catalog.int4;
 begin
+  v_scenario_ordinal := case v_scenario
+    when 'M1Q_HOSTED_POSITIVE' then 1
+    when 'M1Q_HOSTED_STATEMENT_TIMEOUT' then 2
+    when 'M1Q_HOSTED_WATCHDOG_ABORT' then 3
+    else null
+  end;
   if current_user <> 'postgres'
     or session_user <> 'postgres'
+    or v_scenario_ordinal is null
     or (select pg_catalog.count(*) from
-      careslink_v1_generation.communication_note_preview_authorizations) <> 1
+      careslink_v1_generation.communication_note_preview_authorizations) <>
+      v_scenario_ordinal
     or (select pg_catalog.count(*) from
       careslink_v1_generation.communication_note_preview_authorization_revocations) <> 0
     or (select pg_catalog.count(*) from
-      careslink_v1_generation.communication_note_preview_claims) <> 1
+      careslink_v1_generation.communication_note_preview_claims) <>
+      v_scenario_ordinal
     or (select pg_catalog.count(*) from
-      careslink_v1_generation.communication_note_preview_dispatch_reservations) <> 1
+      careslink_v1_generation.communication_note_preview_dispatch_reservations) <>
+      v_scenario_ordinal
     or (select pg_catalog.count(*) from
-      careslink_v1_generation.communication_note_preview_dispatch_receipts) <> 1
+      careslink_v1_generation.communication_note_preview_dispatch_receipts) <>
+      v_scenario_ordinal
     or (select pg_catalog.count(*) from
-      careslink_v1_generation.communication_note_preview_runner_terminals) <> 0
+      careslink_v1_generation.communication_note_preview_runner_terminals) <>
+      case when v_scenario_ordinal = 1 then 0 else 1 end
+    or exists (
+      (
+        select * from pg_temp.m1gh_valid_chain_projection
+        except all
+        select
+          scenario_record.authorization_id,
+          scenario_record.authorization_nonce_hash,
+          scenario_record.run_id_hash,
+          scenario_record.claim_id,
+          scenario_record.reservation_id,
+          scenario_record.client_request_id_hmac,
+          scenario_record.openai_request_id_hmac,
+          scenario_record.openai_response_id_hmac,
+          case
+            when scenario_record.scenario_ordinal = v_scenario_ordinal
+              then false
+            else scenario_record.terminal_after_path
+          end
+        from pg_temp.m1gh_valid_scenario_catalog as scenario_record
+        where scenario_record.scenario_ordinal <= v_scenario_ordinal
+      )
+      union all
+      (
+        select
+          scenario_record.authorization_id,
+          scenario_record.authorization_nonce_hash,
+          scenario_record.run_id_hash,
+          scenario_record.claim_id,
+          scenario_record.reservation_id,
+          scenario_record.client_request_id_hmac,
+          scenario_record.openai_request_id_hmac,
+          scenario_record.openai_response_id_hmac,
+          case
+            when scenario_record.scenario_ordinal = v_scenario_ordinal
+              then false
+            else scenario_record.terminal_after_path
+          end
+        from pg_temp.m1gh_valid_scenario_catalog as scenario_record
+        where scenario_record.scenario_ordinal <= v_scenario_ordinal
+        except all
+        select * from pg_temp.m1gh_valid_chain_projection
+      )
+    )
     or exists (
       (
         select
