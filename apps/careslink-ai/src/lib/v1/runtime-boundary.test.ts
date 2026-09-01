@@ -85,6 +85,11 @@ describe("V1 shadow runtime boundary", () => {
       "src/lib/v1/communication-note-preview-approved-runtime-postgres-session.server.ts",
       "src/lib/v1/communication-note-preview-approved-runtime-adapters.server.ts",
       "src/lib/v1/communication-note-preview-product-runtime-composition.server.ts",
+      "src/lib/v1/communication-note-preview-product-runtime-identities.server.ts",
+      "src/lib/v1/communication-note-preview-product-runtime-platform-adapters.server.ts",
+      "src/lib/v1/communication-note-preview-product-runtime-gcp-adapters.server.ts",
+      "src/lib/v1/communication-note-preview-product-runtime-gcp-rest-bridge.server.ts",
+      "src/lib/v1/communication-note-preview-product-runtime-supabase-management-bridge.server.ts",
       "src/lib/v1/native-auth-boundary.server.ts",
       "src/lib/v1/openai-communication-note-provider.server.ts",
       "src/lib/v1/communication-note-provider-policy.ts",
@@ -585,6 +590,18 @@ describe("V1 shadow runtime boundary", () => {
         process.cwd(),
         "src/lib/v1/communication-note-preview-approved-runtime-target.server.ts",
       ),
+      join(
+        process.cwd(),
+        "src/lib/v1/communication-note-preview-product-runtime-identities.server.test.ts",
+      ),
+      join(
+        process.cwd(),
+        "src/lib/v1/communication-note-preview-product-runtime-platform-adapters.server.test.ts",
+      ),
+      join(
+        process.cwd(),
+        "src/lib/v1/communication-note-preview-product-runtime-provider-bridges-m1v.server.test.ts",
+      ),
       durableCredentialResolverModule,
       durableCredentialResolverTest,
       resolvedRuntimeBindingTest,
@@ -679,6 +696,8 @@ describe("V1 shadow runtime boundary", () => {
           "src/lib/v1/communication-note-preview-approved-runtime-adapters.server.test.ts",
           "src/lib/v1/communication-note-preview-approved-runtime-adapters.server.ts",
           "src/lib/v1/communication-note-preview-approved-runtime-target.server.test.ts",
+          "src/lib/v1/communication-note-preview-product-runtime-identities.server.test.ts",
+          "src/lib/v1/communication-note-preview-product-runtime-identities.server.ts",
         ],
       },
       {
@@ -778,6 +797,14 @@ describe("V1 shadow runtime boundary", () => {
         process.cwd(),
         "src/lib/v1/communication-note-preview-product-runtime-composition.server.test.ts",
       ),
+      join(
+        process.cwd(),
+        "src/lib/v1/communication-note-preview-product-runtime-identities.server.test.ts",
+      ),
+      join(
+        process.cwd(),
+        "src/lib/v1/communication-note-preview-product-runtime-identities.server.ts",
+      ),
     ]);
     expect(
       walkSourceFiles("src/app").filter((file) =>
@@ -810,6 +837,224 @@ describe("V1 shadow runtime boundary", () => {
     expect(source).toContain(
       "SOURCE_PRODUCT_RUNTIME_COMPOSITION_NOT_ACTIVATED",
     );
+  });
+
+  it("quarantines the M1s Product runtime identities to its own test and forbids ambient authority", () => {
+    const relativePath =
+      "src/lib/v1/communication-note-preview-product-runtime-identities.server.ts";
+    const modulePath = join(process.cwd(), relativePath);
+    const testPath = join(
+      process.cwd(),
+      "src/lib/v1/communication-note-preview-product-runtime-identities.server.test.ts",
+    );
+    const importStem =
+      "communication-note-preview-product-runtime-identities.server";
+    const importPattern = new RegExp(
+      `(?:from\\s+|import\\s*(?:\\(\\s*)?|require\\s*\\(\\s*)["'][^"']*${importStem.replaceAll(".", "\\.")}(?:\\.(?:[cm]?[jt]s|[jt]sx))?["']`,
+    );
+    const importers = walkControlledScriptFiles().filter((file) =>
+      importPattern.test(readFileSync(file, "utf8")),
+    );
+    const source = readFileSync(modulePath, "utf8");
+
+    expect(importers).toEqual([
+      testPath,
+      join(
+        process.cwd(),
+        "src/lib/v1/communication-note-preview-product-runtime-platform-adapters.server.test.ts",
+      ),
+      join(
+        process.cwd(),
+        "src/lib/v1/communication-note-preview-product-runtime-platform-adapters.server.ts",
+      ),
+    ]);
+    expect(
+      walkSourceFiles("src/app").filter((file) =>
+        importPattern.test(readFileSync(file, "utf8")),
+      ),
+    ).toEqual([]);
+    expect(
+      walkSourceFiles("src/components").filter((file) =>
+        importPattern.test(readFileSync(file, "utf8")),
+      ),
+    ).toEqual([]);
+    expect(source).toMatch(/^import "server-only";/);
+    expect(source).not.toMatch(
+      /process\.env|import\.meta\.env|Deno\.env|Bun\.env|fetch\s*\(|(?:from\s+|import\s*\(|require\s*\()\s*["'](?:pg|openai|@supabase\/)|node:(?:http|https|net|tls)|postgres(?:ql)?:\/\/|DATABASE_URL|connectionString\s*:|SUPABASE_(?:ACCESS_TOKEN|SECRET_KEY|SERVICE_ROLE_KEY)|NEXT_PUBLIC_|console\.(?:debug|error|info|log|warn)|\blogger\b|\blog\s*\(/i,
+    );
+    expect(source).not.toMatch(/_READY\s*=\s*(?:\r?\n\s*)?true\b/);
+    expect(source).toMatch(
+      /_READY\s*=\s*(?:\r?\n\s*)?false\s+as const/,
+    );
+    expect(source).toContain("SOURCE_PRODUCT_RUNTIME_IDENTITIES_NOT_ACTIVATED");
+  });
+
+  it("quarantines the M1t Product runtime platform adapters to its own test and forbids ambient authority", () => {
+    const relativePath =
+      "src/lib/v1/communication-note-preview-product-runtime-platform-adapters.server.ts";
+    const modulePath = join(process.cwd(), relativePath);
+    const testPath = join(
+      process.cwd(),
+      "src/lib/v1/communication-note-preview-product-runtime-platform-adapters.server.test.ts",
+    );
+    const importStem =
+      "communication-note-preview-product-runtime-platform-adapters.server";
+    const importPattern = new RegExp(
+      `(?:from\\s+|import\\s*(?:\\(\\s*)?|require\\s*\\(\\s*)["'][^"']*${importStem.replaceAll(".", "\\.")}(?:\\.(?:[cm]?[jt]s|[jt]sx))?["']`,
+    );
+    const importers = walkControlledScriptFiles().filter((file) =>
+      importPattern.test(readFileSync(file, "utf8")),
+    );
+    const source = readFileSync(modulePath, "utf8");
+
+    expect(importers).toEqual([
+      testPath,
+      join(
+        process.cwd(),
+        "src/lib/v1/communication-note-preview-product-runtime-provider-bridges-m1v.server.test.ts",
+      ),
+    ].sort());
+    expect(
+      walkSourceFiles("src/app").filter((file) =>
+        importPattern.test(readFileSync(file, "utf8")),
+      ),
+    ).toEqual([]);
+    expect(
+      walkSourceFiles("src/components").filter((file) =>
+        importPattern.test(readFileSync(file, "utf8")),
+      ),
+    ).toEqual([]);
+    expect(source).toMatch(/^import "server-only";/);
+    expect(source).not.toMatch(
+      /process\.env|import\.meta\.env|Deno\.env|Bun\.env|fetch\s*\(|(?:from\s+|import\s*\(|require\s*\()\s*["'](?:pg|openai|@supabase\/)|node:(?:http|https|net|tls)|postgres(?:ql)?:\/\/|DATABASE_URL|connectionString\s*:|SUPABASE_(?:SECRET_KEY|SERVICE_ROLE_KEY)|NEXT_PUBLIC_|console\.(?:debug|error|info|log|warn)|\blogger\b|\blog\s*\(/i,
+    );
+    expect(source).not.toContain("/v1/branches/");
+    expect(source).not.toMatch(/_READY\s*=\s*(?:\r?\n\s*)?true\b/);
+    expect(source).toMatch(
+      /_READY\s*=\s*(?:\r?\n\s*)?false\s+as const/,
+    );
+    expect(source).toContain(
+      "SOURCE_PRODUCT_RUNTIME_PLATFORM_ADAPTERS_NOT_ACTIVATED",
+    );
+    expect(source).toContain(
+      "/v1/projects/{production_ref}/branches",
+    );
+    expect(source).toContain(
+      "/v1/projects/${CARESLINK_PRODUCTION_SUPABASE_REF}/branches",
+    );
+  });
+
+  it("quarantines the M1u GCP provider adapters to its own test and forbids ambient cloud authority", () => {
+    const relativePath =
+      "src/lib/v1/communication-note-preview-product-runtime-gcp-adapters.server.ts";
+    const modulePath = join(process.cwd(), relativePath);
+    const testPath = join(
+      process.cwd(),
+      "src/lib/v1/communication-note-preview-product-runtime-gcp-adapters.server.test.ts",
+    );
+    const importStem =
+      "communication-note-preview-product-runtime-gcp-adapters.server";
+    const importPattern = new RegExp(
+      `(?:from\\s+|import\\s*(?:\\(\\s*)?|require\\s*\\(\\s*)["'][^"']*${importStem.replaceAll(".", "\\.")}(?:\\.(?:[cm]?[jt]s|[jt]sx))?["']`,
+    );
+    const importers = walkControlledScriptFiles().filter((file) =>
+      importPattern.test(readFileSync(file, "utf8")),
+    );
+    const source = readFileSync(modulePath, "utf8");
+
+    expect(importers).toEqual([
+      testPath,
+      join(
+        process.cwd(),
+        "src/lib/v1/communication-note-preview-product-runtime-provider-bridges-m1v.server.test.ts",
+      ),
+    ].sort());
+    expect(
+      walkSourceFiles("src/app").filter((file) =>
+        importPattern.test(readFileSync(file, "utf8")),
+      ),
+    ).toEqual([]);
+    expect(
+      walkSourceFiles("src/components").filter((file) =>
+        importPattern.test(readFileSync(file, "utf8")),
+      ),
+    ).toEqual([]);
+    expect(source).toMatch(/^import "server-only";/);
+    expect(source).not.toMatch(
+      /process\.env|import\.meta\.env|Deno\.env|Bun\.env|GOOGLE_APPLICATION_CREDENTIALS|private_key|client_email|fetch\s*\(|node:(?:http|https|net|tls)|postgres(?:ql)?:\/\/|DATABASE_URL|connectionString\s*:|SUPABASE_(?:SECRET_KEY|SERVICE_ROLE_KEY)|NEXT_PUBLIC_|console\.(?:debug|error|info|log|warn)|\blogger\b|\blog\s*\(/i,
+    );
+    expect(source).not.toMatch(/_READY\s*=\s*(?:\r?\n\s*)?true\b/);
+    expect(source).toMatch(
+      /_READY\s*=\s*(?:\r?\n\s*)?false\s+as const/,
+    );
+    expect(source).toContain("SOURCE_GCP_PROVIDER_ADAPTERS_NOT_ACTIVATED");
+    expect(source).toContain("applicationDefaultCredentialsAllowed: false");
+    expect(source).toContain("serviceAccountJsonAllowed: false");
+    expect(source).toContain("concreteGoogleSdkClientsWired: false");
+    expect(source).not.toContain("/versions/latest");
+  });
+
+  it("quarantines both M1v provider bridges to their own tests and the single audited integration importer", () => {
+    const integrationTest = join(
+      process.cwd(),
+      "src/lib/v1/communication-note-preview-product-runtime-provider-bridges-m1v.server.test.ts",
+    );
+    const modules = [
+      {
+        relativePath:
+          "src/lib/v1/communication-note-preview-product-runtime-gcp-rest-bridge.server.ts",
+        ownTest:
+          "src/lib/v1/communication-note-preview-product-runtime-gcp-rest-bridge.server.test.ts",
+        status: "SOURCE_GCP_REST_BRIDGE_NOT_ACTIVATED",
+      },
+      {
+        relativePath:
+          "src/lib/v1/communication-note-preview-product-runtime-supabase-management-bridge.server.ts",
+        ownTest:
+          "src/lib/v1/communication-note-preview-product-runtime-supabase-management-bridge.server.test.ts",
+        status: "SOURCE_SUPABASE_MANAGEMENT_BRIDGE_NOT_ACTIVATED",
+      },
+    ] as const;
+
+    for (const { relativePath, ownTest, status } of modules) {
+      const modulePath = join(process.cwd(), relativePath);
+      const importStem = relativePath
+        .split("/")
+        .at(-1)
+        ?.replace(/\.ts$/, "");
+      expect(importStem).toBeDefined();
+      const importPattern = new RegExp(
+        `(?:from\\s+|import\\s*(?:\\(\\s*)?|require\\s*\\(\\s*)["'][^"']*${importStem?.replaceAll(".", "\\.")}(?:\\.(?:[cm]?[jt]s|[jt]sx))?["']`,
+      );
+      const importers = walkControlledScriptFiles().filter((file) =>
+        importPattern.test(readFileSync(file, "utf8")),
+      );
+      const source = readFileSync(modulePath, "utf8");
+
+      expect(importers).toEqual([
+        join(process.cwd(), ownTest),
+        integrationTest,
+      ].sort());
+      expect(
+        walkSourceFiles("src/app").filter((file) =>
+          importPattern.test(readFileSync(file, "utf8")),
+        ),
+      ).toEqual([]);
+      expect(
+        walkSourceFiles("src/components").filter((file) =>
+          importPattern.test(readFileSync(file, "utf8")),
+        ),
+      ).toEqual([]);
+      expect(source).toMatch(/^import "server-only";/);
+      expect(source).not.toMatch(/_READY\s*=\s*(?:\r?\n\s*)?true\b/);
+      expect(source).toMatch(
+        /_READY\s*=\s*(?:\r?\n\s*)?false\s+as const/,
+      );
+      expect(source).toContain(status);
+      expect(source).not.toMatch(
+        /process\.env|import\.meta\.env|Deno\.env|Bun\.env|SUPABASE_(?:SECRET_KEY|SERVICE_ROLE_KEY)|GOOGLE_APPLICATION_CREDENTIALS|private_key|client_email|NEXT_PUBLIC_|console\.(?:debug|error|info|log|warn)|\blogger\b|\blog\s*\(/i,
+      );
+    }
   });
 
   it("exposes the privacy review as a physical POST-only route", () => {

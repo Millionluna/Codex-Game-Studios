@@ -83,7 +83,7 @@ function getPrivacyCopy(locale: Locale) {
       title: "隐私、信息收集与保留说明",
       intro:
         "本说明概述 CaresLink AI 在文档草稿流程中处理哪些信息、保留多久，以及用户可执行的控制。它是产品说明，不是法律保证。",
-      updated: "最后更新：2026 年 8 月 4 日",
+      updated: "最后更新：2026 年 9 月 1 日",
       sections: [
         {
           title: "我们收集什么",
@@ -95,7 +95,9 @@ function getPrivacyCopy(locale: Locale) {
         {
           title: "AI 处理",
           paragraphs: [
-            "完成浏览器隐私复核与两项确认后，服务端仍会独立检查输入。只有通过检查的结构化事实才会发送给 OpenAI 生成受控格式草稿。",
+            "Communication Note Composer 当前是独立的本地版本：七个字段、本地隐私发现和清理预览只保留在当前浏览器标签页内，不会发送给 Product API 或 OpenAI，也不会保存、扣除 Points、创建临时结果或导出草稿。",
+            "未来的联网生成功能必须单独启用，在发送任何内容前再次通过服务端隐私与契约检查，并先在本说明中明确更新其处理方式。",
+            "对于已联网的 NDIS Case Note Companion，完成浏览器隐私复核与两项确认后，服务端仍会独立检查输入。只有通过检查的结构化事实才会发送给 OpenAI 生成受控格式草稿。",
             "OpenAI 请求使用 store:false。我们不把这一设置描述为 zero data retention；服务提供方仍可能按其适用条款和安全流程处理请求。",
           ],
         },
@@ -133,7 +135,7 @@ function getPrivacyCopy(locale: Locale) {
     title: "Privacy, collection and retention notice",
     intro:
       "This notice explains what CaresLink AI handles during document drafting, how long it is retained and the controls available to users. It is a product notice, not a legal guarantee.",
-    updated: "Last updated: 4 August 2026",
+    updated: "Last updated: 1 September 2026",
     sections: [
       {
         title: "What we collect",
@@ -145,7 +147,9 @@ function getPrivacyCopy(locale: Locale) {
       {
         title: "AI processing",
         paragraphs: [
-          "After browser privacy review and both confirmations, the server independently validates the input. Only reviewed structured facts that pass those checks are sent to OpenAI for a controlled-format draft.",
+          "The current Communication Note Composer is a separate local-only release: its seven fields, local privacy findings and cleaned preview stay in the current browser tab. They are not sent to the Product API or OpenAI, saved, charged against Points, placed in a temporary result or exported as a draft.",
+          "Any future connected generation must be enabled separately, repeat server-side privacy and contract checks before sending content, and first update this notice with its processing terms.",
+          "For the connected NDIS Case Note Companion, the server independently validates the input after browser privacy review and both confirmations. Only reviewed structured facts that pass those checks are sent to OpenAI for a controlled-format draft.",
           "OpenAI requests use store:false. We do not describe that setting as zero data retention; the service provider may still process requests under its applicable terms and security processes.",
         ],
       },

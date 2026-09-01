@@ -6,7 +6,13 @@ import "./globals.css";
 const DOCUMENT_LANGUAGE_BOOTSTRAP = `(() => {
   try {
     const locale = new URLSearchParams(window.location.search).get("lang");
-    document.documentElement.lang = locale === "zh-Hans" ? "zh-Hans" : "en";
+    const pathname = window.location.pathname.replace(/\\/+$/, "");
+    const supportedLocales = new Set(
+      pathname === "/ai-documents/communication-note"
+        ? ["en", "zh-Hans", "zh-Hant"]
+        : ["en", "zh-Hans"],
+    );
+    document.documentElement.lang = supportedLocales.has(locale) ? locale : "en";
   } catch {
     document.documentElement.lang = "en";
   }

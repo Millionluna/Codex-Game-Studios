@@ -6,6 +6,7 @@ import {
   FolderOpen,
   KeyRound,
   LockKeyhole,
+  MessageSquareText,
   ShieldCheck,
 } from "lucide-react";
 import Link from "next/link";
@@ -20,6 +21,7 @@ import {
   getGeneratedMaterialDraftStore,
   type GeneratedMaterialDraftRecord,
 } from "@/lib/generated-material-draft-store";
+import { isCommunicationNoteComposerEnabled } from "@/lib/communication-note-composer-feature";
 import { parseNdisCaseNoteMaterial } from "@/lib/ndis-case-note-companion";
 import { withWorkspaceAccount } from "@/lib/referral-workspace-auth";
 import { getWorkspaceAccessGateWithServerSession } from "@/lib/referral-workspace-session";
@@ -48,6 +50,8 @@ export default async function AiDocumentsPage({
   const copy = getAiDocumentsCopy(locale);
   const workspaceCopy = getReferralWorkspaceCopy(locale);
   const gate = await getWorkspaceAccessGateWithServerSession(params);
+  const communicationNoteComposerEnabled =
+    isCommunicationNoteComposerEnabled();
 
   if (gate.status === "signed_out") {
     return (
@@ -169,6 +173,20 @@ export default async function AiDocumentsPage({
                   }
                   icon={<FileText className="size-5" aria-hidden="true" />}
                 />
+                {communicationNoteComposerEnabled ? (
+                  <DocumentToolRow
+                    href={href("/ai-documents/communication-note")}
+                    title={copy.communicationNoteTitle}
+                    description={copy.communicationNoteDescription}
+                    status={copy.localPreparation}
+                    icon={
+                      <MessageSquareText
+                        className="size-5"
+                        aria-hidden="true"
+                      />
+                    }
+                  />
+                ) : null}
                 <DocumentToolRow
                   href={href("/referral-workspace/materials")}
                   title={copy.referralMaterialsTitle}
@@ -461,6 +479,10 @@ function getAiDocumentsCopy(locale: Locale) {
       caseNoteTitle: "NDIS Case Note AI 助手",
       caseNoteDescription:
         "把去标识化的支持事实整理成中性、可复核的 case note 草稿。",
+      communicationNoteTitle: "Communication Note 输入与隐私复核",
+      communicationNoteDescription:
+        "整理联系时间、渠道、参与角色和可观察事实；先在浏览器内完成隐私预检。",
+      localPreparation: "本地准备 · 生成未连接",
       availableNow: "立即开始",
       referralMaterialsTitle: "转介沟通材料",
       referralMaterialsDescription:
@@ -523,6 +545,10 @@ function getAiDocumentsCopy(locale: Locale) {
     caseNoteTitle: "NDIS Case Note AI Companion",
     caseNoteDescription:
       "Turn de-identified support facts into neutral case-note wording for review.",
+    communicationNoteTitle: "Communication Note intake & privacy review",
+    communicationNoteDescription:
+      "Structure the contact time, channel, parties by role and observable facts, then complete a browser-only privacy preflight.",
+    localPreparation: "Local preparation · generation offline",
     availableNow: "Start now",
     referralMaterialsTitle: "Referral communication materials",
     referralMaterialsDescription:

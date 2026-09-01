@@ -763,6 +763,179 @@ complete 188-file / 2,578-test suite, TypeScript, full ESLint, 73-file adapter
 sync, 64/64-page Webpack build and a 24-client-chunk negative leak scan. None of
 those checks schedules work or makes this module a reachable product entry.
 
+### Product runtime identities M1s — source only
+
+M1s adds one server-only, default-off outer composition around M1r. A TestOnly
+call first validates an injected, five-minute-bounded deployment identity for
+the exact source revision, target ref and CA digest. It then requires one atomic
+authenticated control-plane identity + branch observation and derives a
+canonical content-free evidence digest. Project-ref HMAC, pinned-CA loading and
+each management credential custody call are privately wrapped with the same
+source revision, deployment identity evidence and control-plane evidence before
+M1r/M1m can consume them.
+
+The formal factory remains fixed `PRODUCT_API_DISABLED`; `READY=false`, the
+approved export is absent and App Route/component importers remain zero. M1s
+does not import `pg`, Supabase/OpenAI SDKs or network modules and performs no
+environment discovery. It accepts no PAT, OAuth token, API secret, DSN,
+password, host or CA body as composition configuration. The underlying branch
+admin password is still explicitly static and reusable: the 60-second bound is
+only the one-use delivery envelope, while source expiry remains `null` and
+source revocation remains branch delete or password reset. No real deployment
+identity, Management API adapter, KMS/HMAC, CA store or secret-manager transport
+is implemented or claimed by this source contract.
+
+Local closeout passed the 4-file / 76-test M1s/M1r/M1m-target/runtime-boundary
+focus, the complete 189-file / 2,609-test suite, TypeScript, full ESLint,
+73-file adapter sync, the 64/64-page Turbopack production build and the expanded
+24-client-chunk M1r/M1s negative leak scan. Package and lock files stayed exact
+to M1r. The run created no Supabase resource, SQL connection, migration,
+deployment, schedule or provider/model call.
+
+### Product runtime platform protocol adapters M1t — source only
+
+M1t is the implemented server-only, default-off protocol layer outside
+M1s. Its formal factory remains fixed `PRODUCT_API_DISABLED`; `READY=false`,
+the approved export is absent and no Product API route, component or automation
+may activate it. Provider SDKs, credentials and cloud resources remain outside
+this source slice.
+
+The only allowed Supabase control-plane request is an authenticated, no-query,
+no-redirect, zero-retry `GET /v1/projects/{production_ref}/branches` using exact
+OAuth App scope `environment:read`, pinned app/grant reference digests and an
+enforced endpoint allowlist. `branching_development_read` belongs to the
+separate fine-grained-token model and is not claimed on this OAuth token. PAT is
+forbidden. `GET /v1/branches/{branch_id_or_ref}` is also forbidden because its
+official branch-config response schema includes `db_pass` and `jwt_secret`,
+which would collapse the control-plane and credential-custody boundaries before
+M1s can assert content-free evidence.
+
+Vercel OIDC alone does not attest the source revision; M1t therefore requires a
+separate managed source-manifest attestation bound to the workload, target and
+CA digest. The minimal target is Direct-only
+`db.{child_ref}.supabase.co:5432/postgres`. PostgreSQL 17 requires both the
+deployment-attested source pin and M1m's later database-session check; this
+source handoff supplies no live PG17 evidence. Managed HMAC, pinned CA,
+Management API credential and static branch-admin password remain distinct
+injected protocol ports. No KMS or Secret Manager provider has been selected.
+
+The completed local source gate passed M1t 33/33, the focused M1r/M1s/M1t
+4-file / 84-test set, the full 190-file / 2,643-test suite, TypeScript, full
+ESLint, `git diff --check`, the 64/64-page production build and the 24-chunk
+M1r/M1s/M1t leak scan. These checks used no real provider credential, API,
+database or cloud resource.
+M1u requires separate provider, cost and resource authorization before any
+workload federation, KMS key, OAuth credential, CA custody, secret version,
+live Management API observation, database connection or deployment is created.
+See
+`documentation/communication-note-preview-product-runtime-platform-adapters-m1t.md`.
+
+### Product runtime GCP adapters M1u — source closeout, live blocked
+
+M1u selects Google Cloud for M1t's first concrete provider adapter and now has
+a default-off, injected-client TestOnly protocol seam, but no concrete provider
+runtime or live gate exists yet. GCP project `careslink-m1u-security` (project
+number `288554824534`) has been created without a linked billing account;
+regional KMS/Secret resources are pinned to `australia-southeast1`. Consequently
+the pinned WIF pool/provider, runtime service account, IAM bindings, KMS key
+ring/keys/versions and regional Secret Manager secrets/versions have not been
+created. API enablement is not attested by this handoff. Vercel Team issuer is selected
+for exact team `millionlunas-projects` / project `careslink-ai`; there is no M1u
+Preview deployment or successful federation. A subsequently authorized batch
+created Supabase OAuth App `Careslink AI M1u Preview` with website
+`https://careslink.com.au`, localhost callback
+`http://localhost:32119/m1u/supabase/oauth/callback` and only
+`environment:read`. Raw client id is omitted; its inventory marker is SHA-256
+`4b7a6fef8101c33fee65eae04d24cae31f59770773a21cb61af8299702bda77b`.
+The one-time client secret was not persisted to the workspace, environment or a
+credential store and remains an owner custody/rotation handoff. No authorization
+grant, access token or refresh token exists.
+
+The WIF plan pins exchanged-token `aud` to the provider-specific
+`https://iam.googleapis.com/projects/288554824534/locations/global/workloadIdentityPools/vercel-careslink-preview/providers/vercel-team-preview`,
+while `google-auth-library` uses the distinct external-account resource audience
+`//iam.googleapis.com/projects/288554824534/locations/global/workloadIdentityPools/vercel-careslink-preview/providers/vercel-team-preview`.
+Neither may fall back to Vercel's normal team audience at exchange time.
+
+M1u also corrects the control-plane authorization model: Supabase OAuth App
+scope `environment:read` and fine-grained-token permission
+`branching_development_read` are different models. This runtime chooses the
+OAuth app scope plus pinned app/grant metadata SHA-256 attestations and the exact
+list-branches endpoint allowlist; it does not claim that an OAuth token carries a
+fine-grained permission. Raw app/grant IDs, client secrets and tokens stay out of
+evidence and logs.
+
+`READY=false`; version is
+`gcp-adapters.communication.openai.synthetic-preview.2026-09-01.m1u.v1` and
+policy digest is
+`5a0b358626f1864cd13584e4abadf79254e5d365911b28586666e58a76c76c36`.
+The completed local source gate passed M1u/runtime-boundary 2 files / 24 tests,
+the focused M1s/M1t/M1u/runtime-boundary 4-file / 102-test set, the full
+191-file / 2,667-test suite, TypeScript, full ESLint, `git diff --check`, the
+64/64-page production build and the 24-chunk M1r/M1s/M1t/M1u leak scan. This is
+source-only evidence; live source revision and live resource evidence remain
+`TBD`.
+
+The earlier OAuth evidence, database-custody request-shape and explicit
+`nbf`/name-claim mismatches are closed, together with descriptor-safe hostile
+input rejection, uint32 CRC, monotonic clock, credential freshness, KMS success
+integrity and X.509 CA validation. M1v subsequently closed the source-only
+provider-bridge and M1u→M1t composition gaps with default-off TestOnly ports;
+this does not change the GCP or deployment live status. Provisioning/live remains NO-GO
+because the independent source-manifest signer/artifact pipeline, GCP billing
+and resources, Supabase OAuth secret custody/rotation, canonical app/grant
+references, grant/live intake plus rotated-token writer,
+Node transport live evidence and one-time no-data Preview gate do not exist.
+The runtime service account may not silently receive source-manifest signing
+authority, and source wiring is not evidence of a live provider call.
+No Preview/Production database, SQL/migration, real data, deployment or AI call
+was involved. Billing linkage, Google APIs/resources/IAM, KMS/secret versions,
+Supabase OAuth secret custody/rotation and grant, any Vercel Preview deployment and every live branch
+operation remain separate action-time confirmation blockers. See
+`documentation/communication-note-preview-product-runtime-gcp-adapters-m1u.md`
+and
+`documentation/communication-note-preview-product-runtime-provider-bridges-m1v.md`.
+
+### Product runtime provider bridges M1v — source wired, live blocked
+
+M1v adds two default-off source bridges without enabling a formal runtime. The
+GCP bridge uses the exact direct-REST chain
+`@vercel/oidc` → Vercel custom-audience exchange → Google STS → runtime
+service-account impersonation → pinned KMS/Regional Secret Manager calls. Every
+operation is zero-retry, no-redirect, five-second bounded and receives the same
+root `AbortSignal`; exact project/provider/service-account, numeric key/secret
+versions and response/CRC boundaries remain pinned. Its version is
+`gcp-rest-bridge.communication.openai.synthetic-preview.2026-09-01.m1v.v1` and
+policy digest is
+`c116c449fb025ecaca156e952d37b812c7dd272258120f677c8cef1e202326e3`.
+
+The Supabase bridge consumes a one-use OAuth intake credential, proactively
+refreshes exactly once per bundle and serves only the `environment:read`
+list-branches GET. A 401 revokes local use without refresh or replay. A rotated
+refresh token is deliberately not persisted because no reviewed writer exists.
+Its version is
+`supabase-management-bridge.communication.openai.synthetic-preview.2026-09-01.m1v.v1`
+and policy digest is
+`2c4c87bb7a15f3b101fd78c4438f44ed8b2e6dd28f782a615b92f87029e43c68`.
+
+Injected-transport source tests compose the actual M1u→M1t→M1s→M1r→M1m
+modules without constructing a PostgreSQL Client or consuming the terminal
+database credential. Both formal bridges remain absent with `READY=false`,
+deployment/activation false. No GCP resource, live credential, provider exchange,
+database, deployment, real care data or model call is evidence of this source
+slice. A later authorized batch created only the scoped Supabase OAuth App; its
+one-time secret was not persisted and no grant/token exists. GCP remains blocked
+by missing billing and resources. Remaining gates are the independent signer
+artifact/revision handoff, OAuth secret custody/rotation, canonical app/grant
+references, grant/live intake and rotated-token writer,
+Node transport live evidence, then an explicitly confirmed one-time no-data
+Preview/live/delete cycle.
+
+The M1v closeout passed 6 focused files / 82 tests, the full 194-file /
+2,683-test suite, TypeScript, full ESLint, the 73-file Codex-adapter sync check,
+`git diff --check`, the 64/64-page production build and a fresh 24-chunk
+M1r/M1s/M1t/M1u/M1v server-only leak scan.
+
 Supabase CLI 2.115.0 has since generated source-only migration `20260823213144_harden_v1_note_generation_registration_retention.sql`. It adds `attempts_registration_digest_idx` and the named `attempts_registration_catalog_fk` from `attempts.registration_digest` to `worker_registrations.registration_digest`, with update/delete `RESTRICT`, `NOT VALID` creation and explicit validation. It creates no seed, caller grant, runtime surface or Production change. Its local gate passed 39/39 focused contracts, the full 125-file / 1,381-test suite, lint, TypeScript, the 63/63-page production build, the 73-file Codex-adapter sync check and `git diff --check`. Deleted disposable `r22` then clean-applied the current manifest 15/15 and passed the seven rollback suites; the hosted registration-retention gate is now closed without enabling any runtime automation.
 
 ### PostgreSQL 16.15 local isolated gate — 2026-08-24
