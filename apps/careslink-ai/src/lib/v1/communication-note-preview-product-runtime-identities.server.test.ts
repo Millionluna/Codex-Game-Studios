@@ -85,6 +85,8 @@ const DEPLOYMENT_IDENTITY_EVIDENCE_SHA256 = "5".repeat(64);
 const CONTROL_PLANE_EVIDENCE_SHA256 = "6".repeat(64);
 const CONTROL_PLANE_PRINCIPAL_SHA256 = "7".repeat(64);
 const CONTROL_PLANE_CREDENTIAL_SHA256 = "8".repeat(64);
+const OAUTH_APP_REFERENCE_SHA256 = "a".repeat(64);
+const OAUTH_GRANT_REFERENCE_SHA256 = "b".repeat(64);
 const SECRET_SENTINEL = "M1S_SECRET_SENTINEL_MUST_NEVER_ESCAPE";
 
 const FIXED_FAILURE = Object.freeze({
@@ -119,7 +121,7 @@ describe("Communication Note M1s product runtime identities", () => {
     expect(
       productRuntimeIdentities.CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_PRODUCT_RUNTIME_IDENTITIES_VERSION,
     ).toBe(
-      "identities.communication.openai.synthetic-preview.2026-09-01.m1s.v1",
+      "identities.communication.openai.synthetic-preview.2026-09-01.m1s.v2",
     );
     expect(
       productRuntimeIdentities.CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_PRODUCT_RUNTIME_IDENTITIES_READY,
@@ -130,7 +132,7 @@ describe("Communication Note M1s product runtime identities", () => {
     expect(
       productRuntimeIdentities.CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_PRODUCT_RUNTIME_IDENTITIES_POLICY_DIGEST,
     ).toBe(
-      "4c33184016b7335e39918715b79351673141c3f41c966b34b5b7a617d0a44db2",
+      "98a25545a0d2998b136453d1703dea747467cd1ebf2f1ba443121125f27df08a",
     );
     expect(
       canonicalSha256(
@@ -162,6 +164,15 @@ describe("Communication Note M1s product runtime identities", () => {
       secretManagerImplementationPresent: false,
       maximumIdentityAgeMs: 300_000,
       maximumIdentityRemainingMs: 300_000,
+      controlPlaneAuthorizationModel: "SUPABASE_OAUTH_APP_SCOPE",
+      requiredControlPlaneOAuthScope: "environment:read",
+      controlPlaneScopeAttestationSource:
+        "PINNED_OAUTH_APP_CONFIGURATION_AND_GRANT",
+      controlPlaneOAuthAppReferenceRequired: true,
+      controlPlaneOAuthGrantReferenceRequired: true,
+      controlPlaneEndpointAllowlistEnforced: true,
+      fineGrainedTokenPermissionClaimed: false,
+      productionControlPlaneAuthorizationAllowed: false,
       underlyingCredentialClass:
         "STATIC_SUPABASE_BRANCH_ADMIN_PASSWORD",
       underlyingCredentialShortLived: false,
@@ -409,7 +420,7 @@ describe("Communication Note M1s product runtime identities", () => {
     expect(deploymentIdentityEvidenceSha256).toBe(
       canonicalSha256({
         domain:
-          "careslink.communication-note.preview.deployment-identity.m1s.v1",
+          "careslink.communication-note.preview.deployment-identity.m1s.v2",
         request: identityRequest(),
         identity: validIdentity(),
       }),
@@ -425,7 +436,7 @@ describe("Communication Note M1s product runtime identities", () => {
     expect(controlPlaneEvidenceSha256).toBe(
       canonicalSha256({
         domain:
-          "careslink.communication-note.preview.authenticated-control-plane-evidence.m1s.v1",
+          "careslink.communication-note.preview.authenticated-control-plane-evidence.m1s.v2",
         sourceRevisionSha256: SOURCE_REVISION_SHA256,
         deploymentIdentityEvidenceSha256,
         identity: validControlPlaneEnvelope().identity,
@@ -492,7 +503,25 @@ describe("Communication Note M1s product runtime identities", () => {
 
   it.each([
     ["wrong audience", { audience: "WRONG" }],
-    ["production permission", { permission: "PRODUCTION_ADMIN" }],
+    ["wrong authorization model", { authorizationModel: "FINE_GRAINED_TOKEN" }],
+    ["wrong OAuth scope", { oauthScope: "environment:write" }],
+    [
+      "OAuth app reference reused from workload identity",
+      { oauthAppReferenceSha256: WORKLOAD_IDENTITY_HMAC_SHA256 },
+    ],
+    [
+      "reused OAuth grant reference",
+      { oauthGrantReferenceSha256: OAUTH_APP_REFERENCE_SHA256 },
+    ],
+    [
+      "wrong scope attestation source",
+      { scopeAttestationSource: "TOKEN_SELF_ASSERTION" },
+    ],
+    ["disabled endpoint allowlist", { endpointAllowlistEnforced: false }],
+    [
+      "fine-grained token permission claim",
+      { permission: "BRANCHING_DEVELOPMENT_READ" },
+    ],
     ["raw credential claim", { rawCredentialMaterialPresent: true }],
     ["stale issue time", { issuedAt: "2026-09-01T11:54:59.999Z" }],
     ["extra identity field", { extra: SECRET_SENTINEL }],
@@ -1012,7 +1041,13 @@ describe("Communication Note M1s product runtime identities", () => {
               "AUTHENTICATED_CONTROL_PLANE_IDENTITY_NOT_APPROVED",
             source: "SUPABASE_MANAGEMENT_API",
             audience: "SUPABASE_MANAGEMENT_API",
-            permission: "BRANCHING_DEVELOPMENT_READ",
+            authorizationModel: "SUPABASE_OAUTH_APP_SCOPE",
+            oauthScope: "environment:read",
+            oauthAppReferenceSha256: "b".repeat(64),
+            oauthGrantReferenceSha256: "c".repeat(64),
+            scopeAttestationSource:
+              "PINNED_OAUTH_APP_CONFIGURATION_AND_GRANT",
+            endpointAllowlistEnforced: true,
             principalReferenceSha256: "5".repeat(64),
             credentialReferenceSha256: "6".repeat(64),
             issuedAt: "2026-09-01T11:58:00.000Z",
@@ -1242,7 +1277,13 @@ function validControlPlaneEnvelope() {
       status: "AUTHENTICATED_CONTROL_PLANE_IDENTITY_NOT_APPROVED",
       source: "SUPABASE_MANAGEMENT_API",
       audience: "SUPABASE_MANAGEMENT_API",
-      permission: "BRANCHING_DEVELOPMENT_READ",
+      authorizationModel: "SUPABASE_OAUTH_APP_SCOPE",
+      oauthScope: "environment:read",
+      oauthAppReferenceSha256: OAUTH_APP_REFERENCE_SHA256,
+      oauthGrantReferenceSha256: OAUTH_GRANT_REFERENCE_SHA256,
+      scopeAttestationSource:
+        "PINNED_OAUTH_APP_CONFIGURATION_AND_GRANT",
+      endpointAllowlistEnforced: true,
       principalReferenceSha256: CONTROL_PLANE_PRINCIPAL_SHA256,
       credentialReferenceSha256: CONTROL_PLANE_CREDENTIAL_SHA256,
       issuedAt: "2026-09-01T11:58:00.000Z",

@@ -34,14 +34,18 @@ const RUNTIME_ENVIRONMENT_CLASS = "NON_PRODUCTION_PREVIEW" as const;
 const AUTHENTICATED_TARGET_OBSERVATION_PURPOSE =
   "CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_AUTHENTICATED_TARGET_OBSERVATION" as const;
 const CONTROL_PLANE_SOURCE = "SUPABASE_MANAGEMENT_API" as const;
-const CONTROL_PLANE_PERMISSION = "BRANCHING_DEVELOPMENT_READ" as const;
+const CONTROL_PLANE_AUTHORIZATION_MODEL =
+  "SUPABASE_OAUTH_APP_SCOPE" as const;
+const CONTROL_PLANE_OAUTH_SCOPE = "environment:read" as const;
+const CONTROL_PLANE_SCOPE_ATTESTATION_SOURCE =
+  "PINNED_OAUTH_APP_CONFIGURATION_AND_GRANT" as const;
 const MANAGEMENT_CREDENTIAL_PURPOSE =
   "CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_MANAGEMENT_SESSION" as const;
 const MANAGEMENT_APPLICATION_NAME =
   "careslink-preview-runtime-credential-broker-management" as const;
 
 export const CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_PRODUCT_RUNTIME_IDENTITIES_VERSION =
-  "identities.communication.openai.synthetic-preview.2026-09-01.m1s.v1" as const;
+  "identities.communication.openai.synthetic-preview.2026-09-01.m1s.v2" as const;
 export const CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_PRODUCT_RUNTIME_IDENTITIES_READY =
   false as const;
 
@@ -71,8 +75,15 @@ const PRODUCT_RUNTIME_IDENTITIES_POLICY_CORE = deepFreeze({
   maximumIdentityAgeMs: MAXIMUM_IDENTITY_AGE_MS,
   maximumIdentityRemainingMs: MAXIMUM_IDENTITY_REMAINING_MS,
   controlPlaneSource: CONTROL_PLANE_SOURCE,
-  requiredControlPlanePermission: CONTROL_PLANE_PERMISSION,
-  productionControlPlanePermissionAllowed: false,
+  controlPlaneAuthorizationModel: CONTROL_PLANE_AUTHORIZATION_MODEL,
+  requiredControlPlaneOAuthScope: CONTROL_PLANE_OAUTH_SCOPE,
+  controlPlaneScopeAttestationSource:
+    CONTROL_PLANE_SCOPE_ATTESTATION_SOURCE,
+  controlPlaneOAuthAppReferenceRequired: true,
+  controlPlaneOAuthGrantReferenceRequired: true,
+  controlPlaneEndpointAllowlistEnforced: true,
+  fineGrainedTokenPermissionClaimed: false,
+  productionControlPlaneAuthorizationAllowed: false,
   identityBinding:
     "CANONICAL_SHA256_ATTESTATION_AND_ATOMIC_CONTROL_PLANE_OBSERVATION",
   sourceRevisionBinding:
@@ -115,7 +126,7 @@ const PRODUCT_RUNTIME_IDENTITIES_POLICY_CORE = deepFreeze({
 } as const);
 
 export const CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_PRODUCT_RUNTIME_IDENTITIES_POLICY_DIGEST =
-  "4c33184016b7335e39918715b79351673141c3f41c966b34b5b7a617d0a44db2" as const;
+  "98a25545a0d2998b136453d1703dea747467cd1ebf2f1ba443121125f27df08a" as const;
 
 if (
   canonicalSha256(PRODUCT_RUNTIME_IDENTITIES_POLICY_CORE) !==
@@ -265,7 +276,7 @@ export async function createTestOnlyCaresLinkV1CommunicationNotePreviewProductRu
     );
     const deploymentIdentityEvidenceSha256 = canonicalSha256({
       domain:
-        "careslink.communication-note.preview.deployment-identity.m1s.v1",
+        "careslink.communication-note.preview.deployment-identity.m1s.v2",
       request: identityRequest,
       identity: deploymentIdentity,
     });
@@ -655,7 +666,12 @@ function validateAuthenticatedControlPlaneEnvelope(
     "status",
     "source",
     "audience",
-    "permission",
+    "authorizationModel",
+    "oauthScope",
+    "oauthAppReferenceSha256",
+    "oauthGrantReferenceSha256",
+    "scopeAttestationSource",
+    "endpointAllowlistEnforced",
     "principalReferenceSha256",
     "credentialReferenceSha256",
     "issuedAt",
@@ -667,11 +683,22 @@ function validateAuthenticatedControlPlaneEnvelope(
       "AUTHENTICATED_CONTROL_PLANE_IDENTITY_NOT_APPROVED" ||
     identityValue.source !== CONTROL_PLANE_SOURCE ||
     identityValue.audience !== CONTROL_PLANE_SOURCE ||
-    identityValue.permission !== CONTROL_PLANE_PERMISSION ||
+    identityValue.authorizationModel !==
+      CONTROL_PLANE_AUTHORIZATION_MODEL ||
+    identityValue.oauthScope !== CONTROL_PLANE_OAUTH_SCOPE ||
+    identityValue.scopeAttestationSource !==
+      CONTROL_PLANE_SCOPE_ATTESTATION_SOURCE ||
+    identityValue.endpointAllowlistEnforced !== true ||
     identityValue.rawCredentialMaterialPresent !== false
   ) {
     throw unavailable();
   }
+  const oauthAppReferenceSha256 = requireSha256(
+    identityValue.oauthAppReferenceSha256,
+  );
+  const oauthGrantReferenceSha256 = requireSha256(
+    identityValue.oauthGrantReferenceSha256,
+  );
   const principalReferenceSha256 = requireSha256(
     identityValue.principalReferenceSha256,
   );
@@ -745,12 +772,16 @@ function validateAuthenticatedControlPlaneEnvelope(
     new Set([
       sourceRevisionSha256,
       deploymentIdentityEvidenceSha256,
+      deploymentIdentity.workloadIdentityHmacSha256,
+      deploymentIdentity.deploymentHmacSha256,
       deploymentIdentity.attestationEvidenceSha256,
+      oauthAppReferenceSha256,
+      oauthGrantReferenceSha256,
       principalReferenceSha256,
       credentialReferenceSha256,
       observationEvidenceSha256,
       targetRequest.tlsRootCertificateSha256,
-    ]).size !== 7
+    ]).size !== 11
   ) {
     throw unavailable();
   }
@@ -760,7 +791,12 @@ function validateAuthenticatedControlPlaneEnvelope(
       "AUTHENTICATED_CONTROL_PLANE_IDENTITY_NOT_APPROVED" as const,
     source: CONTROL_PLANE_SOURCE,
     audience: CONTROL_PLANE_SOURCE,
-    permission: CONTROL_PLANE_PERMISSION,
+    authorizationModel: CONTROL_PLANE_AUTHORIZATION_MODEL,
+    oauthScope: CONTROL_PLANE_OAUTH_SCOPE,
+    oauthAppReferenceSha256,
+    oauthGrantReferenceSha256,
+    scopeAttestationSource: CONTROL_PLANE_SCOPE_ATTESTATION_SOURCE,
+    endpointAllowlistEnforced: true as const,
     principalReferenceSha256,
     credentialReferenceSha256,
     issuedAt,
@@ -803,7 +839,7 @@ function validateAuthenticatedControlPlaneEnvelope(
   }
   const controlPlaneEvidenceSha256 = canonicalSha256({
     domain:
-      "careslink.communication-note.preview.authenticated-control-plane-evidence.m1s.v1",
+      "careslink.communication-note.preview.authenticated-control-plane-evidence.m1s.v2",
     sourceRevisionSha256,
     deploymentIdentityEvidenceSha256,
     identity,

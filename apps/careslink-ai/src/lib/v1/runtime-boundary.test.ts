@@ -87,6 +87,7 @@ describe("V1 shadow runtime boundary", () => {
       "src/lib/v1/communication-note-preview-product-runtime-composition.server.ts",
       "src/lib/v1/communication-note-preview-product-runtime-identities.server.ts",
       "src/lib/v1/communication-note-preview-product-runtime-platform-adapters.server.ts",
+      "src/lib/v1/communication-note-preview-product-runtime-gcp-adapters.server.ts",
       "src/lib/v1/native-auth-boundary.server.ts",
       "src/lib/v1/openai-communication-note-provider.server.ts",
       "src/lib/v1/communication-note-provider-policy.ts",
@@ -929,6 +930,50 @@ describe("V1 shadow runtime boundary", () => {
     expect(source).toContain(
       "/v1/projects/${CARESLINK_PRODUCTION_SUPABASE_REF}/branches",
     );
+  });
+
+  it("quarantines the M1u GCP provider adapters to its own test and forbids ambient cloud authority", () => {
+    const relativePath =
+      "src/lib/v1/communication-note-preview-product-runtime-gcp-adapters.server.ts";
+    const modulePath = join(process.cwd(), relativePath);
+    const testPath = join(
+      process.cwd(),
+      "src/lib/v1/communication-note-preview-product-runtime-gcp-adapters.server.test.ts",
+    );
+    const importStem =
+      "communication-note-preview-product-runtime-gcp-adapters.server";
+    const importPattern = new RegExp(
+      `(?:from\\s+|import\\s*(?:\\(\\s*)?|require\\s*\\(\\s*)["'][^"']*${importStem.replaceAll(".", "\\.")}(?:\\.(?:[cm]?[jt]s|[jt]sx))?["']`,
+    );
+    const importers = walkControlledScriptFiles().filter((file) =>
+      importPattern.test(readFileSync(file, "utf8")),
+    );
+    const source = readFileSync(modulePath, "utf8");
+
+    expect(importers).toEqual([testPath]);
+    expect(
+      walkSourceFiles("src/app").filter((file) =>
+        importPattern.test(readFileSync(file, "utf8")),
+      ),
+    ).toEqual([]);
+    expect(
+      walkSourceFiles("src/components").filter((file) =>
+        importPattern.test(readFileSync(file, "utf8")),
+      ),
+    ).toEqual([]);
+    expect(source).toMatch(/^import "server-only";/);
+    expect(source).not.toMatch(
+      /process\.env|import\.meta\.env|Deno\.env|Bun\.env|GOOGLE_APPLICATION_CREDENTIALS|private_key|client_email|fetch\s*\(|node:(?:http|https|net|tls)|postgres(?:ql)?:\/\/|DATABASE_URL|connectionString\s*:|SUPABASE_(?:SECRET_KEY|SERVICE_ROLE_KEY)|NEXT_PUBLIC_|console\.(?:debug|error|info|log|warn)|\blogger\b|\blog\s*\(/i,
+    );
+    expect(source).not.toMatch(/_READY\s*=\s*(?:\r?\n\s*)?true\b/);
+    expect(source).toMatch(
+      /_READY\s*=\s*(?:\r?\n\s*)?false\s+as const/,
+    );
+    expect(source).toContain("SOURCE_GCP_PROVIDER_ADAPTERS_NOT_ACTIVATED");
+    expect(source).toContain("applicationDefaultCredentialsAllowed: false");
+    expect(source).toContain("serviceAccountJsonAllowed: false");
+    expect(source).toContain("concreteGoogleSdkClientsWired: false");
+    expect(source).not.toContain("/versions/latest");
   });
 
   it("exposes the privacy review as a physical POST-only route", () => {

@@ -801,12 +801,14 @@ may activate it. Provider SDKs, credentials and cloud resources remain outside
 this source slice.
 
 The only allowed Supabase control-plane request is an authenticated, no-query,
-no-redirect, zero-retry `GET /v1/projects/{production_ref}/branches` using OAuth
-scope `environment:read` and attested permission `branching_development_read`.
-PAT is forbidden. `GET /v1/branches/{branch_id_or_ref}` is also forbidden
-because its official branch-config response schema includes `db_pass` and
-`jwt_secret`, which would collapse the control-plane and credential-custody
-boundaries before M1s can assert content-free evidence.
+no-redirect, zero-retry `GET /v1/projects/{production_ref}/branches` using exact
+OAuth App scope `environment:read`, pinned app/grant reference digests and an
+enforced endpoint allowlist. `branching_development_read` belongs to the
+separate fine-grained-token model and is not claimed on this OAuth token. PAT is
+forbidden. `GET /v1/branches/{branch_id_or_ref}` is also forbidden because its
+official branch-config response schema includes `db_pass` and `jwt_secret`,
+which would collapse the control-plane and credential-custody boundaries before
+M1s can assert content-free evidence.
 
 Vercel OIDC alone does not attest the source revision; M1t therefore requires a
 separate managed source-manifest attestation bound to the workload, target and
@@ -827,6 +829,62 @@ workload federation, KMS key, OAuth credential, CA custody, secret version,
 live Management API observation, database connection or deployment is created.
 See
 `documentation/communication-note-preview-product-runtime-platform-adapters-m1t.md`.
+
+### Product runtime GCP adapters M1u — source closeout, live blocked
+
+M1u selects Google Cloud for M1t's first concrete provider adapter and now has
+a default-off, injected-client TestOnly protocol seam, but no concrete provider
+runtime or live gate exists yet. GCP project `careslink-m1u-security` (project
+number `288554824534`) has been created without a linked billing account;
+regional KMS/Secret resources are pinned to `australia-southeast1`. Consequently
+the pinned WIF pool/provider, runtime service account, IAM bindings, KMS key
+ring/keys/versions and regional Secret Manager secrets/versions have not been
+created. API enablement is not attested by this handoff. Vercel Team issuer is selected
+for exact team `millionlunas-projects` / project `careslink-ai`; there is no M1u
+Preview deployment or successful federation. The Supabase OAuth App form
+`Careslink AI M1u Preview` has Environment Read-only selected, but Confirm has
+not been clicked, so no app credential, grant or token exists.
+
+The WIF plan pins exchanged-token `aud` to the provider-specific
+`https://iam.googleapis.com/projects/288554824534/locations/global/workloadIdentityPools/vercel-careslink-preview/providers/vercel-team-preview`,
+while `google-auth-library` uses the distinct external-account resource audience
+`//iam.googleapis.com/projects/288554824534/locations/global/workloadIdentityPools/vercel-careslink-preview/providers/vercel-team-preview`.
+Neither may fall back to Vercel's normal team audience at exchange time.
+
+M1u also corrects the control-plane authorization model: Supabase OAuth App
+scope `environment:read` and fine-grained-token permission
+`branching_development_read` are different models. This runtime chooses the
+OAuth app scope plus pinned app/grant metadata SHA-256 attestations and the exact
+list-branches endpoint allowlist; it does not claim that an OAuth token carries a
+fine-grained permission. Raw app/grant IDs, client secrets and tokens stay out of
+evidence and logs.
+
+`READY=false`; version is
+`gcp-adapters.communication.openai.synthetic-preview.2026-09-01.m1u.v1` and
+policy digest is
+`5a0b358626f1864cd13584e4abadf79254e5d365911b28586666e58a76c76c36`.
+The completed local source gate passed M1u/runtime-boundary 2 files / 24 tests,
+the focused M1s/M1t/M1u/runtime-boundary 4-file / 102-test set, the full
+191-file / 2,667-test suite, TypeScript, full ESLint, `git diff --check`, the
+64/64-page production build and the 24-chunk M1r/M1s/M1t/M1u leak scan. This is
+source-only evidence; live source revision and live resource evidence remain
+`TBD`.
+
+The earlier OAuth evidence, database-custody request-shape and explicit
+`nbf`/name-claim mismatches are closed, together with descriptor-safe hostile
+input rejection, uint32 CRC, monotonic clock, credential freshness, KMS success
+integrity and X.509 CA validation. Provisioning/live remains NO-GO because the
+concrete Vercel→WIF/service-account→Google SDK bridge, M1t HTTPS port,
+independent source-manifest signer/artifact pipeline, Supabase OAuth
+intake/refresh/revoke custody and end-to-end M1u→M1t composition smoke do not
+exist. The runtime service account may not silently receive source-manifest
+signing authority, and installed Google/Vercel SDK dependencies are not evidence
+of wired calls.
+No Preview/Production database, SQL/migration, real data, deployment or AI call
+was involved. Billing linkage, Google APIs/resources/IAM, KMS/secret versions,
+Supabase OAuth Confirm/grant, any Vercel Preview deployment and every live branch
+operation remain separate action-time confirmation blockers. See
+`documentation/communication-note-preview-product-runtime-gcp-adapters-m1u.md`.
 
 Supabase CLI 2.115.0 has since generated source-only migration `20260823213144_harden_v1_note_generation_registration_retention.sql`. It adds `attempts_registration_digest_idx` and the named `attempts_registration_catalog_fk` from `attempts.registration_digest` to `worker_registrations.registration_digest`, with update/delete `RESTRICT`, `NOT VALID` creation and explicit validation. It creates no seed, caller grant, runtime surface or Production change. Its local gate passed 39/39 focused contracts, the full 125-file / 1,381-test suite, lint, TypeScript, the 63/63-page production build, the 73-file Codex-adapter sync check and `git diff --check`. Deleted disposable `r22` then clean-applied the current manifest 15/15 and passed the seven rollback suites; the hosted registration-retention gate is now closed without enabling any runtime automation.
 

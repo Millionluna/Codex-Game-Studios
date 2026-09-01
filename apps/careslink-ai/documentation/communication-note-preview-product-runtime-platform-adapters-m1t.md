@@ -13,19 +13,23 @@ AWS、GCP、Azure、Vault 或其他 KMS/Secret Manager 供应商，也不创建�
 
 | 项目 | 固定值或状态 |
 |---|---|
-| platform-adapters version | `platform-adapters.communication.openai.synthetic-preview.2026-09-01.m1t.v1` |
+| platform-adapters version | `platform-adapters.communication.openai.synthetic-preview.2026-09-01.m1t.v2` |
 | source status | `SOURCE_PRODUCT_RUNTIME_PLATFORM_ADAPTERS_NOT_ACTIVATED` |
 | activation | `false`；approved export absent |
 | Supabase Management API method | 仅 `GET` |
 | 唯一允许路径 | `/v1/projects/{production_ref}/branches` |
-| OAuth scope | `environment:read` |
-| required permission | `BRANCHING_DEVELOPMENT_READ` / `branching_development_read` |
+| authorization model | `SUPABASE_OAUTH_APP_SCOPE` |
+| OAuth scope | exact `environment:read` |
+| scope attestation | `PINNED_OAUTH_APP_CONFIGURATION_AND_GRANT` |
+| OAuth references | exact app SHA-256 + grant SHA-256；互不相同 |
+| endpoint allowlist | enforced；仅固定 branch-list request |
+| fine-grained token permission claimed | `false` |
 | PAT | 禁止 |
 | connection mode | 仅 Direct `5432` |
 | PostgreSQL major | source pin + deployment attestation；数据库 session 再验证 `17` |
 | provider selection/configuration | 未选择、未配置 |
-| policy digest | `0ff4bcf1c82575d037793c344c9679d10b6c8018abd3b0b050d040860100624c` |
-| source verification | M1t 33/33；M1r/M1s/M1t focused 4 files / 84 tests；full 190 files / 2,643 tests |
+| policy digest | `d1cbf263a7c6704f8cf24e58555c24ae2c45f4450b00b37d0f0897ecded76a6d` |
+| source verification | M1s/M1t focused 2 files / 78 tests；TypeScript；full ESLint；`git diff --check` |
 
 本批文档与源码验证不会访问 Supabase、Vercel、KMS、Secret Manager 或 PostgreSQL，不执行
 SQL、migration、部署或 provider/model call，也不处理真实 care data。
@@ -44,13 +48,18 @@ schema 包含 `db_pass` 与 `jwt_secret`；即使调用方只准备读取 host/v
 凭据带入控制面进程，违反 M1s 的 `rawCredentialMaterialPresent=false`、控制面观察与数据库
 凭据保管分离，以及“数据库密码只能经一次 callback delivery”契约。
 
-Management API identity 必须使用 `environment:read` scope 且被可信 custody metadata 证明
-只有 `branching_development_read`。PAT 携带签发用户的完整权限，不能由一次成功 GET 证明其
-没有 Production 权限，因此 M1t 固定拒绝 PAT。OAuth bearer token 只能在私有 callback 内
-交给 HTTPS port，不得作为 composition option、普通环境 fallback、返回值或 evidence 字段。
+Management API identity 必须使用 OAuth App 上配置的 exact `environment:read` scope，并由
+可信 custody metadata 绑定 pinned OAuth app reference 与该次 grant reference。Supabase 为
+同一 endpoint 另列出的 `branching_development_read` / `branching_production_read` 是
+fine-grained token 的权限要求，不是 OAuth access token 可额外自证的 permission；M1t v2
+明确不声称该 permission。实际能力收窄由 `endpointAllowlistEnforced=true` 和固定 HTTPS
+request 共同执行。PAT 携带签发用户的完整权限，不能由一次成功 GET 证明其没有 Production
+权限，因此 M1t 固定拒绝 PAT。OAuth bearer token 只能在私有 callback 内交给 HTTPS port，
+不得作为 composition option、普通环境 fallback、返回值或 evidence 字段。
 
 参考：
 [Management API authentication](https://supabase.com/docs/reference/api/introduction)、
+[OAuth App scopes](https://supabase.com/docs/guides/integrations/build-a-supabase-oauth-integration/oauth-scopes)、
 [List all branches](https://supabase.com/docs/reference/api/v1-list-all-branches)、
 [Get branch config](https://supabase.com/docs/reference/api/v1-get-a-branch-config)。
 
@@ -111,12 +120,11 @@ snapshot recheck、Abort 与 sequential/pending duplicate credential callback �
 M1t→M1s→M1r→M1m source smoke 通过且 composition 阶段 `pg.Client` 构造数为零；runtime importer
 quarantine 与 24 个 client chunks 的 version/status/digest/sentinel negative scan 通过。
 
-实际命令结果为：M1t 33/33；M1r/M1s/M1t focused 4 files / 84 tests；完整 Vitest 190 files /
-2,643 tests；TypeScript、全仓 ESLint、`git diff --check` 与 Next.js 16.2.9 Turbopack 64/64-page
-production build 全部通过。首次沙箱内 build 因 CSS worker 无权绑定本地临时端口失败；获批后
-以同一源码在沙箱外重跑成功。这些仍只是 source/build 证据，没有读取真实 token、调用
-Management API、连接 PostgreSQL 或创建/部署资源；低层 HTTPS port 的真实五秒 timeout 仍须
-由 M1u provider adapter 实证。
+本次 v2 OAuth 授权模型修订的实际命令结果为：M1s/M1t focused 2 files / 78 tests、
+TypeScript、全仓 ESLint 与 `git diff --check` 全部通过。本批未重跑完整 Vitest、production
+build 或 client-chunk scan，因此早期 v1 的更广验证数字不作为 v2 证据。这些仍只是 source
+证据，没有读取真实 token、调用 Management API、连接 PostgreSQL 或创建/部署资源；低层
+HTTPS port 的真实五秒 timeout 仍须由 M1u provider adapter 实证。
 
 M1t 只关闭 provider-neutral 平台协议源码切面。M1u 必须另行取得明确授权后才能：
 

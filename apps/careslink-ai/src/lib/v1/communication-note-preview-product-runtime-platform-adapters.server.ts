@@ -59,8 +59,11 @@ const BRANCH_RESPONSE_KEYS = [
 const RUNTIME_IDENTITY_AUDIENCE =
   "CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RUNTIME" as const;
 const RUNTIME_ENVIRONMENT_CLASS = "NON_PRODUCTION_PREVIEW" as const;
-const MANAGEMENT_PERMISSION = "BRANCHING_DEVELOPMENT_READ" as const;
+const MANAGEMENT_AUTHORIZATION_MODEL =
+  "SUPABASE_OAUTH_APP_SCOPE" as const;
 const MANAGEMENT_OAUTH_SCOPE = "environment:read" as const;
+const MANAGEMENT_SCOPE_ATTESTATION_SOURCE =
+  "PINNED_OAUTH_APP_CONFIGURATION_AND_GRANT" as const;
 const MANAGEMENT_CREDENTIAL_CLASS =
   "SUPABASE_MANAGEMENT_API_OAUTH2_ACCESS_TOKEN" as const;
 
@@ -72,7 +75,7 @@ const PROJECT_REF_HMAC_PURPOSE =
   "SUPABASE_PROJECT_REF_BINDING" as const;
 
 export const CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_PRODUCT_RUNTIME_PLATFORM_ADAPTERS_VERSION =
-  "platform-adapters.communication.openai.synthetic-preview.2026-09-01.m1t.v1" as const;
+  "platform-adapters.communication.openai.synthetic-preview.2026-09-01.m1t.v2" as const;
 export const CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_PRODUCT_RUNTIME_PLATFORM_ADAPTERS_READY =
   false as const;
 
@@ -108,8 +111,14 @@ const PRODUCT_RUNTIME_PLATFORM_ADAPTERS_POLICY_CORE = deepFreeze({
   supabaseBranchConfigPathAllowed: false,
   supabaseBranchConfigPathReason:
     "OFFICIAL_RESPONSE_CONTAINS_DB_PASS_AND_JWT_SECRET",
+  supabaseManagementAuthorizationModel: MANAGEMENT_AUTHORIZATION_MODEL,
   supabaseManagementOAuthScope: MANAGEMENT_OAUTH_SCOPE,
-  supabaseManagementRequiredPermission: MANAGEMENT_PERMISSION,
+  supabaseManagementScopeAttestationSource:
+    MANAGEMENT_SCOPE_ATTESTATION_SOURCE,
+  supabaseManagementOAuthAppReferenceRequired: true,
+  supabaseManagementOAuthGrantReferenceRequired: true,
+  supabaseManagementEndpointAllowlistEnforced: true,
+  supabaseManagementFineGrainedTokenPermissionClaimed: false,
   supabaseManagementPatAllowed: false,
   supabaseManagementMaximumResponseBytes:
     MAXIMUM_MANAGEMENT_API_RESPONSE_BYTES,
@@ -147,7 +156,7 @@ const PRODUCT_RUNTIME_PLATFORM_ADAPTERS_POLICY_CORE = deepFreeze({
 } as const);
 
 export const CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_PRODUCT_RUNTIME_PLATFORM_ADAPTERS_POLICY_DIGEST =
-  "0ff4bcf1c82575d037793c344c9679d10b6c8018abd3b0b050d040860100624c" as const;
+  "d1cbf263a7c6704f8cf24e58555c24ae2c45f4450b00b37d0f0897ecded76a6d" as const;
 
 const actualPolicyDigest = canonicalSha256(
   PRODUCT_RUNTIME_PLATFORM_ADAPTERS_POLICY_CORE,
@@ -456,7 +465,7 @@ export async function createTestOnlyCaresLinkV1CommunicationNotePreviewProductRu
           }
           const observationEvidenceSha256 = canonicalSha256({
             domain:
-              "careslink.communication-note.preview.safe-supabase-branch-observation.m1t.v1",
+              "careslink.communication-note.preview.safe-supabase-branch-observation.m1t.v2",
             sourceRevisionSha256: expectedSourceRevisionSha256,
             deploymentIdentityEvidenceSha256:
               request.deploymentIdentityEvidenceSha256,
@@ -473,7 +482,16 @@ export async function createTestOnlyCaresLinkV1CommunicationNotePreviewProductRu
               "AUTHENTICATED_CONTROL_PLANE_IDENTITY_NOT_APPROVED" as const,
             source: "SUPABASE_MANAGEMENT_API" as const,
             audience: "SUPABASE_MANAGEMENT_API" as const,
-            permission: MANAGEMENT_PERMISSION,
+            authorizationModel: result.credential.authorizationModel,
+            oauthScope: result.credential.oauthScope,
+            oauthAppReferenceSha256:
+              result.credential.oauthAppReferenceSha256,
+            oauthGrantReferenceSha256:
+              result.credential.oauthGrantReferenceSha256,
+            scopeAttestationSource:
+              result.credential.scopeAttestationSource,
+            endpointAllowlistEnforced:
+              result.credential.endpointAllowlistEnforced,
             principalReferenceSha256:
               result.credential.principalReferenceSha256,
             credentialReferenceSha256:
@@ -508,7 +526,7 @@ export async function createTestOnlyCaresLinkV1CommunicationNotePreviewProductRu
           });
           const m1sControlPlaneEvidenceSha256 = canonicalSha256({
             domain:
-              "careslink.communication-note.preview.authenticated-control-plane-evidence.m1s.v1",
+              "careslink.communication-note.preview.authenticated-control-plane-evidence.m1s.v2",
             sourceRevisionSha256: expectedSourceRevisionSha256,
             deploymentIdentityEvidenceSha256:
               request.deploymentIdentityEvidenceSha256,
@@ -841,8 +859,13 @@ type PlatformRequest = Readonly<{
   postgresMajor: 17;
   connectionMode: "DIRECT";
   managementCredentialClass: typeof MANAGEMENT_CREDENTIAL_CLASS;
+  managementAuthorizationModel: typeof MANAGEMENT_AUTHORIZATION_MODEL;
   managementOAuthScope: typeof MANAGEMENT_OAUTH_SCOPE;
-  managementPermission: typeof MANAGEMENT_PERMISSION;
+  managementOAuthAppReferenceSha256: string;
+  managementOAuthGrantReferenceSha256: string;
+  managementScopeAttestationSource:
+    typeof MANAGEMENT_SCOPE_ATTESTATION_SOURCE;
+  managementEndpointAllowlistEnforced: true;
 }>;
 type TargetRequest = Readonly<{
   targetProjectRef: string;
@@ -884,8 +907,12 @@ type ManagementCredentialAttestation = Readonly<{
   status: "ATTESTED_SUPABASE_MANAGEMENT_API_CREDENTIAL_NOT_APPROVED";
   source: "MANAGED_SECRET_CUSTODY";
   credentialClass: typeof MANAGEMENT_CREDENTIAL_CLASS;
+  authorizationModel: typeof MANAGEMENT_AUTHORIZATION_MODEL;
   oauthScope: typeof MANAGEMENT_OAUTH_SCOPE;
-  permission: typeof MANAGEMENT_PERMISSION;
+  oauthAppReferenceSha256: string;
+  oauthGrantReferenceSha256: string;
+  scopeAttestationSource: typeof MANAGEMENT_SCOPE_ATTESTATION_SOURCE;
+  endpointAllowlistEnforced: true;
   principalReferenceSha256: string;
   credentialReferenceSha256: string;
   observedAt: string;
@@ -953,29 +980,66 @@ function validatePlatformRequest(value: unknown): PlatformRequest {
     "postgresMajor",
     "connectionMode",
     "managementCredentialClass",
+    "managementAuthorizationModel",
     "managementOAuthScope",
-    "managementPermission",
+    "managementOAuthAppReferenceSha256",
+    "managementOAuthGrantReferenceSha256",
+    "managementScopeAttestationSource",
+    "managementEndpointAllowlistEnforced",
   ]);
   if (
     object.vercelEnvironment !== "preview" ||
     object.postgresMajor !== 17 ||
     object.connectionMode !== "DIRECT" ||
     object.managementCredentialClass !== MANAGEMENT_CREDENTIAL_CLASS ||
+    object.managementAuthorizationModel !==
+      MANAGEMENT_AUTHORIZATION_MODEL ||
     object.managementOAuthScope !== MANAGEMENT_OAUTH_SCOPE ||
-    object.managementPermission !== MANAGEMENT_PERMISSION
+    object.managementScopeAttestationSource !==
+      MANAGEMENT_SCOPE_ATTESTATION_SOURCE ||
+    object.managementEndpointAllowlistEnforced !== true
+  ) {
+    throw unavailable();
+  }
+  const vercelTeamIdSha256 = requireSha256(object.vercelTeamIdSha256);
+  const vercelProjectIdSha256 = requireSha256(
+    object.vercelProjectIdSha256,
+  );
+  const sourceManifestSha256 = requireSha256(
+    object.sourceManifestSha256,
+  );
+  const managementOAuthAppReferenceSha256 = requireSha256(
+    object.managementOAuthAppReferenceSha256,
+  );
+  const managementOAuthGrantReferenceSha256 = requireSha256(
+    object.managementOAuthGrantReferenceSha256,
+  );
+  if (
+    new Set([
+      vercelTeamIdSha256,
+      vercelProjectIdSha256,
+      sourceManifestSha256,
+      managementOAuthAppReferenceSha256,
+      managementOAuthGrantReferenceSha256,
+    ]).size !== 5
   ) {
     throw unavailable();
   }
   return Object.freeze({
-    vercelTeamIdSha256: requireSha256(object.vercelTeamIdSha256),
-    vercelProjectIdSha256: requireSha256(object.vercelProjectIdSha256),
-    sourceManifestSha256: requireSha256(object.sourceManifestSha256),
+    vercelTeamIdSha256,
+    vercelProjectIdSha256,
+    sourceManifestSha256,
     vercelEnvironment: "preview" as const,
     postgresMajor: 17 as const,
     connectionMode: "DIRECT" as const,
     managementCredentialClass: MANAGEMENT_CREDENTIAL_CLASS,
+    managementAuthorizationModel: MANAGEMENT_AUTHORIZATION_MODEL,
     managementOAuthScope: MANAGEMENT_OAUTH_SCOPE,
-    managementPermission: MANAGEMENT_PERMISSION,
+    managementOAuthAppReferenceSha256,
+    managementOAuthGrantReferenceSha256,
+    managementScopeAttestationSource:
+      MANAGEMENT_SCOPE_ATTESTATION_SOURCE,
+    managementEndpointAllowlistEnforced: true as const,
   });
 }
 
@@ -1225,8 +1289,14 @@ async function observeSafeBranch(input: {
     purpose:
       "CONSUME_SUPABASE_MANAGEMENT_API_OAUTH2_ACCESS_TOKEN" as const,
     managementApiOrigin: MANAGEMENT_API_ORIGIN,
+    authorizationModel: MANAGEMENT_AUTHORIZATION_MODEL,
     oauthScope: MANAGEMENT_OAUTH_SCOPE,
-    permission: MANAGEMENT_PERMISSION,
+    oauthAppReferenceSha256:
+      input.platformRequest.managementOAuthAppReferenceSha256,
+    oauthGrantReferenceSha256:
+      input.platformRequest.managementOAuthGrantReferenceSha256,
+    scopeAttestationSource: MANAGEMENT_SCOPE_ATTESTATION_SOURCE,
+    endpointAllowlistEnforced: true as const,
     productionProjectRef: CARESLINK_PRODUCTION_SUPABASE_REF,
     targetProjectRef: input.targetRequest.targetProjectRef,
     sourceRevisionSha256: input.request.sourceRevisionSha256,
@@ -1265,6 +1335,7 @@ async function observeSafeBranch(input: {
         const credential = validateManagementCredentialAttestation(
           attestationValue,
           input.clock,
+          input.platformRequest,
         );
         requireNotAborted(input.context.signal);
         const response = await input.requestManagementApi(
@@ -1341,13 +1412,18 @@ async function observeSafeBranch(input: {
 function validateManagementCredentialAttestation(
   value: unknown,
   clock: Clock,
+  platformRequest: PlatformRequest,
 ): ManagementCredentialAttestation {
   const object = exactDataRecord(value, [
     "status",
     "source",
     "credentialClass",
+    "authorizationModel",
     "oauthScope",
-    "permission",
+    "oauthAppReferenceSha256",
+    "oauthGrantReferenceSha256",
+    "scopeAttestationSource",
+    "endpointAllowlistEnforced",
     "principalReferenceSha256",
     "credentialReferenceSha256",
     "observedAt",
@@ -1359,8 +1435,15 @@ function validateManagementCredentialAttestation(
       "ATTESTED_SUPABASE_MANAGEMENT_API_CREDENTIAL_NOT_APPROVED" ||
     object.source !== "MANAGED_SECRET_CUSTODY" ||
     object.credentialClass !== MANAGEMENT_CREDENTIAL_CLASS ||
+    object.authorizationModel !== MANAGEMENT_AUTHORIZATION_MODEL ||
     object.oauthScope !== MANAGEMENT_OAUTH_SCOPE ||
-    object.permission !== MANAGEMENT_PERMISSION ||
+    object.oauthAppReferenceSha256 !==
+      platformRequest.managementOAuthAppReferenceSha256 ||
+    object.oauthGrantReferenceSha256 !==
+      platformRequest.managementOAuthGrantReferenceSha256 ||
+    object.scopeAttestationSource !==
+      MANAGEMENT_SCOPE_ATTESTATION_SOURCE ||
+    object.endpointAllowlistEnforced !== true ||
     object.rawCredentialMaterialPresent !== false
   ) {
     throw unavailable();
@@ -1374,7 +1457,20 @@ function validateManagementCredentialAttestation(
   const credentialReferenceSha256 = requireSha256(
     object.credentialReferenceSha256,
   );
-  if (principalReferenceSha256 === credentialReferenceSha256) {
+  const oauthAppReferenceSha256 = requireSha256(
+    object.oauthAppReferenceSha256,
+  );
+  const oauthGrantReferenceSha256 = requireSha256(
+    object.oauthGrantReferenceSha256,
+  );
+  if (
+    new Set([
+      oauthAppReferenceSha256,
+      oauthGrantReferenceSha256,
+      principalReferenceSha256,
+      credentialReferenceSha256,
+    ]).size !== 4
+  ) {
     throw unavailable();
   }
   return Object.freeze({
@@ -1382,8 +1478,12 @@ function validateManagementCredentialAttestation(
       "ATTESTED_SUPABASE_MANAGEMENT_API_CREDENTIAL_NOT_APPROVED" as const,
     source: "MANAGED_SECRET_CUSTODY" as const,
     credentialClass: MANAGEMENT_CREDENTIAL_CLASS,
+    authorizationModel: MANAGEMENT_AUTHORIZATION_MODEL,
     oauthScope: MANAGEMENT_OAUTH_SCOPE,
-    permission: MANAGEMENT_PERMISSION,
+    oauthAppReferenceSha256,
+    oauthGrantReferenceSha256,
+    scopeAttestationSource: MANAGEMENT_SCOPE_ATTESTATION_SOURCE,
+    endpointAllowlistEnforced: true as const,
     principalReferenceSha256,
     credentialReferenceSha256,
     observedAt,

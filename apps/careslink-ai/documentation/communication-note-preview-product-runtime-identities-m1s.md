@@ -23,13 +23,17 @@ Vercel、调用 provider/model 或处理真实 care data。
 
 | 项目 | 固定值 |
 |---|---|
-| identities version | `identities.communication.openai.synthetic-preview.2026-09-01.m1s.v1` |
-| policy digest | `4c33184016b7335e39918715b79351673141c3f41c966b34b5b7a617d0a44db2` |
+| identities version | `identities.communication.openai.synthetic-preview.2026-09-01.m1s.v2` |
+| policy digest | `98a25545a0d2998b136453d1703dea747467cd1ebf2f1ba443121125f27df08a` |
 | source status | `SOURCE_PRODUCT_RUNTIME_IDENTITIES_NOT_ACTIVATED` |
 | deployment audience | `CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_RUNTIME` |
 | environment class | `NON_PRODUCTION_PREVIEW` |
 | control-plane source | `SUPABASE_MANAGEMENT_API` |
-| required permission class | `BRANCHING_DEVELOPMENT_READ` |
+| control-plane authorization model | Supabase OAuth App scope |
+| required OAuth scope | exact `environment:read` |
+| scope attestation | pinned OAuth app configuration + exact grant reference |
+| endpoint allowlist | enforced；仅允许下游固定 branch-list request |
+| fine-grained token permission claimed | `false` |
 | maximum identity age / remaining | 5 minutes / 5 minutes |
 | underlying credential class | `STATIC_SUPABASE_BRANCH_ADMIN_PASSWORD` |
 | source credential expiry | `null` |
@@ -61,9 +65,12 @@ port、target request、verified authorization、runtime custody resolver、cloc
    environment、revision 精确匹配且新鲜的 content-free identity observation；M1s 对完整
    request + observation 做 canonical SHA-256 聚合。
 2. 单次 authenticated control-plane port 原子返回 control-plane identity 与 branch
-   observation，避免“先证明身份、后读目标”的两步替换窗口。身份必须是非 Production
-   permission class，观察仍需通过 M1m 的 non-default、non-persistent、with-data=false、
-   PostgreSQL 17、`ACTIVE_HEALTHY`、Direct/Session 5432 与 pinned-CA 全部校验。
+   observation，避免“先证明身份、后读目标”的两步替换窗口。身份必须证明 exact
+   `SUPABASE_OAUTH_APP_SCOPE` / `environment:read`，并绑定互不相同的 OAuth app 与 grant
+   reference SHA-256、固定 scope-attestation source 及已启用 endpoint allowlist；不得把 OAuth
+   scope 伪装成 fine-grained token permission。观察仍需通过 M1m 的 non-default、
+   non-persistent、with-data=false、PostgreSQL 17、`ACTIVE_HEALTHY`、Direct/Session 5432 与
+   pinned-CA 全部校验。
 3. M1s 对 deployment evidence、control-plane identity、完整 observation 与 source revision
    再做 canonical SHA-256 聚合。目标有效期取部署身份、控制面身份与观察有效期的最早值。
 4. target/Production project-ref HMAC 与 CA loader 请求都加入两层聚合证据；随后由 M1m
@@ -76,6 +83,15 @@ port、target request、verified authorization、runtime custody resolver、cloc
 所有端口都只是 TestOnly source contract。上游返回的 content-free attestation 不能单靠
 普通 JSON 自证真实云身份；未来正式 adapter 必须由实际工作负载身份、管理 API 授权、
 KMS/HMAC 与 secret custody 系统产生并接受独立运行证据。
+
+Supabase 对同一 branch-list endpoint 分别列出 OAuth App scope `environment:read`，以及供
+fine-grained token 使用的 `branching_development_read` / `branching_production_read` 权限。
+两者是不同授权模型。M1s v2 只声明已获授权的 OAuth App scope 模型，并把 app 配置与该次
+grant 的不可逆 reference 绑定进控制面 evidence；它不再声称 OAuth access token 同时具有
+fine-grained token permission。实际可调用 endpoint 仍由 M1t 的 exact HTTPS allowlist 强制。
+
+参考：[OAuth App scopes](https://supabase.com/docs/guides/integrations/build-a-supabase-oauth-integration/oauth-scopes)、
+[List all branches](https://supabase.com/docs/reference/api/v1-list-all-branches)。
 
 ## Supabase credential 语义
 
@@ -105,12 +121,10 @@ M1r 仍是唯一非测试 `pg` importer，M1s 不新增 package 或 lockfile 变
 环境名与日志 sink；production build 后继续扫描 client chunks 中的 M1r/M1s/M1t
 version/status/digest 与 secret sentinel。
 
-同一未部署源码通过 M1s/M1r/M1m-target/runtime-boundary 聚焦 4 files / 76 tests，以及
-完整 Vitest 189 files / 2,609 tests。TypeScript、全仓 ESLint、73-file Codex adapter sync、
-`git diff --check`、package/lock 相对 M1r exact-no-change、Next.js 16.2.9 Turbopack 64/64-page
-production build 与 24-file client-chunk scan 均通过。首次沙箱内 build 因 Turbopack CSS
-worker 无权绑定本地端口而失败；在获批的沙箱外以同一源码重跑后成功，这不是源码或测试
-失败，也没有启动可访问部署。
+本次 v2 OAuth 授权模型修订以同一未部署源码通过 M1s/M1t 聚焦 2 files / 78 tests、
+TypeScript、全仓 ESLint 与 `git diff --check`。本批未重跑完整 Vitest、production build 或
+client-chunk scan，因此早期 v1 的更广验证数字不作为 v2 证据；也没有启动可访问部署。
+本修订不引入 package 或 lockfile 变更。
 
 M1s 只关闭“默认关闭的身份、控制面观察与凭据保管 source composition 契约”这一项。
 M1t 已完成并验证 provider-neutral、source-only、default-off 的平台协议适配器：

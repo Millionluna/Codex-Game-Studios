@@ -3018,9 +3018,11 @@ The required source-test matrix is:
 - exact version/policy digest/export surface, frozen policy, cold-import zero
   I/O and hostile formal-factory Proxy zero traps;
 - the sole Management API allowlist request,
-  `GET /v1/projects/{production_ref}/branches`, with exact OAuth
-  `environment:read` / `branching_development_read` identity and a single safe
-  branch snapshot;
+  `GET /v1/projects/{production_ref}/branches`, with exact OAuth App scope
+  `environment:read`, pinned app/grant reference digests, an enforced endpoint
+  allowlist and a single safe branch snapshot; fine-grained-token permission
+  `branching_development_read` is a different authorization model and is not
+  claimed on the OAuth token;
 - static rejection of PAT, redirects, query strings, alternate origins,
   mutation methods and `GET /v1/branches/{branch_id_or_ref}`, whose official
   response may contain `db_pass` and `jwt_secret`;
@@ -3053,6 +3055,58 @@ model. The concrete HTTPS adapter must still prove that it enforces the passed
 five-second timeout/Abort/redirect rules. M1u must separately authorize the
 selected provider, costs and resources before a live gate can begin. See
 `documentation/communication-note-preview-product-runtime-platform-adapters-m1t.md`.
+
+### Communication Note product runtime GCP adapters M1u — source closeout
+
+M1u now has claimable local source-only test evidence, but still has no live
+provider, resource or deployment evidence. The tested default-off seam freezes:
+
+- exact Vercel Team issuer, immutable team/project IDs, `preview` environment
+  and provider-specific custom audience; Vercel's `https://` exchanged-token
+  audience is tested separately from `google-auth-library`'s
+  `//iam.googleapis.com/` external-account resource audience;
+- exact GCP project number, global WIF pool/provider, runtime service account,
+  `australia-southeast1` KMS key ring, four HMAC keys at numeric version `1` and
+  three regional Secret Manager secrets at numeric version `1`;
+- no service-account key, ambient ADC, wildcard principal, project-level
+  Secret Accessor/KMS role, `latest`/`primary` lookup or runtime
+  source-manifest signing authority;
+- Supabase OAuth app `environment:read` plus pinned app/grant metadata SHA-256
+  references and the sole list-branches GET allowlist. The distinct
+  fine-grained-token permission `branching_development_read` is not claimed on
+  the OAuth token;
+- raw OAuth IDs/secrets/tokens, branch password and CA bytes remain outside
+  public evidence/logs; branch password revocation still requires exact branch
+  delete or password reset.
+
+M1u's 8 source tests and runtime-boundary quarantine total 2 files / 24 tests.
+The focused M1s/M1t/M1u/runtime-boundary set passed 4 files / 102 tests; the full
+suite passed 191 files / 2,667 tests, followed by TypeScript, full ESLint,
+`git diff --check`, a 64/64-page production build and a 24-chunk
+M1r/M1s/M1t/M1u leak scan. Version is
+`gcp-adapters.communication.openai.synthetic-preview.2026-09-01.m1u.v1`; policy digest is
+`5a0b358626f1864cd13584e4abadf79254e5d365911b28586666e58a76c76c36`.
+`READY=false`, the approved export remains absent and live source/resource
+evidence is still `TBD`.
+
+Negative coverage now includes all pinned OIDC identity/name/audience/freshness
+claims, Production-before-I/O rejection, KMS manifest success-integrity, exact
+numeric resources, uint32 CRC32C, Secret Manager CRC, accessor/symbol/Proxy and
+callable-alias rejection, monotonic clock rollback, stale OAuth evidence, and
+CA digest plus PEM/X.509/private-key rejection. The earlier M1u↔M1t OAuth and
+database-custody shape mismatches are closed.
+
+At handoff time only the unbilled GCP project and Vercel Team issuer selection
+exist. WIF/IAM/KMS/Secret resources are absent. The Supabase OAuth form has
+Environment Read-only selected but Confirm has not been clicked, so no app,
+credential, grant or token exists. The source-manifest build signer identity is
+also `TBD` and must remain separate from the runtime service account. Concrete
+Vercel/WIF/Google SDK wiring, the Supabase HTTPS/OAuth refresh-revoke bridge and
+a real M1u→M1t→M1s→M1r→M1m composition smoke remain required before
+provisioning or live gate.
+No Supabase Preview/Production connection, SQL/migration, Vercel deployment,
+real data or provider/model call occurred. See
+`documentation/communication-note-preview-product-runtime-gcp-adapters-m1u.md`.
 
 ### Current live/read-only evidence
 

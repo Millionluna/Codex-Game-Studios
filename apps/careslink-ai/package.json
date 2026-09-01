@@ -14,9 +14,15 @@
     "test:preview:e2e:worker-rpc": "node scripts/preview-e2e/note-worker-rpc-concurrency.mjs"
   },
   "dependencies": {
+    "@google-cloud/kms": "5.7.0",
+    "@google-cloud/secret-manager": "6.3.0",
     "@supabase/ssr": "0.12.0",
     "@supabase/supabase-js": "2.108.2",
     "@vercel/analytics": "^2.0.1",
+    "@vercel/oidc": "3.8.5",
+    "fast-crc32c": "2.0.0",
+    "google-auth-library": "11.0.2",
+    "jose": "6.2.10",
     "lucide-react": "^1.21.0",
     "next": "16.2.9",
     "pg": "8.23.0",

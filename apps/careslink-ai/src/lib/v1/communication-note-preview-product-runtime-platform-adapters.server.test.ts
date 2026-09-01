@@ -73,6 +73,12 @@ const SOURCE_MANIFEST_EVIDENCE_SHA256 = sha256(
 );
 const MANAGEMENT_PRINCIPAL_SHA256 = sha256("m1t-management-principal");
 const MANAGEMENT_CREDENTIAL_SHA256 = sha256("m1t-management-credential");
+const MANAGEMENT_OAUTH_APP_REFERENCE_SHA256 = sha256(
+  "m1t-management-oauth-app",
+);
+const MANAGEMENT_OAUTH_GRANT_REFERENCE_SHA256 = sha256(
+  "m1t-management-oauth-grant",
+);
 const M1S_DEPLOYMENT_EVIDENCE_SHA256 = sha256(
   "m1s-deployment-identity-evidence",
 );
@@ -154,7 +160,7 @@ describe("Communication Note M1t product runtime platform adapters", () => {
     expect(
       platformAdapters.CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_PRODUCT_RUNTIME_PLATFORM_ADAPTERS_VERSION,
     ).toBe(
-      "platform-adapters.communication.openai.synthetic-preview.2026-09-01.m1t.v1",
+      "platform-adapters.communication.openai.synthetic-preview.2026-09-01.m1t.v2",
     );
     expect(
       platformAdapters.CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_PRODUCT_RUNTIME_PLATFORM_ADAPTERS_READY,
@@ -165,7 +171,7 @@ describe("Communication Note M1t product runtime platform adapters", () => {
     expect(
       platformAdapters.CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_PRODUCT_RUNTIME_PLATFORM_ADAPTERS_POLICY_DIGEST,
     ).toBe(
-      "0ff4bcf1c82575d037793c344c9679d10b6c8018abd3b0b050d040860100624c",
+      "d1cbf263a7c6704f8cf24e58555c24ae2c45f4450b00b37d0f0897ecded76a6d",
     );
     expect(
       canonicalSha256(
@@ -195,6 +201,14 @@ describe("Communication Note M1t product runtime platform adapters", () => {
       supabaseManagementApiAllowedPath:
         "/v1/projects/{production_ref}/branches",
       supabaseBranchConfigPathAllowed: false,
+      supabaseManagementAuthorizationModel: "SUPABASE_OAUTH_APP_SCOPE",
+      supabaseManagementOAuthScope: "environment:read",
+      supabaseManagementScopeAttestationSource:
+        "PINNED_OAUTH_APP_CONFIGURATION_AND_GRANT",
+      supabaseManagementOAuthAppReferenceRequired: true,
+      supabaseManagementOAuthGrantReferenceRequired: true,
+      supabaseManagementEndpointAllowlistEnforced: true,
+      supabaseManagementFineGrainedTokenPermissionClaimed: false,
       supabaseManagementPatAllowed: false,
       supabaseManagementMaximumResponseBytes: 131_072,
       supabaseManagementTimeoutMs: 5_000,
@@ -282,8 +296,14 @@ describe("Communication Note M1t product runtime platform adapters", () => {
     ).toEqual({
       purpose: "CONSUME_SUPABASE_MANAGEMENT_API_OAUTH2_ACCESS_TOKEN",
       managementApiOrigin: "https://api.supabase.com",
+      authorizationModel: "SUPABASE_OAUTH_APP_SCOPE",
       oauthScope: "environment:read",
-      permission: "BRANCHING_DEVELOPMENT_READ",
+      oauthAppReferenceSha256: MANAGEMENT_OAUTH_APP_REFERENCE_SHA256,
+      oauthGrantReferenceSha256:
+        MANAGEMENT_OAUTH_GRANT_REFERENCE_SHA256,
+      scopeAttestationSource:
+        "PINNED_OAUTH_APP_CONFIGURATION_AND_GRANT",
+      endpointAllowlistEnforced: true,
       productionProjectRef: PRODUCTION_PROJECT_REF,
       targetProjectRef: TARGET_PROJECT_REF,
       sourceRevisionSha256: SOURCE_REVISION_SHA256,
@@ -307,7 +327,14 @@ describe("Communication Note M1t product runtime platform adapters", () => {
     expect(envelope).toMatchObject({
       identity: {
         source: "SUPABASE_MANAGEMENT_API",
-        permission: "BRANCHING_DEVELOPMENT_READ",
+        authorizationModel: "SUPABASE_OAUTH_APP_SCOPE",
+        oauthScope: "environment:read",
+        oauthAppReferenceSha256: MANAGEMENT_OAUTH_APP_REFERENCE_SHA256,
+        oauthGrantReferenceSha256:
+          MANAGEMENT_OAUTH_GRANT_REFERENCE_SHA256,
+        scopeAttestationSource:
+          "PINNED_OAUTH_APP_CONFIGURATION_AND_GRANT",
+        endpointAllowlistEnforced: true,
         rawCredentialMaterialPresent: false,
       },
       observation: {
@@ -365,6 +392,81 @@ describe("Communication Note M1t product runtime platform adapters", () => {
     expect(harness.pinnedCaLoad).not.toHaveBeenCalled();
     expect(harness.databaseCredentialConsume).not.toHaveBeenCalled();
     expect(captured.FakePgClient.constructed).toBe(0);
+  });
+
+  it.each([
+    ["wrong authorization model", { authorizationModel: "FINE_GRAINED_TOKEN" }],
+    ["wrong OAuth scope", { oauthScope: "environment:write" }],
+    [
+      "wrong OAuth app reference",
+      { oauthAppReferenceSha256: sha256("wrong-oauth-app") },
+    ],
+    [
+      "wrong OAuth grant reference",
+      { oauthGrantReferenceSha256: sha256("wrong-oauth-grant") },
+    ],
+    [
+      "reused OAuth grant reference",
+      { oauthGrantReferenceSha256: MANAGEMENT_OAUTH_APP_REFERENCE_SHA256 },
+    ],
+    [
+      "wrong scope attestation source",
+      { scopeAttestationSource: "TOKEN_SELF_ASSERTION" },
+    ],
+    ["disabled endpoint allowlist", { endpointAllowlistEnforced: false }],
+    [
+      "fine-grained token permission claim",
+      { permission: "BRANCHING_DEVELOPMENT_READ" },
+    ],
+  ])("rejects a Management OAuth attestation with %s", async (
+    _label,
+    mutation,
+  ) => {
+    const harness = validHarness();
+    harness.managementCredentialConsume.mockImplementationOnce(
+      async (_request, _context, consumer) => {
+        await consumer(
+          MANAGEMENT_ACCESS_TOKEN,
+          Object.freeze({
+            ...validManagementAttestation(),
+            ...mutation,
+          }),
+        );
+      },
+    );
+    const composed = await composeCaptured(harness);
+    await attestWorkload(composed);
+
+    const error = await captureRejection(observeBranch(composed));
+
+    expect(error).toMatchObject(FIXED_FAILURE);
+    expect(harness.managementRequest).not.toHaveBeenCalled();
+    expect(harness.pinnedCaLoad).not.toHaveBeenCalled();
+    expect(harness.databaseCredentialConsume).not.toHaveBeenCalled();
+    expect(captured.FakePgClient.constructed).toBe(0);
+  });
+
+  it("rejects reused OAuth app/grant references before external authority", async () => {
+    const harness = validHarness();
+    const error = await captureRejection(
+      platformAdapters.createTestOnlyCaresLinkV1CommunicationNotePreviewProductRuntimePlatformAdapters(
+        {
+          ...harness.options,
+          platformRequest: Object.freeze({
+            ...harness.options.platformRequest,
+            managementOAuthGrantReferenceSha256:
+              MANAGEMENT_OAUTH_APP_REFERENCE_SHA256,
+          }),
+        },
+        Object.freeze({ signal: new AbortController().signal }),
+      ),
+    );
+
+    expect(error).toMatchObject(FIXED_FAILURE);
+    expect(harness.workloadVerify).not.toHaveBeenCalled();
+    expect(harness.managementCredentialConsume).not.toHaveBeenCalled();
+    expect(harness.managementRequest).not.toHaveBeenCalled();
+    expect(captured.identitiesFactory).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -980,8 +1082,15 @@ function validHarness() {
       connectionMode: "DIRECT" as const,
       managementCredentialClass:
         "SUPABASE_MANAGEMENT_API_OAUTH2_ACCESS_TOKEN" as const,
+      managementAuthorizationModel: "SUPABASE_OAUTH_APP_SCOPE" as const,
       managementOAuthScope: "environment:read" as const,
-      managementPermission: "BRANCHING_DEVELOPMENT_READ" as const,
+      managementOAuthAppReferenceSha256:
+        MANAGEMENT_OAUTH_APP_REFERENCE_SHA256,
+      managementOAuthGrantReferenceSha256:
+        MANAGEMENT_OAUTH_GRANT_REFERENCE_SHA256,
+      managementScopeAttestationSource:
+        "PINNED_OAUTH_APP_CONFIGURATION_AND_GRANT" as const,
+      managementEndpointAllowlistEnforced: true as const,
     }),
     targetRequest: Object.freeze({
       targetProjectRef: TARGET_PROJECT_REF,
@@ -1155,7 +1264,7 @@ function m1sControlPlaneEvidence(envelope: {
 }) {
   return canonicalSha256({
     domain:
-      "careslink.communication-note.preview.authenticated-control-plane-evidence.m1s.v1",
+      "careslink.communication-note.preview.authenticated-control-plane-evidence.m1s.v2",
     sourceRevisionSha256: SOURCE_REVISION_SHA256,
     deploymentIdentityEvidenceSha256:
       M1S_DEPLOYMENT_EVIDENCE_SHA256,
@@ -1195,8 +1304,14 @@ function validManagementAttestation() {
     source: "MANAGED_SECRET_CUSTODY" as const,
     credentialClass:
       "SUPABASE_MANAGEMENT_API_OAUTH2_ACCESS_TOKEN" as const,
+    authorizationModel: "SUPABASE_OAUTH_APP_SCOPE" as const,
     oauthScope: "environment:read" as const,
-    permission: "BRANCHING_DEVELOPMENT_READ" as const,
+    oauthAppReferenceSha256: MANAGEMENT_OAUTH_APP_REFERENCE_SHA256,
+    oauthGrantReferenceSha256:
+      MANAGEMENT_OAUTH_GRANT_REFERENCE_SHA256,
+    scopeAttestationSource:
+      "PINNED_OAUTH_APP_CONFIGURATION_AND_GRANT" as const,
+    endpointAllowlistEnforced: true as const,
     principalReferenceSha256: MANAGEMENT_PRINCIPAL_SHA256,
     credentialReferenceSha256: MANAGEMENT_CREDENTIAL_SHA256,
     observedAt: OBSERVED_AT,
