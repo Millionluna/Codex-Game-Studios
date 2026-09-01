@@ -20,28 +20,34 @@ const forbiddenMarkers = [
   "SOURCE_GCP_PROVIDER_ADAPTERS_NOT_ACTIVATED",
   "5a0b358626f1864cd13584e4abadf79254e5d365911b28586666e58a76c76c36",
   "M1U_SECRET_SENTINEL_MUST_NEVER_ESCAPE",
+  "gcp-rest-bridge.communication.openai.synthetic-preview.2026-09-01.m1v.v1",
+  "SOURCE_GCP_REST_BRIDGE_NOT_ACTIVATED",
+  "c116c449fb025ecaca156e952d37b812c7dd272258120f677c8cef1e202326e3",
+  "supabase-management-bridge.communication.openai.synthetic-preview.2026-09-01.m1v.v1",
+  "SOURCE_SUPABASE_MANAGEMENT_BRIDGE_NOT_ACTIVATED",
+  "2c4c87bb7a15f3b101fd78c4438f44ed8b2e6dd28f782a615b92f87029e43c68",
 ];
 
 if (!existsSync(buildIdPath) || !existsSync(chunksRoot)) {
-  throw new Error("M1r/M1s/M1t/M1u client-boundary check requires a completed Next.js build");
+  throw new Error("M1r/M1s/M1t/M1u/M1v client-boundary check requires a completed Next.js build");
 }
 
 const chunkFiles = walkFiles(chunksRoot).filter((file) =>
   [".js", ".mjs", ".json", ".map"].includes(extname(file)),
 );
 if (chunkFiles.length === 0) {
-  throw new Error("M1r/M1s/M1t/M1u client-boundary check found no static chunk files");
+  throw new Error("M1r/M1s/M1t/M1u/M1v client-boundary check found no static chunk files");
 }
 for (const file of chunkFiles) {
   const source = readFileSync(file, "utf8");
   const marker = forbiddenMarkers.find((candidate) => source.includes(candidate));
   if (marker) {
-      throw new Error(`M1r/M1s/M1t/M1u server-only marker leaked into client chunk: ${marker}`);
+      throw new Error(`M1r/M1s/M1t/M1u/M1v server-only marker leaked into client chunk: ${marker}`);
   }
 }
 
 process.stdout.write(
-  `M1r/M1s/M1t/M1u client boundary passed across ${chunkFiles.length} static chunk files.\n`,
+  `M1r/M1s/M1t/M1u/M1v client boundary passed across ${chunkFiles.length} static chunk files.\n`,
 );
 
 function walkFiles(directory) {

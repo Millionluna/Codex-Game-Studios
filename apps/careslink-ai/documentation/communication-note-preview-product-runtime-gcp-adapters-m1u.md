@@ -26,6 +26,12 @@ Preview deployment 与 activation 均不存在。version 为
 revision 与 live evidence 仍为 `TBD`；这些本地结果不得描述为 resource existence、真实 federation、
 OAuth grant、数据库或部署证据。
 
+后续 M1v 已在此 pin set 上补充默认关闭的 GCP direct-REST 与 Supabase OAuth/Management
+source bridges，并完成实际 M1u→M1t→M1s→M1r→M1m 的 injected-transport source smoke；
+这关闭的是 source port/composition gap，不改变本页的外部资源、billing、OAuth Confirm、
+deployment 或 live-evidence 状态。见
+`documentation/communication-note-preview-product-runtime-provider-bridges-m1v.md`。
+
 本批没有创建 Supabase Preview、没有连接 Preview 或 Production PostgreSQL、没有执行 SQL 或
 migration、没有读取 Production 或真实 care data、没有调用 provider/model，也没有产生 AI
 费用或产品流量。
@@ -113,8 +119,10 @@ attestation。
 当前 M1u source worktree 与 lockfile 固定以下 exact versions：`@google-cloud/kms@5.7.0`、
 `@google-cloud/secret-manager@6.3.0`、`@vercel/oidc@3.8.5`、`fast-crc32c@2.0.0`、
 `google-auth-library@11.0.2` 与 `jose@6.2.10`。lockfile、tests、TypeScript、ESLint 与 build
-已通过；当前 source seam 只使用 `jose` 与 `fast-crc32c`。Google/Vercel SDK packages 尚未接入
-concrete bridge，因此不得把“已安装并锁定”写成“已验证真实 SDK 调用”或“已部署”。
+已通过。M1v direct-REST bridge 现使用 `@vercel/oidc` 与 `fast-crc32c`，并有意不把 Google
+GAPIC client 当作严格 timeout/Abort/zero-retry contract 的实现；`@google-cloud/*` 与
+`google-auth-library` 仍只是候选 lockfile pins。任何已安装 package 或 source wiring 都不得写成
+“已验证真实 provider 调用”或“已部署”。
 
 ### Supabase target 与 OAuth app
 
@@ -171,7 +179,7 @@ M1u 明确采用 **Supabase OAuth app scope model**：
    `roles/cloudkms.signerVerifier` 比所需权限更宽，应使用 reviewed custom roles，不得把宽角色
    授予 project 或 key ring。
 5. `roles/secretmanager.secretAccessor` 只绑定到上述三个 exact secret resource，不在 project
-   层授予。SDK 请求必须使用 explicit regional endpoint 与 numeric version `1`；即使 IAM 可见
+   层授予。provider 请求必须使用 explicit regional endpoint 与 numeric version `1`；即使 IAM 可见
    其他版本，adapter 也必须在访问前拒绝别名、其他 version 和其他 secret。
 6. provisioning operator 与 runtime service account 分离。创建/设置 IAM、KMS/Secret resource、
    OAuth app/grant 或 billing 的人工权限只在经批准的 provisioning batch 使用，不能留给
@@ -186,12 +194,12 @@ M1u 明确采用 **Supabase OAuth app scope model**：
 ## Secret custody 与撤销边界
 
 - `supabase-management-oauth-credential` 的候选 schema 只接受短时 access token、app/principal
-  与 grant/credential 的 canonical SHA-256 references、`observedAt` 和 `expiresAt`；access token
-  在未来 concrete HTTPS port 中只能经单次 callback 交付；当前 TestOnly seam 不写环境变量、
-  argv、stdout/stderr、普通 JSON config 或 evidence。OAuth client secret、authorization code
-  与 refresh token **不属于该 secret
-  version**；它们的授权/交换/刷新 custody 尚为独立 `TBD` blocker，不能被暗中塞入当前 payload
-  或在 runtime 内临时发明。
+  与 grant/credential 的 canonical SHA-256 references、`observedAt` 和 `expiresAt`；M1v source
+  bridge 只经单次 callback 交付 access token，且不写环境变量、argv、stdout/stderr、普通 JSON
+  config 或 evidence。OAuth client secret、authorization code 与 refresh token **不属于该 secret
+  version**；M1v 可以从独立 one-use intake port 做一次 proactive refresh，但 live intake backing
+  与 rotated-refresh-token writer 仍是 `TBD` blocker，不能被暗中塞入当前 payload 或在 runtime
+  内临时发明。
 - `supabase-preview-pinned-ca-pem` 只保存本次 exact Preview 当前 CA PEM；CA 不是 bearer
   credential，但必须有独立 expected SHA-256、size/PEM/X509 校验并禁止 private key。旧 branch
   或旧 digest 不得复用。
@@ -215,19 +223,22 @@ shape 对齐；OIDC precheck 现逐项固定 issuer、custom audience、subject�
 integrity，以及 CA digest/PEM/X.509 CA/private-key rejection 均有本地负测。上述旧静态 mismatch
 不再是 blocker。
 
-M1u 仍不能与 M1t 形成可运行或可部署 bundle，且 provisioning/live gate 保持 **NO-GO**：
+M1v 已补充 source-only direct REST / Supabase bridge，并用 injected transports 完成实际
+M1u→M1t→M1s→M1r→M1m composition smoke；因此“缺少 source HTTPS port”与“缺少 source
+composition”不再是 blocker。它仍不是可运行或可部署 bundle，provisioning/live gate 保持
+**NO-GO**：
 
-1. 当前只有 injected-client TestOnly seam，没有 M1t 所需的 concrete Supabase Management HTTPS
-   port，也没有真实 `@vercel/oidc` → GCP WIF/STS/service-account impersonation → KMS/Secret Manager
-   SDK normalization。五秒 timeout、同一 AbortSignal、no redirect、zero retry 和 SDK response
-   normalization 仍须实现与负测。
+1. GCP billing 尚未关联，WIF/IAM/KMS/Secret Manager resources 与 versions 均不存在；
 2. 独立 source-manifest build signer identity、canonical artifact producer、revision-to-deployment
-   传递、anti-replay 与 signer/runtime IAM 分离尚未固定。runtime service account 不能获得
-   source-manifest sign 权限。
-3. Supabase OAuth app/grant 仍不存在；actual canonical app/grant references、client-secret/code
-   intake、refresh/revoke custody、401 handling 与 live scope evidence 尚未闭合。
-4. 在上述 bridge 完成后，仍需 M1u→M1t→M1s→M1r→M1m composition smoke、同一 revision review
-   与 source-manifest artifact evidence，才能进入 resource provisioning 和一次性 Preview gate。
+   handoff、anti-replay 与 signer/runtime IAM 分离尚未固定；runtime service account 不能获得
+   source-manifest sign 权限；
+3. Supabase OAuth app/grant 仍不存在，Confirm 未点击；actual app/grant references、
+   client-secret/code/refresh-token live intake 与 rotated-refresh-token writer 尚未闭合；M1v 的
+   source policy 只允许 proactive refresh 一次，401 不 refresh/replay；
+4. actual Node HTTPS transport 尚无同一 revision live 5 秒 timeout、root AbortSignal、no redirect、
+   zero retry、provider response normalization 与 revocation evidence；
+5. 仍需经 action-time 确认后运行 fresh no-data Preview live gate，并无论成功或失败删除 exact
+   Preview；Production、真实 care data 与 AI model call 不在该批范围内。
 
 后续源码修复必须继续保持 `READY=false`，以 focused/full tests、build 和 leak scan 做同 revision
 closeout。当前不得运行 live gate、不得把 provider flags 改为 true，也不得创建 Product API importer。
@@ -255,7 +266,7 @@ closeout。当前不得运行 live gate、不得把 provider flags 改为 true�
 10. 删除或安排销毁 KMS version、secret、WIF/IAM、OAuth grant/app 等 material external
    resources；teardown 也必须明确确认，不因“测试结束”自动扩大为 destructive authority。
 
-在 billing 仍未关联、OAuth app 尚未 Confirm 且 concrete bridge/signer/OAuth custody 尚未闭合的
-当前状态，下一步只能先实现和审查这些 live blockers，再选择一个经 action-time 确认的
-provisioning batch；不得运行 live gate，不得把 `READY` 改为 true，也不得创建 Product API
-importer。
+在 billing 仍未关联、OAuth app 尚未 Confirm，且 signer artifact、live OAuth custody/writer、
+Node transport evidence 尚未闭合的当前状态，下一步只能先处理这些 live blockers，再选择一个
+经 action-time 确认的 provisioning batch；不得运行 live gate，不得把 `READY` 改为 true，也
+不得创建 Product API importer。

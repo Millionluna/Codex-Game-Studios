@@ -873,18 +873,59 @@ source-only evidence; live source revision and live resource evidence remain
 The earlier OAuth evidence, database-custody request-shape and explicit
 `nbf`/name-claim mismatches are closed, together with descriptor-safe hostile
 input rejection, uint32 CRC, monotonic clock, credential freshness, KMS success
-integrity and X.509 CA validation. Provisioning/live remains NO-GO because the
-concrete Vercel→WIF/service-account→Google SDK bridge, M1t HTTPS port,
-independent source-manifest signer/artifact pipeline, Supabase OAuth
-intake/refresh/revoke custody and end-to-end M1u→M1t composition smoke do not
-exist. The runtime service account may not silently receive source-manifest
-signing authority, and installed Google/Vercel SDK dependencies are not evidence
-of wired calls.
+integrity and X.509 CA validation. M1v subsequently closed the source-only
+provider-bridge and M1u→M1t composition gaps with default-off TestOnly ports;
+this does not change M1u's external/live status. Provisioning/live remains NO-GO
+because the independent source-manifest signer/artifact pipeline, GCP billing
+and resources, Supabase OAuth app/grant/live intake plus rotated-token writer,
+Node transport live evidence and one-time no-data Preview gate do not exist.
+The runtime service account may not silently receive source-manifest signing
+authority, and source wiring is not evidence of a live provider call.
 No Preview/Production database, SQL/migration, real data, deployment or AI call
 was involved. Billing linkage, Google APIs/resources/IAM, KMS/secret versions,
 Supabase OAuth Confirm/grant, any Vercel Preview deployment and every live branch
 operation remain separate action-time confirmation blockers. See
-`documentation/communication-note-preview-product-runtime-gcp-adapters-m1u.md`.
+`documentation/communication-note-preview-product-runtime-gcp-adapters-m1u.md`
+and
+`documentation/communication-note-preview-product-runtime-provider-bridges-m1v.md`.
+
+### Product runtime provider bridges M1v — source wired, live blocked
+
+M1v adds two default-off source bridges without enabling a formal runtime. The
+GCP bridge uses the exact direct-REST chain
+`@vercel/oidc` → Vercel custom-audience exchange → Google STS → runtime
+service-account impersonation → pinned KMS/Regional Secret Manager calls. Every
+operation is zero-retry, no-redirect, five-second bounded and receives the same
+root `AbortSignal`; exact project/provider/service-account, numeric key/secret
+versions and response/CRC boundaries remain pinned. Its version is
+`gcp-rest-bridge.communication.openai.synthetic-preview.2026-09-01.m1v.v1` and
+policy digest is
+`c116c449fb025ecaca156e952d37b812c7dd272258120f677c8cef1e202326e3`.
+
+The Supabase bridge consumes a one-use OAuth intake credential, proactively
+refreshes exactly once per bundle and serves only the `environment:read`
+list-branches GET. A 401 revokes local use without refresh or replay. A rotated
+refresh token is deliberately not persisted because no reviewed writer exists.
+Its version is
+`supabase-management-bridge.communication.openai.synthetic-preview.2026-09-01.m1v.v1`
+and policy digest is
+`2c4c87bb7a15f3b101fd78c4438f44ed8b2e6dd28f782a615b92f87029e43c68`.
+
+Injected-transport source tests compose the actual M1u→M1t→M1s→M1r→M1m
+modules without constructing a PostgreSQL Client or consuming the terminal
+database credential. Both formal bridges remain absent with `READY=false`,
+deployment/activation false. No external resource, credential, live provider
+exchange, database, deployment, real care data or model call is evidence of
+this slice. GCP remains blocked by missing billing and resources; the Supabase
+OAuth form is still unconfirmed. Remaining gates are the independent signer
+artifact/revision handoff, OAuth app/grant/live intake and rotated-token writer,
+Node transport live evidence, then an explicitly confirmed one-time no-data
+Preview/live/delete cycle.
+
+The M1v closeout passed 6 focused files / 82 tests, the full 194-file /
+2,683-test suite, TypeScript, full ESLint, the 73-file Codex-adapter sync check,
+`git diff --check`, the 64/64-page production build and a fresh 24-chunk
+M1r/M1s/M1t/M1u/M1v server-only leak scan.
 
 Supabase CLI 2.115.0 has since generated source-only migration `20260823213144_harden_v1_note_generation_registration_retention.sql`. It adds `attempts_registration_digest_idx` and the named `attempts_registration_catalog_fk` from `attempts.registration_digest` to `worker_registrations.registration_digest`, with update/delete `RESTRICT`, `NOT VALID` creation and explicit validation. It creates no seed, caller grant, runtime surface or Production change. Its local gate passed 39/39 focused contracts, the full 125-file / 1,381-test suite, lint, TypeScript, the 63/63-page production build, the 73-file Codex-adapter sync check and `git diff --check`. Deleted disposable `r22` then clean-applied the current manifest 15/15 and passed the seven rollback suites; the hosted registration-retention gate is now closed without enabling any runtime automation.
 

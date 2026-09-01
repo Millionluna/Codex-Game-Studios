@@ -3100,13 +3100,56 @@ At handoff time only the unbilled GCP project and Vercel Team issuer selection
 exist. WIF/IAM/KMS/Secret resources are absent. The Supabase OAuth form has
 Environment Read-only selected but Confirm has not been clicked, so no app,
 credential, grant or token exists. The source-manifest build signer identity is
-also `TBD` and must remain separate from the runtime service account. Concrete
-Vercel/WIF/Google SDK wiring, the Supabase HTTPS/OAuth refresh-revoke bridge and
-a real M1u→M1t→M1s→M1r→M1m composition smoke remain required before
-provisioning or live gate.
+also `TBD` and must remain separate from the runtime service account. M1v later
+adds source-only direct-REST and Supabase bridges plus an actual
+M1u→M1t→M1s→M1r→M1m injected-transport composition smoke; these close the
+source gaps but do not supply provisioning or live evidence.
 No Supabase Preview/Production connection, SQL/migration, Vercel deployment,
 real data or provider/model call occurred. See
-`documentation/communication-note-preview-product-runtime-gcp-adapters-m1u.md`.
+`documentation/communication-note-preview-product-runtime-gcp-adapters-m1u.md`
+and
+`documentation/communication-note-preview-product-runtime-provider-bridges-m1v.md`.
+
+### Communication Note product runtime provider bridges M1v — source evidence
+
+M1v's GCP bridge tests prove the exact single-shot chain from
+`@vercel/oidc.getVercelOidcTokenSync` through the Vercel custom-audience token
+exchange, Google STS, runtime service-account impersonation, pinned KMS
+`macSign`/`macVerify` and regional Secret Manager access. Negative coverage
+includes wrong resources/audiences, repeated exchanges, non-2xx and malformed
+responses, redirect, oversize bodies, CRC/shape mismatch, timeout/Abort and a
+different call-level signal. Each request is fixed at zero retry and five
+seconds, with the same composition-root `AbortSignal`. The source policy digest
+is `c116c449fb025ecaca156e952d37b812c7dd272258120f677c8cef1e202326e3`.
+
+The Supabase bridge tests prove one-use intake custody followed by exactly one
+proactive OAuth refresh per bundle, credential reuse within that bundle and the
+sole `environment:read` list-branches GET. They reject late/double custody
+callbacks, malformed or oversized token responses, alternate requests,
+redirects, timeouts and signal changes. A branches 401 is single-shot: access
+is revoked locally and the bridge does not refresh or replay. A provider-rotated
+refresh token is not persisted because this slice has no writer. The source
+policy digest is `2c4c87bb7a15f3b101fd78c4438f44ed8b2e6dd28f782a615b92f87029e43c68`.
+
+The integration smoke uses the actual M1u, M1t, M1s, M1r and M1m source
+modules. With injected transports it completes one OAuth refresh, one branches
+GET, the purpose-separated KMS MAC operations and pinned CA access, then yields
+the M1m bundle. It constructs no PostgreSQL Client, does not read the branch
+admin password and does not invoke the terminal database credential resolver
+during composition.
+
+The M1v closeout passed 6 focused files / 82 tests, the full 194-file /
+2,683-test suite, TypeScript, full ESLint, the 73-file Codex-adapter sync check,
+`git diff --check`, the 64/64-page production build and the fresh-build
+M1r/M1s/M1t/M1u/M1v leak scan across 24 static chunks.
+
+These are local source tests only. Both formal exports remain absent,
+`READY=false`, deployment/activation false; no real Node HTTPS call, GCP
+federation/resource, Supabase app/grant/token, database, deployment, care data or
+model call is represented. Live progression remains blocked on GCP billing and
+resource creation, the independent signer artifact/revision handoff, OAuth
+Confirm/grant/live intake plus rotated-token writer, Node transport evidence and
+an explicitly authorized one-time no-data Preview/live/delete gate.
 
 ### Current live/read-only evidence
 
