@@ -3006,6 +3006,54 @@ The final local run passed 4 focused files / 76 tests and the complete 189-file
 M1r/M1s client-chunk scan also passed. These are source/build tests only: no
 cloud identity, Supabase API/database, Vault/KMS, deployment or model was used.
 
+### Communication Note product runtime platform adapters M1t — source-only handoff
+
+M1t keeps `READY=false`, the approved export absent and the formal factory
+fixed `PRODUCT_API_DISABLED`. Its TestOnly protocol composition must remain the
+only usable path, with no App Route/component importer and no ambient
+credential, provider SDK or cloud-resource discovery.
+
+The required source-test matrix is:
+
+- exact version/policy digest/export surface, frozen policy, cold-import zero
+  I/O and hostile formal-factory Proxy zero traps;
+- the sole Management API allowlist request,
+  `GET /v1/projects/{production_ref}/branches`, with exact OAuth
+  `environment:read` / `branching_development_read` identity and a single safe
+  branch snapshot;
+- static rejection of PAT, redirects, query strings, alternate origins,
+  mutation methods and `GET /v1/branches/{branch_id_or_ref}`, whose official
+  response may contain `db_pass` and `jwt_secret`;
+- bounded response bytes, content type, timeout, Abort, zero retry, 429/5xx,
+  duplicate/missing target, malformed JSON and content-free error mapping;
+- injected workload observation 的 team/project/Preview freshness、PG17/Direct
+  与独立 managed source-manifest 字段约束；M1t 本身不验签 OIDC，真实
+  issuer/audience/JWT/provider 验证和 OIDC-only source-revision 拒绝仍由 M1u 证明；
+- Direct-only endpoint derivation from the child ref, deployment-attested PG17
+  source pin and the retained downstream M1m database-session PG17 check;
+- purpose-separated managed HMAC, pinned-CA digest/size, distinct Management
+  token/database-password custody, one-use callback delivery and honest static
+  password expiry/revocation semantics;
+- clock rollback, stale control-plane snapshot, pre-credential branch recheck,
+  Proxy/accessor/mutable/reentrant ports, late/double callback and Abort at every
+  asynchronous boundary;
+- a genuine M1t→M1s→M1r→M1m source smoke with zero PostgreSQL Client
+  construction during composition, plus runtime-importer and post-build client
+  marker/secret negative scans.
+
+The completed source gate passed M1t 33/33, the focused M1r/M1s/M1t 4-file /
+84-test set and the full 190-file / 2,643-test suite. TypeScript, full ESLint,
+`git diff --check`, the 64/64-page production build, runtime importer quarantine
+and the 24-chunk M1r/M1s/M1t marker/secret scan also passed. The protocol tests
+include malformed and duplicate-key JSON, 429/5xx, missing/duplicate target,
+workload mismatch, clock rollback, branch recheck, Abort and pending duplicate
+credential delivery. This handoff used no real Vercel OIDC token, Supabase
+Management API/database, KMS, CA store, Secret Manager, SQL, deployment or
+model. The concrete HTTPS adapter must still prove that it enforces the passed
+five-second timeout/Abort/redirect rules. M1u must separately authorize the
+selected provider, costs and resources before a live gate can begin. See
+`documentation/communication-note-preview-product-runtime-platform-adapters-m1t.md`.
+
 ### Current live/read-only evidence
 
 - Supabase migrations, tables, RLS flags, policies, grants, function grants and aggregate row counts were checked read-only.

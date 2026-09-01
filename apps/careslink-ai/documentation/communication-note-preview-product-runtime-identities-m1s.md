@@ -97,10 +97,12 @@ gate，分别建模 token expiry、database authorization expiry 与 revocation�
 
 ## 隔离与后续 gate
 
-M1s module 的唯一 importer 是自己的测试；`src/app` 与 `src/components` importer 均为零。
+M1s module 的 direct importers 现在精确为自己的测试、M1t 测试与 M1t source module；
+`src/app` 与 `src/components` importer 仍均为零。
+M1t source module 自身的 direct importer 仅为 M1t 测试。
 M1r 仍是唯一非测试 `pg` importer，M1s 不新增 package 或 lockfile 变化。静态边界禁止环境
 读取、Supabase/OpenAI SDK、fetch、HTTP/TLS socket、DSN、connection string、credential
-环境名与日志 sink；production build 后继续扫描 client chunks 中的 M1r/M1s
+环境名与日志 sink；production build 后继续扫描 client chunks 中的 M1r/M1s/M1t
 version/status/digest 与 secret sentinel。
 
 同一未部署源码通过 M1s/M1r/M1m-target/runtime-boundary 聚焦 4 files / 76 tests，以及
@@ -110,13 +112,23 @@ production build 与 24-file client-chunk scan 均通过。首次沙箱内 build
 worker 无权绑定本地端口而失败；在获批的沙箱外以同一源码重跑后成功，这不是源码或测试
 失败，也没有启动可访问部署。
 
-M1s 只关闭“默认关闭的身份、控制面观察与凭据保管 source composition 契约”这一项。进入
-真实产品接线前仍需分别授权并完成：
+M1s 只关闭“默认关闭的身份、控制面观察与凭据保管 source composition 契约”这一项。
+M1t 已完成并验证 provider-neutral、source-only、default-off 的平台协议适配器：
+Management API 只允许 `GET /v1/projects/{production_ref}/branches`；会返回 `db_pass` 与
+`jwt_secret` 的 branch-config endpoint 必须固定禁止；Vercel OIDC 还必须叠加独立的
+source-manifest attestation。M1t 不选择供应商、不创建资源，也不改变本模块的
+`READY=false`、正式 factory 固定关闭或 approved export absent。
 
-1. 真实 deployment workload identity、Supabase Management API 最小权限 adapter、KMS/HMAC、
-   pinned-CA custody 与 secret-manager transport，并产生同 revision 运行证据；
+进入真实产品接线前仍需分别授权并完成：
+
+1. 由 M1u 另行选择和授权真实 deployment workload identity、Supabase Management API OAuth、
+   KMS/HMAC、pinned-CA custody 与 secret-manager
+   transport，确认费用、创建资源并产生同 revision 运行证据；
 2. Product API route/importer wiring、Production migration、Vercel deployment 与 activation；
 3. provider/model evaluation、费用、真实产品流量与人类语义验收。
 
 完成这些 gate 前，不得把 M1s 描述为已配置云身份、已接入 Vault/KMS、已连接数据库或 AI
 应用已上线。
+
+详见
+[`communication-note-preview-product-runtime-platform-adapters-m1t.md`](communication-note-preview-product-runtime-platform-adapters-m1t.md)。

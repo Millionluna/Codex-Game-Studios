@@ -792,6 +792,42 @@ focus, the complete 189-file / 2,609-test suite, TypeScript, full ESLint,
 to M1r. The run created no Supabase resource, SQL connection, migration,
 deployment, schedule or provider/model call.
 
+### Product runtime platform protocol adapters M1t — source only
+
+M1t is the implemented server-only, default-off protocol layer outside
+M1s. Its formal factory remains fixed `PRODUCT_API_DISABLED`; `READY=false`,
+the approved export is absent and no Product API route, component or automation
+may activate it. Provider SDKs, credentials and cloud resources remain outside
+this source slice.
+
+The only allowed Supabase control-plane request is an authenticated, no-query,
+no-redirect, zero-retry `GET /v1/projects/{production_ref}/branches` using OAuth
+scope `environment:read` and attested permission `branching_development_read`.
+PAT is forbidden. `GET /v1/branches/{branch_id_or_ref}` is also forbidden
+because its official branch-config response schema includes `db_pass` and
+`jwt_secret`, which would collapse the control-plane and credential-custody
+boundaries before M1s can assert content-free evidence.
+
+Vercel OIDC alone does not attest the source revision; M1t therefore requires a
+separate managed source-manifest attestation bound to the workload, target and
+CA digest. The minimal target is Direct-only
+`db.{child_ref}.supabase.co:5432/postgres`. PostgreSQL 17 requires both the
+deployment-attested source pin and M1m's later database-session check; this
+source handoff supplies no live PG17 evidence. Managed HMAC, pinned CA,
+Management API credential and static branch-admin password remain distinct
+injected protocol ports. No KMS or Secret Manager provider has been selected.
+
+The completed local source gate passed M1t 33/33, the focused M1r/M1s/M1t
+4-file / 84-test set, the full 190-file / 2,643-test suite, TypeScript, full
+ESLint, `git diff --check`, the 64/64-page production build and the 24-chunk
+M1r/M1s/M1t leak scan. These checks used no real provider credential, API,
+database or cloud resource.
+M1u requires separate provider, cost and resource authorization before any
+workload federation, KMS key, OAuth credential, CA custody, secret version,
+live Management API observation, database connection or deployment is created.
+See
+`documentation/communication-note-preview-product-runtime-platform-adapters-m1t.md`.
+
 Supabase CLI 2.115.0 has since generated source-only migration `20260823213144_harden_v1_note_generation_registration_retention.sql`. It adds `attempts_registration_digest_idx` and the named `attempts_registration_catalog_fk` from `attempts.registration_digest` to `worker_registrations.registration_digest`, with update/delete `RESTRICT`, `NOT VALID` creation and explicit validation. It creates no seed, caller grant, runtime surface or Production change. Its local gate passed 39/39 focused contracts, the full 125-file / 1,381-test suite, lint, TypeScript, the 63/63-page production build, the 73-file Codex-adapter sync check and `git diff --check`. Deleted disposable `r22` then clean-applied the current manifest 15/15 and passed the seven rollback suites; the hosted registration-retention gate is now closed without enabling any runtime automation.
 
 ### PostgreSQL 16.15 local isolated gate — 2026-08-24
