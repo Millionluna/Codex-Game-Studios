@@ -1183,16 +1183,22 @@ checks.
 M1x adds the physical
 `POST /api/ai-documents/communication-note/generate` request boundary without
 adding an automation runtime. Its independent environment flag is gated again
-by a compile-time `READY=false` latch, and the formal submission port is
-`undefined`. The default handler therefore returns a fixed, no-store
+by a compile-time `READY=false` latch, and the formal strict-principal resolver
+and formal submission port are both `undefined`. The default handler therefore
+returns a fixed, no-store
 `503 PRODUCT_API_DISABLED` before authentication or body access, including when
 the environment value is accidentally set to exact `true`.
 
-The injected source-test contract models an already-resolved provider account,
-rejects bearer credentials, and validates same-origin HTTPS, bounded JSON, an
-idempotency header, exact Communication facts, both privacy confirmations and
-two server-side privacy scanners before accepting a strictly owner-safe
-admission response. It is not live cookie-session authority evidence. Fresh
+The source-only strict-principal factory replaces the loose Workspace-account
+test seam. It rejects every `Authorization` header before Auth work, then uses
+explicitly injected ports to verify Cookie JWT claims, require the exact Auth
+`session_id` to be active for an eligible trusted-metadata Provider, and match
+the authoritative Auth user. It passes the frozen full principal to the
+submission boundary without returning or logging it. This is not a formal
+service-role composition or live Cookie/Auth/database result. The route then
+validates same-origin HTTPS, bounded JSON, an idempotency header, exact
+Communication facts, both privacy confirmations and two server-side privacy
+scanners before accepting a strictly owner-safe admission response. Fresh
 admission returns `202`; exact replay
 returns `200` with the current durable job state, including valid terminal state.
 Duplicate JSON properties and unsafe/temporally inconsistent job envelopes fail
@@ -1201,8 +1207,11 @@ OpenAI provider, owner repository, Points store or cloud bridge. No queue,
 schedule, retry worker, model call, payload storage, database connection,
 Preview, Production resource or deployment was added.
 
-A future runtime must first bind server privacy authority, Points reservation,
-retention-bounded payload custody and formal owner admission, then let a
+A future runtime must first bind an exact non-Production target and
+least-privilege session-status client, normalize trusted Provider roles, and
+bind server privacy authority, Points reservation, retention-bounded payload
+custody and formal owner admission. Owner admission must recheck session and
+privacy authority inside the enqueue transaction, then let a
 registered asynchronous worker call an approved provider. M1x does not permit
 the HTTP request thread to call a model directly. See
 `documentation/communication-note-generation-api-m1x.md`.

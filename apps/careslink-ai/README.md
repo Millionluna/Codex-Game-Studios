@@ -273,15 +273,20 @@ default-off and also held by a compile-time `READY=false` latch; the formal
 submission port is `undefined`. Consequently, even
 `CARESLINK_COMMUNICATION_NOTE_GENERATION_API_ENABLED=true` returns a no-store
 `503 PRODUCT_API_DISABLED` before reading authentication or request content.
-The test-only seam models an injected resolved provider account, rejects bearer
-credentials, and freezes same-origin HTTPS, bounded JSON, exact Communication
-Note facts, both privacy confirmations, server-side dual privacy scanning,
-idempotency and an owner-safe admission response. It is not live cookie-session
-authority evidence. A new admission returns `202`; an exact replay returns `200`
-with the current strictly parsed job state. It does not connect the composer
-button, a model, Points, payload storage, a worker, Supabase generation RPCs,
-Preview or Production. See
-`documentation/communication-note-generation-api-m1x.md`.
+The source-only follow-up replaces the former loose Workspace-account seam with
+an explicit strict-principal port. Its pure test composition is Cookie-only,
+rejects every `Authorization` header before Auth work, verifies JWT claims,
+requires the exact Auth `session_id` to be active for an eligible Provider, and
+then matches the authoritative Auth user. The formal principal resolver and
+submission port both remain `undefined`, so this is not live cookie-session or
+database evidence. The remaining boundary freezes same-origin HTTPS, bounded
+JSON, exact Communication Note facts, both privacy confirmations, server-side
+dual privacy scanning, idempotency and an owner-safe admission response. A new
+admission returns `202`; an exact replay returns `200` with the current strictly
+parsed job state. It does not connect the composer button, a model, Points,
+payload storage, a worker, Supabase generation RPCs, Preview or Production. See
+`documentation/communication-note-generation-api-m1x.md` and
+`documentation/communication-note-generation-strict-session-admission.md`.
 
 ## NDIS Case Note AI Companion
 

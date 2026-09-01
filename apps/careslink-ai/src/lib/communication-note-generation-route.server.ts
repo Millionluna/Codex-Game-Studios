@@ -20,9 +20,12 @@ import {
   type CommunicationNoteGenerationResult,
 } from "./communication-note-generation-contract";
 import { isCommunicationNoteGenerationApiEnabled } from "./communication-note-generation-feature";
-import { resolveWorkspaceAccountFromSupabaseSession } from "./referral-workspace-session";
-import type { WorkspaceAccount } from "./referral-workspace-auth";
-import { createCareslinkServerSupabaseClient } from "./supabase-server";
+import {
+  COMMUNICATION_NOTE_GENERATION_PRINCIPAL_RESOLVER,
+  type CommunicationNoteGenerationPrincipalResolution,
+  type CommunicationNoteGenerationPrincipalResolver,
+  type CommunicationNoteGenerationProviderPrincipal,
+} from "./communication-note-generation-principal.server";
 import { scanCaresLinkV1CleanedFacts } from "./v1/privacy-review-scanner.server";
 import {
   CARESLINK_V1_GENERATION_STATUSES,
@@ -48,10 +51,8 @@ const UUID_PATTERN =
 const SERVER_TIME_PATTERN =
   /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
 
-type ProviderAccount = Pick<WorkspaceAccount, "id" | "role">;
-
 export type CommunicationNoteGenerationCommand = Readonly<{
-  providerUserId: string;
+  principal: CommunicationNoteGenerationProviderPrincipal;
   noteType: typeof NOTE_TYPE;
   serviceCode: typeof SERVICE_CODE;
   sourceLocale: CaresLinkV1Locale;
@@ -88,7 +89,9 @@ export const COMMUNICATION_NOTE_GENERATION_SUBMITTER = undefined as
 type CommunicationNoteGenerationRouteDependencies = Readonly<{
   isRuntimeEnabled(): boolean;
   getSubmitter(): CommunicationNoteGenerationSubmitter | undefined;
-  resolveAccount(): Promise<ProviderAccount | undefined>;
+  getPrincipalResolver():
+    | CommunicationNoteGenerationPrincipalResolver
+    | undefined;
   createCorrelationId(): string;
 }>;
 
@@ -96,14 +99,15 @@ export type TestOnlyCommunicationNoteGenerationRouteOptions = Readonly<{
   capability: "TEST_ONLY_M1X_COMMUNICATION_NOTE_GENERATION_ROUTE";
   runtimeEnabled: boolean;
   submitter?: CommunicationNoteGenerationSubmitter;
-  resolveAccount(): Promise<ProviderAccount | undefined>;
+  resolvePrincipal?: CommunicationNoteGenerationPrincipalResolver;
   createCorrelationId?: () => string;
 }>;
 
 const DEFAULT_DEPENDENCIES: CommunicationNoteGenerationRouteDependencies = {
   isRuntimeEnabled: isCommunicationNoteGenerationApiEnabled,
   getSubmitter: () => COMMUNICATION_NOTE_GENERATION_SUBMITTER,
-  resolveAccount: resolveDefaultAccount,
+  getPrincipalResolver: () =>
+    COMMUNICATION_NOTE_GENERATION_PRINCIPAL_RESOLVER,
   createCorrelationId: randomUUID,
 };
 
@@ -121,7 +125,8 @@ export function createTestOnlyCommunicationNoteGenerationHandler(
     options.capability !==
       "TEST_ONLY_M1X_COMMUNICATION_NOTE_GENERATION_ROUTE" ||
     typeof options.runtimeEnabled !== "boolean" ||
-    typeof options.resolveAccount !== "function" ||
+    (options.resolvePrincipal !== undefined &&
+      typeof options.resolvePrincipal !== "function") ||
     (options.submitter !== undefined &&
       typeof options.submitter.submit !== "function") ||
     (options.createCorrelationId !== undefined &&
@@ -133,7 +138,7 @@ export function createTestOnlyCommunicationNoteGenerationHandler(
   const dependencies: CommunicationNoteGenerationRouteDependencies = {
     isRuntimeEnabled: () => options.runtimeEnabled,
     getSubmitter: () => options.submitter,
-    resolveAccount: options.resolveAccount,
+    getPrincipalResolver: () => options.resolvePrincipal,
     createCorrelationId: options.createCorrelationId ?? randomUUID,
   };
   return (request: Request) => handleRequest(request, dependencies);
@@ -163,33 +168,29 @@ async function handleRequest(
     return disabledResponse(correlationId, headers);
   }
 
-  let account: ProviderAccount | undefined;
+  let resolvePrincipal: CommunicationNoteGenerationPrincipalResolver | undefined;
   try {
-    account = await dependencies.resolveAccount();
+    resolvePrincipal = dependencies.getPrincipalResolver();
   } catch {
     return disabledResponse(correlationId, headers);
   }
-  if (!account) {
-    return errorResponse(
-      "AUTH_REQUIRED",
-      "Authentication is required",
-      401,
-      correlationId,
-      headers,
-    );
-  }
-  if (account.role !== "provider") {
-    return errorResponse(
-      "FORBIDDEN",
-      "A provider account is required",
-      403,
-      correlationId,
-      headers,
-    );
-  }
-  if (!UUID_PATTERN.test(account.id)) {
+  if (!resolvePrincipal) {
     return disabledResponse(correlationId, headers);
   }
+
+  let principalResolution: CommunicationNoteGenerationPrincipalResolution;
+  try {
+    principalResolution = parsePrincipalResolution(
+      await resolvePrincipal(request),
+    );
+  } catch {
+    return disabledResponse(correlationId, headers);
+  }
+  if (!principalResolution.ok) {
+    return principalFailureResponse(principalResolution, correlationId, headers);
+  }
+
+  const principal = principalResolution.principal;
 
   try {
     assertCookieMutationTransport(request);
@@ -217,7 +218,7 @@ async function handleRequest(
 
     const admission = parseAdmission(
       await submitter.submit({
-        providerUserId: account.id,
+        principal,
         noteType: NOTE_TYPE,
         serviceCode: SERVICE_CODE,
         sourceLocale: input.sourceLocale,
@@ -250,9 +251,109 @@ async function handleRequest(
   }
 }
 
-async function resolveDefaultAccount() {
-  const supabase = await createCareslinkServerSupabaseClient();
-  return resolveWorkspaceAccountFromSupabaseSession(supabase);
+function principalFailureResponse(
+  resolution: Exclude<
+    CommunicationNoteGenerationPrincipalResolution,
+    { ok: true }
+  >,
+  correlationId: string,
+  headers: Headers,
+) {
+  switch (resolution.reason) {
+    case "auth_required":
+      return resolution.status === 401
+        ? errorResponse(
+            "AUTH_REQUIRED",
+            fixedContractMessage("AUTH_REQUIRED"),
+            401,
+            correlationId,
+            headers,
+          )
+        : disabledResponse(correlationId, headers);
+    case "session_revoked":
+      return resolution.status === 401
+        ? errorResponse(
+            "SESSION_REVOKED",
+            fixedContractMessage("SESSION_REVOKED"),
+            401,
+            correlationId,
+            headers,
+          )
+        : disabledResponse(correlationId, headers);
+    case "forbidden_transport":
+      return resolution.status === 403
+        ? errorResponse(
+            "FORBIDDEN",
+            fixedContractMessage("FORBIDDEN"),
+            403,
+            correlationId,
+            headers,
+          )
+        : disabledResponse(correlationId, headers);
+    case "unavailable":
+      return disabledResponse(correlationId, headers);
+    default:
+      return disabledResponse(correlationId, headers);
+  }
+}
+
+function parsePrincipalResolution(
+  value: unknown,
+): CommunicationNoteGenerationPrincipalResolution {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error("Communication Note principal resolution is unavailable");
+  }
+
+  const candidate = value as Record<string, unknown>;
+  if (candidate.ok === true) {
+    const success = exactDataRecord(candidate, ["ok", "principal"]);
+    return Object.freeze({
+      ok: true,
+      principal: parseProviderPrincipal(success.principal),
+    });
+  }
+
+  if (candidate.ok === false) {
+    const rejected = exactDataRecord(candidate, ["ok", "reason", "status"]);
+    if (
+      (rejected.reason === "auth_required" && rejected.status === 401) ||
+      (rejected.reason === "session_revoked" && rejected.status === 401) ||
+      (rejected.reason === "forbidden_transport" && rejected.status === 403) ||
+      (rejected.reason === "unavailable" && rejected.status === 503)
+    ) {
+      return Object.freeze({
+        ok: false,
+        reason: rejected.reason,
+        status: rejected.status,
+      });
+    }
+  }
+
+  throw new Error("Communication Note principal resolution is unavailable");
+}
+
+function parseProviderPrincipal(
+  value: unknown,
+): CommunicationNoteGenerationProviderPrincipal {
+  const principal = exactDataRecord(value, [
+    "sessionId",
+    "transport",
+    "userId",
+  ]);
+  if (
+    typeof principal.userId !== "string" ||
+    !UUID_PATTERN.test(principal.userId) ||
+    typeof principal.sessionId !== "string" ||
+    !UUID_PATTERN.test(principal.sessionId) ||
+    principal.transport !== "COOKIE"
+  ) {
+    throw new Error("Communication Note generation principal is unavailable");
+  }
+  return Object.freeze({
+    userId: principal.userId.toLowerCase(),
+    sessionId: principal.sessionId.toLowerCase(),
+    transport: "COOKIE",
+  });
 }
 
 function parseRequestBody(body: Record<string, unknown>) {
