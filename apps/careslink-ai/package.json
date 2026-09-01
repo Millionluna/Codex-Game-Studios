@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
+    "test:build:m1r-client-boundary": "node scripts/check-m1r-client-bundle.mjs",
     "test:local:portal-follow-up-concurrency": "node scripts/preview-e2e/portal-referral-follow-up-concurrency-local-pg16.mjs",
     "test:preview:e2e:policy": "vitest run scripts/preview-e2e",
     "test:preview:e2e:worker-rpc": "node scripts/preview-e2e/note-worker-rpc-concurrency.mjs"
@@ -18,18 +19,19 @@
     "@vercel/analytics": "^2.0.1",
     "lucide-react": "^1.21.0",
     "next": "16.2.9",
+    "pg": "8.23.0",
     "react": "19.2.4",
     "react-dom": "19.2.4"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
+    "@types/pg": "8.23.0",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.2.9",
     "jsdom": "26.1.0",
-    "pg": "8.23.0",
     "playwright-core": "^1.61.0",
     "tailwindcss": "^4",
     "typescript": "^5",

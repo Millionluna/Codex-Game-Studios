@@ -84,6 +84,7 @@ describe("V1 shadow runtime boundary", () => {
       "src/lib/v1/communication-note-preview-approved-runtime-broker.server.ts",
       "src/lib/v1/communication-note-preview-approved-runtime-postgres-session.server.ts",
       "src/lib/v1/communication-note-preview-approved-runtime-adapters.server.ts",
+      "src/lib/v1/communication-note-preview-product-runtime-composition.server.ts",
       "src/lib/v1/native-auth-boundary.server.ts",
       "src/lib/v1/openai-communication-note-provider.server.ts",
       "src/lib/v1/communication-note-provider-policy.ts",
@@ -717,6 +718,8 @@ describe("V1 shadow runtime boundary", () => {
         expectedImporterPaths: [
           "src/lib/v1/communication-note-preview-approved-runtime-adapters-hosted.live.test.ts",
           "src/lib/v1/communication-note-preview-approved-runtime-adapters.server.test.ts",
+          "src/lib/v1/communication-note-preview-product-runtime-composition.server.test.ts",
+          "src/lib/v1/communication-note-preview-product-runtime-composition.server.ts",
         ],
       },
     ] as const;
@@ -729,7 +732,7 @@ describe("V1 shadow runtime boundary", () => {
         ?.replace(/\.ts$/, "");
       expect(importStem).toBeDefined();
       const importPattern = new RegExp(
-        `(?:from\\s+|import\\s*\\(|require\\s*\\()\\s*["'][^"']*${importStem?.replaceAll(".", "\\.")}(?:\\.(?:[cm]?[jt]s|[jt]sx))?["']`,
+        `(?:from\\s+|import\\s*(?:\\(\\s*)?|require\\s*\\(\\s*)["'][^"']*${importStem?.replaceAll(".", "\\.")}(?:\\.(?:[cm]?[jt]s|[jt]sx))?["']`,
       );
       const importers = walkControlledScriptFiles().filter((file) =>
         importPattern.test(readFileSync(file, "utf8")),
@@ -754,6 +757,59 @@ describe("V1 shadow runtime boundary", () => {
       expect(source).toMatch(/_READY\s*=\s*(?:\r?\n\s*)?false\s+as const/);
       expect(source).toContain("SOURCE_ADAPTER");
     }
+  });
+
+  it("quarantines the M1r product runtime composition and pg driver to one server-only source boundary", () => {
+    const relativePath =
+      "src/lib/v1/communication-note-preview-product-runtime-composition.server.ts";
+    const modulePath = join(process.cwd(), relativePath);
+    const importStem =
+      "communication-note-preview-product-runtime-composition.server";
+    const importPattern = new RegExp(
+      `(?:from\\s+|import\\s*(?:\\(\\s*)?|require\\s*\\(\\s*)["'][^"']*${importStem.replaceAll(".", "\\.")}(?:\\.(?:[cm]?[jt]s|[jt]sx))?["']`,
+    );
+    const importers = walkControlledScriptFiles().filter((file) =>
+      importPattern.test(readFileSync(file, "utf8")),
+    );
+    const source = readFileSync(modulePath, "utf8");
+
+    expect(importers).toEqual([
+      join(
+        process.cwd(),
+        "src/lib/v1/communication-note-preview-product-runtime-composition.server.test.ts",
+      ),
+    ]);
+    expect(
+      walkSourceFiles("src/app").filter((file) =>
+        importPattern.test(readFileSync(file, "utf8")),
+      ),
+    ).toEqual([]);
+    expect(
+      walkSourceFiles("src/components").filter((file) =>
+        importPattern.test(readFileSync(file, "utf8")),
+      ),
+    ).toEqual([]);
+    expect(
+      walkAllScriptFiles("src").filter(
+        (file) =>
+          !/\.test\.(?:[cm]?[jt]s|[jt]sx)$/.test(file) &&
+          /(?:from\s+|import\s*(?:\(\s*)?|require\s*\(\s*)["']pg(?:\/[^"']*)?["']/.test(
+            readFileSync(file, "utf8"),
+          ),
+      ),
+    ).toEqual([modulePath]);
+    expect(source).toMatch(/^import "server-only";/);
+    expect(source).toContain('import { Client as PgClient } from "pg";');
+    expect(source).not.toMatch(
+      /process\.env|import\.meta\.env|Deno\.env|Bun\.env|fetch\s*\(|node:(?:http|https|net|tls)|@supabase\/|postgres(?:ql)?:\/\/|DATABASE_URL|connectionString\s*:|SUPABASE_|OPENAI_|NEXT_PUBLIC_|console\.|\blogger\b|new\s+PgClient/i,
+    );
+    expect(source).not.toMatch(/_READY\s*=\s*(?:\r?\n\s*)?true\b/);
+    expect(source).toMatch(
+      /_READY\s*=\s*(?:\r?\n\s*)?false\s+as const/,
+    );
+    expect(source).toContain(
+      "SOURCE_PRODUCT_RUNTIME_COMPOSITION_NOT_ACTIVATED",
+    );
   });
 
   it("exposes the privacy review as a physical POST-only route", () => {

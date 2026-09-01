@@ -85,21 +85,22 @@ terminal/persist/commit freshness fence 会拒绝过期结果。若未来要求 
 
 - 适配器不读取 `process.env`，不构造 connection string，不导入 Supabase/OpenAI SDK，
   不自行执行网络发现，也不记录原始错误或秘密。
-- `pg` 目前仍是开发依赖；源码通过注入的 `Client` constructor 测试。因为 approved
-  bundle 尚不存在、产品入口没有 importer，本批次不把 `pg` 宣称为已部署 runtime
-  dependency。
+- M1r 后续已把固定 `pg@8.23.0` 晋级为产品运行依赖，并新增唯一的 server-only 产品
+  composition 源 importer；它仍没有 App Route/Product API importer，approved bundle
+  不存在，因此不能把依赖晋级描述为已部署或已连接数据库。
 - M1m 没有修改 M1l migration、preflight/coordinator pins 或数据库 readiness；第 40
   条 migration 仍未应用到 Production。
 - M1n 已增加 source-pinned、default-off 的 Hosted harness；M1o 又补齐 factory nonce
   防重放、有界 admin close 与同步 pipe failure 收敛。M1n/M1o source batch 当时没有创建
-  Preview；后续 M1p 首次授权执行已通过 child metadata/TLS/PG17 与 40/40 migration gate，
-  但在 synthetic setup 前因 Vitest 的 `pg` namespace Proxy false negative 固定失败，因此
-  真实 PID/persist/cleanup lifecycle 仍未通过；详见
+  Preview。M1p 首次授权执行因 Vitest `pg` namespace Proxy false negative 在 synthetic
+  setup 前失败；修正版 M1p 随后通过 positive path，M1q 又通过 timeout/Abort negative
+  paths。两个成功 gate 的 exact Preview 均已删除；这些证据只适用于对应 TestOnly revision，
+  不构成部署或 activation。详见
   `documentation/communication-note-preview-approved-runtime-hosted-harness-m1n.md`。
 
 ## 验证与后续 gate
 
-M1o 当前同一源码通过 M1m/M1n 十文件聚焦 169/169（含 runtime boundary 12/12）和完整
+M1o checkpoint 当时同一源码通过 M1m/M1n 十文件聚焦 169/169（含 runtime boundary 12/12）和完整
 Vitest 187 files / 2,565 tests、TypeScript、全仓 ESLint、三个 Node runner syntax、
 whitespace/diff、73-file Codex adapter sync 与 Next.js 16.2.9 Webpack 64/64-page build。
 这些本地结果只能证明 source contract 一致，不表示部署或 Production greenlight。
@@ -171,10 +172,13 @@ SQL/数据访问、Vercel deployment、provider/model 调用或真实护理数�
 
 若要实际接通 AI 应用，后续仍需分别取得：
 
-1. approved target resolver、控制面身份、KMS/Vault credential transport、部署身份与
-   runtime dependency 的审查；
-2. Production migration、部署与 activation 的独立授权；
-3. provider/model evaluation、费用与产品流量的独立授权。
+1. approved target resolver、控制面身份、KMS/Vault credential transport 与部署身份；
+2. Product API route/importer wiring、Production migration、部署与 activation 的独立授权；
+3. provider/model evaluation、费用、产品流量与人类语义验收的独立授权。
+
+M1r 已关闭固定 runtime dependency 与 default-off 产品 composition 的源码门禁；详见
+`documentation/communication-note-preview-product-runtime-composition-m1r.md`。这不改变上述
+三项 live/Production/provider gate。
 
 在这些 gate 完成前，M1m 不启用 Product API route，不产生模型调用，不写 Production，
 readiness/approval 保持 false/undefined。
