@@ -763,6 +763,35 @@ complete 188-file / 2,578-test suite, TypeScript, full ESLint, 73-file adapter
 sync, 64/64-page Webpack build and a 24-client-chunk negative leak scan. None of
 those checks schedules work or makes this module a reachable product entry.
 
+### Product runtime identities M1s — source only
+
+M1s adds one server-only, default-off outer composition around M1r. A TestOnly
+call first validates an injected, five-minute-bounded deployment identity for
+the exact source revision, target ref and CA digest. It then requires one atomic
+authenticated control-plane identity + branch observation and derives a
+canonical content-free evidence digest. Project-ref HMAC, pinned-CA loading and
+each management credential custody call are privately wrapped with the same
+source revision, deployment identity evidence and control-plane evidence before
+M1r/M1m can consume them.
+
+The formal factory remains fixed `PRODUCT_API_DISABLED`; `READY=false`, the
+approved export is absent and App Route/component importers remain zero. M1s
+does not import `pg`, Supabase/OpenAI SDKs or network modules and performs no
+environment discovery. It accepts no PAT, OAuth token, API secret, DSN,
+password, host or CA body as composition configuration. The underlying branch
+admin password is still explicitly static and reusable: the 60-second bound is
+only the one-use delivery envelope, while source expiry remains `null` and
+source revocation remains branch delete or password reset. No real deployment
+identity, Management API adapter, KMS/HMAC, CA store or secret-manager transport
+is implemented or claimed by this source contract.
+
+Local closeout passed the 4-file / 76-test M1s/M1r/M1m-target/runtime-boundary
+focus, the complete 189-file / 2,609-test suite, TypeScript, full ESLint,
+73-file adapter sync, the 64/64-page Turbopack production build and the expanded
+24-client-chunk M1r/M1s negative leak scan. Package and lock files stayed exact
+to M1r. The run created no Supabase resource, SQL connection, migration,
+deployment, schedule or provider/model call.
+
 Supabase CLI 2.115.0 has since generated source-only migration `20260823213144_harden_v1_note_generation_registration_retention.sql`. It adds `attempts_registration_digest_idx` and the named `attempts_registration_catalog_fk` from `attempts.registration_digest` to `worker_registrations.registration_digest`, with update/delete `RESTRICT`, `NOT VALID` creation and explicit validation. It creates no seed, caller grant, runtime surface or Production change. Its local gate passed 39/39 focused contracts, the full 125-file / 1,381-test suite, lint, TypeScript, the 63/63-page production build, the 73-file Codex-adapter sync check and `git diff --check`. Deleted disposable `r22` then clean-applied the current manifest 15/15 and passed the seven rollback suites; the hosted registration-retention gate is now closed without enabling any runtime automation.
 
 ### PostgreSQL 16.15 local isolated gate — 2026-08-24

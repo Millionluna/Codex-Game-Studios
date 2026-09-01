@@ -2974,6 +2974,38 @@ The final local run passed 3 focused files / 36 tests and the complete 188-file
 `git diff --check`, the 64/64-page Webpack production build and the 24-file
 client-chunk scan also passed.
 
+### Communication Note product runtime identities M1s — source only
+
+M1s tests the default-off identity/custody composition placed outside M1r. The
+suite fixes the version, policy digest/readiness, frozen policy, absent approved
+export and exact seven-symbol runtime export surface. Formal factory hostile
+Proxy inputs are not inspected. TestOnly validation rejects missing/extra,
+accessor, null-prototype, Proxy and malformed identity data before target/M1r
+composition or PostgreSQL Client construction.
+
+The positive test captures the deployment attestation request and verifies the
+exact audience, non-Production environment, source revision, target and CA
+binding. It then invokes the three private target wrappers and management
+credential wrapper, proving one canonical deployment evidence digest and one
+canonical authenticated control-plane evidence digest propagate unchanged to
+HMAC, CA and credential custody. Raw upstream evidence is not re-exported as the
+aggregate digest; the output remains the original frozen M1r bundle. Stale,
+future, expired, overlong, revision/audience/environment-mismatched and raw-
+credential identity claims fail closed, and source failures are normalized to
+the fixed content-free error.
+
+Runtime-boundary tests restrict M1s to its exact test importer, keep App Route
+and component importers at zero, retain M1r as the only non-test `pg` importer,
+and forbid ambient environment/network/SDK/DSN/log authority in M1s. The
+post-build scanner now checks both M1r and M1s version/status/digest/secret
+markers across client chunks.
+
+The final local run passed 4 focused files / 76 tests and the complete 189-file
+/ 2,609-test suite. TypeScript, full ESLint, 73-file adapter sync,
+`git diff --check`, the 64/64-page Turbopack production build and the 24-file
+M1r/M1s client-chunk scan also passed. These are source/build tests only: no
+cloud identity, Supabase API/database, Vault/KMS, deployment or model was used.
+
 ### Current live/read-only evidence
 
 - Supabase migrations, tables, RLS flags, policies, grants, function grants and aggregate row counts were checked read-only.

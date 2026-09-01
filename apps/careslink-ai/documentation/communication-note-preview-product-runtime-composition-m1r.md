@@ -81,3 +81,8 @@ M1r 只关闭“运行包可安装且产品组合源边界存在”这一项。�
 3. provider/model evaluation、费用、真实产品流量与人类语义验收。
 
 完成这些 gate 前，不得把 source composition 描述为已部署、已连接数据库或 AI 应用已上线。
+
+后续 M1s 已新增默认关闭的 deployment/control-plane identity 与 credential-custody source
+composition 契约，但没有提供任何实际云身份、Management API、KMS/Vault 或 secret-manager
+adapter。因此上列第 1 项只在接口与隔离层面部分关闭，真实平台实现和运行证据仍是后续
+gate；M1r 本身的 policy、digest、READY 与 export 保持不变。
