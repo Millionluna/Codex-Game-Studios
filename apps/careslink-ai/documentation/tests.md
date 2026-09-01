@@ -3163,34 +3163,59 @@ an explicitly authorized one-time no-data Preview/live/delete gate.
 
 M1x adds a physical Node.js POST-only Route Handler at
 `/api/ai-documents/communication-note/generate`, an independent exact-`true`
-server flag and a compile-time `READY=false` latch. The formal submission port
-is `undefined`, so the default route returns no-store
+server flag and a compile-time `READY=false` latch. The formal strict-principal
+resolver and formal submission port are both `undefined`, so the default route
+returns no-store
 `503 PRODUCT_API_DISABLED` before reading request/auth state even if the flag is
 set. The source-test seam is not a runtime activation mechanism.
 
-Focused tests cover gate-before-request/auth/body/submission ordering, absent
-runtime, injected missing-account and admin-role denial before body access,
-malformed server-owned identity, bearer rejection, same-origin HTTPS, JSON media
-type, idempotency, invalid and oversized streamed bodies, duplicate/unknown-key
+Focused tests cover gate-before-request/auth/body/submission ordering; absent
+formal ports; Product master-gate ordering; rejection of bearer, basic and even
+empty `Authorization` headers before Cookie client/RPC creation; verified claims
+and canonical subject/session IDs; the exact service-only active-session RPC;
+revoked/ineligible Provider, malformed/unavailable RPC and authoritative-user
+mismatch mapping; frozen Cookie principal propagation; malformed principal
+denial; same-origin HTTPS; JSON media type, idempotency, invalid and oversized
+streamed bodies; duplicate/unknown-key
 and credential-field rejection, both
 literal privacy confirmations, exact seven-field schema validation, independent
 M1w and V1 privacy scanner bypasses, canonical facts hashing, fresh `202`
 admission, progressed/terminal exact replay with `200`, owner-safe
 current-job parsing, temporal/state invariant enforcement, shared HTTP error
-mapping, unsafe runtime output rejection, secret-free failures and a static
-provider/cloud/Points/repository import quarantine. The new focused set plus the
-existing runtime boundary passes 4 files / 62 tests; full-suite and
-production-build verification passed 202 files / 2,765 tests, TypeScript,
-full ESLint, `git diff --check` and the Next.js 16.2.9 webpack production build
-with 64/64 static pages. The build manifest contains the new dynamic POST route.
+mapping, unsafe runtime output rejection, secret-free failures and static loose
+Workspace/provider/cloud/Points/repository import quarantines. Verification
+counts for this strict-principal follow-up are recorded after its final local
+gate below.
 
 No UI action was enabled, no owner repository or database was called, and no
 Points, payload vault, worker, provider/model, GCP, Supabase management,
 Preview, Production or deployment action occurred. See
 `documentation/communication-note-generation-api-m1x.md`.
 
-The injected account seam is not live Cookie/Auth/session evidence. Activation
-still requires strict durable provider authority and fresh active-session checks.
+The pure injected strict-principal seam is not live Cookie/Auth/session evidence.
+Activation still requires exact Preview target binding, least-privilege client
+composition, live active/revoked-session proof and same-transaction owner
+admission reauthorization.
+
+#### Strict Cookie principal follow-up — local source evidence
+
+The new resolver reuses the Product Auth order `getClaims` → exact
+`resolve_v1_shadow_session_status(user_id, session_id)` → `getUser`. The RPC's
+existing source contract treats missing/revoked/expired sessions and unconfirmed,
+deleted, banned, anonymous or non-Provider users as `REVOKED`; the route returns
+the same fixed `401 SESSION_REVOKED` envelope without disclosing which predicate
+failed. Invalid/missing Cookie identity returns `401 AUTH_REQUIRED`, any
+`Authorization` transport returns `403 FORBIDDEN`, and unavailable authority
+returns `503 PRODUCT_API_DISABLED`.
+
+The formal resolver remains absent, the service RPC is not called by the real
+route, and no target/credential client was composed. The source gate therefore
+proves fail-closed ordering and mapping only, not a live database transaction or
+activation. The exact focused gate, including the session-SQL migration
+contract, passed 8 files / 140 tests; the full Vitest suite passed 203 files /
+2,793 tests; TypeScript, full ESLint, the 73-file Codex
+adapter check, `git diff --check` and the Next.js 16.2.9 Webpack production build
+with 64/64 static pages passed.
 
 ### Current live/read-only evidence
 

@@ -17,6 +17,10 @@ import {
   handleCommunicationNoteGenerationRequest,
   type CommunicationNoteGenerationSubmitter,
 } from "./communication-note-generation-route.server";
+import {
+  COMMUNICATION_NOTE_GENERATION_PRINCIPAL_RESOLVER,
+  type CommunicationNoteGenerationPrincipalResolution,
+} from "./communication-note-generation-principal.server";
 import { stringifyCaresLinkV1CanonicalJson } from "./v1/canonical-json";
 import { CaresLinkV1ContractError } from "./v1/shared-contracts";
 
@@ -24,6 +28,7 @@ vi.mock("server-only", () => ({}));
 
 const CORRELATION_ID = "11111111-1111-4111-8111-111111111111";
 const PROVIDER_ID = "22222222-2222-4222-8222-222222222222";
+const SESSION_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const JOB_ID = "33333333-3333-4333-8333-333333333333";
 const SERVER_TIME = "2026-09-01T04:30:00.000Z";
 
@@ -87,6 +92,7 @@ describe("Communication Note generation server route", () => {
     expect(COMMUNICATION_NOTE_GENERATION_API_MAX_REQUEST_BYTES).toBe(96 * 1024);
     vi.stubEnv("CARESLINK_COMMUNICATION_NOTE_GENERATION_API_ENABLED", "true");
     expect(COMMUNICATION_NOTE_GENERATION_SUBMITTER).toBeUndefined();
+    expect(COMMUNICATION_NOTE_GENERATION_PRINCIPAL_RESOLVER).toBeUndefined();
     const request = new Proxy({} as Request, {
       get() {
         throw new Error("request must remain opaque");
@@ -103,11 +109,11 @@ describe("Communication Note generation server route", () => {
   });
 
   it("checks the runtime gate before auth, body and submission", async () => {
-    const resolveAccount = vi.fn();
+    const resolvePrincipal = vi.fn();
     const submit = vi.fn();
     const handler = testHandler({
       runtimeEnabled: false,
-      resolveAccount,
+      resolvePrincipal,
       submit,
     });
     const request = new Proxy({} as Request, {
@@ -119,16 +125,16 @@ describe("Communication Note generation server route", () => {
     const response = await handler(request);
 
     expect(response.status).toBe(503);
-    expect(resolveAccount).not.toHaveBeenCalled();
+    expect(resolvePrincipal).not.toHaveBeenCalled();
     expect(submit).not.toHaveBeenCalled();
   });
 
   it("requires a submission port before auth or body access", async () => {
-    const resolveAccount = vi.fn();
+    const resolvePrincipal = vi.fn();
     const handler = createTestOnlyCommunicationNoteGenerationHandler({
       capability: "TEST_ONLY_M1X_COMMUNICATION_NOTE_GENERATION_ROUTE",
       runtimeEnabled: true,
-      resolveAccount,
+      resolvePrincipal,
       createCorrelationId: () => CORRELATION_ID,
     });
     const request = new Proxy({} as Request, {
@@ -140,20 +146,41 @@ describe("Communication Note generation server route", () => {
     const response = await handler(request);
 
     expect(response.status).toBe(503);
-    expect(resolveAccount).not.toHaveBeenCalled();
+    expect(resolvePrincipal).not.toHaveBeenCalled();
   });
 
-  it("authenticates and enforces the provider role before reading the request", async () => {
+  it("requires a formal principal resolver before reading the request", async () => {
     const submit = vi.fn();
-    const signedOut = testHandler({
-      resolveAccount: vi.fn().mockResolvedValue(undefined),
-      submit,
+    const handler = createTestOnlyCommunicationNoteGenerationHandler({
+      capability: "TEST_ONLY_M1X_COMMUNICATION_NOTE_GENERATION_ROUTE",
+      runtimeEnabled: true,
+      submitter: { submit },
+      createCorrelationId: () => CORRELATION_ID,
     });
-    const admin = testHandler({
-      resolveAccount: vi.fn().mockResolvedValue({
-        id: PROVIDER_ID,
-        role: "admin",
-      }),
+    const request = new Proxy({} as Request, {
+      get() {
+        throw new Error("request must remain opaque");
+      },
+    });
+
+    const response = await handler(request);
+
+    expect(response.status).toBe(503);
+    expect(await response.json()).toMatchObject({
+      error: { code: "PRODUCT_API_DISABLED" },
+    });
+    expect(submit).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["missing authentication", principalFailure("auth_required", 401), 401, "AUTH_REQUIRED"],
+    ["revoked or ineligible provider session", principalFailure("session_revoked", 401), 401, "SESSION_REVOKED"],
+    ["forbidden credential transport", principalFailure("forbidden_transport", 403), 403, "FORBIDDEN"],
+    ["unavailable strict authority", principalFailure("unavailable", 503), 503, "PRODUCT_API_DISABLED"],
+  ] as const)("rejects %s before reading the request", async (_name, resolution, status, code) => {
+    const submit = vi.fn();
+    const handler = testHandler({
+      resolvePrincipal: vi.fn().mockResolvedValue(resolution),
       submit,
     });
     const request = new Proxy({} as Request, {
@@ -162,33 +189,60 @@ describe("Communication Note generation server route", () => {
       },
     });
 
-    const signedOutResponse = await signedOut(request);
-    const adminResponse = await admin(request);
+    const response = await handler(request);
 
-    expect(signedOutResponse.status).toBe(401);
-    expect(await signedOutResponse.json()).toMatchObject({
-      error: { code: "AUTH_REQUIRED" },
-    });
-    expect(adminResponse.status).toBe(403);
-    expect(await adminResponse.json()).toMatchObject({
-      error: { code: "FORBIDDEN" },
-    });
+    expect(response.status).toBe(status);
+    expect(await response.json()).toMatchObject({ error: { code } });
     expect(submit).not.toHaveBeenCalled();
   });
 
-  it("fails closed when authenticated account identity is malformed", async () => {
+  it.each([
+    { userId: "demo-provider", sessionId: SESSION_ID, transport: "COOKIE" },
+    { userId: PROVIDER_ID, sessionId: "not-a-session", transport: "COOKIE" },
+    { userId: PROVIDER_ID, sessionId: SESSION_ID, transport: "BEARER" },
+  ])("fails closed when the resolved provider principal is malformed: %j", async (principal) => {
     const submit = vi.fn();
     const handler = testHandler({
-      resolveAccount: vi.fn().mockResolvedValue({
-        id: "demo-provider",
-        role: "provider",
-      }),
+      resolvePrincipal: vi.fn().mockResolvedValue({ ok: true, principal }),
       submit,
     });
 
     const response = await handler(validRequest());
 
     expect(response.status).toBe(503);
+    expect(submit).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    null,
+    {},
+    { ok: false, reason: "unexpected", status: 401 },
+    { ok: false, reason: "auth_required", status: 503 },
+    {
+      ok: true,
+      principal: {
+        userId: PROVIDER_ID,
+        sessionId: SESSION_ID,
+        transport: "COOKIE",
+      },
+      extra: true,
+    },
+  ])("fails closed for malformed principal resolution: %j", async (resolution) => {
+    const submit = vi.fn();
+    const handler = createTestOnlyCommunicationNoteGenerationHandler({
+      capability: "TEST_ONLY_M1X_COMMUNICATION_NOTE_GENERATION_ROUTE",
+      runtimeEnabled: true,
+      submitter: { submit },
+      resolvePrincipal: vi.fn().mockResolvedValue(resolution),
+      createCorrelationId: () => CORRELATION_ID,
+    });
+
+    const response = await handler(validRequest());
+
+    expect(response.status).toBe(503);
+    expect(await response.json()).toMatchObject({
+      error: { code: "PRODUCT_API_DISABLED" },
+    });
     expect(submit).not.toHaveBeenCalled();
   });
 
@@ -389,7 +443,11 @@ describe("Communication Note generation server route", () => {
     expect(submit).toHaveBeenCalledOnce();
     const command = submit.mock.calls[0][0];
     expect(command).toMatchObject({
-      providerUserId: PROVIDER_ID,
+      principal: {
+        userId: PROVIDER_ID,
+        sessionId: SESSION_ID,
+        transport: "COOKIE",
+      },
       noteType: "communication",
       serviceCode: "note.communication.generate",
       sourceLocale: "en",
@@ -400,6 +458,7 @@ describe("Communication Note generation server route", () => {
       idempotencyKey: "communication-note-request-0001",
       correlationId: CORRELATION_ID,
     });
+    expect(Object.isFrozen(command.principal)).toBe(true);
     expect(command.cleanedFacts).toEqual(cleanedFacts);
     expect(command.cleanedFacts).not.toBe(cleanedFacts);
     expect(command.cleanedFactsHash).toBe(
@@ -411,6 +470,7 @@ describe("Communication Note generation server route", () => {
     expect(serialized).not.toContain(cleanedFacts.observable_facts);
     expect(serialized).not.toContain(command.cleanedFactsHash);
     expect(serialized).not.toContain(PROVIDER_ID);
+    expect(serialized).not.toContain(SESSION_ID);
   });
 
   it("returns the current owner-safe durable job for an exact idempotent replay", async () => {
@@ -602,7 +662,7 @@ describe("Communication Note generation server route", () => {
     expect(serialized).not.toContain("secret-unregistered-error");
   });
 
-  it("keeps provider, cloud, Points and durable adapters out of the route module", () => {
+  it("keeps loose Workspace auth, provider, cloud, Points and durable adapters out of the route module", () => {
     const source = readFileSync(
       join(process.cwd(), "src/lib/communication-note-generation-route.server.ts"),
       "utf8",
@@ -610,6 +670,9 @@ describe("Communication Note generation server route", () => {
     expect(source).toMatch(/^import "server-only";/);
     expect(source).not.toMatch(
       /openai-communication-note-provider|communication-note-preview-product-runtime|note-generation-owner-repository|getGuidedAiRateLimiter|account-credit-store|@vercel\/oidc|google-auth-library/,
+    );
+    expect(source).not.toMatch(
+      /referral-workspace-session|referral-workspace-auth|createWorkspaceAccountFromSupabaseUser/,
     );
     expect(source).toContain(
       "COMMUNICATION_NOTE_GENERATION_SUBMITTER = undefined",
@@ -619,16 +682,13 @@ describe("Communication Note generation server route", () => {
 
 function testHandler({
   runtimeEnabled = true,
-  resolveAccount = vi.fn().mockResolvedValue({
-    id: PROVIDER_ID,
-    role: "provider",
-  }),
+  resolvePrincipal = vi.fn().mockResolvedValue(principalSuccess()),
   submit = vi.fn().mockResolvedValue(queuedAdmission),
 }: {
   runtimeEnabled?: boolean;
-  resolveAccount?: () => Promise<
-    { id: string; role: "provider" | "admin" } | undefined
-  >;
+  resolvePrincipal?: (
+    request: Request,
+  ) => Promise<CommunicationNoteGenerationPrincipalResolution>;
   submit?: CommunicationNoteGenerationSubmitter["submit"];
 } = {}) {
   const submitter: CommunicationNoteGenerationSubmitter = { submit };
@@ -636,9 +696,30 @@ function testHandler({
     capability: "TEST_ONLY_M1X_COMMUNICATION_NOTE_GENERATION_ROUTE",
     runtimeEnabled,
     submitter,
-    resolveAccount,
+    resolvePrincipal,
     createCorrelationId: () => CORRELATION_ID,
   });
+}
+
+function principalSuccess(): CommunicationNoteGenerationPrincipalResolution {
+  return {
+    ok: true,
+    principal: {
+      userId: PROVIDER_ID,
+      sessionId: SESSION_ID,
+      transport: "COOKIE",
+    },
+  };
+}
+
+function principalFailure(
+  reason: Exclude<
+    CommunicationNoteGenerationPrincipalResolution,
+    { ok: true }
+  >["reason"],
+  status: 401 | 403 | 503,
+): CommunicationNoteGenerationPrincipalResolution {
+  return { ok: false, reason, status };
 }
 
 function validRequest(
