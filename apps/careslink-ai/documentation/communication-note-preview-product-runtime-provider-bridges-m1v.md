@@ -18,9 +18,10 @@ Product API 可达。
 | GCP direct REST | `gcp-rest-bridge.communication.openai.synthetic-preview.2026-09-01.m1v.v1` | `c116c449fb025ecaca156e952d37b812c7dd272258120f677c8cef1e202326e3` | `READY=false`；formal export absent；source-only |
 | Supabase Management | `supabase-management-bridge.communication.openai.synthetic-preview.2026-09-01.m1v.v1` | `2c4c87bb7a15f3b101fd78c4438f44ed8b2e6dd28f782a615b92f87029e43c68` | `READY=false`；formal export absent；source-only |
 
-本批没有创建或改变任何 GCP WIF/IAM/KMS/Secret Manager resource，没有生成 service-account
-key，没有创建 Supabase OAuth app/grant/token 或 Preview branch，没有连接 Preview/Production
-PostgreSQL，没有读取真实 care data，没有部署，也没有调用 AI provider/model。所有已运行的
+M1v source 批次本身没有创建或改变任何 GCP WIF/IAM/KMS/Secret Manager resource，没有生成
+service-account key，也没有创建 Supabase OAuth app/grant/token 或 Preview branch。随后获批的
+外部操作只创建了最小权限 Supabase OAuth App；未创建 grant/token/Preview，没有连接
+Preview/Production PostgreSQL，没有读取真实 care data，没有部署，也没有调用 AI provider/model。所有已运行的
 bridge 与 composition evidence 都来自 injected/fake transport 的本地 source tests；没有 Node
 transport live evidence。
 
@@ -118,9 +119,12 @@ GCP REST bridge → M1u 与实际 Supabase bridge → M1t/M1s/M1r/M1m，而不�
 - GCP project `careslink-m1u-security` 已存在，但没有关联 billing account；当前操作者没有可用
   billing account administrator 权限。因此 API enablement、WIF pool/provider、runtime service
   account、IAM binding、KMS key ring/keys/versions 与 regional secrets/versions 均未创建。
-- Supabase OAuth App 表单 `Careslink AI M1u Preview` 已填写 Environment Read-only、website 与
-  localhost callback，但 **Confirm 尚未点击**。因此 app/client credential、authorization grant、
-  access token、refresh token 与 canonical live references 均不存在。
+- Supabase OAuth App `Careslink AI M1u Preview` 已创建，website 为 `https://careslink.com.au`，
+  callback 为 `http://localhost:32119/m1u/supabase/oauth/callback`，唯一 scope 为
+  `environment:read`。raw client id 不写入本文，client-id inventory marker SHA-256 为
+  `4b7a6fef8101c33fee65eae04d24cae31f59770773a21cb61af8299702bda77b`。一次性 client
+  secret 未持久化到 workspace、环境变量或 credential store；authorization grant、
+  access/refresh token 与 canonical app/grant references 均不存在。
 - 没有 Vercel M1u/M1v Preview deployment，也没有 live Node HTTPS transport、federation exchange
   或 provider audit evidence。
 
@@ -129,8 +133,9 @@ GCP REST bridge → M1u 与实际 Supabase bridge → M1t/M1s/M1r/M1m，而不�
 1. 关联 GCP billing，并创建和审查 exact WIF/IAM/KMS/Secret Manager resources；
 2. 固定独立 source-manifest signer identity，生成 canonical artifact，并闭合
    artifact/revision-to-deployment handoff；runtime service account 不得取得 manifest sign 权限；
-3. 在 Supabase 点击 OAuth App Confirm、完成 authorization grant 和受控 client-secret/code/
-   refresh-token intake，并增加经审查的 rotated-refresh-token writer；
+3. 安全托管或轮换已创建 App 的 client secret，固定 canonical app reference，完成
+   authorization grant 和受控 client-secret/code/refresh-token intake，并增加经审查的
+   rotated-refresh-token writer；
 4. 在同一 revision 上取得 Node transport 的 live 5 秒/Abort/no-redirect/zero-retry 与 provider
    response normalization evidence；
 5. 经执行时再次确认价格、exact target 和 teardown 后，创建一次 fresh、无数据、

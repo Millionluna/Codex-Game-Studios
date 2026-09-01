@@ -3096,10 +3096,16 @@ callable-alias rejection, monotonic clock rollback, stale OAuth evidence, and
 CA digest plus PEM/X.509/private-key rejection. The earlier M1u↔M1t OAuth and
 database-custody shape mismatches are closed.
 
-At handoff time only the unbilled GCP project and Vercel Team issuer selection
-exist. WIF/IAM/KMS/Secret resources are absent. The Supabase OAuth form has
-Environment Read-only selected but Confirm has not been clicked, so no app,
-credential, grant or token exists. The source-manifest build signer identity is
+At source handoff time only the unbilled GCP project and Vercel Team issuer
+selection existed. WIF/IAM/KMS/Secret resources remain absent. A later authorized
+batch created Supabase OAuth App `Careslink AI M1u Preview` with website
+`https://careslink.com.au`, callback
+`http://localhost:32119/m1u/supabase/oauth/callback` and only
+`environment:read`. Raw client id is omitted; its inventory marker is SHA-256
+`4b7a6fef8101c33fee65eae04d24cae31f59770773a21cb61af8299702bda77b`.
+The one-time client secret was not persisted to the workspace, environment or a
+credential store and remains an owner custody/rotation handoff. No authorization
+grant, access token or refresh token exists. The source-manifest build signer identity is
 also `TBD` and must remain separate from the runtime service account. M1v later
 adds source-only direct-REST and Supabase bridges plus an actual
 M1u→M1t→M1s→M1r→M1m injected-transport composition smoke; these close the
@@ -3145,10 +3151,12 @@ M1r/M1s/M1t/M1u/M1v leak scan across 24 static chunks.
 
 These are local source tests only. Both formal exports remain absent,
 `READY=false`, deployment/activation false; no real Node HTTPS call, GCP
-federation/resource, Supabase app/grant/token, database, deployment, care data or
-model call is represented. Live progression remains blocked on GCP billing and
-resource creation, the independent signer artifact/revision handoff, OAuth
-Confirm/grant/live intake plus rotated-token writer, Node transport evidence and
+federation/resource, Supabase grant/token, database, deployment, care data or
+model call is represented. The later scoped OAuth App creation supplies no live
+runtime evidence. Live progression remains blocked on GCP billing and resource
+creation, the independent signer artifact/revision handoff, OAuth secret
+custody/rotation, canonical app/grant references, grant/live intake plus
+rotated-token writer, Node transport evidence and
 an explicitly authorized one-time no-data Preview/live/delete gate.
 
 ### Current live/read-only evidence

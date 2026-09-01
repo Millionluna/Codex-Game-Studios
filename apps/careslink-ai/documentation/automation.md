@@ -841,9 +841,15 @@ the pinned WIF pool/provider, runtime service account, IAM bindings, KMS key
 ring/keys/versions and regional Secret Manager secrets/versions have not been
 created. API enablement is not attested by this handoff. Vercel Team issuer is selected
 for exact team `millionlunas-projects` / project `careslink-ai`; there is no M1u
-Preview deployment or successful federation. The Supabase OAuth App form
-`Careslink AI M1u Preview` has Environment Read-only selected, but Confirm has
-not been clicked, so no app credential, grant or token exists.
+Preview deployment or successful federation. A subsequently authorized batch
+created Supabase OAuth App `Careslink AI M1u Preview` with website
+`https://careslink.com.au`, localhost callback
+`http://localhost:32119/m1u/supabase/oauth/callback` and only
+`environment:read`. Raw client id is omitted; its inventory marker is SHA-256
+`4b7a6fef8101c33fee65eae04d24cae31f59770773a21cb61af8299702bda77b`.
+The one-time client secret was not persisted to the workspace, environment or a
+credential store and remains an owner custody/rotation handoff. No authorization
+grant, access token or refresh token exists.
 
 The WIF plan pins exchanged-token `aud` to the provider-specific
 `https://iam.googleapis.com/projects/288554824534/locations/global/workloadIdentityPools/vercel-careslink-preview/providers/vercel-team-preview`,
@@ -875,15 +881,16 @@ The earlier OAuth evidence, database-custody request-shape and explicit
 input rejection, uint32 CRC, monotonic clock, credential freshness, KMS success
 integrity and X.509 CA validation. M1v subsequently closed the source-only
 provider-bridge and M1u→M1t composition gaps with default-off TestOnly ports;
-this does not change M1u's external/live status. Provisioning/live remains NO-GO
+this does not change the GCP or deployment live status. Provisioning/live remains NO-GO
 because the independent source-manifest signer/artifact pipeline, GCP billing
-and resources, Supabase OAuth app/grant/live intake plus rotated-token writer,
+and resources, Supabase OAuth secret custody/rotation, canonical app/grant
+references, grant/live intake plus rotated-token writer,
 Node transport live evidence and one-time no-data Preview gate do not exist.
 The runtime service account may not silently receive source-manifest signing
 authority, and source wiring is not evidence of a live provider call.
 No Preview/Production database, SQL/migration, real data, deployment or AI call
 was involved. Billing linkage, Google APIs/resources/IAM, KMS/secret versions,
-Supabase OAuth Confirm/grant, any Vercel Preview deployment and every live branch
+Supabase OAuth secret custody/rotation and grant, any Vercel Preview deployment and every live branch
 operation remain separate action-time confirmation blockers. See
 `documentation/communication-note-preview-product-runtime-gcp-adapters-m1u.md`
 and
@@ -914,11 +921,13 @@ and policy digest is
 Injected-transport source tests compose the actual M1u→M1t→M1s→M1r→M1m
 modules without constructing a PostgreSQL Client or consuming the terminal
 database credential. Both formal bridges remain absent with `READY=false`,
-deployment/activation false. No external resource, credential, live provider
-exchange, database, deployment, real care data or model call is evidence of
-this slice. GCP remains blocked by missing billing and resources; the Supabase
-OAuth form is still unconfirmed. Remaining gates are the independent signer
-artifact/revision handoff, OAuth app/grant/live intake and rotated-token writer,
+deployment/activation false. No GCP resource, live credential, provider exchange,
+database, deployment, real care data or model call is evidence of this source
+slice. A later authorized batch created only the scoped Supabase OAuth App; its
+one-time secret was not persisted and no grant/token exists. GCP remains blocked
+by missing billing and resources. Remaining gates are the independent signer
+artifact/revision handoff, OAuth secret custody/rotation, canonical app/grant
+references, grant/live intake and rotated-token writer,
 Node transport live evidence, then an explicitly confirmed one-time no-data
 Preview/live/delete cycle.
 

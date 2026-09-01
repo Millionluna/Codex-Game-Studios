@@ -12,8 +12,12 @@ provider protocol seam；它不宣称平台接线已经完成。Google Cloud pro
 `careslink-m1u-security`（project number
 `288554824534`）已经创建，但尚未关联 billing account。因此 WIF pool/provider、runtime
 service account、IAM binding、KMS key ring/keys/versions、Secret Manager
-secrets/versions 均尚未创建。Vercel 已选择 Team issuer；Supabase OAuth App 表单已填入
-Environment Read-only，但 **Confirm 尚未点击**，所以 OAuth app/client credential、授权 grant、
+secrets/versions 均尚未创建。Vercel 已选择 Team issuer；后续经授权已创建 Supabase OAuth App
+`Careslink AI M1u Preview`，website 为 `https://careslink.com.au`，callback 为
+`http://localhost:32119/m1u/supabase/oauth/callback`，唯一 scope 为 `environment:read`。raw
+client id 不写入本文，只记录 client-id inventory SHA-256
+`4b7a6fef8101c33fee65eae04d24cae31f59770773a21cb61af8299702bda77b`。Dashboard 展示的
+一次性 client secret 未持久化到 workspace、环境变量或 credential store；authorization grant、
 access token 与 refresh token 均不存在。
 
 正式状态保持关闭：`READY=false`，approved export absent，Product API route/importer、
@@ -28,8 +32,8 @@ OAuth grant、数据库或部署证据。
 
 后续 M1v 已在此 pin set 上补充默认关闭的 GCP direct-REST 与 Supabase OAuth/Management
 source bridges，并完成实际 M1u→M1t→M1s→M1r→M1m 的 injected-transport source smoke；
-这关闭的是 source port/composition gap，不改变本页的外部资源、billing、OAuth Confirm、
-deployment 或 live-evidence 状态。见
+这关闭的是 source port/composition gap。随后获批的外部操作只创建了上述 OAuth App；未创建
+grant/token/Preview，也未改变 GCP billing/resource、deployment 或 live-evidence 状态。见
 `documentation/communication-note-preview-product-runtime-provider-bridges-m1v.md`。
 
 本批没有创建 Supabase Preview、没有连接 Preview 或 Production PostgreSQL、没有执行 SQL 或
@@ -42,11 +46,11 @@ migration、没有读取 Production 或真实 care data、没有调用 provider/
 |---|---|---|
 | Google Cloud | project `careslink-m1u-security` / number `288554824534` 已创建；regional resource location 选择 `australia-southeast1` | billing 未关联；API enablement 尚未在本 handoff 验证；WIF、service account、IAM、KMS、Secret Manager resource 均未创建 |
 | Vercel | Team issuer 已选择；team/project pins 已确认 | 没有 M1u Preview deployment、route、environment secret 或 GCP federation live exchange |
-| Supabase | OAuth App 表单名、website、redirect URI 与 Environment Read-only 已填写 | Confirm 未点击；app/client id、client secret、grant、access/refresh token 均不存在；没有 Preview 或数据库连接 |
+| Supabase | OAuth App `Careslink AI M1u Preview` 已创建；website、redirect URI 固定；唯一 scope 为 `environment:read`；client-id inventory marker 为 SHA-256 `4b7a6fef8101c33fee65eae04d24cae31f59770773a21cb61af8299702bda77b` | client secret 安全托管/轮换、canonical app reference 尚未闭合；grant、access/refresh token、canonical grant reference、Preview 与数据库连接均不存在 |
 
 Google Cloud project 的存在不等于 runtime identity 或 secret custody 已存在；Vercel issuer 的
-选择也不等于某个 deployment 已取得 GCP 权限；Dashboard 表单尚未 Confirm 更不能描述为已
-创建 OAuth credential。
+选择也不等于某个 deployment 已取得 GCP 权限；OAuth App 的存在不等于 client-secret custody、
+authorization grant 或可部署 runtime，当前仍不得描述为已授权或已有 token。
 
 ## 固定 resource pins
 
@@ -135,7 +139,7 @@ GAPIC client 当作严格 timeout/Abort/zero-retry contract 的实现；`@google
 | redirect URI | `http://localhost:32119/m1u/supabase/oauth/callback` |
 | app scope | Environment Read-only；其他 scope No access |
 | allowed Management API request | only `GET https://api.supabase.com/v1/projects/adocsnwnslxhxcjgbyee/branches`；no query、no redirect、zero retry |
-| app/grant reference pins | raw identifiers 尚不存在；Confirm + authorization 后只保留 canonical metadata SHA-256 references |
+| app/grant reference pins | client-id inventory SHA-256 为 `4b7a6fef8101c33fee65eae04d24cae31f59770773a21cb61af8299702bda77b`；raw client id/secret 不在本文记录；canonical app metadata reference 仍为 `TBD`，grant reference 不存在 |
 
 ## Supabase OAuth scope 与 fine-grained permission 的区别
 
@@ -232,9 +236,10 @@ composition”不再是 blocker。它仍不是可运行或可部署 bundle，pro
 2. 独立 source-manifest build signer identity、canonical artifact producer、revision-to-deployment
    handoff、anti-replay 与 signer/runtime IAM 分离尚未固定；runtime service account 不能获得
    source-manifest sign 权限；
-3. Supabase OAuth app/grant 仍不存在，Confirm 未点击；actual app/grant references、
-   client-secret/code/refresh-token live intake 与 rotated-refresh-token writer 尚未闭合；M1v 的
-   source policy 只允许 proactive refresh 一次，401 不 refresh/replay；
+3. Supabase OAuth App 已创建，但 canonical app reference、authorization grant/grant reference、
+   client-secret 安全托管或轮换、code/refresh-token live intake 与 rotated-refresh-token writer
+   尚未闭合；access/refresh token 均不存在；M1v 的 source policy 只允许 proactive refresh 一次，
+   401 不 refresh/replay；
 4. actual Node HTTPS transport 尚无同一 revision live 5 秒 timeout、root AbortSignal、no redirect、
    zero retry、provider response normalization 与 revocation evidence；
 5. 仍需经 action-time 确认后运行 fresh no-data Preview live gate，并无论成功或失败删除 exact
@@ -254,8 +259,8 @@ closeout。当前不得运行 live gate、不得把 provider flags 改为 true�
 3. 创建 regional key ring、四个 HMAC keys 和 numeric version `1`；
 4. 创建三个 regional secrets/version `1`、写入实际 credential/CA/password，并授予 exact
    secret access；
-5. 在 Supabase Dashboard 点击 OAuth App **Confirm**，安全接收新 client credential，随后由
-   用户完成 OAuth authorization/PKCE grant；
+5. 安全托管或轮换已呈现但未持久化的一次性 client secret，固定 canonical app reference，
+   随后由用户完成 OAuth authorization/PKCE grant 与受控 code/refresh-token intake；
 6. 在 Vercel 配置或部署任何会让 M1u route/importer 可达的 Preview runtime；
 7. 读取当时 Supabase branch 实时价格、创建 fresh no-data/non-default/non-persistent Preview、
    取得 branch credential、执行同 revision live gate，并无论成功或失败删除 exact branch；
@@ -266,7 +271,8 @@ closeout。当前不得运行 live gate、不得把 provider flags 改为 true�
 10. 删除或安排销毁 KMS version、secret、WIF/IAM、OAuth grant/app 等 material external
    resources；teardown 也必须明确确认，不因“测试结束”自动扩大为 destructive authority。
 
-在 billing 仍未关联、OAuth app 尚未 Confirm，且 signer artifact、live OAuth custody/writer、
-Node transport evidence 尚未闭合的当前状态，下一步只能先处理这些 live blockers，再选择一个
+在 billing 仍未关联、OAuth secret custody/rotation、canonical app/grant references、grant 与
+writer 尚未闭合，且 signer artifact、Node transport evidence 尚未闭合的当前状态，下一步只能
+先处理这些 live blockers，再选择一个
 经 action-time 确认的 provisioning batch；不得运行 live gate，不得把 `READY` 改为 true，也
 不得创建 Product API importer。
