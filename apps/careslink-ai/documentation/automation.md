@@ -1178,6 +1178,35 @@ tests), the full
 production build with 63/63 static pages, the 73-file adapter check and diff
 checks.
 
+### Communication Note generation HTTP boundary M1x
+
+M1x adds the physical
+`POST /api/ai-documents/communication-note/generate` request boundary without
+adding an automation runtime. Its independent environment flag is gated again
+by a compile-time `READY=false` latch, and the formal submission port is
+`undefined`. The default handler therefore returns a fixed, no-store
+`503 PRODUCT_API_DISABLED` before authentication or body access, including when
+the environment value is accidentally set to exact `true`.
+
+The injected source-test contract models an already-resolved provider account,
+rejects bearer credentials, and validates same-origin HTTPS, bounded JSON, an
+idempotency header, exact Communication facts, both privacy confirmations and
+two server-side privacy scanners before accepting a strictly owner-safe
+admission response. It is not live cookie-session authority evidence. Fresh
+admission returns `202`; exact replay
+returns `200` with the current durable job state, including valid terminal state.
+Duplicate JSON properties and unsafe/temporally inconsistent job envelopes fail
+closed. It imports no M1r–M1v composition,
+OpenAI provider, owner repository, Points store or cloud bridge. No queue,
+schedule, retry worker, model call, payload storage, database connection,
+Preview, Production resource or deployment was added.
+
+A future runtime must first bind server privacy authority, Points reservation,
+retention-bounded payload custody and formal owner admission, then let a
+registered asynchronous worker call an approved provider. M1x does not permit
+the HTTP request thread to call a model directly. See
+`documentation/communication-note-generation-api-m1x.md`.
+
 ## Inactive shadow automation contracts
 
 - The contract and migrations define generation/export job states. Source-only memory contracts model leases, recovery, retry policy, provider evidence and single-use payload grants, and the registered-worker v2 facade composes those boundaries without a payload locator. All five generation migrations remain Production-unapplied; deleted `r9` supplied isolated PostgreSQL 17.6 execution evidence for database-clock claim/heartbeat/fence/commit/settle/resolve/recover/authorize/consume logic and payload/grant/evidence/purge-outbox metadata, deleted `r20` supplied the three true two-session race results, and deleted `r21` supplied exact historical transient-retry/success replay through payload/outbox purge. The later local owner-repository gate covers the three private owner RPCs, and migration #29 adds only the non-login control-executor-owned graceful-retirement identity described above. There is still no caller grant. Normal consume deliberately settles `DENIED_SETTLED` / `PAYLOAD_UNAVAILABLE` and returns no vault grant, locator or facts; the historical rollback-only `TEST_ONLY` `CONSUMED` fixture proves only scripted canonical transaction atomicity. There is still no payload vault, queue service, deployed worker, live retry loop or served cancellation endpoint.

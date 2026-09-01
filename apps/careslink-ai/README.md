@@ -267,6 +267,22 @@ view containing only its sanitised route metadata; it does not receive the form
 facts. The generation action remains visibly disabled; enabling the composer
 flag does not enable any M1v runtime, Preview or Production gate.
 
+M1x adds a physical server boundary at
+`POST /api/ai-documents/communication-note/generate`. It is independently
+default-off and also held by a compile-time `READY=false` latch; the formal
+submission port is `undefined`. Consequently, even
+`CARESLINK_COMMUNICATION_NOTE_GENERATION_API_ENABLED=true` returns a no-store
+`503 PRODUCT_API_DISABLED` before reading authentication or request content.
+The test-only seam models an injected resolved provider account, rejects bearer
+credentials, and freezes same-origin HTTPS, bounded JSON, exact Communication
+Note facts, both privacy confirmations, server-side dual privacy scanning,
+idempotency and an owner-safe admission response. It is not live cookie-session
+authority evidence. A new admission returns `202`; an exact replay returns `200`
+with the current strictly parsed job state. It does not connect the composer
+button, a model, Points, payload storage, a worker, Supabase generation RPCs,
+Preview or Production. See
+`documentation/communication-note-generation-api-m1x.md`.
+
 ## NDIS Case Note AI Companion
 
 The provider-authenticated, single-task companion route is:

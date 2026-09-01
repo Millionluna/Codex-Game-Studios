@@ -3159,6 +3159,39 @@ custody/rotation, canonical app/grant references, grant/live intake plus
 rotated-token writer, Node transport evidence and
 an explicitly authorized one-time no-data Preview/live/delete gate.
 
+### Communication Note generation HTTP boundary M1x — source evidence
+
+M1x adds a physical Node.js POST-only Route Handler at
+`/api/ai-documents/communication-note/generate`, an independent exact-`true`
+server flag and a compile-time `READY=false` latch. The formal submission port
+is `undefined`, so the default route returns no-store
+`503 PRODUCT_API_DISABLED` before reading request/auth state even if the flag is
+set. The source-test seam is not a runtime activation mechanism.
+
+Focused tests cover gate-before-request/auth/body/submission ordering, absent
+runtime, injected missing-account and admin-role denial before body access,
+malformed server-owned identity, bearer rejection, same-origin HTTPS, JSON media
+type, idempotency, invalid and oversized streamed bodies, duplicate/unknown-key
+and credential-field rejection, both
+literal privacy confirmations, exact seven-field schema validation, independent
+M1w and V1 privacy scanner bypasses, canonical facts hashing, fresh `202`
+admission, progressed/terminal exact replay with `200`, owner-safe
+current-job parsing, temporal/state invariant enforcement, shared HTTP error
+mapping, unsafe runtime output rejection, secret-free failures and a static
+provider/cloud/Points/repository import quarantine. The new focused set plus the
+existing runtime boundary passes 4 files / 62 tests; full-suite and
+production-build verification passed 202 files / 2,765 tests, TypeScript,
+full ESLint, `git diff --check` and the Next.js 16.2.9 webpack production build
+with 64/64 static pages. The build manifest contains the new dynamic POST route.
+
+No UI action was enabled, no owner repository or database was called, and no
+Points, payload vault, worker, provider/model, GCP, Supabase management,
+Preview, Production or deployment action occurred. See
+`documentation/communication-note-generation-api-m1x.md`.
+
+The injected account seam is not live Cookie/Auth/session evidence. Activation
+still requires strict durable provider authority and fresh active-session checks.
+
 ### Current live/read-only evidence
 
 - Supabase migrations, tables, RLS flags, policies, grants, function grants and aggregate row counts were checked read-only.
