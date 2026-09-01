@@ -1066,6 +1066,58 @@ describe("V1 shadow runtime boundary", () => {
     expect(source).not.toMatch(/export async function (?:DELETE|GET|PATCH|PUT)/);
   });
 
+  it("keeps the M1x Communication Note generation route POST-only and outside provider runtimes", () => {
+    const handlerPath = join(
+      process.cwd(),
+      "src/lib/communication-note-generation-route.server.ts",
+    );
+    const handlerTestPath = join(
+      process.cwd(),
+      "src/lib/communication-note-generation-route.server.test.ts",
+    );
+    const boundaryTestPath = join(
+      process.cwd(),
+      "src/lib/v1/runtime-boundary.test.ts",
+    );
+    const routeSource = readFileSync(
+      join(
+        process.cwd(),
+        "src/app/api/ai-documents/communication-note/generate/route.ts",
+      ),
+      "utf8",
+    );
+    const handlerSource = readFileSync(
+      handlerPath,
+      "utf8",
+    );
+    const testOnlyFactoryImporters = walkControlledScriptFiles().filter(
+      (file) =>
+        file !== handlerPath &&
+        file !== boundaryTestPath &&
+        readFileSync(file, "utf8").includes(
+          "createTestOnlyCommunicationNoteGenerationHandler",
+        ),
+    );
+
+    expect(routeSource).toContain("export async function POST");
+    expect(routeSource).not.toMatch(
+      /export async function (?:DELETE|GET|PATCH|PUT)/,
+    );
+    expect(routeSource).toContain('export const runtime = "nodejs"');
+    expect(routeSource).toContain(
+      "@/lib/communication-note-generation-route.server",
+    );
+    expect(routeSource).not.toMatch(/@\/lib\/v1|SUPABASE_SERVICE_ROLE_KEY|service_role/i);
+    expect(handlerSource).toMatch(/^import "server-only";/);
+    expect(handlerSource).not.toMatch(
+      /openai-communication-note-provider|communication-note-preview-product-runtime|note-generation-owner-repository|account-credit-store|@vercel\/oidc|google-auth-library/,
+    );
+    expect(handlerSource).toContain(
+      "COMMUNICATION_NOTE_GENERATION_SUBMITTER = undefined",
+    );
+    expect(testOnlyFactoryImporters).toEqual([handlerTestPath]);
+  });
+
   it("keeps service-role repositories outside the client component tree", () => {
     const componentFiles = walkSourceFiles("src/components");
 
