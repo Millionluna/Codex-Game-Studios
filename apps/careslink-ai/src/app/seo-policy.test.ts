@@ -41,11 +41,16 @@ describe("CaresLink AI crawl and index policy", () => {
     );
   });
 
-  it("synchronizes the document language from the allowlisted locale query", () => {
+  it("allows Traditional Chinese only on its translated Communication Note route", () => {
     const layout = readAppSource("layout.tsx");
 
     expect(layout).toContain(
-      'locale === "zh-Hans" ? "zh-Hans" : "en"',
+      'pathname === "/ai-documents/communication-note"',
+    );
+    expect(layout).toContain('? ["en", "zh-Hans", "zh-Hant"]');
+    expect(layout).toContain(': ["en", "zh-Hans"]');
+    expect(layout).toContain(
+      'supportedLocales.has(locale) ? locale : "en"',
     );
     expect(layout).toContain("suppressHydrationWarning");
     expect(layout).not.toContain("document.documentElement.lang = locale;");

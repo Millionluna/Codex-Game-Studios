@@ -29,6 +29,12 @@ describe("AI privacy notice", () => {
     expect(markup).toContain("until that user deletes it");
     expect(markup).toContain("metadata");
     expect(markup).toContain(
+      "The current Communication Note Composer is a separate local-only release",
+    );
+    expect(markup).toContain("not sent to the Product API or OpenAI");
+    expect(markup).toContain("must be enabled separately");
+    expect(markup).toContain("For the connected NDIS Case Note Companion");
+    expect(markup).toContain(
       "We do not describe that setting as zero data retention",
     );
   });
@@ -47,5 +53,9 @@ describe("AI privacy notice", () => {
     expect(markup).toContain("不承诺在第 30 分钟即时物理删除");
     expect(markup).toContain("直到该用户主动删除");
     expect(markup).toContain("不是完成的正式记录");
+    expect(markup).toContain("Communication Note Composer 当前是独立的本地版本");
+    expect(markup).toContain("不会发送给 Product API 或 OpenAI");
+    expect(markup).toContain("必须单独启用");
+    expect(markup).toContain("对于已联网的 NDIS Case Note Companion");
   });
 });

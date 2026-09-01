@@ -252,6 +252,21 @@ render generated content JSON, so admins can review usage patterns without
 turning draft material into endorsement, quality review, or referral outcome
 evidence.
 
+## Communication Note Composer
+
+The provider-only `/ai-documents/communication-note` route is a default-off
+M1w product slice. Set `CARESLINK_COMMUNICATION_NOTE_COMPOSER_ENABLED=true` to
+show its AI Documents entry and route. It provides the frozen seven-field
+Communication Note intake, explicit English / Simplified Chinese / Traditional
+Chinese copy, and a deterministic privacy preflight held only in browser
+memory. Unsupported locales are identified before an explicit English fallback.
+
+This slice does not call a model or Product API, charge Points, or save, export,
+log or place form facts in URLs. The shared analytics wrapper may record a page
+view containing only its sanitised route metadata; it does not receive the form
+facts. The generation action remains visibly disabled; enabling the composer
+flag does not enable any M1v runtime, Preview or Production gate.
+
 ## NDIS Case Note AI Companion
 
 The provider-authenticated, single-task companion route is:
