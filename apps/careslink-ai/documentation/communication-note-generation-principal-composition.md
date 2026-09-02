@@ -12,6 +12,7 @@ route.
 - Formal submitter: `undefined`
 - Physical route importer: absent
 - UI, worker, provider/model, Points and payload-vault wiring: absent
+- Authenticated current-session RPC migration: source-only and unapplied
 
 Changing environment variables cannot activate the route. The formal route
 continues to return no-store `503 PRODUCT_API_DISABLED` before authentication or
@@ -51,6 +52,10 @@ exact target/custody guard
   → frozen Cookie principal
 ```
 
+That remains the exact composition in this source tree. The later
+`public.resolve_v1_current_session_status()` migration is not called here, and
+it does not install the formal composition or resolver.
+
 Test environment and client ports require an explicit TestOnly capability. The
 default path can read only the process environment supplied by the deployment
 platform. Static importer tests restrict the composition to its own test and
@@ -74,39 +79,54 @@ a service-role-equivalent context and bypass RLS. The existing
 Therefore this batch must not be described as least privilege, live Supabase
 evidence or approval to activate the route.
 
+The separately added
+`20260902012628_add_v1_authenticated_current_session_status_rpc.sql` defines a
+zero-argument `SECURITY DEFINER` function with an empty `search_path`. It derives
+the owner from `auth.uid()`, the exact session from the JWT `session_id`,
+preserves the existing trusted Provider/session predicates, revokes
+`PUBLIC`/`anon`/`service_role`/`authenticator`, and grants only
+`authenticated`. That is the intended least-privilege database identity for a
+later Cookie-client composition. The migration remains unapplied and unwired,
+so its source and local SQL evidence are not live least-privilege evidence.
+
 ## No external effect
 
-No environment was changed, no real key was created or read, no Supabase client
-or network connection was opened, no migration was applied, and no Preview,
-Production, Vercel deployment, database row, care data, Point or model call was
-created or changed.
+No environment was changed, no real key was created or read, and no Supabase
+client or external network connection was opened. The migration was not applied
+to Supabase, Preview, Production or any persistent environment; it was executed
+only in the isolated local rollback gate described below. No Vercel deployment,
+persistent database row, care data, Point or model call was created or changed.
 
 ## Local verification
 
-- focused principal/composition/route/Product-auth/session-migration/runtime
-  boundary gate: 9 files / 196 tests passed;
-- full Vitest suite: 204 files / 2,837 tests passed;
-- TypeScript and full ESLint: passed;
-- Next.js 16.2.9 Webpack production build: 64/64 static pages passed;
-- Codex adapter sync: 73 files passed;
-- `git diff --check`: passed.
+The prior composition checkpoint passed its focused 9-file / 196-test gate,
+204-file / 2,837-test full Vitest suite, TypeScript, full ESLint, 64/64-page
+Webpack build, 73-file adapter check and diff check.
 
-These are local source/build results only, not live Preview, database or Auth
-evidence.
+The additive RPC checkpoint passed its 1-file / 4-test static contract and the
+combined 2-file / 22-test migration contract. Its rollback-only catalog, ACL,
+role and claim matrix also passed on an isolated PostgreSQL 16.15 cluster using
+fixed synthetic Auth rows and no care data; the server and temporary directory
+were then removed.
+
+The final current-source closeout passed 9 focused files / 116 tests and the
+full 205-file / 2,841-test Vitest suite. TypeScript, full ESLint, the Next.js
+16.2.9 Webpack build with 64/64 static pages, the 73-file adapter check and
+`git diff --check` also passed.
+
+These are local source/build/database results only, not Hosted Preview, retained
+database or live Auth evidence.
 
 ## Next independent batch
 
-Add and review an authenticated current-session RPC that:
+Rewire the source-only composition to use the request-scoped
+Cookie/authenticated Supabase client for
+`resolve_v1_current_session_status()`. The rewiring must remove the dedicated
+service-role-equivalent session-status client and its secret path without a
+fallback to the legacy two-argument RPC.
 
-1. accepts no user/session UUID arguments;
-2. derives identity only from `auth.uid()` and JWT `session_id`;
-3. preserves the exact active-session and trusted Provider predicates;
-4. fixes `search_path` and all ownership/ACL/catalog expectations;
-5. revokes `PUBLIC`, `anon` and `service_role` execution;
-6. grants only `authenticated`;
-7. passes role and malformed-claim matrices plus an authorized disposable
-   no-data Preview gate.
-
-After that, role normalization, formal composition installation and
-same-transaction session/privacy reauthorization inside owner enqueue remain
-required before any model-backed application work can be enabled.
+That source change still does not install the formal composition or resolver.
+Trusted role normalization, same-transaction session/privacy reauthorization
+inside owner enqueue, and a separately authorized disposable no-data Hosted
+Preview active/revoked-session gate remain independent requirements before any
+model-backed application work can be enabled.

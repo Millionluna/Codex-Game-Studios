@@ -1900,3 +1900,22 @@ this broker.
 
 Detailed handoff is in
 `documentation/communication-note-preview-runtime-credential-broker-m1l.md`.
+
+## Authenticated current-session bridge — 2 September 2026
+
+Repository migration
+`20260902012628_add_v1_authenticated_current_session_status_rpc.sql` adds the
+independent zero-argument `public.resolve_v1_current_session_status()` source
+identity. It is not a sixth generation migration and does not change the five
+Production-unapplied durable-generation migrations described above. The new
+RPC derives the owner and exact session only from request Auth, keeps the
+trusted Provider/session predicates, fixes an empty `search_path`, and grants
+execution only to `authenticated`.
+
+Its static contracts and rollback-only catalog/ACL/role/claim matrix passed on
+an isolated PostgreSQL 16.15 cluster, which was then removed. The migration is
+not applied to Supabase or wired into the owner repository, principal
+composition or route. Source rewiring, formal installation, same-transaction
+owner session/privacy reauthorization and a separately authorized no-data
+Hosted Preview remain required. All 40-migration M1l Hosted pins above remain
+historical evidence for their exact revision.

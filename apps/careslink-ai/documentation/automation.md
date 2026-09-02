@@ -450,10 +450,10 @@ M1l supplies binding
 and durable resolver `resolver.communication.openai.synthetic-preview.2026-08-30.m1l.v2`
 with digest `e53114d9d247ffcdb20ed83b4724fa5b8b09eeab31e4f2fc1a868ade13a2f43e`.
 It supplies the formal additive migration source that M1k intentionally left
-isolated, but it still schedules and activates nothing. The source tree now has
-40 migrations; the 40th creates the private, forced-RLS, hash-only durable
-broker and preserves the existing three-argument terminal RPC behind a shared
-transaction fence. Runtime bind changes the 45–90-second SCRAM role to
+isolated, but it still schedules and activates nothing. At the M1l checkpoint,
+the source tree had 40 migrations; the 40th creates the private, forced-RLS,
+hash-only durable broker and preserves the existing three-argument terminal RPC
+behind a shared transaction fence. Runtime bind changes the 45–90-second SCRAM role to
 `NOLOGIN`; terminal writes then re-attest the ACTIVE acquisition, role/OID,
 PID/backend start, fixed application, authorization/run/HMAC and expiry while
 holding that shared fence. Tombstone and finalize take the matching exclusive
@@ -1203,7 +1203,11 @@ valid claims. The formal wrapper export remains `undefined`, and the route does
 not import it. The dedicated key is still service-role-equivalent and bypasses
 RLS, so this is custody separation rather than database least privilege or live
 Cookie/Auth/database evidence. It does not query Supabase branch provenance or
-health. The route then
+health. A separate, unapplied repository migration now defines the zero-argument
+`resolve_v1_current_session_status()` RPC with request identity and
+authenticated-only execution. The current wrapper still uses the legacy
+two-argument service path and dedicated key; no formal port imports the new RPC.
+The route then
 validates same-origin HTTPS, bounded JSON, an idempotency header, exact
 Communication facts, both privacy confirmations and two server-side privacy
 scanners before accepting a strictly owner-safe admission response. Fresh
@@ -1215,11 +1219,11 @@ OpenAI provider, owner repository, Points store or cloud bridge. No queue,
 schedule, retry worker, model call, payload storage, database connection,
 Preview, Production resource or deployment was added.
 
-A future runtime must first add an independently reviewed authenticated
-self-session RPC that derives `auth.uid()` and JWT `session_id`, accepts no
-caller identity and grants execution only to `authenticated`. It must then
-normalize trusted Provider roles and bind server privacy authority, Points
-reservation, retention-bounded payload custody and formal owner admission.
+A future source batch must first rewire the strict-principal composition to the
+authenticated Cookie client and zero-argument RPC, removing the dedicated
+service-role-equivalent secret path without legacy fallback. A future runtime
+must then normalize trusted Provider roles and bind server privacy authority,
+Points reservation, retention-bounded payload custody and formal owner admission.
 Owner admission must recheck session and privacy authority inside the enqueue
 transaction, then let a
 registered asynchronous worker call an approved provider. M1x does not permit

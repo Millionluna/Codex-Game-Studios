@@ -70,12 +70,12 @@ describe("Communication Note M1l activation preflight", () => {
     expect(
       CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_ACTIVATION_PREFLIGHT_VERSION,
     ).toBe(
-      "preflight.communication.openai.synthetic-preview.2026-08-30.m1l.v1",
+      "preflight.communication.openai.synthetic-preview.2026-09-02.authenticated-current-session.v1",
     );
     expect(
       CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_ACTIVATION_PREFLIGHT_POLICY_DIGEST,
     ).toBe(
-      "4447c071fa37ab21f23624a4d3d4d28b2ee9ba2e1ef4c9be969bf9a0481de2f3",
+      "b0709121adf8d3c03c5c2112e0f9acaff0f5d79ca0f6f3460909067833629787",
     );
     expect(
       CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_ACTIVATION_PREFLIGHT_POLICY,
@@ -180,7 +180,7 @@ describe("Communication Note M1l activation preflight", () => {
       ),
     );
     expect(result.candidate.database).toMatchObject({
-      migrationCount: 40,
+      migrationCount: 41,
       runtimeCredentialBrokerMigrationSha256:
         CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_DATABASE_EVIDENCE_PINS
           .runtimeCredentialBrokerMigrationSha256,
@@ -238,7 +238,7 @@ describe("Communication Note M1l activation preflight", () => {
     }
   });
 
-  it("pins the exact 40-migration manifest and nine M1g-b through M1l database artifacts", () => {
+  it("pins the exact 41-migration manifest and nine M1g-b through M1l database artifacts", () => {
     const migrationsDirectory = join(process.cwd(), "supabase/migrations");
     const migrationNames = readdirSync(migrationsDirectory)
       .filter((name) => name.endsWith(".sql"))

@@ -343,6 +343,11 @@ configuration evidence, and readiness remains `false`. See
 
 ## Current auth, URL and feature variables
 
+The authenticated zero-argument current-session RPC migration adds no
+environment variable. A later source rewiring is intended to retire the
+dedicated privileged session-status key below; the current composition has not
+made that switch.
+
 | Variable | Class | Purpose | Boundary |
 |---|---|---|---|
 | `CARESLINK_GOOGLE_OAUTH_ENABLED` | Server configuration | honest Google OAuth release gate | provider must also be configured in Supabase/Google |
@@ -358,7 +363,7 @@ configuration evidence, and readiness remains `false`. See
 | `CARESLINK_COMMUNICATION_NOTE_PRINCIPAL_COMPOSITION_ENABLED` | Reserved server configuration | source-only strict-principal composition guard | keep false/unset; exact `true` cannot install the formal composition/resolver or bypass `READY=false`, and every target/custody check must also pass |
 | `CARESLINK_COMMUNICATION_NOTE_PRINCIPAL_EXPECTED_SUPABASE_REF` | Reserved non-secret server configuration | binds the source-only composition to one exact configured ref distinct from the pinned known Production ref | keep empty; must be exactly 20 lowercase alphanumeric characters and match both byte-exact canonical Supabase URLs; this source check does not prove branch provenance, health or disposability |
 | `CARESLINK_COMMUNICATION_NOTE_PRINCIPAL_EXPECTED_VERCEL_PROJECT_ID` | Reserved non-secret server configuration | expected project half of the exact Vercel Preview identity check | keep empty; must exactly equal platform-provided `VERCEL_PROJECT_ID`, with `VERCEL=1` and both environment values equal to `preview` |
-| `CARESLINK_COMMUNICATION_NOTE_SESSION_STATUS_PREVIEW_SECRET_KEY` | Reserved server secret | dedicated source-only client for the existing session-status RPC | keep empty; accepts only `sb_secret_`, never falls back to or reuses generic/privacy-review keys, but remains service-role-equivalent and bypasses RLS, so it is not database least privilege |
+| `CARESLINK_COMMUNICATION_NOTE_SESSION_STATUS_PREVIEW_SECRET_KEY` | Reserved server secret | dedicated source-only client for the existing two-argument session-status RPC | keep empty; accepts only `sb_secret_`, never falls back to or reuses generic/privacy-review keys, but remains service-role-equivalent and bypasses RLS. The new zero-argument RPC is source-only, unapplied and unwired, so this variable is not an activation mechanism and is retired only by the later rewiring |
 | `CARESLINK_V1_PRODUCT_API_ENABLED` | Server configuration | master gate for the local shared `/v1` route adapter | only exact `true` passes the first application gate; default/unset is off |
 | `CARESLINK_V1_PRODUCT_API_DURABLE_ADAPTER_ENABLED` | Server configuration | independent gate for request-scoped Supabase persistence and active-session validation | only exact `true`; also requires the master gate, verified Preview target, server configuration, the unapplied database migration and its separate default-off database flag |
 | `CARESLINK_V1_PRODUCT_API_EXPECTED_SUPABASE_REF` | Server configuration | binds the Product API runtime to one reviewed Preview branch | must exactly match the ref parsed from the server Supabase URL; missing/mismatch, non-Preview Vercel environment and the known Production ref all fail closed before any client is created |
@@ -414,7 +419,7 @@ between Preview and Production by hand.
 |---|---|---|
 | Supabase service role | all server-side private data/RPC access | revoke/rotate, redeploy, audit server logs and privileged actions |
 | Dedicated Preview privacy-review key | Preview-only proof issuance | revoke/rotate, keep the Product API gates off, inspect metadata-only proof issuance and redeploy only to the exact reviewed Preview |
-| Dedicated Communication Note session-status key | source-only Preview session-status composition; still service-role-equivalent | revoke/rotate, keep all Communication Note generation/formal ports off, inspect privileged access and do not treat rotation as least-privilege remediation |
+| Dedicated Communication Note session-status key | current source-only Preview composition until authenticated-RPC rewiring; still service-role-equivalent | revoke/rotate, keep all Communication Note generation/formal ports off, inspect privileged access and do not treat rotation as least-privilege remediation |
 | OpenAI API key | model access and spend | rotate, check provider usage/cost, redeploy |
 | fingerprint pepper | pseudonymous quota identity | rotate, expect counters to start a new hash epoch, record change metadata |
 

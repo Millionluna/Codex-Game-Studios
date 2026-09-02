@@ -286,7 +286,12 @@ ref, byte-exact canonical Supabase URLs, matching
 no-fallback `sb_secret_` client created only after valid claims. Its formal
 composition export is also `undefined`, and the physical route does not import
 it. That dedicated key remains service-role-equivalent and bypasses RLS; this
-is custody separation, not database least privilege. The remaining boundary
+is custody separation, not database least privilege. A later, unapplied
+migration now adds a zero-argument current-session RPC whose identity comes only
+from the authenticated request and whose `EXECUTE` grant is authenticated-only.
+The current wrapper has not been rewired: it still uses the old two-argument
+service RPC and dedicated key, while the formal ports and route remain off. The
+remaining boundary
 freezes same-origin HTTPS, bounded
 JSON, exact Communication Note facts, both privacy confirmations, server-side
 dual privacy scanning, idempotency and an owner-safe admission response. A new

@@ -83,12 +83,12 @@ const PREFLIGHT_OBSERVED_AT = "2026-08-28T01:59:00.000Z";
 describe("Communication Note M1l reserve-before-dispatch coordinator transcript", () => {
   it("literal-pins a source-only policy and preserves every existing readiness and approval latch", () => {
     expect(CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_COORDINATOR_VERSION).toBe(
-      "coordinator.communication.openai.synthetic-preview.2026-08-30.m1l.v1",
+      "coordinator.communication.openai.synthetic-preview.2026-09-02.authenticated-current-session.v1",
     );
     expect(
       CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_COORDINATOR_POLICY_DIGEST,
     ).toBe(
-      "570544bf700997a0ba90e06422019c237a01835ba8b75ff70bed5348cdf4bf02",
+      "ea496d6f2e08680b5f8d7515228a1e39d307d38e3f195fb1a361b0875330303b",
     );
     expect(
       CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_COORDINATOR_POLICY,

@@ -66,6 +66,7 @@
     "supabase/migrations/20260829011323_add_communication_note_preview_signed_terminal_caller_shadow.sql",
     "supabase/migrations/20260829041316_align_communication_note_preview_terminal_accepted_usage.sql",
     "supabase/migrations/20260830065750_add_communication_note_preview_runtime_credential_broker.sql",
+    "supabase/migrations/20260902012628_add_v1_authenticated_current_session_status_rpc.sql",
     "tsconfig.json"
   ]
 }

@@ -38,11 +38,14 @@ describe("Communication Note TEST_ONLY runtime credential broker SQL", () => {
       .filter((name) => name.endsWith(".sql"))
       .sort();
 
-    expect(migrationNames).toHaveLength(40);
+    expect(migrationNames).toHaveLength(41);
     expect(migrationNames.every((name) => /^\d{14}_[a-z0-9_]+\.sql$/.test(name)))
       .toBe(true);
-    expect(migrationNames.at(-1)).toBe(
+    expect(migrationNames.at(-2)).toBe(
       "20260830065750_add_communication_note_preview_runtime_credential_broker.sql",
+    );
+    expect(migrationNames.at(-1)).toBe(
+      "20260902012628_add_v1_authenticated_current_session_status_rpc.sql",
     );
     expect(migrationNames).not.toContain(
       SETUP_PATH.split("/").at(-1),

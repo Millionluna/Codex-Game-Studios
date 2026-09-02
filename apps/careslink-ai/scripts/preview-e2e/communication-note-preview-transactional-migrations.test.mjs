@@ -24,20 +24,32 @@ const RUNNER_PATH = fileURLToPath(new URL(
 ));
 
 describe("Communication Note Preview transactional migration policy", () => {
-  it("pins all 40 repository migrations and removes only 20 known wrappers in memory", async () => {
+  it("pins all 41 repository migrations and removes only 21 known wrappers in memory", async () => {
     const bundle = await loadPinnedCommunicationNotePreviewMigrations();
     expect(bundle).toMatchObject({
       manifestSha256: POLICY.manifestSha256,
-      outerTransactionCount: 20,
+      outerTransactionCount: 21,
     });
-    expect(bundle.migrations).toHaveLength(40);
+    expect(bundle.migrations).toHaveLength(41);
     expect(bundle.migrations.at(-1)).toMatchObject({
       basename:
-        "20260830065750_add_communication_note_preview_runtime_credential_broker.sql",
-      version: "20260830065750",
+        "20260902012628_add_v1_authenticated_current_session_status_rpc.sql",
+      version: "20260902012628",
       outerTransactionRemoved: true,
     });
-    const runtimeBroker = bundle.migrations.at(-1);
+    const currentSessionResolver = bundle.migrations.at(-1);
+    expect(currentSessionResolver.statements[0]).toMatch(/\bbegin$/i);
+    expect(currentSessionResolver.statements.at(-1)).toMatch(/^commit$/i);
+    expect(currentSessionResolver.executionSql.trim().toLowerCase()).not.toMatch(
+      /^begin\b|\bcommit;$/,
+    );
+    expect(currentSessionResolver.executionSql).toMatch(
+      /resolve_v1_current_session_status/,
+    );
+
+    const runtimeBroker = bundle.migrations.find((migration) =>
+      migration.version === "20260830065750"
+    );
     expect(runtimeBroker.statements[0]).toMatch(/\bbegin$/i);
     expect(runtimeBroker.statements.at(-1)).toMatch(/^commit$/i);
     expect(runtimeBroker.executionSql.trim().toLowerCase()).not.toMatch(

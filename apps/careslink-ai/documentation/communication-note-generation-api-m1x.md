@@ -119,9 +119,9 @@ child of Production; those remain live Preview evidence requirements.
 
 ## Remaining activation gates
 
-- an independently reviewed authenticated self-session RPC that derives
-  `auth.uid()` and JWT `session_id` internally, accepts no caller UUIDs, revokes
-  `PUBLIC`/`anon`/`service_role` execution and grants only `authenticated`;
+- rewire the source-only composition to the subsequent zero-argument
+  authenticated self-session RPC, using the Cookie/authenticated client and
+  removing the legacy privileged-key/two-argument RPC path without fallback;
 - formal installation of that least-privilege principal composition plus live
   active/revoked-session evidence on a same-revision no-data Preview;
 - trusted Provider role normalization compatible with the RPC's exact
@@ -135,7 +135,9 @@ child of Production; those remain live Preview evidence requirements.
 - same-revision disposable no-data Preview, deployment and rollback evidence;
 - separate owner approval for any cloud spend, provider call or Production step.
 
-M1x provides none of those approvals and changes no external resource.
+The later RPC migration provides source/local SQL evidence only. M1x and that
+migration provide none of the remaining approvals and change no external
+resource.
 
 ## Local verification
 

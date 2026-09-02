@@ -84,14 +84,15 @@ only this RPC through the new client interface.
 
 ## Deliberate limits and next gate
 
-Formal installation first requires a separate migration for an authenticated,
-zero-argument current-session RPC. It must derive only `auth.uid()` and the JWT
-`session_id`, accept no caller-provided identity, revoke
-`PUBLIC`/`anon`/`service_role` execution and grant only `authenticated`, with a
-fixed empty search path and reviewed catalog assertions. Existing Web users
-must also be checked or normalized to the trusted exact Provider role expected
-by the predicate, followed by same-revision live active/revoked evidence on a
-disposable no-data Preview.
+A subsequent repository migration now supplies the authenticated, zero-argument
+current-session RPC source and isolated PostgreSQL 16.15 catalog/ACL/claim
+evidence. It derives only `auth.uid()` and JWT `session_id`, accepts no caller
+identity, fixes an empty `search_path`, and grants only `authenticated`. It is
+unapplied and the composition still uses the legacy two-argument service-only
+RPC plus dedicated privileged key. The next source gate is therefore Cookie/
+authenticated-client rewiring with no legacy fallback. Formal installation,
+trusted Provider role normalization and same-revision live active/revoked proof
+on a disposable no-data Preview remain separate.
 
 Request-time admission is not sufficient by itself. The future durable owner
 enqueue RPC must re-read the active session and privacy authority inside the
