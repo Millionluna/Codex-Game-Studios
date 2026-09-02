@@ -2081,7 +2081,7 @@ function readSourceManifest() {
       .map((entry) => `supabase/migrations/${entry.name}`)
       .sort();
     if (
-      migrationPaths.length !== 41 ||
+      migrationPaths.length !== 42 ||
       JSON.stringify(migrationPaths) !== JSON.stringify(actualMigrationPaths)
     ) {
       fail(FAILURE_CODES.config);

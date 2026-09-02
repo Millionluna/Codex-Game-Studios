@@ -6,6 +6,7 @@ import {
   type CommunicationNoteComposerLocale,
 } from "../../../lib/communication-note-composer";
 import { isCommunicationNoteComposerEnabled } from "../../../lib/communication-note-composer-feature";
+import { resolveCommunicationNotePointsPreview } from "../../../lib/communication-note-points-preview.server";
 import { resolveWorkspaceAccountFromSupabaseSession } from "../../../lib/referral-workspace-session";
 import { CARESLINK_AI_NOINDEX_ROBOTS } from "../../../lib/seo-policy";
 import { createCareslinkServerSupabaseClient } from "../../../lib/supabase-server";
@@ -61,9 +62,12 @@ export default async function CommunicationNotePage({
     redirect(`/ai-documents?lang=${encodeURIComponent(workspaceLocale)}`);
   }
 
+  const pointsPreview = await resolveCommunicationNotePointsPreview(supabase);
+
   return (
     <CommunicationNoteComposer
       locale={localeResult.locale}
+      pointsPreview={pointsPreview}
       unsupportedLocale={localeResult.unsupported}
     />
   );

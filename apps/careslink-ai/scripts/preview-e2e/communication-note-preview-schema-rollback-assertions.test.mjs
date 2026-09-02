@@ -48,6 +48,7 @@ const EXPECTED_ASSERTION_STAGE_MAPPING = Object.freeze([
   ["A17", "v1_privacy_review_shadow_assertions.sql"],
   ["A18", "v1_shadow_contract_assertions.sql"],
   ["A19", "v1_authenticated_current_session_status_assertions.sql"],
+  ["A20", "v1_communication_note_points_preview_assertions.sql"],
 ]);
 
 function candidates() {
@@ -143,9 +144,9 @@ function fakeClientClass(behaviors) {
 
 function rollbackBundleWithMigrationEntryRole() {
   return Object.freeze({
-    fileCount: 19,
+    fileCount: 20,
     manifestSha256: POLICY.manifestSha256,
-    scripts: Object.freeze(Array.from({ length: 19 }, (_, index) =>
+    scripts: Object.freeze(Array.from({ length: 20 }, (_, index) =>
       Object.freeze({
         stage: STAGES.assertions[index],
         sql: `ASSERTION_SCRIPT_${index}`,
@@ -592,7 +593,7 @@ async function captureFailure(promise) {
 }
 
 describe("Communication Note Preview schema rollback assertion runner", () => {
-  it("pins the exact 19-file rollback manifest", async () => {
+  it("pins the exact 20-file rollback manifest", async () => {
     const loadedBasenames = [];
     const bundle = await loadCommunicationNotePreviewRollbackAssertions(
       async (url, encoding) => {
@@ -601,11 +602,11 @@ describe("Communication Note Preview schema rollback assertion runner", () => {
       },
     );
     expect(bundle).toMatchObject({
-      fileCount: 19,
+      fileCount: 20,
       manifestSha256:
-        "6370a375828a1005315a9b090cbaead139944fdc66a903f9939f948524d3cf4d",
+        "a503760e63debffb2038338ba892823728940fb08b15ab6d6991c5d11366fb53",
     });
-    expect(bundle.scripts).toHaveLength(19);
+    expect(bundle.scripts).toHaveLength(20);
     expect(STAGES).toEqual({
       runner: "R00",
       assertions: EXPECTED_ASSERTION_STAGE_MAPPING.map(([stage]) => stage),
@@ -628,6 +629,15 @@ describe("Communication Note Preview schema rollback assertion runner", () => {
     );
     expect(bundle.scripts[2].sql).not.toContain(
       "'{usage,inputTokens}',to_jsonb(121)",
+    );
+    expect(bundle.scripts[19].sql).toContain(
+      "'availablePoints', 42",
+    );
+    expect(bundle.scripts[19].sql).toContain(
+      "'reservedPoints', 20",
+    );
+    expect(bundle.scripts[19].sql).toContain(
+      "Points preview RPC mutated protected relations",
     );
     expect(classifyCommunicationNotePreviewRollbackAssertionMessage(
       new Error("M1g-f assertions require PostgreSQL 16+"),
@@ -837,10 +847,10 @@ describe("Communication Note Preview schema rollback assertion runner", () => {
   it("keeps the CLI contract and successful stdout evidence minimal", async () => {
     const source = await readFile(RUNNER_URL, "utf8");
     expect(POLICY).toEqual({
-      version: "2026-09-02.preview-schema-rollback-assertions.6",
-      fileCount: 19,
+      version: "2026-09-02.preview-schema-rollback-assertions.7",
+      fileCount: 20,
       manifestSha256:
-        "6370a375828a1005315a9b090cbaead139944fdc66a903f9939f948524d3cf4d",
+        "a503760e63debffb2038338ba892823728940fb08b15ab6d6991c5d11366fb53",
       applicationName: "careslink-preview-schema-rollback-assertions",
       transportRolePrefix: "careslink_m1gh_assert_transport_",
       actorRolePrefix: "careslink_m1gh_assert_actor_",
@@ -862,9 +872,9 @@ describe("Communication Note Preview schema rollback assertion runner", () => {
     expect(source).not.toContain("console.log");
     expect(source).not.toContain("console.error");
     expect(source).not.toMatch(/writeFile|appendFile|createWriteStream/);
-    expect(source).toContain("fileCount: 19");
+    expect(source).toContain("fileCount: 20");
     expect(source).toContain("manifestSha256: ASSERTION_MANIFEST_SHA256");
-    expect(source).toContain("passedCount: 19");
+    expect(source).toContain("passedCount: 20");
     expect(JSON.stringify(POLICY)).not.toContain(SECRET);
     expect(
       new CommunicationNotePreviewSchemaRollbackAssertionError(
@@ -896,12 +906,12 @@ describe("Communication Note Preview schema rollback assertion runner", () => {
     );
     expect(
       JSON.stringify({
-        fileCount: 19,
+        fileCount: 20,
         manifestSha256: POLICY.manifestSha256,
-        passedCount: 19,
+        passedCount: 20,
       }),
     ).toBe(
-      `{"fileCount":19,"manifestSha256":"${POLICY.manifestSha256}","passedCount":19}`,
+      `{"fileCount":20,"manifestSha256":"${POLICY.manifestSha256}","passedCount":20}`,
     );
   });
 
@@ -1124,9 +1134,9 @@ describe("Communication Note Preview schema rollback assertion runner", () => {
         rolePassword: "r".repeat(43),
       }),
     ).resolves.toEqual({
-      fileCount: 19,
+      fileCount: 20,
       manifestSha256: POLICY.manifestSha256,
-      passedCount: 19,
+      passedCount: 20,
     });
     expect(fake.instances).toHaveLength(3);
     expect(fake.state).toEqual({
@@ -1144,7 +1154,7 @@ describe("Communication Note Preview schema rollback assertion runner", () => {
     ]);
     expect(
       fake.reconnectEvents.filter((event) => event === "continued_assertion"),
-    ).toHaveLength(11);
+    ).toHaveLength(12);
   });
 
   it("returns only the fixed cleanup code when the one reconnect cannot clean up", async () => {

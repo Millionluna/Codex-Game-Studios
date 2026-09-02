@@ -3265,25 +3265,26 @@ synthetic `.invalid` Auth fixtures and no care data. The temporary server and
 directory were removed afterward. No Supabase environment migration apply,
 Preview, Production, deployment or live route changed.
 
-The current atomic source pins are: 41 migrations; ordered basename/entry
-digests `bb85d720f970ec57ee1916df7c682041b21c9fb131488c33a9dae1830f20bf90`
-and `698630978aaa34ab51f72f1c3b9ffaf93763459b848f5416c1a8e90284eb7c75`;
-transactional policy `2026-09-02.preview-transactional-migrations.8` with 21
+The current atomic source pins are: 42 migrations; ordered basename/entry
+digests `94cc5a7af76da30b3bf66a518f48cd30b2afbdcd3005339317b1458fcb226057`
+and `76792a55f9bef01b4c455aaccfb2e6eaf2255d7f7f5104c37f829d3c1a825ddf`;
+transactional policy `2026-09-02.preview-transactional-migrations.9` with 22
 outer wrappers and manifest
-`73ec29a2c60ee3479548f70a6d7718782ec86185d8f34287633ebb623ed1fec7`;
-A19 assertion SHA-256
-`4b9096cbe06d36378b4bd799aa115de6da452a5acd29b60eb6d8cb2fdb491006`;
-rollback policy `2026-09-02.preview-schema-rollback-assertions.6` with 19 files
+`d0213ba6e2d5e04ff46bd034ac47680081ea6161b9e2b5ee5fa63864aefc150d`;
+A19/A20 assertion SHA-256 values
+`4b9096cbe06d36378b4bd799aa115de6da452a5acd29b60eb6d8cb2fdb491006`
+and `b03fa8acf981f1bec7eba08002323682d033f0073f9d2bc05eed31c8e7b63654`;
+rollback policy `2026-09-02.preview-schema-rollback-assertions.7` with 20 files
 and manifest
-`6370a375828a1005315a9b090cbaead139944fdc66a903f9939f948524d3cf4d`;
+`a503760e63debffb2038338ba892823728940fb08b15ab6d6991c5d11366fb53`;
 preflight
 `preflight.communication.openai.synthetic-preview.2026-09-02.authenticated-current-session.v1`
 with digest
-`b0709121adf8d3c03c5c2112e0f9acaff0f5d79ca0f6f3460909067833629787`;
+`1b3ead75f957fdfb75488b65b2a336ea1e203f1b8619687092473b1d2fe1e02b`;
 and coordinator
 `coordinator.communication.openai.synthetic-preview.2026-09-02.authenticated-current-session.v1`
 with digest
-`ea496d6f2e08680b5f8d7515228a1e39d307d38e3f195fb1a361b0875330303b`.
+`11d951e443754fbd8a5a771ea4cdf95bfda4ec8f935f195de531cfea39542401`.
 The M1l 40-migration/A01–A18 pins remain historical evidence for that earlier
 revision and are not relabelled as current evidence.
 
@@ -3315,6 +3316,47 @@ The current focused gate passed 4 files / 98 tests, and the full Vitest suite
 passed 206 files / 2,860 tests. TypeScript, full ESLint, the Next.js Webpack
 production build with 64/64 static pages, the 73-file adapter sync, the fresh
 client-boundary scan across 100 static chunk files and `git diff --check` passed.
+
+#### Communication Note shadow Points preview — current source/local evidence
+
+Migration `20260902052755_add_v1_communication_note_points_preview.sql` is a
+6,918-byte additive source artifact with SHA-256
+`5615844b3e5786b5d6256bafb08e0e8707fe83d28d4239cf01d7cf584beb1c08`.
+It adds the zero-argument authenticated-only
+`public.get_v1_communication_note_points_preview()` function. The function
+reuses current-session authority, fixes the shadow catalog rate at 20 Points,
+and reads only the current Provider's active/shadow wallet. Available and
+reserved totals are computed in one statement snapshot; an elapsed reservation
+deadline does not release a row whose durable status remains `RESERVED`. The
+function performs no DML and has no access to the legacy three-credit Pilot.
+
+The Communication Note page authorizes the account and Provider role before the
+single Points RPC, using the same request-scoped Cookie client. Its server
+resolver accepts only the exact `AVAILABLE` or `NOT_READY` DTO, fails closed to
+the unit-only `UNAVAILABLE` DTO, and applies a 1.5-second deadline with
+PostgREST `AbortSignal` cancellation when supported. The client component only
+renders the explicitly inactive shadow preview: balance, reserved total and the
+20-Point future generation rate. Static tests deny client-side network,
+storage, cookie, cache and service-worker I/O across the component and all of
+its direct local modules. No reserve, grant, debit, generation job, model call,
+save or export path was enabled.
+
+The 19,845-byte rollback-only A20 assertion has SHA-256
+`b03fa8acf981f1bec7eba08002323682d033f0073f9d2bc05eed31c8e7b63654`.
+An isolated PostgreSQL 16.15 run proved the exact function owner, empty search
+path and two-role grant boundary; Provider A returned 42 available / 20
+reserved, Provider B returned 7 / 0 without cross-owner leakage, a walletless
+Provider returned `NOT_READY`, and an expired session was denied. Exact
+before/after snapshots across six Points and two legacy-credit tables were
+unchanged. Final rollback left all synthetic Auth and Points fixtures at zero,
+and the temporary cluster was removed.
+
+The current focused gate passed 12 files / 160 tests, and the full Vitest suite
+passed 208 files / 2,904 tests. TypeScript, full ESLint, the Next.js 16.2.9
+Webpack production build with 64/64 static pages, the 73-file adapter sync, the
+fresh client-boundary scan across 100 static chunk files and `git diff --check`
+passed. The migration remains unapplied: no external Supabase environment,
+Preview, Production or deployment action occurred.
 
 ### Current live/read-only evidence
 

@@ -10,7 +10,7 @@ import {
 } from "./communication-note-preview-runner-terminal-identity-policy.mjs";
 
 const ASSERTION_MANIFEST_SHA256 =
-  "6370a375828a1005315a9b090cbaead139944fdc66a903f9939f948524d3cf4d";
+  "a503760e63debffb2038338ba892823728940fb08b15ab6d6991c5d11366fb53";
 const ASSERTION_APPLICATION_NAME =
   "careslink-preview-schema-rollback-assertions";
 const ASSERTION_TRANSPORT_ROLE_PREFIX =
@@ -39,6 +39,7 @@ const ASSERTION_STAGE_CODES = Object.freeze([
   "A17",
   "A18",
   "A19",
+  "A20",
 ]);
 const DIRECT_UNREACHABLE_CODES = new Set([
   "ECONNREFUSED",
@@ -145,6 +146,11 @@ const ASSERTION_MANIFEST = Object.freeze([
     path: "supabase/tests/v1_authenticated_current_session_status_assertions.sql",
     sha256: "4b9096cbe06d36378b4bd799aa115de6da452a5acd29b60eb6d8cb2fdb491006",
   }),
+  Object.freeze({
+    stage: "A20",
+    path: "supabase/tests/v1_communication_note_points_preview_assertions.sql",
+    sha256: "b03fa8acf981f1bec7eba08002323682d033f0073f9d2bc05eed31c8e7b63654",
+  }),
 ]);
 
 export const COMMUNICATION_NOTE_PREVIEW_SCHEMA_ROLLBACK_ASSERTION_STAGE_CODES =
@@ -155,7 +161,7 @@ export const COMMUNICATION_NOTE_PREVIEW_SCHEMA_ROLLBACK_ASSERTION_STAGE_CODES =
 
 export const COMMUNICATION_NOTE_PREVIEW_SCHEMA_ROLLBACK_ASSERTION_POLICY =
   Object.freeze({
-    version: "2026-09-02.preview-schema-rollback-assertions.6",
+    version: "2026-09-02.preview-schema-rollback-assertions.7",
     fileCount: ASSERTION_MANIFEST.length,
     manifestSha256: ASSERTION_MANIFEST_SHA256,
     applicationName: ASSERTION_APPLICATION_NAME,
@@ -487,7 +493,7 @@ export async function loadCommunicationNotePreviewRollbackAssertions(
     }));
   }
   if (
-    scripts.length !== 19 ||
+    scripts.length !== 20 ||
     sha256(manifestLines.join("")) !== ASSERTION_MANIFEST_SHA256 ||
     scripts.filter((script) => script.migrationEntryRole).length !== 1
   ) {
@@ -1355,10 +1361,10 @@ export async function runCommunicationNotePreviewSchemaRollbackAssertions({
     !ASSERTION_NONCE_PATTERN.test(roleNonce ?? "") ||
     !/^[A-Za-z0-9_-]{43}$/.test(rolePassword ?? "") ||
     !assertionBundle ||
-    assertionBundle.fileCount !== 19 ||
+    assertionBundle.fileCount !== 20 ||
     assertionBundle.manifestSha256 !== ASSERTION_MANIFEST_SHA256 ||
     !Array.isArray(assertionBundle.scripts) ||
-    assertionBundle.scripts.length !== 19 ||
+    assertionBundle.scripts.length !== 20 ||
     assertionBundle.scripts.some(
       (script, index) => script?.stage !== ASSERTION_STAGE_CODES[index],
     )
@@ -1445,14 +1451,14 @@ export async function runCommunicationNotePreviewSchemaRollbackAssertions({
     await closeQuietly(admin);
   }
   assert(
-    passedCount === 19,
+    passedCount === 20,
     COMMUNICATION_NOTE_PREVIEW_SCHEMA_ROLLBACK_ASSERTION_ERROR_CODES
       .postcheckFailed,
   );
   return Object.freeze({
-    fileCount: 19,
+    fileCount: 20,
     manifestSha256: ASSERTION_MANIFEST_SHA256,
-    passedCount: 19,
+    passedCount: 20,
   });
 }
 
