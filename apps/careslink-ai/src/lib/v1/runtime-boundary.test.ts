@@ -99,6 +99,7 @@ describe("V1 shadow runtime boundary", () => {
       "src/lib/v1/product-api-runtime.server.ts",
       "src/lib/v1/product-api-session-status.server.ts",
       "src/lib/v1/product-api-supabase.server.ts",
+      "src/lib/communication-note-generation-current-session.server.ts",
       "src/lib/communication-note-generation-principal.server.ts",
       "src/lib/communication-note-generation-principal-composition.server.ts",
     ]) {
@@ -1089,6 +1090,10 @@ describe("V1 shadow runtime boundary", () => {
       process.cwd(),
       "src/lib/communication-note-generation-principal-composition.server.test.ts",
     );
+    const currentSessionPath = join(
+      process.cwd(),
+      "src/lib/communication-note-generation-current-session.server.ts",
+    );
     const sessionStatusPath = join(
       process.cwd(),
       "src/lib/v1/product-api-session-status.server.ts",
@@ -1129,10 +1134,24 @@ describe("V1 shadow runtime boundary", () => {
         (file) =>
           file !== sessionStatusPath &&
           file !== boundaryTestPath &&
+          !file.endsWith(".test.ts") &&
           readFileSync(file, "utf8").includes(
             "createCaresLinkV1SessionStatusRpcClient",
           ),
       );
+    const currentSessionImporters = walkControlledScriptFiles().filter(
+      (file) =>
+        file !== currentSessionPath &&
+        file !== boundaryTestPath &&
+        readFileSync(file, "utf8").includes(
+          "communication-note-generation-current-session",
+        ),
+    );
+    const currentSessionSource = readFileSync(currentSessionPath, "utf8");
+    const envExampleSource = readFileSync(
+      join(process.cwd(), ".env.example"),
+      "utf8",
+    );
 
     expect(routeSource).toContain("export async function POST");
     expect(routeSource).not.toMatch(
@@ -1160,15 +1179,44 @@ describe("V1 shadow runtime boundary", () => {
     expect(principalCompositionImporters).toEqual([
       principalCompositionTestPath,
     ]);
-    expect(privilegedClientFactoryImporters).toEqual([
-      principalCompositionPath,
-    ]);
+    expect(privilegedClientFactoryImporters).toEqual([]);
+    expect(currentSessionImporters).toEqual(
+      [
+        join(
+          process.cwd(),
+          "src/lib/communication-note-generation-current-session.server.test.ts",
+        ),
+        principalCompositionPath,
+        principalCompositionTestPath,
+        join(
+          process.cwd(),
+          "src/lib/communication-note-generation-principal.server.ts",
+        ),
+        join(
+          process.cwd(),
+          "src/lib/communication-note-generation-principal.server.test.ts",
+        ),
+      ].sort(),
+    );
     expect(principalCompositionSource).toMatch(/^import "server-only";/);
     expect(principalCompositionSource).toContain(
       "COMMUNICATION_NOTE_GENERATION_FORMAL_PRINCIPAL_COMPOSITION =\n  undefined",
     );
     expect(principalCompositionSource).not.toContain(
       "createCaresLinkV1SessionStatusResolverFromEnv",
+    );
+    expect(principalCompositionSource).not.toMatch(
+      /CARESLINK_COMMUNICATION_NOTE_SESSION_STATUS_PREVIEW_SECRET_KEY|SUPABASE_SECRET_KEY|SUPABASE_SERVICE_ROLE_KEY|CARESLINK_V1_PRIVACY_REVIEW_PREVIEW_SERVICE_ROLE_KEY|createCaresLinkV1SessionStatusRpcClient|resolve_v1_shadow_session_status|service_role|sb_secret_/,
+    );
+    expect(currentSessionSource).toMatch(/^import "server-only";/);
+    expect(currentSessionSource).toContain(
+      "resolve_v1_current_session_status",
+    );
+    expect(currentSessionSource).not.toMatch(
+      /resolve_v1_shadow_session_status|p_user_id|p_session_id|SUPABASE_SECRET_KEY|SUPABASE_SERVICE_ROLE_KEY|service_role|sb_secret_/,
+    );
+    expect(envExampleSource).not.toContain(
+      "CARESLINK_COMMUNICATION_NOTE_SESSION_STATUS_PREVIEW_SECRET_KEY",
     );
   });
 

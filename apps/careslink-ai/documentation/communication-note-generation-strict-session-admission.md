@@ -20,18 +20,23 @@ this order:
 1. require the Product API master flag;
 2. reject every request containing an `Authorization` header before creating an
    Auth client or issuing an RPC;
-3. use Cookie Auth `getClaims()` to verify the JWT and derive canonical `sub`
-   and `session_id` UUIDs;
-4. call only `resolve_v1_shadow_session_status(p_user_id, p_session_id)`;
+3. create one request-scoped Cookie/authenticated Supabase client and use its
+   `getClaims()` to verify the JWT and derive canonical `sub` and `session_id`
+   UUIDs;
+4. revalidate the frozen configuration and call only the same client's
+   zero-argument `resolve_v1_current_session_status()` RPC, without an argument
+   object or caller identity;
 5. require exact `ACTIVE` status;
-6. call Cookie Auth `getUser()` and require its canonical ID to match `sub`;
+6. call the same client's Cookie Auth `getUser()` and require its canonical ID
+   to match `sub`;
 7. return the frozen Cookie principal to the route.
 
-The existing service-only RPC returns `ACTIVE` only when the exact Auth session
-belongs to the user, is not past `not_after`, and the Auth user is authenticated,
-email-confirmed, not deleted, not currently banned, not anonymous, and has the
-trusted exact `raw_app_meta_data.role = provider`. No user-editable metadata,
-request body identity, query string or Workspace default-role fallback is used.
+The authenticated current-session RPC returns `ACTIVE` only when the exact Auth
+session belongs to the user, is not past `not_after`, and the Auth user is
+authenticated, email-confirmed, not deleted, not currently banned, not
+anonymous, and has the trusted exact `raw_app_meta_data.role = provider`. No
+user-editable metadata, request body identity, query string or Workspace
+default-role fallback is used.
 
 ## Fixed failure boundary
 
@@ -50,7 +55,7 @@ real route stops at `503 PRODUCT_API_DISABLED` before authority inspection.
 The route never returns the user or session ID, and errors never reflect tokens,
 upstream messages or facts.
 
-## Source-only target and custody composition
+## Source-only target and authenticated-client composition
 
 The follow-up composition remains outside the route and has a formal export of
 `undefined`. Its executable source factory fails closed unless all of these
@@ -64,35 +69,34 @@ conditions hold together:
 5. server and public Supabase URLs are both byte-exact
    `https://<ref>.supabase.co` with no credentials, port, slash, path, query or
    fragment;
-6. server and public keys are identical `sb_publishable_` values;
-7. the dedicated session-status value is an `sb_secret_` and is neither absent
-   nor equal to the generic secret/service-role or privacy-review credential.
+6. server and public keys are identical `sb_publishable_` values.
 
 The validated configuration is frozen and rechecked before constructing the
-Cookie client and again after claims, before constructing the privileged
-client. No client is created at module import or composition-factory time. Any
-`Authorization` header creates neither client; invalid claims can create the
-Cookie client but never the privileged client. Successful ordering is fixed as
-`getClaims → dedicated-client factory → exact RPC → getUser`.
+Cookie client and again after claims, before calling the current-session RPC.
+No client is created at module import or composition-factory time. Any
+`Authorization` header creates no client; invalid claims may create the Cookie
+client but cannot call the RPC or `getUser()`. The same client is used throughout
+the request, in this fixed order: Cookie client → `getClaims` → snapshot
+revalidation → zero-argument RPC → `getUser`.
 
-This is exact target and credential-custody separation, not database least
-privilege. The current `SECURITY DEFINER` RPC explicitly requires JWT role
-`service_role`, revokes general execution and grants execution only to
-`service_role`. A dedicated `sb_secret_` therefore remains
-service-role-equivalent and bypasses RLS even though application code exposes
-only this RPC through the new client interface.
+This Communication Note path reads no dedicated or generic privileged key,
+creates no privileged client and does not import or fall back to the legacy
+two-argument service-only RPC. The new `SECURITY DEFINER` RPC derives its owner
+from `auth.uid()` and exact session from the authenticated request JWT, revokes
+general execution and grants execution only to `authenticated`. Its migration
+remains unapplied, so the source wiring is not live database least-privilege or
+Cookie/Auth evidence.
 
 ## Deliberate limits and next gate
 
-A subsequent repository migration now supplies the authenticated, zero-argument
+The repository migration supplies the authenticated, zero-argument
 current-session RPC source and isolated PostgreSQL 16.15 catalog/ACL/claim
 evidence. It derives only `auth.uid()` and JWT `session_id`, accepts no caller
-identity, fixes an empty `search_path`, and grants only `authenticated`. It is
-unapplied and the composition still uses the legacy two-argument service-only
-RPC plus dedicated privileged key. The next source gate is therefore Cookie/
-authenticated-client rewiring with no legacy fallback. Formal installation,
-trusted Provider role normalization and same-revision live active/revoked proof
-on a disposable no-data Preview remain separate.
+identity, fixes an empty `search_path`, and grants only `authenticated`. The
+source-only composition is now wired to it without a legacy fallback, but the
+migration remains unapplied and the formal composition/resolver remain absent.
+Formal installation, trusted Provider role normalization and same-revision live
+active/revoked proof on a disposable no-data Preview remain separate.
 
 Request-time admission is not sufficient by itself. The future durable owner
 enqueue RPC must re-read the active session and privacy authority inside the

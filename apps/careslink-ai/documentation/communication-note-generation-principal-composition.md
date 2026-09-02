@@ -2,9 +2,8 @@
 
 ## Status
 
-This batch adds a server-only, source-only composition factory for the strict
-Communication Note principal. It does not install that factory into the product
-route.
+This server-only, source-only composition factory implements the strict
+Communication Note principal. It is not installed into the product route.
 
 - Compile-time generation readiness: `false`
 - Formal principal composition: `undefined`
@@ -12,7 +11,7 @@ route.
 - Formal submitter: `undefined`
 - Physical route importer: absent
 - UI, worker, provider/model, Points and payload-vault wiring: absent
-- Authenticated current-session RPC migration: source-only and unapplied
+- Authenticated current-session RPC: source-wired; migration unapplied
 
 Changing environment variables cannot activate the route. The formal route
 continues to return no-store `503 PRODUCT_API_DISABLED` before authentication or
@@ -30,54 +29,49 @@ pinned known Production ref. It accepts only:
   known Production ref;
 - identical server/public URLs equal byte-for-byte to
   `https://<ref>.supabase.co`;
-- identical server/public `sb_publishable_` keys;
-- one dedicated server-only `sb_secret_` value.
+- identical server/public `sb_publishable_` keys.
 
-The dedicated value has no fallback to `SUPABASE_SECRET_KEY`,
-`SUPABASE_SERVICE_ROLE_KEY` or the privacy-review credential, and equality with
-any of those values is rejected. Failure reasons expose no secret.
+The Communication Note composition does not read, compare or pass
+`SUPABASE_SECRET_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, the privacy-review credential
+or a dedicated session-status secret. Those values cannot affect its
+configuration decision, and failures expose no environment value.
 
-The configuration snapshot is revalidated before both lazy client boundaries.
-The Cookie client is created only after configuration and transport checks. The
-privileged client is created only after `getClaims()` has verified canonical
-user and session UUIDs. The fixed successful order is:
+The configuration snapshot is revalidated before lazy client construction and
+again after verified claims, immediately before the current-session RPC. One
+request-scoped Cookie/authenticated client performs every Auth and RPC
+operation. The fixed successful order is:
 
 ```text
-exact target/custody guard
+exact target/configuration guard
   → Cookie client
   → getClaims
-  → dedicated privileged client
-  → resolve_v1_shadow_session_status(user_id, session_id)
+  → frozen snapshot revalidation
+  → resolve_v1_current_session_status()
   → getUser
   → frozen Cookie principal
 ```
 
-That remains the exact composition in this source tree. The later
-`public.resolve_v1_current_session_status()` migration is not called here, and
-it does not install the formal composition or resolver.
+The RPC call supplies only the function name: no argument object and no
+user/session identifier crosses the client boundary. The composition creates no
+privileged client and has no fallback to
+`resolve_v1_shadow_session_status(user_id, session_id)`. This source wiring does
+not install the formal composition or resolver.
 
 Test environment and client ports require an explicit TestOnly capability. The
 default path can read only the process environment supplied by the deployment
-platform. Static importer tests restrict the composition to its own test and
-restrict direct external import of the newly exposed low-level privileged
-factory to this composition; its defining session-status module also uses that
-factory internally as the legacy `create...FromEnv` default.
+platform. Static importer tests restrict the composition to its own test,
+quarantine the authenticated current-session resolver inside the strict
+principal stack, and prove the Communication Note composition does not import
+the legacy low-level privileged factory or service-only RPC. The legacy module
+remains available to the separate Product API path; it is not a Communication
+Note fallback.
 
 The guard does not query Supabase branch/control-plane metadata and therefore
 does not prove that the configured ref is disposable, non-default, healthy or a
 child of Production. Those properties require a separately authorized live
 Preview gate.
 
-## Security limitation
-
-The dedicated `sb_secret_` improves separation, rotation and no-fallback
-custody, but it does not reduce database authority. Supabase secret keys map to
-a service-role-equivalent context and bypass RLS. The existing
-`SECURITY DEFINER` session RPC itself checks `auth.jwt()->>'role' =
-'service_role'` and grants execution only to `service_role`.
-
-Therefore this batch must not be described as least privilege, live Supabase
-evidence or approval to activate the route.
+## Authenticated source boundary and remaining limitation
 
 The separately added
 `20260902012628_add_v1_authenticated_current_session_status_rpc.sql` defines a
@@ -85,9 +79,16 @@ zero-argument `SECURITY DEFINER` function with an empty `search_path`. It derive
 the owner from `auth.uid()`, the exact session from the JWT `session_id`,
 preserves the existing trusted Provider/session predicates, revokes
 `PUBLIC`/`anon`/`service_role`/`authenticator`, and grants only
-`authenticated`. That is the intended least-privilege database identity for a
-later Cookie-client composition. The migration remains unapplied and unwired,
-so its source and local SQL evidence are not live least-privilege evidence.
+`authenticated`. The source-only composition now calls it through the same
+Cookie/authenticated client that verifies claims and later resolves the
+authoritative user. No dedicated or generic privileged key is read, no
+privileged client is constructed, and no legacy RPC fallback exists on this
+path.
+
+The migration remains unapplied, the formal composition/resolver remain
+`undefined`, and the route remains disconnected. Therefore this batch is not
+live Supabase evidence, Production least-privilege evidence or approval to
+activate the route.
 
 ## No external effect
 
@@ -109,24 +110,26 @@ role and claim matrix also passed on an isolated PostgreSQL 16.15 cluster using
 fixed synthetic Auth rows and no care data; the server and temporary directory
 were then removed.
 
-The final current-source closeout passed 9 focused files / 116 tests and the
-full 205-file / 2,841-test Vitest suite. TypeScript, full ESLint, the Next.js
-16.2.9 Webpack build with 64/64 static pages, the 73-file adapter check and
-`git diff --check` also passed.
+The authenticated-RPC atomic batch closeout passed 9 focused files / 116 tests
+and the full 205-file / 2,841-test Vitest suite. TypeScript, full ESLint, the
+Next.js 16.2.9 Webpack build with 64/64 static pages, the 73-file adapter check
+and `git diff --check` also passed.
+
+Those figures are historical checkpoints from before the authenticated-client
+rewiring. The current rewiring passed its focused 4-file / 98-test gate and the
+full 206-file / 2,860-test Vitest suite. TypeScript, full ESLint, the 64/64-page
+Webpack build, 73-file adapter sync, fresh 100-static-chunk client-boundary scan
+and `git diff --check` passed.
 
 These are local source/build/database results only, not Hosted Preview, retained
 database or live Auth evidence.
 
 ## Next independent batch
 
-Rewire the source-only composition to use the request-scoped
-Cookie/authenticated Supabase client for
-`resolve_v1_current_session_status()`. The rewiring must remove the dedicated
-service-role-equivalent session-status client and its secret path without a
-fallback to the legacy two-argument RPC.
-
-That source change still does not install the formal composition or resolver.
-Trusted role normalization, same-transaction session/privacy reauthorization
-inside owner enqueue, and a separately authorized disposable no-data Hosted
-Preview active/revoked-session gate remain independent requirements before any
-model-backed application work can be enabled.
+Formally install the reviewed authenticated current-session composition only
+after its remaining release gates are authorized. Trusted role normalization,
+same-transaction session/privacy reauthorization inside owner enqueue, and a
+separately authorized disposable no-data Hosted Preview active/revoked-session
+gate remain independent requirements before any model-backed application work
+can be enabled. `READY`, the formal principal resolver and the physical route
+must remain closed until that evidence exists.

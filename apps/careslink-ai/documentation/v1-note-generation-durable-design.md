@@ -1914,8 +1914,12 @@ execution only to `authenticated`.
 
 Its static contracts and rollback-only catalog/ACL/role/claim matrix passed on
 an isolated PostgreSQL 16.15 cluster, which was then removed. The migration is
-not applied to Supabase or wired into the owner repository, principal
-composition or route. Source rewiring, formal installation, same-transaction
-owner session/privacy reauthorization and a separately authorized no-data
-Hosted Preview remain required. All 40-migration M1l Hosted pins above remain
-historical evidence for their exact revision.
+not applied to Supabase. The request-scoped Cookie/authenticated client is now
+wired into the source-only principal composition in the fixed `getClaims` →
+snapshot revalidation → zero-argument current-session RPC → `getUser` order,
+without a privileged key/client or legacy RPC fallback. It is not wired into the
+formal principal resolver, owner repository or physical route, and `READY`
+remains false. Formal installation, same-transaction owner session/privacy
+reauthorization and a separately authorized no-data Hosted Preview remain
+required. All 40-migration M1l Hosted pins above remain historical evidence for
+their exact revision.

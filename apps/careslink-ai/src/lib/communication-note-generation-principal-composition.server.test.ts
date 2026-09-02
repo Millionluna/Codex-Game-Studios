@@ -4,17 +4,19 @@ import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  COMMUNICATION_NOTE_GENERATION_CURRENT_SESSION_STATUS_RPC,
+  type CommunicationNoteGenerationAuthenticatedClient,
+} from "./communication-note-generation-current-session.server";
+import {
   CARESLINK_COMMUNICATION_NOTE_PRINCIPAL_COMPOSITION_FLAG,
   CARESLINK_COMMUNICATION_NOTE_PRINCIPAL_COMPOSITION_TEST_CAPABILITY,
   CARESLINK_COMMUNICATION_NOTE_PRINCIPAL_EXPECTED_SUPABASE_REF_FLAG,
   CARESLINK_COMMUNICATION_NOTE_PRINCIPAL_EXPECTED_VERCEL_PROJECT_ID_FLAG,
-  CARESLINK_COMMUNICATION_NOTE_SESSION_STATUS_PREVIEW_SECRET_KEY,
   COMMUNICATION_NOTE_GENERATION_FORMAL_PRINCIPAL_COMPOSITION,
   createCommunicationNoteGenerationPrincipalComposition,
   resolveCommunicationNoteGenerationPrincipalCompositionGuard,
   type CommunicationNoteGenerationPrincipalCompositionEnv,
 } from "./communication-note-generation-principal-composition.server";
-import type { CaresLinkV1ProductApiAuthClient } from "./v1/product-api-auth.server";
 import { CARESLINK_PRODUCTION_SUPABASE_REF } from "./v1/ndis-shadow-guard";
 
 vi.mock("server-only", () => ({}));
@@ -26,12 +28,11 @@ const PREVIEW_URL = `https://${PREVIEW_REF}.supabase.co`;
 const VERCEL_PROJECT_ID = "prj_1234567890abcdef";
 const PUBLISHABLE_KEY =
   "sb_publishable_1234567890abcdefghijklmnopqrstuvwxyz";
-const DEDICATED_SECRET = "sb_secret_1234567890abcdefghijklmnopqrstuvwxyz";
+const PRIVATE_VALUE = "sb_secret_1234567890abcdefghijklmnopqrstuvwxyz";
 
 describe("Communication Note principal composition", () => {
   it("keeps the formal composition absent and constructs no client at import or factory time", () => {
     const createCookieAuthClient = vi.fn();
-    const createSessionStatusClient = vi.fn();
     const env = enabledEnv();
 
     expect(
@@ -48,9 +49,6 @@ describe("Communication Note principal composition", () => {
     ).toBe(
       "CARESLINK_COMMUNICATION_NOTE_PRINCIPAL_EXPECTED_VERCEL_PROJECT_ID",
     );
-    expect(CARESLINK_COMMUNICATION_NOTE_SESSION_STATUS_PREVIEW_SECRET_KEY).toBe(
-      "CARESLINK_COMMUNICATION_NOTE_SESSION_STATUS_PREVIEW_SECRET_KEY",
-    );
     expect(
       CARESLINK_COMMUNICATION_NOTE_PRINCIPAL_COMPOSITION_TEST_CAPABILITY,
     ).toBe("TEST_ONLY_COMMUNICATION_NOTE_PRINCIPAL_COMPOSITION");
@@ -62,7 +60,6 @@ describe("Communication Note principal composition", () => {
         CARESLINK_COMMUNICATION_NOTE_PRINCIPAL_COMPOSITION_TEST_CAPABILITY,
       env,
       createCookieAuthClient,
-      createSessionStatusClient,
     });
 
     expect(guard).toEqual({
@@ -75,59 +72,42 @@ describe("Communication Note principal composition", () => {
     expect(Object.isFrozen(guard)).toBe(true);
     expect(resolver).toBeTypeOf("function");
     expect(createCookieAuthClient).not.toHaveBeenCalled();
-    expect(createSessionStatusClient).not.toHaveBeenCalled();
-    expect(JSON.stringify(guard)).not.toContain(DEDICATED_SECRET);
+    expect(JSON.stringify(guard)).not.toContain(PRIVATE_VALUE);
   });
 
   it.each([
     { name: "environment", options: { env: enabledEnv() } },
     {
-      name: "client ports",
-      options: {
-        createCookieAuthClient: vi.fn(),
-        createSessionStatusClient: vi.fn(),
-      },
+      name: "client port",
+      options: { createCookieAuthClient: vi.fn() },
     },
   ])(
     "rejects injected $name without the explicit TestOnly capability",
     ({ options }) => {
       expect(() =>
-        createCommunicationNoteGenerationPrincipalComposition(
-          options as never,
-        ),
+        createCommunicationNoteGenerationPrincipalComposition(options as never),
       ).toThrow("principal composition test ports are unavailable");
     },
   );
 
-  it("captures TestOnly ports so a retained options object cannot replace them", async () => {
+  it("captures the TestOnly client port so a retained options object cannot replace it", async () => {
     const { client } = authClient();
     const originalCookieFactory = vi.fn(async () => client);
-    const rpc = vi.fn(async () => ({ data: "ACTIVE", error: null }));
-    const originalSessionFactory = vi.fn(() => ({ rpc }));
     const options = {
       capability:
         CARESLINK_COMMUNICATION_NOTE_PRINCIPAL_COMPOSITION_TEST_CAPABILITY,
       env: enabledEnv(),
       createCookieAuthClient: originalCookieFactory,
-      createSessionStatusClient: originalSessionFactory,
     } as const;
-    const resolver = createCommunicationNoteGenerationPrincipalComposition(
-      options,
-    );
+    const resolver = createCommunicationNoteGenerationPrincipalComposition(options);
     const retained = options as unknown as Record<string, unknown>;
     retained.env = {};
     retained.createCookieAuthClient = vi.fn(() => {
       throw new Error("replaced Cookie port");
     });
-    retained.createSessionStatusClient = vi.fn(() => {
-      throw new Error("replaced privileged port");
-    });
 
-    await expect(resolver?.(cookieRequest())).resolves.toMatchObject({
-      ok: true,
-    });
+    await expect(resolver?.(cookieRequest())).resolves.toMatchObject({ ok: true });
     expect(originalCookieFactory).toHaveBeenCalledOnce();
-    expect(originalSessionFactory).toHaveBeenCalledOnce();
   });
 
   it.each([
@@ -189,7 +169,6 @@ describe("Communication Note principal composition", () => {
   ])("rejects an invalid $name before any client", ({ override, reason }) => {
     const env = { ...enabledEnv(), ...override };
     const createCookieAuthClient = vi.fn();
-    const createSessionStatusClient = vi.fn();
 
     expect(
       resolveCommunicationNoteGenerationPrincipalCompositionGuard(env),
@@ -200,11 +179,9 @@ describe("Communication Note principal composition", () => {
           CARESLINK_COMMUNICATION_NOTE_PRINCIPAL_COMPOSITION_TEST_CAPABILITY,
         env,
         createCookieAuthClient,
-        createSessionStatusClient,
       }),
     ).toBeUndefined();
     expect(createCookieAuthClient).not.toHaveBeenCalled();
-    expect(createSessionStatusClient).not.toHaveBeenCalled();
   });
 
   it("rejects the known Production ref before any URL or client use", () => {
@@ -218,7 +195,6 @@ describe("Communication Note principal composition", () => {
       NEXT_PUBLIC_SUPABASE_URL: productionUrl,
     };
     const createCookieAuthClient = vi.fn();
-    const createSessionStatusClient = vi.fn();
 
     expect(
       resolveCommunicationNoteGenerationPrincipalCompositionGuard(env),
@@ -229,11 +205,9 @@ describe("Communication Note principal composition", () => {
           CARESLINK_COMMUNICATION_NOTE_PRINCIPAL_COMPOSITION_TEST_CAPABILITY,
         env,
         createCookieAuthClient,
-        createSessionStatusClient,
       }),
     ).toBeUndefined();
     expect(createCookieAuthClient).not.toHaveBeenCalled();
-    expect(createSessionStatusClient).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -259,12 +233,10 @@ describe("Communication Note principal composition", () => {
     {
       name: "server publishable key missing",
       override: { SUPABASE_PUBLISHABLE_KEY: undefined },
-      reason: "publishable_key_unavailable",
     },
     {
       name: "public publishable key malformed",
       override: { NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "anon-key" },
-      reason: "publishable_key_unavailable",
     },
     {
       name: "publishable keys mismatch",
@@ -272,54 +244,44 @@ describe("Communication Note principal composition", () => {
         NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY:
           "sb_publishable_abcdefghijklmnopqrstuvwxyz1234567890",
       },
-      reason: "publishable_key_unavailable",
     },
-    {
-      name: "dedicated secret missing despite a generic key",
-      override: {
-        CARESLINK_COMMUNICATION_NOTE_SESSION_STATUS_PREVIEW_SECRET_KEY:
-          undefined,
-        SUPABASE_SERVICE_ROLE_KEY: "sb_secret_generic1234567890abcdef",
-      },
-      reason: "privileged_key_unavailable",
-    },
-    {
-      name: "dedicated secret malformed",
-      override: {
-        CARESLINK_COMMUNICATION_NOTE_SESSION_STATUS_PREVIEW_SECRET_KEY:
-          "legacy-service-role-jwt",
-      },
-      reason: "privileged_key_unavailable",
-    },
-  ])("rejects $name without fallback", ({ override, reason }) => {
+  ])("rejects $name without fallback", ({ override }) => {
     const env = { ...enabledEnv(), ...override };
     expect(
       resolveCommunicationNoteGenerationPrincipalCompositionGuard(env),
-    ).toEqual({ enabled: false, reason });
+    ).toEqual({ enabled: false, reason: "publishable_key_unavailable" });
   });
 
-  it.each([
-    "SUPABASE_SECRET_KEY",
-    "SUPABASE_SERVICE_ROLE_KEY",
-    "CARESLINK_V1_PRIVACY_REVIEW_PREVIEW_SERVICE_ROLE_KEY",
-  ] as const)("rejects dedicated credential reuse through %s", (field) => {
-    const env = { ...enabledEnv(), [field]: DEDICATED_SECRET };
+  it("does not read or depend on any generic, dedicated or privacy service credential", () => {
+    const forbidden = new Set([
+      "CARESLINK_COMMUNICATION_NOTE_SESSION_STATUS_PREVIEW_SECRET_KEY",
+      "CARESLINK_V1_PRIVACY_REVIEW_PREVIEW_SERVICE_ROLE_KEY",
+      "SUPABASE_SECRET_KEY",
+      "SUPABASE_SERVICE_ROLE_KEY",
+    ]);
+    const env = new Proxy(enabledEnv(), {
+      get(target, property, receiver) {
+        if (typeof property === "string" && forbidden.has(property)) {
+          throw new Error(`forbidden credential read: ${property}`);
+        }
+        return Reflect.get(target, property, receiver);
+      },
+    });
+
     expect(
       resolveCommunicationNoteGenerationPrincipalCompositionGuard(env),
-    ).toEqual({ enabled: false, reason: "credential_reuse_denied" });
+    ).toMatchObject({ enabled: true });
   });
 
-  it.each([`Bearer ${DEDICATED_SECRET}`, `Basic ${DEDICATED_SECRET}`, ""])(
-    "rejects every Authorization header before either client factory: %j",
+  it.each([`Bearer ${PRIVATE_VALUE}`, `Basic ${PRIVATE_VALUE}`, "", " "])(
+    "rejects every Authorization header before the only client factory: %j",
     async (authorization) => {
       const createCookieAuthClient = vi.fn();
-      const createSessionStatusClient = vi.fn();
       const resolver = createCommunicationNoteGenerationPrincipalComposition({
         capability:
           CARESLINK_COMMUNICATION_NOTE_PRINCIPAL_COMPOSITION_TEST_CAPABILITY,
         env: enabledEnv(),
         createCookieAuthClient,
-        createSessionStatusClient,
       });
 
       const result = await resolver?.(
@@ -334,23 +296,20 @@ describe("Communication Note principal composition", () => {
         status: 403,
       });
       expect(createCookieAuthClient).not.toHaveBeenCalled();
-      expect(createSessionStatusClient).not.toHaveBeenCalled();
-      expect(JSON.stringify(result)).not.toContain(DEDICATED_SECRET);
+      expect(JSON.stringify(result)).not.toContain(PRIVATE_VALUE);
     },
   );
 
-  it("does not construct the privileged client when verified claims are invalid", async () => {
-    const { client, getUser } = authClient({
-      claimsError: { message: DEDICATED_SECRET },
+  it("does not call the session RPC when verified claims are invalid", async () => {
+    const { client, rpc, getUser } = authClient({
+      claimsError: { message: PRIVATE_VALUE },
     });
     const createCookieAuthClient = vi.fn(async () => client);
-    const createSessionStatusClient = vi.fn();
     const resolver = createCommunicationNoteGenerationPrincipalComposition({
       capability:
         CARESLINK_COMMUNICATION_NOTE_PRINCIPAL_COMPOSITION_TEST_CAPABILITY,
       env: enabledEnv(),
       createCookieAuthClient,
-      createSessionStatusClient,
     });
 
     const result = await resolver?.(cookieRequest());
@@ -361,38 +320,31 @@ describe("Communication Note principal composition", () => {
       status: 401,
     });
     expect(createCookieAuthClient).toHaveBeenCalledOnce();
-    expect(createSessionStatusClient).not.toHaveBeenCalled();
+    expect(rpc).not.toHaveBeenCalled();
     expect(getUser).not.toHaveBeenCalled();
-    expect(JSON.stringify(result)).not.toContain(DEDICATED_SECRET);
+    expect(JSON.stringify(result)).not.toContain(PRIVATE_VALUE);
   });
 
-  it("uses only the exact target and dedicated secret after verified claims", async () => {
-    const { client, getClaims, getUser } = authClient();
+  it("uses one exact authenticated Cookie client after both target checks", async () => {
+    const { client, getClaims, rpc, getUser } = authClient();
     const createCookieAuthClient = vi.fn(async () => client);
-    const rpc = vi.fn(async () => ({ data: "ACTIVE", error: null }));
-    const createSessionStatusClient = vi.fn(() => ({ rpc }));
     const resolver = createCommunicationNoteGenerationPrincipalComposition({
       capability:
         CARESLINK_COMMUNICATION_NOTE_PRINCIPAL_COMPOSITION_TEST_CAPABILITY,
       env: enabledEnv(),
       createCookieAuthClient,
-      createSessionStatusClient,
     });
 
     const result = await resolver?.(cookieRequest());
 
-    expect(createSessionStatusClient).toHaveBeenCalledWith(
-      PREVIEW_URL,
-      DEDICATED_SECRET,
+    expect(createCookieAuthClient).toHaveBeenCalledOnce();
+    expect(getClaims).toHaveBeenCalledOnce();
+    expect(rpc).toHaveBeenCalledWith(
+      COMMUNICATION_NOTE_GENERATION_CURRENT_SESSION_STATUS_RPC,
     );
-    expect(rpc).toHaveBeenCalledWith("resolve_v1_shadow_session_status", {
-      p_user_id: USER_ID,
-      p_session_id: SESSION_ID,
-    });
+    expect(rpc.mock.calls[0]).toHaveLength(1);
+    expect(getUser).toHaveBeenCalledOnce();
     expect(getClaims.mock.invocationCallOrder[0]).toBeLessThan(
-      createSessionStatusClient.mock.invocationCallOrder[0],
-    );
-    expect(createSessionStatusClient.mock.invocationCallOrder[0]).toBeLessThan(
       rpc.mock.invocationCallOrder[0],
     );
     expect(rpc.mock.invocationCallOrder[0]).toBeLessThan(
@@ -408,19 +360,16 @@ describe("Communication Note principal composition", () => {
     });
     expect(result && Object.isFrozen(result)).toBe(true);
     expect(result?.ok && Object.isFrozen(result.principal)).toBe(true);
-    expect(JSON.stringify(result)).not.toContain(DEDICATED_SECRET);
   });
 
   it("fails closed before Cookie Auth when the frozen target configuration drifts", async () => {
     const env = enabledEnv();
     const createCookieAuthClient = vi.fn();
-    const createSessionStatusClient = vi.fn();
     const resolver = createCommunicationNoteGenerationPrincipalComposition({
       capability:
         CARESLINK_COMMUNICATION_NOTE_PRINCIPAL_COMPOSITION_TEST_CAPABILITY,
       env,
       createCookieAuthClient,
-      createSessionStatusClient,
     });
     setEnv(env, "VERCEL_ENV", "production");
 
@@ -430,26 +379,25 @@ describe("Communication Note principal composition", () => {
       status: 503,
     });
     expect(createCookieAuthClient).not.toHaveBeenCalled();
-    expect(createSessionStatusClient).not.toHaveBeenCalled();
   });
 
-  it("rejects a still-valid credential snapshot drift after claims", async () => {
+  it.each([
+    ["composition flag", "CARESLINK_COMMUNICATION_NOTE_PRINCIPAL_COMPOSITION_ENABLED", "false"],
+    ["Vercel environment", "VERCEL_ENV", "production"],
+    ["Vercel project", "VERCEL_PROJECT_ID", "prj_bbbbbbbbbbbbbbbb"],
+    ["Supabase ref", "CARESLINK_COMMUNICATION_NOTE_PRINCIPAL_EXPECTED_SUPABASE_REF", "zyxwvutsrqponmlkjihg"],
+    ["Supabase URL", "SUPABASE_URL", "https://zyxwvutsrqponmlkjihg.supabase.co"],
+    ["publishable key", "SUPABASE_PUBLISHABLE_KEY", "sb_publishable_zyxwvutsrqponmlkjihgfedcba0987654321"],
+  ])("rejects %s snapshot drift after claims and before RPC", async (_name, key, value) => {
     const env = enabledEnv();
-    const { client, getUser } = authClient({
-      onGetClaims: () =>
-        setEnv(
-          env,
-          "CARESLINK_COMMUNICATION_NOTE_SESSION_STATUS_PREVIEW_SECRET_KEY",
-          "sb_secret_zyxwvutsrqponmlkjihgfedcba0987654321",
-        ),
+    const { client, getClaims, rpc, getUser } = authClient({
+      onGetClaims: () => setEnv(env, key, value),
     });
-    const createSessionStatusClient = vi.fn();
     const resolver = createCommunicationNoteGenerationPrincipalComposition({
       capability:
         CARESLINK_COMMUNICATION_NOTE_PRINCIPAL_COMPOSITION_TEST_CAPABILITY,
       env,
       createCookieAuthClient: async () => client,
-      createSessionStatusClient,
     });
 
     await expect(resolver?.(cookieRequest())).resolves.toEqual({
@@ -457,21 +405,18 @@ describe("Communication Note principal composition", () => {
       reason: "unavailable",
       status: 503,
     });
-    expect(createSessionStatusClient).not.toHaveBeenCalled();
+    expect(getClaims).toHaveBeenCalledOnce();
+    expect(rpc).not.toHaveBeenCalled();
     expect(getUser).not.toHaveBeenCalled();
   });
 
-  it("maps a privileged factory exception to a fixed unavailable result", async () => {
-    const { client, getUser } = authClient();
-    const createSessionStatusClient = vi.fn(() => {
-      throw new Error(`${DEDICATED_SECRET}: upstream detail`);
-    });
+  it("maps an RPC exception to a fixed unavailable result without fallback", async () => {
+    const { client, rpc, getUser } = authClient({ rpcThrows: true });
     const resolver = createCommunicationNoteGenerationPrincipalComposition({
       capability:
         CARESLINK_COMMUNICATION_NOTE_PRINCIPAL_COMPOSITION_TEST_CAPABILITY,
       env: enabledEnv(),
       createCookieAuthClient: async () => client,
-      createSessionStatusClient,
     });
 
     const result = await resolver?.(cookieRequest());
@@ -481,9 +426,9 @@ describe("Communication Note principal composition", () => {
       reason: "unavailable",
       status: 503,
     });
-    expect(createSessionStatusClient).toHaveBeenCalledOnce();
+    expect(rpc).toHaveBeenCalledOnce();
     expect(getUser).not.toHaveBeenCalled();
-    expect(JSON.stringify(result)).not.toContain(DEDICATED_SECRET);
+    expect(JSON.stringify(result)).not.toContain(PRIVATE_VALUE);
   });
 
   it("keeps the composition server-only, source-only and out of the formal route", () => {
@@ -513,11 +458,8 @@ describe("Communication Note principal composition", () => {
     expect(source).toContain(
       "COMMUNICATION_NOTE_GENERATION_FORMAL_PRINCIPAL_COMPOSITION =\n  undefined",
     );
-    expect(source).not.toContain(
-      "createCaresLinkV1SessionStatusResolverFromEnv",
-    );
     expect(source).not.toMatch(
-      /\?\?\s*env\.(?:SUPABASE_SECRET_KEY|SUPABASE_SERVICE_ROLE_KEY|CARESLINK_V1_PRIVACY_REVIEW_PREVIEW_SERVICE_ROLE_KEY)/,
+      /CARESLINK_COMMUNICATION_NOTE_SESSION_STATUS_PREVIEW_SECRET_KEY|SUPABASE_SECRET_KEY|SUPABASE_SERVICE_ROLE_KEY|CARESLINK_V1_PRIVACY_REVIEW_PREVIEW_SERVICE_ROLE_KEY|createCaresLinkV1SessionStatusRpcClient|resolve_v1_shadow_session_status|parseDedicatedSecretKey|dedicatedPrivilegedKey|privileged_key_unavailable|credential_reuse_denied|service_role|sb_secret_/,
     );
     expect(source).not.toMatch(
       /console\.|logger\.|request\.json\(|request\.url|user_metadata|raw_user_meta_data/,
@@ -538,8 +480,6 @@ function enabledEnv(): CommunicationNoteGenerationPrincipalCompositionEnv {
     CARESLINK_COMMUNICATION_NOTE_PRINCIPAL_EXPECTED_SUPABASE_REF: PREVIEW_REF,
     CARESLINK_COMMUNICATION_NOTE_PRINCIPAL_EXPECTED_VERCEL_PROJECT_ID:
       VERCEL_PROJECT_ID,
-    CARESLINK_COMMUNICATION_NOTE_SESSION_STATUS_PREVIEW_SECRET_KEY:
-      DEDICATED_SECRET,
     CARESLINK_V1_PRODUCT_API_ENABLED: "true",
     SUPABASE_URL: PREVIEW_URL,
     NEXT_PUBLIC_SUPABASE_URL: PREVIEW_URL,
@@ -559,6 +499,7 @@ function cookieRequest() {
 type AuthClientOptions = Readonly<{
   claimsError?: { message?: string };
   onGetClaims?: () => void;
+  rpcThrows?: boolean;
 }>;
 
 function authClient(options: AuthClientOptions = {}) {
@@ -575,10 +516,20 @@ function authClient(options: AuthClientOptions = {}) {
     data: { user: { id: USER_ID } },
     error: null,
   }));
+  const rpc = vi.fn(async () => {
+    if (options.rpcThrows) {
+      throw new Error(`${PRIVATE_VALUE}: upstream detail`);
+    }
+    return { data: "ACTIVE", error: null };
+  });
   return {
-    client: { auth: { getClaims, getUser } } as CaresLinkV1ProductApiAuthClient,
+    client: {
+      auth: { getClaims, getUser },
+      rpc,
+    } as CommunicationNoteGenerationAuthenticatedClient,
     getClaims,
     getUser,
+    rpc,
   };
 }
 
