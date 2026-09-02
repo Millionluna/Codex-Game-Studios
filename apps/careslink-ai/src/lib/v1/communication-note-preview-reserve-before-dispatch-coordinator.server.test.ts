@@ -88,7 +88,7 @@ describe("Communication Note M1l reserve-before-dispatch coordinator transcript"
     expect(
       CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_COORDINATOR_POLICY_DIGEST,
     ).toBe(
-      "3c0336142b5f546ba12a2a6a4f9c6d51167478dfe45781a553608d99b5a62925",
+      "450d092c1cf11cb6d12d7f38a43b056de99b29eb333cf488462cd3cf18c17b40",
     );
     expect(
       CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_COORDINATOR_POLICY,

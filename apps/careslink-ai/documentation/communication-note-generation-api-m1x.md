@@ -110,10 +110,11 @@ The M1r–M1v terminal port is synthetic Preview evaluation persistence, not a
 product generation port. The later source-only coordinator described below can
 use the existing durable payload-admission contract, recheck session/privacy,
 admit the job and reserve exactly 20 Points atomically, but it is not a formal route
-dependency or activation mechanism. A future approved implementation must add
-the terminal commit/release transaction and let a registered asynchronous worker
-invoke an approved provider. The request thread must never bypass that chain by
-calling the model directly.
+dependency or activation mechanism. The later terminal-settlement source
+described below completes the database transaction boundary, but a future
+approved implementation must still install a registered asynchronous worker and
+approved provider. The request thread must never bypass that chain by calling
+the model directly.
 
 The source guard does not query Supabase branch/control-plane metadata. It does
 not prove that the configured ref is disposable, non-default, healthy or a
@@ -137,14 +138,40 @@ omits private binding and Points IDs. This is an API-minimization guarantee, not
 a claim that public Points IDs are invisible: the authenticated owner retains
 historical RLS reads of their own quote, reservation, allocation and ledger rows.
 
-The paid job deliberately remains `QUEUED` and cannot be claimed, recovered,
-attempted, cancelled or passed through legacy Points commit/release. There is no
-terminal settlement, welcome grant or legacy-credit change. A21 provides serial
-rollback-only evidence; separate local PostgreSQL 16.15 three-client evidence
+The admission batch initially left paid jobs quarantined in `QUEUED`; the
+successor below now replaces that source-only quarantine with exact paid worker
+and terminal rules. There is still no welcome grant or legacy-credit change.
+A21 provides serial rollback-only evidence; separate local PostgreSQL 16.15
+three-client evidence
 covers fixed-20 same-key replay, different-key oversubscription, authority/
 expiry failure and generic terminal-operation denial. It is not Hosted,
 Production, deployment or activation evidence. Full evidence and cleanup facts
 are recorded in `documentation/tests.md`.
+
+## Communication Note atomic Points terminal settlement — source only
+
+Migration
+`20260902121601_add_v1_communication_note_points_terminal_settlement.sql`
+keeps the existing API and worker envelopes unchanged while coupling paid
+terminal state to Points. Success can commit the exact 20-Point reservation only
+beside a verified canonical document/revision, sync change, mutation receipt,
+provider evidence and purge request. Permanent failure and cancellation release
+the exact source-lot allocation; retryable lease expiry keeps it `RESERVED`.
+Exact terminal and admission replays revalidate the immutable aggregate and
+write nothing.
+
+The migration adds a separate `NOLOGIN`/`NOBYPASSRLS` settlement role but gives
+it no runtime member. Generic Points terminal functions, API roles and the
+admission purpose role cannot mutate a bound reservation. Claim/recovery,
+heartbeat, authorize and fence replay use fresh post-lock clocks and the pinned
+worker policy's provider/commit safety margins. Per-registration recovery turns
+prevent paid/unpaid and paid queued/running starvation. This remains an
+unapplied, default-off source boundary—not a route, provider call or activation.
+
+The final isolated PostgreSQL 16.15 gate passed its exact 20-migration chain,
+all five terminal/concurrency groups, permanent ACL postcheck and complete
+teardown. The pinned hashes and scenario-level evidence are recorded in
+`documentation/tests.md`; they are local evidence only.
 
 ## Remaining activation gates
 
@@ -155,8 +182,8 @@ are recorded in `documentation/tests.md`.
   `app_metadata.role=provider` predicate;
 - live privacy-proof owner/type/schema/hash/expiry binding;
 - formal installation of the source-only atomic Communication
-  admission/reservation repository and a separately proven terminal
-  success/commit or failure/cancellation/release transaction;
+  admission/reservation and terminal-settlement repositories under an approved
+  runtime principal;
 - encrypted, retention-bounded payload vault and orphan/purge recovery;
 - formal owner repository factory, least-privilege caller and `EXECUTE` grant,
   with session/privacy reauthorization inside the enqueue transaction;
@@ -164,9 +191,10 @@ are recorded in `documentation/tests.md`.
 - same-revision disposable no-data Preview, deployment and rollback evidence;
 - separate owner approval for any cloud spend, provider call or Production step.
 
-The authenticated current-session and atomic Points-admission migrations remain
-unapplied. Their source/local tests provide no live Cookie/Auth/database
-evidence, none of the remaining approvals and no external-resource change.
+The authenticated current-session, atomic Points-admission and terminal Points
+settlement migrations remain unapplied. Their source/local tests provide no live
+Cookie/Auth/database evidence, none of the remaining approvals and no
+external-resource change.
 
 ## Local verification
 

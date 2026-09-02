@@ -567,11 +567,13 @@ function parseCommunicationPointsAdmissionEnvelope(
     if (
       !pointsReserved ||
       job.noteType !== "communication" ||
-      job.status !== "QUEUED" ||
-      job.attemptCount !== 0 ||
-      job.startedAt !== undefined ||
-      job.updatedAt !== job.createdAt ||
-      (created && (job.jobId !== input.jobId || !payloadAccepted)) ||
+      (created &&
+        (job.jobId !== input.jobId ||
+          job.status !== "QUEUED" ||
+          job.attemptCount !== 0 ||
+          job.startedAt !== undefined ||
+          job.updatedAt !== job.createdAt ||
+          !payloadAccepted)) ||
       (payloadAccepted && job.jobId !== input.jobId)
     ) {
       throw unavailable();

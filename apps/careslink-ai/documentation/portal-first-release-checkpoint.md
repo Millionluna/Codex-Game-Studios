@@ -309,10 +309,12 @@ imports neither repository nor Points adapter.
 The sixth Production-unapplied generation migration now atomically rechecks
 session/privacy authority, admits a Communication durable job and reserves the
 fixed 20-Point rate. It creates no welcome grant and changes no legacy credit.
-Fresh admission deliberately leaves the paid job `QUEUED`; the private marker
-quarantines it from claim, recovery, attempts, cancellation and legacy Points
-commit/release. Terminal success/commit and failure/cancellation/release remain a
-future atomic boundary, so this source must not be activated.
+At this checkpoint fresh admission deliberately left the paid job `QUEUED`; the
+seventh Production-unapplied generation migration now replaces that temporary
+quarantine with exact reservation-gated worker handling. It commits 20 Points
+only beside the canonical result/provider/purge evidence, releases the exact
+source lots on permanent failure/cancellation, and retains `RESERVED` on retry.
+Generic Points terminal functions remain blocked.
 
 The TestOnly adapter returns no private binding or Points ID. Authenticated
 owners may nevertheless read IDs on their own public Points rows under existing
@@ -321,6 +323,13 @@ separate five-scenario/15-PID local PostgreSQL 16.15 concurrency run provide
 source/local transaction evidence only. No Hosted or Production database, new
 Preview, deployment, model invocation or real care data was used, and this delta
 does not authorize any of those actions.
+
+The terminal successor adds a separate non-login settlement purpose role with
+no runtime member and keeps all owner/worker response envelopes unchanged.
+Fresh post-lock timing gates and per-registration recovery turns close stale
+lease/fence and backlog-starvation paths. This still does not install the formal
+principal, route adapter, worker credential or provider transport, so it does
+not authorize activation.
 
 ## 6. First safe local batch and evidence
 

@@ -102,14 +102,37 @@ wallet.
 
 This does not install the principal composition. The Points-admission adapter is
 still `READY=false` and TestOnly, creates no pool or database URL dependency, and
-has no route importer or caller grant. A paid admitted job stays `QUEUED` and is
-quarantined from claim, recovery, attempts, cancellation and legacy Points
-commit/release until a separate terminal settlement batch exists. It changes no
-welcome grant or legacy credit. Its DTO hides the private binding and Points IDs,
-while existing authenticated-owner RLS continues to expose the owner's own
-public Points row IDs. A21 is serial rollback-only evidence; the independent
-five-scenario/15-PID local PG16 gate is the concurrency evidence. Neither is a
-Hosted, Production, deployment or activation result.
+has no route importer or caller grant. The successor terminal-settlement source
+replaces the temporary paid-job quarantine, but it likewise installs no runtime
+principal. Neither migration changes a welcome grant or legacy credit. The DTO
+hides the private binding and Points IDs, while existing authenticated-owner RLS
+continues to expose the owner's own public Points row IDs. A21 is serial
+rollback-only evidence; the independent five-scenario/15-PID local PG16 gate is
+the admission concurrency evidence. Neither is a Hosted, Production, deployment
+or activation result.
+
+## Communication Note atomic Points terminal settlement — source only
+
+Migration
+`20260902121601_add_v1_communication_note_points_terminal_settlement.sql`
+adds a separate non-login settlement purpose role with no runtime member.
+Marked paid work can enter the existing registered-worker lifecycle only behind
+its exact live reservation. Success commits 20 Points in the same transaction
+that proves the canonical result/revision, sync receipt, provider evidence and
+purge outbox; permanent failure/cancellation restores the exact allocation lots,
+while retry keeps the reservation. Old owner/worker envelopes remain unchanged,
+and generic Points terminal functions remain denied.
+
+Claim, recovery, heartbeat, authorize and fence replay revalidate paid state
+using post-lock clocks and the approved worker policy's timing margins. Recovery
+uses per-registration paid/unpaid and paid queued/running turns to avoid backlog
+starvation. This is still source/local evidence only: it does not set `READY`,
+install the principal composition, create a credential or authorize a model.
+
+The final isolated PostgreSQL 16.15 run passed the exact 20-migration dependency
+chain and all five terminal/concurrency groups, then passed permanent ACL,
+zero-fixture, graceful-stop and exact-delete checks. See
+`documentation/tests.md` for the pinned source and scenario evidence.
 
 ## Principal-composition checkpoint: no external effect
 
@@ -151,8 +174,9 @@ database or live Auth evidence.
 Formally install the reviewed authenticated current-session composition only
 after its remaining release gates are authorized. The later source coordinator
 now covers same-transaction session/privacy reauthorization plus fixed 20-Point
-reservation, but formal caller installation, trusted role normalization,
-terminal commit/release, and a separately authorized disposable no-data Hosted
-Preview active/revoked-session gate remain independent requirements before any
-model-backed application work can be enabled. `READY`, the formal principal
-resolver and the physical route must remain closed until that evidence exists.
+reservation and exact terminal settlement, but formal caller installation,
+trusted role normalization and a separately authorized disposable no-data
+Hosted Preview active/revoked-session gate remain independent requirements
+before any model-backed application work can be enabled. `READY`, the formal
+principal resolver and the physical route must remain closed until that evidence
+exists.

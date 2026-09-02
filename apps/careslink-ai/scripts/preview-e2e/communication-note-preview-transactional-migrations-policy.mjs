@@ -7,12 +7,12 @@ const NON_TRANSACTIONAL_SQL_PATTERN = /^(?:create\s+(?:unique\s+)?index\s+concur
 
 export const COMMUNICATION_NOTE_PREVIEW_TRANSACTIONAL_MIGRATION_POLICY =
   Object.freeze({
-    version: "2026-09-02.preview-transactional-migrations.10",
+    version: "2026-09-02.preview-transactional-migrations.11",
     productionProjectRef: "adocsnwnslxhxcjgbyee",
     expectedCliVersion: "2.115.0",
     manifestSha256:
-      "ff73ef38941b7afc94ff8c2be5711a040a39eef9f08868341f1f3ee57044223a",
-    migrationCount: 43,
+      "b8096489e0a525a37a1cb1bbc4af55a5a25fdea062dff0062d6d158baf9d1495",
+    migrationCount: 44,
     disposablePreviewBaselineMigrationCount: 19,
     disposablePreviewBaselineHistorySha256:
       "b742d12dee926ccfe76158cf524e503bcdc576a08e928a7147741faf4a314424",
@@ -136,6 +136,7 @@ export const COMMUNICATION_NOTE_PREVIEW_TRANSACTIONAL_MIGRATION_POLICY =
       "careslink_v1_generation_owner",
       "careslink_v1_generation_owner_api_executor",
       "careslink_v1_generation_points_admission_executor",
+      "careslink_v1_generation_points_settlement_executor",
       "careslink_v1_generation_registration_control_executor",
       "careslink_v1_preview_authorization_executor",
       "careslink_v1_preview_authorization_registration_caller",
@@ -169,6 +170,7 @@ export const COMMUNICATION_NOTE_PREVIEW_TRANSACTIONAL_MIGRATION_POLICY =
       "schema|public|careslink_v1_generation_executor|USAGE|plain|pg_database_owner",
       "schema|public|careslink_v1_generation_owner_api_executor|USAGE|plain|pg_database_owner",
       "schema|public|careslink_v1_generation_points_admission_executor|USAGE|plain|pg_database_owner",
+      "schema|public|careslink_v1_generation_points_settlement_executor|USAGE|plain|pg_database_owner",
       "schema|public|careslink_v1_preview_authorization_executor|USAGE|plain|pg_database_owner",
       "schema|public|careslink_v1_preview_dispatch_executor|USAGE|plain|pg_database_owner",
       "schema|public|careslink_v1_preview_receipt_executor|USAGE|plain|pg_database_owner",
@@ -224,6 +226,7 @@ export const COMMUNICATION_NOTE_PREVIEW_TRANSACTIONAL_MIGRATION_MANIFEST =
     ["20260902012628_add_v1_authenticated_current_session_status_rpc.sql", "cc2dcb0cb31f73bb87b53a0f69a1e0d21fdeb744fb63af3ecfec56009166b0cb"],
     ["20260902052755_add_v1_communication_note_points_preview.sql", "5615844b3e5786b5d6256bafb08e0e8707fe83d28d4239cf01d7cf584beb1c08"],
     ["20260902063211_add_v1_communication_note_points_admission.sql", "7029f48142dac3f2afa5e930930791c2cdbe6e82db283d4616656caae13746ec"],
+    ["20260902121601_add_v1_communication_note_points_terminal_settlement.sql", "e10c67d24336fec97137b804534c0c6f867f88656980e577ffb8ea57d0b5eeea"],
   ].map(([basename, sha256]) => Object.freeze({ basename, sha256 })));
 
 const OUTER_TRANSACTION_MIGRATIONS = new Set([
@@ -250,6 +253,7 @@ const OUTER_TRANSACTION_MIGRATIONS = new Set([
   "20260902012628_add_v1_authenticated_current_session_status_rpc.sql",
   "20260902052755_add_v1_communication_note_points_preview.sql",
   "20260902063211_add_v1_communication_note_points_admission.sql",
+  "20260902121601_add_v1_communication_note_points_terminal_settlement.sql",
 ]);
 
 const FIXED_ERROR_CODES = new Set([

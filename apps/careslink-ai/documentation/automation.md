@@ -1224,8 +1224,8 @@ composition only after trusted Provider roles are normalized and server privacy
 authority, retention-bounded payload custody, terminal Points settlement and a
 formal owner admission caller are bound. The source-only successor below now
 rechecks session/privacy and couples durable admission to a fixed 20-Point
-reservation, but remains unwired and deliberately quarantines paid jobs from
-workers. M1x does not permit
+reservation. The later terminal-settlement source safely unquarantines that
+paid lane, but both remain unwired. M1x does not permit
 the HTTP request thread to call a model directly. See
 `documentation/communication-note-generation-api-m1x.md` and
 `documentation/communication-note-generation-principal-composition.md`.
@@ -1251,13 +1251,14 @@ privilege ends false. The adapter remains `READY=false` and TestOnly, creates no
 pool, reads no database URL and is imported by no route. No API or service role
 receives coordinator execution.
 
-This is not settlement automation. A marked paid job stays `QUEUED` and is
-quarantined from claim, recovery, attempts, cancellation and legacy Points
-commit/release. The DTO omits private binding and Points IDs, although the
-authenticated owner can historically read their own public Points row IDs under
-existing RLS. No welcome grant or legacy-credit rule changes.
+At this checkpoint a marked paid job stayed `QUEUED` and was quarantined from
+claim, recovery, attempts, cancellation and legacy Points commit/release. The
+successor below replaces that temporary source quarantine. The DTO still omits
+private binding and Points IDs, although the authenticated owner can
+historically read their own public Points row IDs under existing RLS. No welcome
+grant or legacy-credit rule changes.
 
-The current transactional migration manifest covers 43 migrations. The Hosted
+The current transactional migration manifest covers 44 migrations. The Hosted
 schema-rollback runner remains A01–A20; A21 passed only as a standalone,
 isolated-local serial rollback-only 34-`DO`/6-savepoint assertion and is not
 part of that Hosted runner or concurrency evidence. A separate fresh-empty
@@ -1280,10 +1281,41 @@ the cluster was deleted. Static concurrency coverage passed 1 file / 12 tests.
 No Hosted or Production database, new Preview, deployment, activation, model
 call or real care data is represented.
 
+### Communication Note atomic Points terminal settlement — source only
+
+Migration
+`20260902121601_add_v1_communication_note_points_terminal_settlement.sql`
+adds the seventh Production-unapplied generation migration, two forced-RLS
+private tables and the sixth non-login purpose role. It gives that role no
+runtime member and grants no API or generic Points terminal capability.
+
+Paid claim/recovery, heartbeat, payload authorization and fence replay now
+revalidate the exact reservation with fresh post-lock clocks. Authorization
+must retain the approved policy's provider deadline plus commit safety margin;
+fence replay and success must retain the commit margin. Per-registration turns
+alternate paid/unpaid work and paid queued/running expiry, including batch size
+one, with empty-lane fallback.
+
+Successful terminalization appends exactly one 20-Point `COMMIT` only in the
+same transaction as the canonical document/revision, sync change, mutation
+receipt, provider evidence and purge request. Permanent failure/cancellation
+appends one `RELEASE` and restores the exact source lots. Retry leaves the
+reservation `RESERVED`. Same-idempotency and response-loss replay reassert the
+immutable aggregate and write nothing; the old owner/worker JSON envelopes are
+unchanged. The migration remains default-off, unwired and Production-unapplied,
+with no deployment, provider request, model call or real care data.
+
+The final isolated PostgreSQL 16.15 gate applied the exact 20-migration
+dependency chain and passed all five terminal/concurrency groups, including
+unmarked `QUEUED`/`RUNNING`/`FAILED` cross-surface denial, deterministic
+recovery fairness and permanent ACL checks. Exact cleanup, graceful stop and
+temporary-root deletion all passed; `documentation/tests.md` records the pinned
+hashes and scenario evidence.
+
 ## Inactive shadow automation contracts
 
-- The contract and migrations define generation/export job states. Source-only memory contracts model leases, recovery, retry policy, provider evidence and single-use payload grants, and the registered-worker v2 facade composes those boundaries without a payload locator. All six generation migrations remain Production-unapplied; deleted `r9` supplied isolated PostgreSQL 17.6 execution evidence for database-clock claim/heartbeat/fence/commit/settle/resolve/recover/authorize/consume logic and payload/grant/evidence/purge-outbox metadata, deleted `r20` supplied the three true two-session race results, and deleted `r21` supplied exact historical transient-retry/success replay through payload/outbox purge. The later local owner-repository gate covers the three private owner RPCs, migration #29 adds the non-login control-executor-owned graceful-retirement identity, and the admission successor above adds the fifth purpose role plus one private binding table without a runtime caller. There is still no caller grant. Normal consume deliberately settles `DENIED_SETTLED` / `PAYLOAD_UNAVAILABLE` and returns no vault grant, locator or facts; the historical rollback-only `TEST_ONLY` `CONSUMED` fixture proves only scripted canonical transaction atomicity. There is still no payload vault, queue service, deployed worker, live retry loop or served cancellation endpoint.
-- No worker automation may be scheduled yet. Deleted `r20` closed the PostgreSQL 17.6 true two-session claim/session/privacy race gate, deleted `r21` closed the fixed Attempt-2 historical replay gate, deleted `r22` closed the hosted registration-retention gate, the earlier isolated local PostgreSQL 16.15 run closed its recorded engine/serial/true-two-session version gate, and deleted `r5` closed its historical Hosted 30/30 migration, then-current 11/11 assertion and independent posture gate. Owner admission/enqueue/status/cancel and graceful worker-registration retirement now have source, local SQL and deleted-Hosted schema/transaction boundaries, and Communication has local fixed-20 admission/reservation evidence. Emergency revocation, attempt listing, nested database exact-key envelopes, account-delete/purge and orphan recovery, provider-start binding to a consumed grant plus fresh lease/heartbeat, sequential JSON numeric parsing hardening, and the payload-vault/KMS/retention, caller/route, hosted Auth/Data API, model/STT, terminal Points settlement and runtime-activation blocks remain unproved explicit governance.
+- The contract and migrations define generation/export job states. Source-only memory contracts model leases, recovery, retry policy, provider evidence and single-use payload grants, and the registered-worker v2 facade composes those boundaries without a payload locator. All seven generation migrations remain Production-unapplied; deleted `r9` supplied isolated PostgreSQL 17.6 execution evidence for database-clock claim/heartbeat/fence/commit/settle/resolve/recover/authorize/consume logic and payload/grant/evidence/purge-outbox metadata, deleted `r20` supplied the three true two-session race results, and deleted `r21` supplied exact historical transient-retry/success replay through payload/outbox purge. The later local owner-repository gate covers the three private owner RPCs, migration #29 adds the non-login control-executor-owned graceful-retirement identity, admission adds the fifth purpose role/private binding table, and terminal settlement adds the sixth purpose role plus settlement/recovery-turn tables—none has a runtime caller. There is still no caller grant. Normal consume deliberately settles `DENIED_SETTLED` / `PAYLOAD_UNAVAILABLE` and returns no vault grant, locator or facts; the historical rollback-only `TEST_ONLY` `CONSUMED` fixture proves only scripted canonical transaction atomicity. There is still no payload vault, queue service, deployed worker, live retry loop or served cancellation endpoint.
+- No worker automation may be scheduled yet. Deleted `r20` closed the PostgreSQL 17.6 true two-session claim/session/privacy race gate, deleted `r21` closed the fixed Attempt-2 historical replay gate, deleted `r22` closed the hosted registration-retention gate, the earlier isolated local PostgreSQL 16.15 run closed its recorded engine/serial/true-two-session version gate, and deleted `r5` closed its historical Hosted 30/30 migration, then-current 11/11 assertion and independent posture gate. Owner admission/enqueue/status/cancel and graceful worker-registration retirement now have source, local SQL and deleted-Hosted schema/transaction boundaries; Communication has source/local fixed-20 admission and terminal-settlement boundaries. Emergency revocation, attempt listing, nested database exact-key envelopes, account-delete/purge and orphan recovery, sequential JSON numeric parsing hardening, and the payload-vault/KMS/retention, caller/route, hosted Auth/Data API, model/STT and runtime-activation blocks remain unproved explicit governance.
 - The source follow-up for the two #26 readers and five #30 Portal functions is
   complete: their seven exact `pg_proc.proowner` signature checks now live in
   the maintained worker and Portal-intake rollback suites. The enhanced worker
@@ -1294,7 +1326,7 @@ call or real care data is represented.
   Deleted `r5`'s independent postcheck remains historical Hosted owner-posture
   evidence, but `r5` did not execute these enhanced exact bodies. No fresh
   Hosted exact-body gate has occurred, and Production has not been touched.
-- The memory Points reference store proves quote/reserve/commit/release semantics. The SQL draft exposes five `security definer` shadow RPCs only to `service_role`; those RPCs passed isolated branch tests for settlement, replay/conflict, source-lot release, expiry, insufficient balance and cross-owner denial. The Communication-only successor now has local serial and true-concurrency evidence for atomic fixed-20 reservation with durable admission, but no terminal commit/release path. Both migrations remain unapplied to Production and no server route calls either coordinator.
+- The memory Points reference store proves quote/reserve/commit/release semantics. The SQL draft exposes five `security definer` shadow RPCs only to `service_role`; those RPCs passed isolated branch tests for settlement, replay/conflict, source-lot release, expiry, insufficient balance and cross-owner denial. The Communication-only successors now provide source/local atomic fixed-20 admission and terminal commit/release while keeping generic terminal RPCs blocked. All remain unapplied to Production and no server route calls either coordinator.
 - The legacy NDIS adapter remains pure. The server-only NDIS integration invokes it only after a successful legacy Save on an explicitly verified Preview. The RPC creates an owner-bound shadow revision and metadata-only outbox; optional read comparison records `MATCH/MISMATCH/MISSING/ERROR`. No call invokes OpenAI or settles Points.
 - There is no automatic retry worker. `audit_ndis_shadow_reconciliation` is a service-role-only, read-only operator surface that reports IDs/status/timestamps/hashes. Live legacy rows remain the projection retry source; a legacy-schema canonical document whose source has disappeared while the lifecycle is still non-terminal is reported as `SOURCE_DELETE_CLEANUP_PENDING` for operator cleanup.
 - Isolated database runs proved same-idempotency concurrency (`PROJECTED` + `REPLAYED`), serialized distinct revisions and retained failure evidence. A later protected App Preview proved `PROJECTED`/`MATCH`, same-key replay, provider B isolation and master kill-switch behavior with zero model calls. Projection/adapter failure now emits content-free `PROJECTION_ERROR`; no note text, participant fact, credential or secret is logged. Test data/users were cleared and temporary activation flags/deployments were removed without changing Production.

@@ -12,6 +12,7 @@ import {
   CARESLINK_V1_NOTE_SCHEMA_VERSION,
   CaresLinkV1ContractError,
 } from "./shared-contracts";
+import { CARESLINK_V1_SERVER_SAVE_ACK } from "./transport-contract";
 
 vi.mock("server-only", () => ({}));
 
@@ -21,12 +22,17 @@ const JOB_ID = "33333333-3333-4333-8333-333333333333";
 const OTHER_JOB_ID = "3abc3333-3333-4333-8333-333333333333";
 const PAYLOAD_ID = "44444444-4444-4444-8444-444444444444";
 const PRIVACY_REVIEW_ID = "55555555-5555-4555-8555-555555555555";
+const CANONICAL_ID = "66666666-6666-4666-8666-666666666666";
+const REVISION_ID = "77777777-7777-4777-8777-777777777777";
 const CREATED_AT = "2026-09-02T01:00:00.000Z";
+const STARTED_AT = "2026-09-02T01:01:00.000Z";
+const FINISHED_AT = "2026-09-02T01:02:00.000Z";
 const PAYLOAD_EXPIRES_AT = "2026-09-02T01:30:00.000Z";
 const CLEANED_FACTS_HASH = "a".repeat(64);
 const IDEMPOTENCY_HASH = "b".repeat(64);
 const REQUEST_HASH = "c".repeat(64);
 const PAYLOAD_HANDLE_HASH = "d".repeat(64);
+const CONTENT_HASH = "e".repeat(64);
 
 const ADMISSION_SQL = `select careslink_v1_generation.admit_and_reserve_v1_shadow_communication_note_generation_job(
   $1::pg_catalog.uuid,
@@ -151,8 +157,122 @@ describe("CaresLink V1 Communication Note Points admission repository", () => {
   });
 
   it.each([
+    [
+      "requeued",
+      jobWire({
+        jobId: OTHER_JOB_ID,
+        attemptCount: 1,
+        startedAt: STARTED_AT,
+        updatedAt: FINISHED_AT,
+      }),
+    ],
+    [
+      "running",
+      jobWire({
+        jobId: OTHER_JOB_ID,
+        status: "RUNNING",
+        attemptCount: 1,
+        startedAt: STARTED_AT,
+        updatedAt: STARTED_AT,
+      }),
+    ],
+    [
+      "succeeded",
+      jobWire({
+        jobId: OTHER_JOB_ID,
+        status: "SUCCEEDED",
+        attemptCount: 1,
+        startedAt: STARTED_AT,
+        finishedAt: FINISHED_AT,
+        updatedAt: FINISHED_AT,
+        result: generationResult(),
+      }),
+    ],
+    [
+      "failed",
+      jobWire({
+        jobId: OTHER_JOB_ID,
+        status: "FAILED",
+        attemptCount: 1,
+        startedAt: STARTED_AT,
+        finishedAt: FINISHED_AT,
+        updatedAt: FINISHED_AT,
+        failureCode: "GENERATION_FAILED",
+      }),
+    ],
+    [
+      "cancelled",
+      jobWire({
+        jobId: OTHER_JOB_ID,
+        status: "CANCELLED",
+        finishedAt: FINISHED_AT,
+        updatedAt: FINISHED_AT,
+      }),
+    ],
+  ])(
+    "accepts an exact %s replay after the original Points admission",
+    async (_label, job) => {
+      const { repository } = createHarness(
+        admissionEnvelope({
+          created: false,
+          payloadAccepted: false,
+          job,
+        }),
+      );
+
+      await expect(repository.enqueue(admission())).resolves.toMatchObject({
+        created: false,
+        payloadAccepted: false,
+        pointsReserved: true,
+        job: { jobId: OTHER_JOB_ID, status: job.status },
+      });
+    },
+  );
+
+  it("keeps replay output free of reservation, quote, lot and ledger references", async () => {
+    const { repository } = createHarness(
+      admissionEnvelope({
+        created: false,
+        payloadAccepted: false,
+        job: jobWire({
+          status: "SUCCEEDED",
+          attemptCount: 1,
+          startedAt: STARTED_AT,
+          finishedAt: FINISHED_AT,
+          updatedAt: FINISHED_AT,
+          result: generationResult(),
+        }),
+      }),
+    );
+
+    const result = await repository.enqueue(admission());
+    expect(Object.keys(result).sort()).toEqual([
+      "created",
+      "job",
+      "payloadAccepted",
+      "pointsReserved",
+    ]);
+    const serialized = JSON.stringify(result).toLowerCase();
+    for (const forbidden of [
+      "reservationid",
+      "reservationreference",
+      "quoteid",
+      "lotid",
+      "ledger",
+      "admissionid",
+      "resultref",
+    ]) {
+      expect(serialized).not.toContain(forbidden);
+    }
+  });
+
+  it.each([
     ["missing reservation", admissionEnvelope({ pointsReserved: false })],
     ["extra envelope field", { ...admissionEnvelope(), points: 20 }],
+    [
+      "private Points reference",
+      { ...admissionEnvelope(), reservationId: PAYLOAD_ID },
+    ],
     [
       "wrong Note type",
       admissionEnvelope({
@@ -181,19 +301,6 @@ describe("CaresLink V1 Communication Note Points admission repository", () => {
       "created non-fresh job",
       admissionEnvelope({
         job: jobWire({
-          status: "RUNNING",
-          attemptCount: 1,
-          startedAt: CREATED_AT,
-        }),
-      }),
-    ],
-    [
-      "replayed non-quarantined job",
-      admissionEnvelope({
-        created: false,
-        payloadAccepted: false,
-        job: jobWire({
-          jobId: OTHER_JOB_ID,
           status: "RUNNING",
           attemptCount: 1,
           startedAt: CREATED_AT,
@@ -274,6 +381,17 @@ function principal() {
     userId: OWNER_ID,
     sessionId: SESSION_ID,
     transport: "BEARER" as const,
+  };
+}
+
+function generationResult() {
+  return {
+    canonicalId: CANONICAL_ID,
+    revisionId: REVISION_ID,
+    contentHash: CONTENT_HASH,
+    revisionNumber: 1,
+    baseRevisionId: null,
+    saveState: CARESLINK_V1_SERVER_SAVE_ACK,
   };
 }
 

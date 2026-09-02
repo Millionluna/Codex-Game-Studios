@@ -99,13 +99,29 @@ authority, expiry or balance failure rolls back the job, payload and all Points
 writes.
 
 The adapter remains `READY=false`, TestOnly and unwired: no route importer,
-caller grant, pool or database URL exists. Paid admitted jobs stay `QUEUED` and
-cannot be claimed, recovered, attempted, cancelled or terminalized through the
-legacy Points functions. This is reserve-only source/local evidence, not a live
-principal installation. A21 is serial rollback-only; a separate five-scenario,
-15-PID local PostgreSQL 16.15 run supplies the concurrency evidence. Neither
-batch used Hosted, Production, a new Preview, deployment, a model or real care
-data.
+caller grant, pool or database URL exists. The successor terminal-settlement
+migration replaces the temporary paid-job quarantine without exposing the
+legacy Points functions or installing a runtime principal. A21 is serial
+rollback-only; a separate five-scenario, 15-PID local PostgreSQL 16.15 run
+supplies the admission concurrency evidence. Neither batch used Hosted,
+Production, a new Preview, deployment, a model or real care data.
+
+## Communication Note atomic Points terminal settlement — source only
+
+The later Production-unapplied migration
+`20260902121601_add_v1_communication_note_points_terminal_settlement.sql`
+admits marked paid jobs to the registered worker only while the exact 20-Point
+reservation remains usable. It atomically commits success with canonical
+artifact, provider and purge evidence; releases exact source lots on permanent
+failure/cancellation; and keeps the reservation on retry. Post-lock lease,
+fence, reservation and worker-policy margins fail closed. Per-registration
+recovery turns prevent paid/unpaid and paid queued/running starvation. It adds a
+non-login purpose role but no runtime membership, route, pool or credential.
+
+The final isolated PostgreSQL 16.15 gate passed the exact 20-migration chain,
+all five terminal/concurrency groups, permanent ACL postcheck and complete
+cleanup. `documentation/tests.md` records the exact hashes and non-production
+evidence boundary.
 
 ## Deliberate limits and next gate
 
@@ -121,10 +137,11 @@ active/revoked proof on a disposable no-data Preview remain separate.
 Request-time admission is not sufficient by itself. The later source coordinator
 now re-reads the active session and privacy authority inside the same database
 transaction that accepts the job and reserves 20 Points, closing that source
-time-of-check/time-of-use window. Formal caller installation, terminal
-success/commit or failure/cancellation/release, and worker unquarantine remain
-absent. Only a registered asynchronous worker may later invoke an approved
-model; the HTTP request thread must not do so.
+time-of-check/time-of-use window. The successor now supplies the source-level
+terminal commit/release and worker unquarantine boundaries. Formal caller and
+principal installation plus live disposable-Preview evidence remain absent.
+Only a registered asynchronous worker may later invoke an approved model; the
+HTTP request thread must not do so.
 
 The strict-session composition batch itself creates or contacts no live or
 ambient client, database connection,

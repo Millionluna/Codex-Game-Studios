@@ -75,7 +75,7 @@ describe("Communication Note M1l activation preflight", () => {
     expect(
       CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_ACTIVATION_PREFLIGHT_POLICY_DIGEST,
     ).toBe(
-      "2d94863efa5644c193c086832e0473cc7a52f5eb6adff655d83d3c1844de03f3",
+      "0cbe311475728efa6c1d38ebbb7ffb71a465e754352b599d5564de51a896fa1f",
     );
     expect(
       CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_ACTIVATION_PREFLIGHT_POLICY,
@@ -180,10 +180,13 @@ describe("Communication Note M1l activation preflight", () => {
       ),
     );
     expect(result.candidate.database).toMatchObject({
-      migrationCount: 43,
+      migrationCount: 44,
       runtimeCredentialBrokerMigrationSha256:
         CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_DATABASE_EVIDENCE_PINS
           .runtimeCredentialBrokerMigrationSha256,
+      pointsTerminalSettlementMigrationSha256:
+        CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_DATABASE_EVIDENCE_PINS
+          .pointsTerminalSettlementMigrationSha256,
       runnerTerminalRuntimeIdentityPresent: false,
       runnerTerminalRuntimeMembershipPresent: false,
       runnerTerminalCredentialResolverPresent: false,
@@ -238,7 +241,7 @@ describe("Communication Note M1l activation preflight", () => {
     }
   });
 
-  it("pins the exact 43-migration manifest and nine M1g-b through M1l database artifacts", () => {
+  it("pins the exact 44-migration manifest and ten database artifacts through Points terminal settlement", () => {
     const migrationsDirectory = join(process.cwd(), "supabase/migrations");
     const migrationNames = readdirSync(migrationsDirectory)
       .filter((name) => name.endsWith(".sql"))
@@ -304,6 +307,11 @@ describe("Communication Note M1l activation preflight", () => {
         "supabase/migrations/20260830065750_add_communication_note_preview_runtime_credential_broker.sql",
         CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_DATABASE_EVIDENCE_PINS
           .runtimeCredentialBrokerMigrationSha256,
+      ],
+      [
+        "supabase/migrations/20260902121601_add_v1_communication_note_points_terminal_settlement.sql",
+        CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_DATABASE_EVIDENCE_PINS
+          .pointsTerminalSettlementMigrationSha256,
       ],
       [
         "supabase/assertions/communication_note_preview_runner_terminal_shadow_assertions.sql",

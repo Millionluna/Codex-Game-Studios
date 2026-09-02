@@ -32,9 +32,9 @@ This handoff does not authorize or implement:
 - a served route, worker deployment or feature activation;
 - raw cleaned-facts persistence;
 - a real model or STT call;
-- Points cutover or terminal commit/release; the later Communication-only
-  source addition reserves exactly 20 Points at admission but remains default-off
-  and unwired;
+- Points cutover; later Communication-only source additions reserve exactly 20
+  Points at admission and settle terminal state atomically, but remain
+  default-off and unwired;
 - Production migration, grants, traffic or data changes.
 
 The application readiness latch and every related runtime capability remain
@@ -1940,8 +1940,9 @@ Fresh success creates a `QUEUED` job at attempt 0, an `AVAILABLE` payload, the
 fixed `2026-08-09.v1-shadow` quote for exactly 20 Points, one `RESERVED`
 reservation, exact source-lot allocations and one `RESERVE` ledger entry. Any
 failure inside that admission statement/transaction rolls all of those writes
-back. A later terminal failure currently leaves the reservation quarantined
-until the future release path exists. Same-key replay revalidates the
+back. At this checkpoint, later terminal failure left the reservation
+quarantined; the successor section below closes that source boundary. Same-key
+replay revalidates the
 job/binding/reservation aggregate plus current session, privacy authority and
 expiry state before returning the original result without writes.
 
@@ -1954,11 +1955,12 @@ and the only creator-management edge is from `postgres` with `ADMIN=true`,
 temporary `TRIGGER` privilege on `public.point_reservations` ends false. Public
 API, `service_role` and `authenticator` have no coordinator execution.
 
-This boundary stops after reservation. The private marker keeps each paid job
-`QUEUED` and out of claim and recovery, while attempt insertion, cancellation,
-job-state mutation and legacy Points commit/release are denied. It implements no
-terminal success/failure, commit/release or worker unquarantine. It adds no
-welcome grant and does not alter legacy credits. The coordinator and TestOnly
+At this checkpoint the boundary stopped after reservation. The private marker
+kept each paid job `QUEUED` and out of claim and recovery, while attempt
+insertion, cancellation, job-state mutation and legacy Points commit/release
+were denied. The successor below replaces that quarantine without exposing the
+legacy terminal functions. Neither addition creates a welcome grant or alters
+legacy credits. The coordinator and TestOnly
 adapter return only `{created,payloadAccepted,pointsReserved:true,job}`; they do
 not return the quote, reservation, allocation, ledger or private binding IDs.
 Existing authenticated-owner RLS still permits reading the owner's own public
@@ -1966,7 +1968,7 @@ Points row IDs; the private binding remains inaccessible.
 
 The adapter is fixed `READY=false`, creates no pool, reads no database URL and
 has neither a route importer nor a caller grant. The current transactional
-migration manifest includes 43 migrations. The Hosted schema-rollback runner
+migration manifest includes 44 migrations. The Hosted schema-rollback runner
 remains A01–A20; A21 passed only as a standalone, isolated-local serial
 rollback-only gate with 34 `DO` blocks and 6 savepoints. It is neither part of
 that Hosted runner nor concurrency evidence.
@@ -1995,6 +1997,47 @@ business and Points rows at zero, runner/support absent and temporary schema
 `USAGE` revoked; the cluster was then deleted. This is source/local PG16
 transaction evidence only—no Hosted or Production database, new Preview,
 deployment, activation, model call or real care data. The next independent
-database/product batch must atomically commit the reservation with a usable
-terminal result, or release it to the original lots on failure/cancellation,
-before paid jobs can leave quarantine.
+database batch below supplies the source/local terminal transaction; product
+principal installation and activation remain separate.
+
+## Communication Note atomic Points terminal settlement — source only
+
+Migration
+`20260902121601_add_v1_communication_note_points_terminal_settlement.sql`
+adds the sixth purpose role,
+`careslink_v1_generation_points_settlement_executor`, plus immutable settlement
+and per-registration recovery-turn tables. The role is
+`NOLOGIN`/`NOINHERIT`/`NOBYPASSRLS`, has no runtime member and owns only the
+minimum security-definer helpers needed to mutate the paid aggregate. API,
+owner, worker and admission roles receive no generic settlement capability;
+generic public Points commit/release remains blocked for a bound reservation.
+
+The job terminal coordinator and Points mutation form one transaction. Success
+requires an exact 20-Point reservation plus the matching first canonical
+document/revision, sync change, mutation receipt, provider evidence and payload
+purge outbox before it appends one `COMMIT` ledger row. Permanent worker failure
+and owner cancellation append one `RELEASE` and restore the exact allocation
+lots. Retryable lease expiry records the attempt and requeues the job without
+settling or releasing the reservation. Exact response-loss and same-key replays
+assert the immutable aggregate and perform zero writes, even after a later legal
+document edit or tombstone.
+
+Claim, recovery, heartbeat, payload authorization and fence replay all
+revalidate the paid reservation. Blocking paths use fresh post-lock clocks;
+authorization retains both provider deadline and commit safety margin, while
+fence replay and success retain the commit margin. Recovery alternates
+paid/unpaid and paid queued/running priority per worker registration, including
+batch size one, and falls through from an empty lane instead of reporting a
+false zero. Existing external owner/worker JSON envelopes do not gain a Points
+or settlement field.
+
+This migration is still Production-unapplied, default-off and unwired. It
+creates no runtime credential, route, deployment, provider request, model call,
+welcome grant, legacy-credit mutation or real care data.
+
+The final isolated PostgreSQL 16.15 gate applied the exact 20-migration
+dependency chain and passed all five terminal/concurrency groups. It also proved
+unmarked cross-surface denial, deterministic recovery fairness, permanent ACL
+closure, zero scoped residue, graceful shutdown and exact temporary-root
+deletion. The pinned migration, setup, cleanup and normalized source hashes are
+recorded in `documentation/tests.md`.

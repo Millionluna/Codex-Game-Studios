@@ -3395,18 +3395,21 @@ no pool, reads no database URL and has no route importer or caller grant.
 
 The rollback-only A21 database assertion passed serially with 34 `DO` blocks
 and 6 savepoints. It is transaction/catalog evidence, not concurrency evidence.
-The current transactional migration manifest now includes all 43 migrations.
-The Hosted schema-rollback runner remains A01–A20; A21 is a standalone,
-isolated-local serial rollback-only gate and is not part of that Hosted runner.
-The older M1x pins above remain historical 42/A01–A20 evidence for their exact
-revision. The true multi-client evidence below used its separate local
-concurrency orchestration and must not be inferred from A21.
+At that admission-only revision, the transactional migration manifest included
+43 migrations. The current terminal-settlement revision includes 44. The Hosted
+schema-rollback runner remains A01–A20; A21 is a standalone, isolated-local
+serial rollback-only gate and is not part of that Hosted runner. The older M1x
+pins above remain historical 42/A01–A20 evidence for their exact revision. The
+true multi-client evidence below used its separate local concurrency
+orchestration and must not be inferred from A21.
 
-A fresh empty PostgreSQL 16.15 cluster applied migrations #1–#43, one file per
-transaction. The minimum Supabase-compatible bootstrap required the exact
-Hosted-compatible `postgres` schema `USAGE` bridge after #25; #26–#43 then
-passed. The bridge was revoked before teardown, and effective `postgres` schema
-`USAGE` and `CREATE` were both false at the final check.
+The admission gate at that exact revision used a fresh empty PostgreSQL 16.15
+cluster and applied migrations #1–#43, one file per transaction. The minimum
+Supabase-compatible bootstrap required the exact Hosted-compatible `postgres`
+schema `USAGE` bridge after #25; #26–#43 then passed. The bridge was revoked
+before teardown, and effective `postgres` schema `USAGE` and `CREATE` were both
+false at the final check. This paragraph is historical admission evidence and
+does not claim that migration #44 ran in that cluster.
 
 The true-concurrency runner used 15 distinct backend PIDs across five
 three-client scenarios, and every waiter was observed behind the exact expected
@@ -3428,6 +3431,66 @@ support objects were absent, temporary schema `USAGE` was revoked, and the
 cluster was deleted. This is local PG16 source/schema/transaction evidence only;
 there was no Hosted or Production database, new Preview, deployment, activation,
 model call or real care data.
+
+#### Communication Note atomic Points terminal settlement — source/local only
+
+Migration
+`20260902121601_add_v1_communication_note_points_terminal_settlement.sql`
+adds the default-off terminal coordinator, a separate non-login settlement
+purpose role, an immutable settlement table and a per-registration recovery-turn
+table. Its SHA-256 is
+`e10c67d24336fec97137b804534c0c6f867f88656980e577ffb8ea57d0b5eeea`.
+The current 44-entry transactional manifest digest is
+`b8096489e0a525a37a1cb1bbc4af55a5a25fdea062dff0062d6d158baf9d1495`.
+
+A fresh passwordless PostgreSQL 16.15 Homebrew cluster with no TCP listener and
+an owned `0700` Unix socket applied the exact 20-migration dependency chain from
+that pinned manifest. The local runner used setup SHA
+`b68d43aa72daf498d02c38c588152f78d6855a1e1a1241c04816d5454755fac1`,
+cleanup SHA
+`3632f078f7354ce574eeacc2dd0bd82f400ac78d1ccdcd108071fea66ef3be17`
+and normalized source revision
+`2a272627e57db69efce212e1c74d02f4158e9abf2df52fb8e91df0e00b6628b6`.
+All five exact dynamic scenario groups passed:
+
+- permanent worker failure released 20 Points, denied generic commit/release,
+  kept the terminal job immutable, and made response-loss replay write-free;
+  unmarked generic Communication jobs were also denied by the paid outer entry
+  at `QUEUED`, `RUNNING` and `FAILED` with zero Points writes;
+- retry retained `RESERVED`; attempt two committed exactly 20 Points beside the
+  canonical document/revision, sync change, mutation receipt, provider evidence
+  and purge outbox; historical retry, same-idempotency and post-document-change
+  replays wrote nothing;
+- queued expiry and concurrent recovery observed the exact blockers, preserved
+  per-registration isolation and processed paid/unpaid plus paid queued/running
+  lanes without deadlock or starvation;
+- a grant with about 848 ms remaining settled `DENIED_SETTLED` and released the
+  original 20-Point allocation;
+- incomplete fence, stale heartbeat and stale fence replay were denied; owner
+  cancellation and its replay released exactly 20 Points once.
+
+The run completed in about 9.4 seconds. Runner quiescence, exact SQL cleanup,
+the independent role/RLS/ACL/zero-fixture postcheck, graceful PostgreSQL stop and
+exact temporary-root deletion were all true; forced stop was false. Static
+coverage also pins the absence of `-infinity` timestamp subtraction, the
+settlement helpers' exact owner/search-path/execute ACLs, schema `CREATE`
+closure and the settlement role's lack of direct extension access.
+
+Two predecessor timing refinements remain explicit pre-activation follow-ups.
+The older five-note terminal RPCs can retain a transaction-start timestamp while
+waiting on a lock, so a long wait can fail an existing timestamp constraint even
+though the new Points settlement authority uses a fresh post-lock clock.
+Likewise, claim rechecks payload and reservation margins after its locks but does
+not recheck the narrow `max_queue_age` crossing window. Neither issue can debit,
+double-settle or expose Points, and neither is a reason to activate this source;
+both must be closed before runtime principal installation.
+
+The current source gate passed 11 focused files / 294 tests and the full Vitest
+suite passed 213 files / 3,002 tests. TypeScript, full ESLint, Node syntax,
+the Next.js 16.2.9 Webpack production build with 64/64 generated pages, the
+100-static-chunk client boundary, the 73-file adapter sync and
+`git diff --check` all passed. Independent final SQL/security review reported
+zero P0 and zero P1 findings; the two P2 timing refinements are recorded above.
 
 ### Current live/read-only evidence
 
@@ -3470,8 +3533,9 @@ The following suites are required before the corresponding V1 slice can be calle
 
 ### Points and Billing
 
-- Extend the now-proved Communication-only concurrent reservation subset to
-  terminal commit/release and rate-version rollover. Those terminal and catalog
+- Repeat the now-proved Communication-only admission and terminal-settlement
+  matrix through the formal runtime principal on a disposable no-data Hosted
+  Preview, and add rate-version rollover. Hosted activation and catalog rollover
   races remain unproved (`AI-PTS-001-007`, `APP-PTS-001-005`).
 - Legacy-credit migration replay/reconciliation/rollback tests (`AI-MIG-002/003`).
 - Stripe/Apple/Google receipt uniqueness, webhook replay, restore, refund/revoke and daily reconciliation tests (`AI-ENT-001`, `AI-BILL-001-005`, `APP-PAY-001-005`).
@@ -3499,13 +3563,14 @@ The following suites are required before the corresponding V1 slice can be calle
 
 1. The native App exists in a separate repository and is outside this task; this AI repository does not execute or attest its iOS/Android, offline, purchase or store gates.
 2. The OpenAPI/TypeScript contract and default-off durable `/v1` route adapter now exist, but there is no Preview- or Production-served Product API, generated client package, schema registry or previous-version compatibility fixture.
-3. The registration-retention source worktree passed its historical 1,381 tests across 125 files and all three focused migration contracts 39/39, with the `r21` 1,377-test / 124-file result, the `r9` 1,337-test / 122-file result and earlier baselines retained. The strict-local harness batch subsequently passed 1,400 tests across the same 125 files. All five Note types share a Production-unapplied private metadata/RPC layer with nine worker RPC identities, three newer owner RPC identities and one separately owned graceful-retirement control identity, but no caller execute grant. Deleted PostgreSQL 17.6 disposable `r9` proved the exact 14-migration, seven-suite and independent postcheck gate; deleted `r20` closed the PostgreSQL 17.6 true two-session claim/session/privacy race gate; deleted `r21` closed Attempt 1 historical replay across Attempt 2 success and post-purge state; deleted `r22` closed the hosted registration historical-retention gate with the exact 15/15 manifest, 7/7 suites and independent postcheck. The earlier disposable local PostgreSQL 16.15 gate closed its recorded engine, serial and true-two-session path with 27/27 repository migrations, exact V1 15/15, 7/7 suites and 3/3 races. The later owner-runtime PG16.15 run passed the new owner, additive-aware worker and durable rollback suites, independent posture postcheck and auth-session lock-wait race; #1-#24 and #26-#28 applied non-super, including fresh exact final #28, while #25 remained an explicit bootstrap-superuser transition. Migration #29 supplies graceful retirement with 14 forced-RLS tables. Its local strict rollback assertion passed inside the final clean 29/29 migration, 9/9 aggregate, independent posture and two-ordering retirement/claim race gate. Deleted Hosted r5 subsequently passed the exact 30/30 migration manifest, all 11 rollback suites and the independent owner/role/RLS/ACL/hard-off/zero-fixture postcheck. No worker/owner Preview or local cluster is retained. The five types still lack emergency revocation, attempt listing, a deployed worker, nested exact-key database vectors, account-delete/purge and orphan recovery, provider-start binding, safe sequential numeric parsing, real vault/KMS/retention, caller credentials/grants/routes, hosted GoTrue/PostgREST, real provider/model/STT integration, terminal Points settlement and complete per-type golden sets; runtime activation remains open.
+3. The registration-retention source worktree passed its historical 1,381 tests across 125 files and all three focused migration contracts 39/39, with the `r21` 1,377-test / 124-file result, the `r9` 1,337-test / 122-file result and earlier baselines retained. The strict-local harness batch subsequently passed 1,400 tests across the same 125 files. All five Note types share a Production-unapplied private metadata/RPC layer with nine worker RPC identities, three newer owner RPC identities and one separately owned graceful-retirement control identity, but no caller execute grant. Deleted PostgreSQL 17.6 disposable `r9` proved the exact 14-migration, seven-suite and independent postcheck gate; deleted `r20` closed the PostgreSQL 17.6 true two-session claim/session/privacy race gate; deleted `r21` closed Attempt 1 historical replay across Attempt 2 success and post-purge state; deleted `r22` closed the hosted registration historical-retention gate with the exact 15/15 manifest, 7/7 suites and independent postcheck. The earlier disposable local PostgreSQL 16.15 gate closed its recorded engine, serial and true-two-session path with 27/27 repository migrations, exact V1 15/15, 7/7 suites and 3/3 races. The later owner-runtime PG16.15 run passed the new owner, additive-aware worker and durable rollback suites, independent posture postcheck and auth-session lock-wait race; #1-#24 and #26-#28 applied non-super, including fresh exact final #28, while #25 remained an explicit bootstrap-superuser transition. Migration #29 supplies graceful retirement with 14 forced-RLS tables. Its local strict rollback assertion passed inside the final clean 29/29 migration, 9/9 aggregate, independent posture and two-ordering retirement/claim race gate. Deleted Hosted r5 subsequently passed the exact 30/30 migration manifest, all 11 rollback suites and the independent owner/role/RLS/ACL/hard-off/zero-fixture postcheck. No worker/owner Preview or local cluster is retained. The five types still lack emergency revocation, attempt listing, a deployed worker, nested exact-key database vectors, account-delete/purge and orphan recovery, provider-start binding, safe sequential numeric parsing, real vault/KMS/retention, caller credentials/grants/routes, hosted GoTrue/PostgREST, real provider/model/STT integration and complete per-type golden sets; runtime activation remains open.
 4. Canonical document/revision/checkpoint states exist as memory/domain contracts plus historical isolated schema/RPC evidence and a Production-unapplied mobile-sync migration draft that was clean-applied only on a deleted disposable branch; there is no retained schema activation, editor, renderer or cross-device recovery E2E.
 5. Points lots/rates/reservations remain shadow-only. Communication Note now has
-   local PG16 proof for fixed 20-Point atomic admission/reservation and its five
-   true-concurrency scenarios, but no runtime entitlement integration, terminal
-   commit/release concurrency, welcome eligibility decision, rate-rollover race
-   or legacy-credit conversion/reconciliation test.
+   local PG16 proof for fixed 20-Point atomic admission/reservation and terminal
+   commit/release, including retry, replay, cancellation and recovery
+   concurrency. It still has no formal runtime entitlement integration,
+   disposable Hosted proof, welcome eligibility decision, rate-rollover race or
+   legacy-credit conversion/reconciliation test.
 6. No payment provider sandbox, webhook replay, refund or reconciliation harness exists.
 7. No content editorial state, Guide, Daily Brief, notification or email/cron service exists.
 8. No signed PIA/data-map/subprocessor/NDB evidence is represented in automated tests.
