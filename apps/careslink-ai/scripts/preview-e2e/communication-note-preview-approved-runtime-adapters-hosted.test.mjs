@@ -294,7 +294,7 @@ describe("Communication Note M1n approved runtime Hosted runner policy", () => {
     expect(manifest.paths).toContain("pnpm-lock.yaml");
     expect(manifest.paths).toContain("tsconfig.json");
     expect(manifest.paths).not.toContain("package-lock.json");
-    expect(manifest.migrationVersions).toHaveLength(40);
+    expect(manifest.migrationVersions).toHaveLength(41);
     expect(manifest.migrationVersions.every((version) => /^\d{14}$/.test(version)))
       .toBe(true);
 
@@ -330,7 +330,7 @@ describe("Communication Note M1n approved runtime Hosted runner policy", () => {
     );
   });
 
-  it("passes the exact ordered 40-version migration manifest to preflight", async () => {
+  it("passes the exact ordered 41-version migration manifest to preflight", async () => {
     const appDirectory = fileURLToPath(new URL("../../", import.meta.url));
     const manifest =
       await readCommunicationNotePreviewApprovedRuntimeAdaptersHostedSourceManifest(

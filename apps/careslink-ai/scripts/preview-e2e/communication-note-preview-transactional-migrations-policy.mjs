@@ -7,12 +7,12 @@ const NON_TRANSACTIONAL_SQL_PATTERN = /^(?:create\s+(?:unique\s+)?index\s+concur
 
 export const COMMUNICATION_NOTE_PREVIEW_TRANSACTIONAL_MIGRATION_POLICY =
   Object.freeze({
-    version: "2026-08-30.preview-transactional-migrations.7",
+    version: "2026-09-02.preview-transactional-migrations.8",
     productionProjectRef: "adocsnwnslxhxcjgbyee",
     expectedCliVersion: "2.115.0",
     manifestSha256:
-      "6590eed19602c4d7931355f18dafde699b1c47012a3fe09f9d040c179e11792d",
-    migrationCount: 40,
+      "73ec29a2c60ee3479548f70a6d7718782ec86185d8f34287633ebb623ed1fec7",
+    migrationCount: 41,
     disposablePreviewBaselineMigrationCount: 19,
     disposablePreviewBaselineHistorySha256:
       "b742d12dee926ccfe76158cf524e503bcdc576a08e928a7147741faf4a314424",
@@ -217,6 +217,7 @@ export const COMMUNICATION_NOTE_PREVIEW_TRANSACTIONAL_MIGRATION_MANIFEST =
     ["20260829011323_add_communication_note_preview_signed_terminal_caller_shadow.sql", "4c13bf50d7866a4b948475b598bb1c103fb625e59824be98c4e272c659da283f"],
     ["20260829041316_align_communication_note_preview_terminal_accepted_usage.sql", "3d2cc53df3cf17ea21a4f93aaf673f8e911fcc9a35b5309cf7c633c6802e448e"],
     ["20260830065750_add_communication_note_preview_runtime_credential_broker.sql", "64dcb8c57f2c73d3fbd5adc99e3261f8e2e0ddd8e8efcf5cca52c12ca34ba5aa"],
+    ["20260902012628_add_v1_authenticated_current_session_status_rpc.sql", "cc2dcb0cb31f73bb87b53a0f69a1e0d21fdeb744fb63af3ecfec56009166b0cb"],
   ].map(([basename, sha256]) => Object.freeze({ basename, sha256 })));
 
 const OUTER_TRANSACTION_MIGRATIONS = new Set([
@@ -240,6 +241,7 @@ const OUTER_TRANSACTION_MIGRATIONS = new Set([
   "20260829011323_add_communication_note_preview_signed_terminal_caller_shadow.sql",
   "20260829041316_align_communication_note_preview_terminal_accepted_usage.sql",
   "20260830065750_add_communication_note_preview_runtime_credential_broker.sql",
+  "20260902012628_add_v1_authenticated_current_session_status_rpc.sql",
 ]);
 
 const FIXED_ERROR_CODES = new Set([

@@ -221,7 +221,7 @@ async function loadSourceRevisionMaterial(appDirectory) {
       .map((entry) => `supabase/migrations/${entry.name}`)
       .sort();
     if (
-      migrationPaths.length !== 40 ||
+      migrationPaths.length !== 41 ||
       JSON.stringify(migrationPaths) !== JSON.stringify(actualMigrationPaths)
     ) {
       fail("M1N_APPROVED_RUNTIME_ADAPTERS_HOSTED_SOURCE_REVISION_FAILED");
@@ -648,7 +648,7 @@ async function connectPreferredAdmin(Client, candidates, certificate) {
 async function verifyPreflight(admin, expectedMigrationVersions) {
   if (
     !Array.isArray(expectedMigrationVersions) ||
-    expectedMigrationVersions.length !== 40 ||
+    expectedMigrationVersions.length !== 41 ||
     expectedMigrationVersions.some((version) => !/^\d{14}$/.test(version))
   ) {
     fail("M1N_APPROVED_RUNTIME_ADAPTERS_HOSTED_PREFLIGHT_FAILED");

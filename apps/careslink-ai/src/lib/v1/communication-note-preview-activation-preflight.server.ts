@@ -23,7 +23,7 @@ import {
 import { CaresLinkV1ContractError } from "./shared-contracts";
 
 export const CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_ACTIVATION_PREFLIGHT_VERSION =
-  "preflight.communication.openai.synthetic-preview.2026-08-30.m1l.v1" as const;
+  "preflight.communication.openai.synthetic-preview.2026-09-02.authenticated-current-session.v1" as const;
 
 const SHA256_PATTERN = /^[a-f0-9]{64}$/;
 const MAXIMUM_EVIDENCE_AGE_MS = 5 * 60 * 1_000;
@@ -51,11 +51,11 @@ export type CaresLinkV1CommunicationNotePreviewActivationBlockedReason =
 
 export const CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_DATABASE_EVIDENCE_PINS =
   deepFreeze({
-    migrationCount: 40,
+    migrationCount: 41,
     orderedMigrationBasenamesSha256:
-      "f9905d27a907045dfd6e7677e54c50af84be06a194535682bcf9dc4859657d4f",
+      "bb85d720f970ec57ee1916df7c682041b21c9fb131488c33a9dae1830f20bf90",
     orderedMigrationEntriesSha256:
-      "7006c0ef8cb62d9596fdd236ffd3357d16338370e9d1437f54a58eb668b4b250",
+      "698630978aaa34ab51f72f1c3b9ffaf93763459b848f5416c1a8e90284eb7c75",
     authorityMigrationSha256:
       "94f83498ea04053e7238a95bb9be0bb8a38ad0a76fa0e751390419800da51f7f",
     custodyMigrationSha256:
@@ -163,7 +163,7 @@ export type CaresLinkV1CommunicationNotePreviewActivationPreflightPolicy =
     Readonly<{ policyDigest: string }>;
 
 export const CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_ACTIVATION_PREFLIGHT_POLICY_DIGEST =
-  "4447c071fa37ab21f23624a4d3d4d28b2ee9ba2e1ef4c9be969bf9a0481de2f3" as const;
+  "b0709121adf8d3c03c5c2112e0f9acaff0f5d79ca0f6f3460909067833629787" as const;
 
 if (
   createCanonicalSha256(ACTIVATION_PREFLIGHT_POLICY_CORE) !==
@@ -310,7 +310,7 @@ export type CaresLinkV1CommunicationNotePreviewActivationPreflightCandidate =
       persistent: false;
       withData: false;
       productionExcluded: true;
-      migrationCount: 40;
+      migrationCount: 41;
       orderedMigrationBasenamesSha256: string;
       orderedMigrationEntriesSha256: string;
       authorityMigrationSha256: string;
@@ -1074,7 +1074,7 @@ function validateDatabase(
     persistent: false as const,
     withData: false as const,
     productionExcluded: true as const,
-    migrationCount: 40 as const,
+    migrationCount: 41 as const,
     orderedMigrationBasenamesSha256: requireEvidencePin(
       object.orderedMigrationBasenamesSha256,
       "orderedMigrationBasenamesSha256",

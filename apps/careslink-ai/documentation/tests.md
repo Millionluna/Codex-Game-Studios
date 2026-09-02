@@ -3199,13 +3199,15 @@ Preview/project variables, configured-ref/known-Production denial,
 canonical-URL binding and dedicated no-fallback credential custody, but it does
 not query Supabase branch provenance/status and its `sb_secret_` remains
 service-role-equivalent and bypasses RLS.
-Activation still requires an authenticated self-session RPC, formal
-least-privilege installation, live active/revoked-session proof and
-same-transaction owner admission reauthorization.
+An authenticated self-session RPC now has source and isolated local SQL proof,
+but it is not applied or wired into this composition. Activation still requires
+the application rewiring, a formal least-privilege installation, live
+active/revoked-session proof and same-transaction owner admission
+reauthorization.
 
 #### Strict Cookie principal and source-only composition — local evidence
 
-The new resolver reuses the Product Auth order `getClaims` → exact
+The strict-principal resolver reuses the Product Auth order `getClaims` → exact
 `resolve_v1_shadow_session_status(user_id, session_id)` → `getUser`. The RPC's
 existing source contract treats missing/revoked/expired sessions and unconfirmed,
 deleted, banned, anonymous or non-Provider users as `REVOKED`; the route returns
@@ -3237,6 +3239,52 @@ not a live database transaction or activation. The exact focused gate passed 9
 files / 196 tests; the full Vitest suite passed 204 files / 2,837 tests.
 TypeScript, full ESLint, the 73-file Codex adapter check, `git diff --check` and
 the Next.js 16.2.9 Webpack production build with 64/64 static pages passed.
+
+#### Authenticated current-session RPC — local source/database evidence
+
+Migration
+`20260902012628_add_v1_authenticated_current_session_status_rpc.sql` is a
+7,132-byte additive source artifact with SHA-256
+`cc2dcb0cb31f73bb87b53a0f69a1e0d21fdeb744fb63af3ecfec56009166b0cb`.
+It adds only `public.resolve_v1_current_session_status()`: zero arguments,
+request-JWT identity, `SECURITY DEFINER`, empty `search_path`, and
+authenticated-only `EXECUTE`. `PUBLIC`, `anon`, `service_role` and
+`authenticator` are denied. The old two-argument service-only RPC and current
+composition are unchanged.
+
+The static contract passed 1 file / 4 tests, and the combined old/new migration
+contracts passed 2 files / 22 tests. The rollback-only catalog, ACL, role and
+claim matrix passed on an isolated PostgreSQL 16.15 cluster with fixed
+synthetic `.invalid` Auth fixtures and no care data. The temporary server and
+directory were removed afterward. No Supabase environment migration apply,
+Preview, Production, deployment or live route changed.
+
+The current atomic source pins are: 41 migrations; ordered basename/entry
+digests `bb85d720f970ec57ee1916df7c682041b21c9fb131488c33a9dae1830f20bf90`
+and `698630978aaa34ab51f72f1c3b9ffaf93763459b848f5416c1a8e90284eb7c75`;
+transactional policy `2026-09-02.preview-transactional-migrations.8` with 21
+outer wrappers and manifest
+`73ec29a2c60ee3479548f70a6d7718782ec86185d8f34287633ebb623ed1fec7`;
+A19 assertion SHA-256
+`4b9096cbe06d36378b4bd799aa115de6da452a5acd29b60eb6d8cb2fdb491006`;
+rollback policy `2026-09-02.preview-schema-rollback-assertions.6` with 19 files
+and manifest
+`6370a375828a1005315a9b090cbaead139944fdc66a903f9939f948524d3cf4d`;
+preflight
+`preflight.communication.openai.synthetic-preview.2026-09-02.authenticated-current-session.v1`
+with digest
+`b0709121adf8d3c03c5c2112e0f9acaff0f5d79ca0f6f3460909067833629787`;
+and coordinator
+`coordinator.communication.openai.synthetic-preview.2026-09-02.authenticated-current-session.v1`
+with digest
+`ea496d6f2e08680b5f8d7515228a1e39d307d38e3f195fb1a361b0875330303b`.
+The M1l 40-migration/A01–A18 pins remain historical evidence for that earlier
+revision and are not relabelled as current evidence.
+
+The final current-source closeout passed 9 focused files / 116 tests and the
+full 205-file / 2,841-test Vitest suite. TypeScript, full ESLint, the Next.js
+16.2.9 Webpack production build with 64/64 static pages, the 73-file adapter
+check and `git diff --check` passed.
 
 ### Current live/read-only evidence
 
