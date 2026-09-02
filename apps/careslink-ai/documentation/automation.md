@@ -1191,22 +1191,22 @@ the environment value is accidentally set to exact `true`.
 
 The source-only strict-principal factory replaces the loose Workspace-account
 test seam. It rejects every `Authorization` header before Auth work, then uses
-explicitly injected ports to verify Cookie JWT claims, require the exact Auth
-`session_id` to be active for an eligible trusted-metadata Provider, and match
-the authoritative Auth user. It passes the frozen full principal to the
-submission boundary without returning or logging it. A separate source-only
-wrapper now requires exact Vercel Preview/project identity, a configured ref
-distinct from the pinned known Production ref, canonical Supabase URLs,
-matching publishable keys and a dedicated, no-fallback `sb_secret_`.
-It revalidates its frozen snapshot and creates the privileged client only after
-valid claims. The formal wrapper export remains `undefined`, and the route does
-not import it. The dedicated key is still service-role-equivalent and bypasses
-RLS, so this is custody separation rather than database least privilege or live
-Cookie/Auth/database evidence. It does not query Supabase branch provenance or
-health. A separate, unapplied repository migration now defines the zero-argument
-`resolve_v1_current_session_status()` RPC with request identity and
-authenticated-only execution. The current wrapper still uses the legacy
-two-argument service path and dedicated key; no formal port imports the new RPC.
+one request-scoped Cookie/authenticated Supabase client to verify Cookie JWT
+claims, revalidate the frozen configuration, call the zero-argument
+`resolve_v1_current_session_status()` RPC and match the authoritative Auth user.
+The RPC receives no caller identity. The same client is used in the fixed
+`getClaims → snapshot revalidation → current-session RPC → getUser` order, and
+the frozen full principal is passed to the submission boundary without being
+returned or logged. A separate source-only wrapper still requires exact Vercel
+Preview/project identity, a configured ref distinct from the pinned known
+Production ref, canonical Supabase URLs and matching publishable keys. It reads
+no dedicated or generic privileged key, creates no privileged client and has no
+fallback to the legacy two-argument service RPC. The formal wrapper export
+remains `undefined`, and the route does not import it. The authenticated
+current-session migration remains unapplied, so this is not live
+Cookie/Auth/database evidence. The wrapper does not query Supabase branch
+provenance or health.
+
 The route then
 validates same-origin HTTPS, bounded JSON, an idempotency header, exact
 Communication facts, both privacy confirmations and two server-side privacy
@@ -1219,14 +1219,13 @@ OpenAI provider, owner repository, Points store or cloud bridge. No queue,
 schedule, retry worker, model call, payload storage, database connection,
 Preview, Production resource or deployment was added.
 
-A future source batch must first rewire the strict-principal composition to the
-authenticated Cookie client and zero-argument RPC, removing the dedicated
-service-role-equivalent secret path without legacy fallback. A future runtime
-must then normalize trusted Provider roles and bind server privacy authority,
-Points reservation, retention-bounded payload custody and formal owner admission.
+A future activation batch must formally install the reviewed strict-principal
+composition only after trusted Provider roles are normalized and server privacy
+authority, Points reservation, retention-bounded payload custody and formal
+owner admission are bound.
 Owner admission must recheck session and privacy authority inside the enqueue
-transaction, then let a
-registered asynchronous worker call an approved provider. M1x does not permit
+transaction, then let a registered asynchronous worker call an approved
+provider. M1x does not permit
 the HTTP request thread to call a model directly. See
 `documentation/communication-note-generation-api-m1x.md` and
 `documentation/communication-note-generation-principal-composition.md`.

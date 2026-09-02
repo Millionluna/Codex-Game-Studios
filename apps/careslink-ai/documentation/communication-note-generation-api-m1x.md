@@ -81,24 +81,23 @@ and status-specific result/failure invariants before serialization.
 
 ## Deliberate non-integration
 
-The strict-principal factory accepts only explicit Cookie Auth and lazy
-session-status RPC client factories. It does not use the loose
-Workspace-account role mapper. A separate source-only wrapper now validates an
+The strict-principal factory accepts only explicit Cookie Auth through one lazy,
+request-scoped Cookie/authenticated Supabase client. It does not use the loose
+Workspace-account role mapper. A separate source-only wrapper validates an
 exact Vercel Preview and project ID, an exact 20-character Supabase ref distinct
-from the pinned known Production ref, byte-exact canonical Supabase URLs,
-matching `sb_publishable_`
-keys and a dedicated `sb_secret_` with no generic-key fallback or reuse. It
-revalidates the frozen configuration before each lazy client boundary, and the
-privileged client cannot be created until verified claims provide canonical
-user/session UUIDs.
+from the pinned known Production ref, byte-exact canonical Supabase URLs and
+matching `sb_publishable_` keys. It creates one client per admitted request and
+fixes the order as `getClaims` → frozen configuration revalidation →
+zero-argument `resolve_v1_current_session_status()` → `getUser`. The RPC receives
+neither an argument object nor caller-supplied user/session IDs.
 
-That dedicated secret is still service-role-equivalent, bypasses RLS and can
-exercise broader project authority outside this single application-code RPC
-surface. It is not database-level least privilege. The wrapper's formal export
-remains `undefined`, the formal principal resolver remains `undefined`, and the
-Route Handler does not import or call the wrapper. Test environment/client
-injection also requires an explicit TestOnly capability and is statically
-quarantined. The Route Handler additionally does not import or call:
+The Communication Note composition reads no dedicated or generic privileged
+key, creates no privileged client and has no fallback to the legacy
+two-argument service RPC. Its formal export remains `undefined`, the formal
+principal resolver remains `undefined`, and the Route Handler does not import
+or call the wrapper. Test environment/client injection also requires an
+explicit TestOnly capability and is statically quarantined. The Route Handler
+additionally does not import or call:
 
 - the M1r–M1v Preview composition and cloud/provider bridges;
 - `createTestOnlyCaresLinkV1NoteGenerationOwnerRepository`;
@@ -119,11 +118,9 @@ child of Production; those remain live Preview evidence requirements.
 
 ## Remaining activation gates
 
-- rewire the source-only composition to the subsequent zero-argument
-  authenticated self-session RPC, using the Cookie/authenticated client and
-  removing the legacy privileged-key/two-argument RPC path without fallback;
-- formal installation of that least-privilege principal composition plus live
-  active/revoked-session evidence on a same-revision no-data Preview;
+- formal installation of the source-wired authenticated current-session
+  principal composition plus live active/revoked-session evidence on a
+  same-revision no-data Preview;
 - trusted Provider role normalization compatible with the RPC's exact
   `app_metadata.role=provider` predicate;
 - live privacy-proof owner/type/schema/hash/expiry binding;
@@ -135,18 +132,19 @@ child of Production; those remain live Preview evidence requirements.
 - same-revision disposable no-data Preview, deployment and rollback evidence;
 - separate owner approval for any cloud spend, provider call or Production step.
 
-The later RPC migration provides source/local SQL evidence only. M1x and that
-migration provide none of the remaining approvals and change no external
-resource.
+The authenticated current-session migration remains unapplied. The source
+rewiring and its local tests provide no live Cookie/Auth/database evidence, none
+of the remaining approvals and no external-resource change.
 
 ## Local verification
 
-- focused M1x/principal-composition, Product-auth, session-SQL contract and
-  runtime-boundary tests: 9 files / 196 tests passed;
-- full Vitest suite: 204 files / 2,837 tests passed;
+- authenticated current-session resolver/principal/composition/runtime-boundary
+  tests: 4 files / 98 tests passed;
+- full Vitest suite: 206 files / 2,860 tests passed;
 - TypeScript and full ESLint: passed;
-- Next.js 16.2.9 webpack production build: passed, 64/64 static pages;
+- Next.js webpack production build: passed, 64/64 static pages;
 - Codex adapter sync: 73 files passed;
+- fresh client-boundary scan: 100 static chunk files passed;
 - `git diff --check`: passed.
 
 These results are source/build evidence only. They do not represent a live

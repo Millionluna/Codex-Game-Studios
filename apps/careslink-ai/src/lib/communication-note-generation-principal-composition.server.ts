@@ -1,5 +1,8 @@
 import "server-only";
 
+import type {
+  CommunicationNoteGenerationAuthenticatedClient,
+} from "./communication-note-generation-current-session.server";
 import {
   createCommunicationNoteGenerationPrincipalResolver,
   type CommunicationNoteGenerationPrincipalResolver,
@@ -7,13 +10,8 @@ import {
 import { createCareslinkServerSupabaseClient } from "./supabase-server";
 import {
   isCaresLinkV1ProductApiEnabled,
-  type CaresLinkV1ProductApiAuthClient,
   type CaresLinkV1ProductApiEnv,
 } from "./v1/product-api-auth.server";
-import {
-  createCaresLinkV1SessionStatusRpcClient,
-  type CaresLinkV1SessionStatusRpcClientFactory,
-} from "./v1/product-api-session-status.server";
 import { CARESLINK_PRODUCTION_SUPABASE_REF } from "./v1/ndis-shadow-guard";
 
 export const CARESLINK_COMMUNICATION_NOTE_PRINCIPAL_COMPOSITION_FLAG =
@@ -22,8 +20,6 @@ export const CARESLINK_COMMUNICATION_NOTE_PRINCIPAL_EXPECTED_SUPABASE_REF_FLAG =
   "CARESLINK_COMMUNICATION_NOTE_PRINCIPAL_EXPECTED_SUPABASE_REF" as const;
 export const CARESLINK_COMMUNICATION_NOTE_PRINCIPAL_EXPECTED_VERCEL_PROJECT_ID_FLAG =
   "CARESLINK_COMMUNICATION_NOTE_PRINCIPAL_EXPECTED_VERCEL_PROJECT_ID" as const;
-export const CARESLINK_COMMUNICATION_NOTE_SESSION_STATUS_PREVIEW_SECRET_KEY =
-  "CARESLINK_COMMUNICATION_NOTE_SESSION_STATUS_PREVIEW_SECRET_KEY" as const;
 export const CARESLINK_COMMUNICATION_NOTE_PRINCIPAL_COMPOSITION_TEST_CAPABILITY =
   "TEST_ONLY_COMMUNICATION_NOTE_PRINCIPAL_COMPOSITION" as const;
 
@@ -34,10 +30,6 @@ export type CommunicationNoteGenerationPrincipalCompositionEnv =
       CARESLINK_COMMUNICATION_NOTE_PRINCIPAL_COMPOSITION_ENABLED?: string;
       CARESLINK_COMMUNICATION_NOTE_PRINCIPAL_EXPECTED_SUPABASE_REF?: string;
       CARESLINK_COMMUNICATION_NOTE_PRINCIPAL_EXPECTED_VERCEL_PROJECT_ID?: string;
-      CARESLINK_COMMUNICATION_NOTE_SESSION_STATUS_PREVIEW_SECRET_KEY?: string;
-      CARESLINK_V1_PRIVACY_REVIEW_PREVIEW_SERVICE_ROLE_KEY?: string;
-      SUPABASE_SECRET_KEY?: string;
-      SUPABASE_SERVICE_ROLE_KEY?: string;
       VERCEL?: string;
       VERCEL_ENV?: string;
       VERCEL_PROJECT_ID?: string;
@@ -63,9 +55,7 @@ export type CommunicationNoteGenerationPrincipalCompositionGuard =
         | "vercel_project_unverified"
         | "supabase_target_unverified"
         | "production_target_denied"
-        | "publishable_key_unavailable"
-        | "privileged_key_unavailable"
-        | "credential_reuse_denied";
+        | "publishable_key_unavailable";
     }>;
 
 export type CommunicationNoteGenerationPrincipalCompositionOptions =
@@ -73,16 +63,14 @@ export type CommunicationNoteGenerationPrincipalCompositionOptions =
     env?: CommunicationNoteGenerationPrincipalCompositionEnv;
     capability?: typeof CARESLINK_COMMUNICATION_NOTE_PRINCIPAL_COMPOSITION_TEST_CAPABILITY;
     createCookieAuthClient?: () => Promise<
-      CaresLinkV1ProductApiAuthClient | undefined
+      CommunicationNoteGenerationAuthenticatedClient | undefined
     >;
-    createSessionStatusClient?: CaresLinkV1SessionStatusRpcClientFactory;
   }>;
 
 /**
  * Approval remains absent. The source factory below models exact target and
- * custody checks, but the current database RPC still requires a
- * service-role-equivalent secret that bypasses RLS. It is therefore not an
- * approved least-privilege installation.
+ * authenticated Cookie-client checks, but it does not install the database
+ * capability or make this composition reachable from the formal route.
  */
 export const COMMUNICATION_NOTE_GENERATION_FORMAL_PRINCIPAL_COMPOSITION =
   undefined as CommunicationNoteGenerationPrincipalResolver | undefined;
@@ -106,20 +94,17 @@ export function resolveCommunicationNoteGenerationPrincipalCompositionGuard(
 
 /**
  * Builds a source-only resolver from a frozen Preview target snapshot.
- * Neither this factory nor module import creates a Supabase client. Both the
- * Cookie client and the dedicated privileged client are constructed lazily,
- * after the target is revalidated; the privileged client is later still and
- * cannot exist until verified claims contain canonical identity UUIDs.
+ * Neither this factory nor module import creates a Supabase client. One
+ * Cookie-backed authenticated client is constructed lazily per request after
+ * the target is revalidated, and the snapshot is checked again after verified
+ * claims before that same client can call the zero-argument session RPC.
  */
 export function createCommunicationNoteGenerationPrincipalComposition(
   options: CommunicationNoteGenerationPrincipalCompositionOptions = {},
 ): CommunicationNoteGenerationPrincipalResolver | undefined {
   const injectedCookieFactory = options.createCookieAuthClient;
-  const injectedSessionFactory = options.createSessionStatusClient;
   if (
-    (options.env !== undefined ||
-      injectedCookieFactory !== undefined ||
-      injectedSessionFactory !== undefined) &&
+    (options.env !== undefined || injectedCookieFactory !== undefined) &&
     options.capability !==
       CARESLINK_COMMUNICATION_NOTE_PRINCIPAL_COMPOSITION_TEST_CAPABILITY
   ) {
@@ -128,10 +113,8 @@ export function createCommunicationNoteGenerationPrincipalComposition(
     );
   }
   if (
-    (injectedCookieFactory !== undefined &&
-      typeof injectedCookieFactory !== "function") ||
-    (injectedSessionFactory !== undefined &&
-      typeof injectedSessionFactory !== "function")
+    injectedCookieFactory !== undefined &&
+    typeof injectedCookieFactory !== "function"
   ) {
     throw new Error(
       "Communication Note principal composition test ports are unavailable",
@@ -156,34 +139,31 @@ export function createCommunicationNoteGenerationPrincipalComposition(
   return createCommunicationNoteGenerationPrincipalResolver({
     env,
     async createCookieAuthClient() {
-      if (!resolveCurrentConfiguration()) {
+      const current = resolveCurrentConfiguration();
+      if (!current) {
         return undefined;
       }
       if (injectedCookieFactory) {
         return injectedCookieFactory();
       }
       return (await createCareslinkServerSupabaseClient({
-        env,
-      })) as unknown as CaresLinkV1ProductApiAuthClient | undefined;
+        env: {
+          SUPABASE_URL: current.supabaseUrl,
+          NEXT_PUBLIC_SUPABASE_URL: current.supabaseUrl,
+          SUPABASE_PUBLISHABLE_KEY: current.publishableKey,
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: current.publishableKey,
+        },
+      })) as unknown as
+        | CommunicationNoteGenerationAuthenticatedClient
+        | undefined;
     },
-    createSessionStatusClient() {
-      const current = resolveCurrentConfiguration();
-      if (!current) {
-        return undefined;
-      }
-      const createClient =
-        injectedSessionFactory ??
-        createCaresLinkV1SessionStatusRpcClient;
-      return createClient(
-        current.supabaseUrl,
-        current.dedicatedPrivilegedKey,
-      );
+    validateCurrentSessionAuthority() {
+      return Boolean(resolveCurrentConfiguration());
     },
   });
 }
 
 type CompositionConfiguration = Readonly<{
-  dedicatedPrivilegedKey: string;
   publishableKey: string;
   supabaseUrl: string;
   targetSupabaseRef: string;
@@ -266,26 +246,9 @@ function resolveConfiguration(
     return rejected("publishable_key_unavailable");
   }
 
-  const dedicatedPrivilegedKey = parseDedicatedSecretKey(
-    env.CARESLINK_COMMUNICATION_NOTE_SESSION_STATUS_PREVIEW_SECRET_KEY,
-  );
-  if (!dedicatedPrivilegedKey) {
-    return rejected("privileged_key_unavailable");
-  }
-  for (const reusedKey of [
-    env.SUPABASE_SECRET_KEY,
-    env.SUPABASE_SERVICE_ROLE_KEY,
-    env.CARESLINK_V1_PRIVACY_REVIEW_PREVIEW_SERVICE_ROLE_KEY,
-  ]) {
-    if (reusedKey !== undefined && reusedKey === dedicatedPrivilegedKey) {
-      return rejected("credential_reuse_denied");
-    }
-  }
-
   return {
     ok: true,
     config: Object.freeze({
-      dedicatedPrivilegedKey,
       publishableKey: serverPublishableKey,
       supabaseUrl: serverUrl,
       targetSupabaseRef,
@@ -347,18 +310,11 @@ function parsePublishableKey(value: string | undefined) {
     : undefined;
 }
 
-function parseDedicatedSecretKey(value: string | undefined) {
-  return value && /^sb_secret_[A-Za-z0-9_-]{16,}$/.test(value)
-    ? value
-    : undefined;
-}
-
 function sameConfiguration(
   expected: CompositionConfiguration,
   current: CompositionConfiguration,
 ) {
   return (
-    expected.dedicatedPrivilegedKey === current.dedicatedPrivilegedKey &&
     expected.publishableKey === current.publishableKey &&
     expected.supabaseUrl === current.supabaseUrl &&
     expected.targetSupabaseRef === current.targetSupabaseRef &&

@@ -3172,11 +3172,14 @@ set. The source-test seam is not a runtime activation mechanism.
 Focused tests cover gate-before-request/auth/body/submission ordering; absent
 formal ports; Product master-gate ordering; rejection of bearer, basic and even
 empty `Authorization` headers before Cookie client/RPC creation; verified claims
-and canonical subject/session IDs; the exact service-only active-session RPC;
+and canonical subject/session IDs; one request-scoped Cookie/authenticated
+client for `getClaims`, snapshot revalidation,
+`resolve_v1_current_session_status()` and `getUser`; the exact zero-argument RPC
+call with no caller identity; request-local client isolation;
 revoked/ineligible Provider, malformed/unavailable RPC and authoritative-user
-mismatch mapping; frozen Cookie principal propagation; malformed principal
-denial; same-origin HTTPS; JSON media type, idempotency, invalid and oversized
-streamed bodies; duplicate/unknown-key
+mismatch mapping; frozen Cookie principal propagation;
+malformed principal denial; same-origin HTTPS; JSON media type, idempotency,
+invalid and oversized streamed bodies; duplicate/unknown-key
 and credential-field rejection, both
 literal privacy confirmations, exact seven-field schema validation, independent
 M1w and V1 privacy scanner bypasses, canonical facts hashing, fresh `202`
@@ -3194,20 +3197,21 @@ Preview, Production or deployment action occurred. See
 `documentation/communication-note-generation-principal-composition.md`.
 
 The pure strict-principal and source-only composition seams are not live
-Cookie/Auth/session evidence. The composition now proves exact Vercel
+Cookie/Auth/session evidence. The composition proves exact Vercel
 Preview/project variables, configured-ref/known-Production denial,
-canonical-URL binding and dedicated no-fallback credential custody, but it does
-not query Supabase branch provenance/status and its `sb_secret_` remains
-service-role-equivalent and bypasses RLS.
-An authenticated self-session RPC now has source and isolated local SQL proof,
-but it is not applied or wired into this composition. Activation still requires
-the application rewiring, a formal least-privilege installation, live
-active/revoked-session proof and same-transaction owner admission
-reauthorization.
+canonical-URL binding, matching publishable keys and frozen snapshot
+revalidation. It reads no dedicated or generic privileged key, creates no
+privileged client and has no fallback to the legacy two-argument service RPC.
+It still does not query Supabase branch provenance/status. The authenticated
+self-session RPC has source and isolated local SQL proof and is now wired into
+the source-only composition, but its migration is not applied. Activation still
+requires formal installation, live active/revoked-session proof and
+same-transaction owner admission reauthorization.
 
-#### Strict Cookie principal and source-only composition — local evidence
+#### Strict Cookie principal and source-only composition — historical pre-rewiring local evidence
 
-The strict-principal resolver reuses the Product Auth order `getClaims` → exact
+At this earlier atomic checkpoint, the strict-principal resolver reused the
+Product Auth order `getClaims` → exact
 `resolve_v1_shadow_session_status(user_id, session_id)` → `getUser`. The RPC's
 existing source contract treats missing/revoked/expired sessions and unconfirmed,
 deleted, banned, anonymous or non-Provider users as `REVOKED`; the route returns
@@ -3216,31 +3220,33 @@ failed. Invalid/missing Cookie identity returns `401 AUTH_REQUIRED`, any
 `Authorization` transport returns `403 FORBIDDEN`, and unavailable authority
 returns `503 PRODUCT_API_DISABLED`.
 
-The new composition matrix covers all three application flags, Vercel runtime
-and dual Preview environment values, expected/actual project identity,
+At that checkpoint, the new composition matrix covered all three application
+flags, Vercel runtime and dual Preview environment values, expected/actual
+project identity,
 20-character configured Supabase ref distinct from the pinned known Production
 ref, byte-exact canonical URL on both
 server/public variables, matching `sb_publishable_` values, dedicated
-`sb_secret_` presence and generic-key no-fallback/no-reuse. It proves no client
+`sb_secret_` presence and generic-key no-fallback/no-reuse. It proved no client
 at import/factory time, no clients for any `Authorization` header, no privileged
 client for invalid claims, the exact
 `getClaims → privileged factory → RPC → getUser` order, frozen configuration
 drift denial, fixed secret-free failures and static route/importer quarantine.
-Injected environment/client ports require a TestOnly capability, the default
-path reads only the process environment, and the low-level privileged factory
-has no other direct external importer than this composition. Its defining
-session-status module still uses the same factory internally for the legacy
+Injected environment/client ports required a TestOnly capability, the default
+path read only the process environment, and the low-level privileged factory
+had no other direct external importer than this composition. Its defining
+session-status module still used the same factory internally for the legacy
 `create...FromEnv` default.
 
-The formal composition and resolver remain absent, the real route does not
-import the composition, and no service RPC is called by the real route. These
-tests prove source ordering, target/custody validation and failure mapping only,
-not a live database transaction or activation. The exact focused gate passed 9
-files / 196 tests; the full Vitest suite passed 204 files / 2,837 tests.
+The formal composition and resolver were absent, the real route did not import
+the composition, and no service RPC was called by the real route. Those tests
+proved the then-current source ordering, target/custody validation and failure
+mapping only, not a live database transaction or activation. The exact focused
+gate passed 9 files / 196 tests; the full Vitest suite passed 204 files / 2,837
+tests.
 TypeScript, full ESLint, the 73-file Codex adapter check, `git diff --check` and
 the Next.js 16.2.9 Webpack production build with 64/64 static pages passed.
 
-#### Authenticated current-session RPC — local source/database evidence
+#### Authenticated current-session RPC — historical migration checkpoint
 
 Migration
 `20260902012628_add_v1_authenticated_current_session_status_rpc.sql` is a
@@ -3249,8 +3255,8 @@ Migration
 It adds only `public.resolve_v1_current_session_status()`: zero arguments,
 request-JWT identity, `SECURITY DEFINER`, empty `search_path`, and
 authenticated-only `EXECUTE`. `PUBLIC`, `anon`, `service_role` and
-`authenticator` are denied. The old two-argument service-only RPC and current
-composition are unchanged.
+`authenticator` are denied. At that checkpoint, the old two-argument service-only
+RPC and then-current composition were unchanged.
 
 The static contract passed 1 file / 4 tests, and the combined old/new migration
 contracts passed 2 files / 22 tests. The rollback-only catalog, ACL, role and
@@ -3281,10 +3287,34 @@ with digest
 The M1l 40-migration/A01–A18 pins remain historical evidence for that earlier
 revision and are not relabelled as current evidence.
 
-The final current-source closeout passed 9 focused files / 116 tests and the
-full 205-file / 2,841-test Vitest suite. TypeScript, full ESLint, the Next.js
+That atomic batch's final source closeout passed 9 focused files / 116 tests and
+the full 205-file / 2,841-test Vitest suite. TypeScript, full ESLint, the Next.js
 16.2.9 Webpack production build with 64/64 static pages, the 73-file adapter
 check and `git diff --check` passed.
+
+#### Cookie/authenticated current-session rewiring — current source/local evidence
+
+The Communication Note strict-principal path now uses one request-scoped
+Cookie/authenticated Supabase client for the fixed sequence of `getClaims`,
+frozen snapshot revalidation, `resolve_v1_current_session_status()` and
+`getUser`. The RPC is invoked with only its function name: no argument object and
+no user/session identifier. Invalid claims, revoked status, configuration drift
+and malformed or unavailable RPC results fail closed before later authority
+steps. Concurrent requests retain their own client and cannot exchange Auth or
+RPC state.
+
+The composition no longer reads any dedicated or generic privileged key,
+constructs no privileged client and has no fallback to the legacy two-argument
+service RPC. The legacy resolver remains available to the separate Product API
+path. Static boundaries keep the new current-session module server-only and out
+of the physical route. `READY=false`, the formal composition/resolver/submitter
+remain absent, the authenticated current-session migration remains unapplied,
+and no Preview, Production, deployment, data or model action occurred.
+
+The current focused gate passed 4 files / 98 tests, and the full Vitest suite
+passed 206 files / 2,860 tests. TypeScript, full ESLint, the Next.js Webpack
+production build with 64/64 static pages, the 73-file adapter sync, the fresh
+client-boundary scan across 100 static chunk files and `git diff --check` passed.
 
 ### Current live/read-only evidence
 

@@ -274,26 +274,23 @@ submission port is `undefined`. Consequently, even
 `CARESLINK_COMMUNICATION_NOTE_GENERATION_API_ENABLED=true` returns a no-store
 `503 PRODUCT_API_DISABLED` before reading authentication or request content.
 The source-only follow-up replaces the former loose Workspace-account seam with
-an explicit strict-principal port. Its pure test composition is Cookie-only,
-rejects every `Authorization` header before Auth work, verifies JWT claims,
-requires the exact Auth `session_id` to be active for an eligible Provider, and
-then matches the authoritative Auth user. The formal principal resolver and
-submission port both remain `undefined`, so this is not live cookie-session or
-database evidence. A later source-only wrapper now models exact Vercel Preview
-and project binding, a configured ref distinct from the pinned known Production
-ref, byte-exact canonical Supabase URLs, matching
-`sb_publishable_` keys, frozen configuration revalidation and a dedicated,
-no-fallback `sb_secret_` client created only after valid claims. Its formal
-composition export is also `undefined`, and the physical route does not import
-it. That dedicated key remains service-role-equivalent and bypasses RLS; this
-is custody separation, not database least privilege. A later, unapplied
-migration now adds a zero-argument current-session RPC whose identity comes only
-from the authenticated request and whose `EXECUTE` grant is authenticated-only.
-The current wrapper has not been rewired: it still uses the old two-argument
-service RPC and dedicated key, while the formal ports and route remain off. The
-remaining boundary
-freezes same-origin HTTPS, bounded
-JSON, exact Communication Note facts, both privacy confirmations, server-side
+an explicit strict-principal port. It is Cookie-only, rejects every
+`Authorization` header before Auth work and uses one request-scoped
+Cookie/authenticated Supabase client in the fixed order `getClaims` → frozen
+configuration revalidation → zero-argument
+`resolve_v1_current_session_status()` → `getUser`. The RPC receives no caller
+identity, and the same client proves the JWT, exact active Auth session plus
+eligible Provider, and authoritative Auth user. This Communication Note path
+reads no dedicated or generic privileged key, creates no privileged client and
+has no fallback to the legacy two-argument service RPC. The source-only wrapper
+still requires exact Vercel Preview/project binding, a configured ref distinct
+from the pinned known Production ref, byte-exact canonical Supabase URLs and
+matching `sb_publishable_` keys. Its formal composition export, principal
+resolver and submission port remain `undefined`, and the physical route does
+not import it. The authenticated current-session migration remains unapplied,
+so this is source/local evidence rather than live Cookie/Auth/database evidence.
+The remaining boundary freezes same-origin HTTPS, bounded JSON, exact
+Communication Note facts, both privacy confirmations, server-side
 dual privacy scanning, idempotency and an owner-safe admission response. A new
 admission returns `202`; an exact replay returns `200` with the current strictly
 parsed job state. It does not connect the composer button, a model, Points,

@@ -3,16 +3,14 @@ import "server-only";
 import {
   isCaresLinkV1ProductApiEnabled,
   resolveCaresLinkV1ProductApiAuth,
-  type CaresLinkV1ProductApiAuthClient,
   type CaresLinkV1ProductApiAuthFailureReason,
   type CaresLinkV1ProductApiEnv,
   type CaresLinkV1SessionStatusResolver,
-  type CaresLinkV1SessionValidationStatus,
 } from "./v1/product-api-auth.server";
 import {
-  createCaresLinkV1SessionStatusResolver,
-  type CaresLinkV1SessionStatusRpcClient,
-} from "./v1/product-api-session-status.server";
+  createCommunicationNoteGenerationCurrentSessionStatusResolver,
+  type CommunicationNoteGenerationAuthenticatedClient,
+} from "./communication-note-generation-current-session.server";
 import type { CaresLinkV1AuthenticatedPrincipal } from "./v1/transport-contract";
 
 export type CommunicationNoteGenerationProviderPrincipal = Readonly<
@@ -43,20 +41,16 @@ export type CommunicationNoteGenerationPrincipalResolver = (
 export type CommunicationNoteGenerationPrincipalResolverOptions = Readonly<{
   env: CaresLinkV1ProductApiEnv;
   createCookieAuthClient(): Promise<
-    CaresLinkV1ProductApiAuthClient | undefined
+    CommunicationNoteGenerationAuthenticatedClient | undefined
   >;
-  createSessionStatusClient():
-    | CaresLinkV1SessionStatusRpcClient
-    | undefined
-    | Promise<CaresLinkV1SessionStatusRpcClient | undefined>;
+  validateCurrentSessionAuthority(): boolean;
 }>;
 
 /**
- * Formal composition remains absent until a database-level least-privilege
- * session-status capability and the rest of the durable admission chain are
- * approved. The separate source-only wrapper still uses a
- * service-role-equivalent secret, so it cannot become reachable from the
- * product route by changing environment variables alone.
+ * Formal composition remains absent until the authenticated current-session
+ * database capability is installed and the rest of the durable admission
+ * chain is approved. This source-only resolver cannot become reachable from
+ * the product route by changing environment variables alone.
  */
 export const COMMUNICATION_NOTE_GENERATION_PRINCIPAL_RESOLVER = undefined as
   | CommunicationNoteGenerationPrincipalResolver
@@ -64,9 +58,10 @@ export const COMMUNICATION_NOTE_GENERATION_PRINCIPAL_RESOLVER = undefined as
 
 /**
  * Creates the strict Cookie principal boundary from explicit server-owned
- * ports. The supplied session resolver is expected to prove the exact Auth
- * session and trusted provider eligibility; this function never infers a role
- * from user-editable metadata and never accepts identity from the request body.
+ * ports. The request's authenticated client proves its own exact Auth session
+ * and trusted provider eligibility through a zero-argument database RPC. This
+ * function never infers a role from user-editable metadata and never accepts
+ * identity from the request body.
  */
 export function createCommunicationNoteGenerationPrincipalResolver(
   options: CommunicationNoteGenerationPrincipalResolverOptions,
@@ -74,7 +69,7 @@ export function createCommunicationNoteGenerationPrincipalResolver(
   if (
     !options ||
     typeof options.createCookieAuthClient !== "function" ||
-    typeof options.createSessionStatusClient !== "function"
+    typeof options.validateCurrentSessionAuthority !== "function"
   ) {
     throw new Error(
       "Communication Note generation principal resolver is unavailable",
@@ -82,25 +77,8 @@ export function createCommunicationNoteGenerationPrincipalResolver(
   }
   const env = options.env;
   const createCookieAuthClient = options.createCookieAuthClient;
-  const createSessionStatusClient = options.createSessionStatusClient;
-
-  // The privileged client is deliberately resolved inside this callback.
-  // Product Auth calls it only after getClaims has produced canonical subject
-  // and session UUIDs, so invalid credentials cannot construct that client.
-  const resolveSessionStatus: CaresLinkV1SessionStatusResolver = async (
-    identity,
-  ): Promise<CaresLinkV1SessionValidationStatus> => {
-    let client: CaresLinkV1SessionStatusRpcClient | undefined;
-    try {
-      client = await createSessionStatusClient();
-    } catch {
-      return "UNAVAILABLE";
-    }
-    if (!client || typeof client.rpc !== "function") {
-      return "UNAVAILABLE";
-    }
-    return createCaresLinkV1SessionStatusResolver(client)(identity);
-  };
+  const validateCurrentSessionAuthority =
+    options.validateCurrentSessionAuthority;
 
   return async (request: Request) => {
     try {
@@ -118,9 +96,37 @@ export function createCommunicationNoteGenerationPrincipalResolver(
     }
 
     try {
+      // This client is request-local by construction. Product Auth uses the
+      // same exact Cookie-backed instance for getClaims and getUser, while the
+      // callback below uses it for the intervening zero-argument RPC.
+      let requestClient:
+        | CommunicationNoteGenerationAuthenticatedClient
+        | undefined;
+      const createRequestCookieAuthClient = async () => {
+        const client = await createCookieAuthClient();
+        requestClient = client;
+        return client;
+      };
+      const resolveSessionStatus: CaresLinkV1SessionStatusResolver = async () => {
+        const client = requestClient;
+        if (!client) {
+          return "UNAVAILABLE";
+        }
+        try {
+          if (!validateCurrentSessionAuthority()) {
+            return "UNAVAILABLE";
+          }
+        } catch {
+          return "UNAVAILABLE";
+        }
+        return createCommunicationNoteGenerationCurrentSessionStatusResolver(
+          client,
+        )();
+      };
+
       const auth = await resolveCaresLinkV1ProductApiAuth(request, {
         env,
-        createCookieAuthClient,
+        createCookieAuthClient: createRequestCookieAuthClient,
         resolveSessionStatus,
       });
 

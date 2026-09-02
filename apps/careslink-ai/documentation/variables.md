@@ -20,7 +20,6 @@
 | `SUPABASE_PUBLISHABLE_KEY` | Server configuration | server publishable fallback | same |
 | `SUPABASE_ANON_KEY` | Server configuration | legacy server fallback | same |
 | `SUPABASE_SERVICE_ROLE_KEY` | Server secret | claims, quota, telemetry, server stores and RPCs | production private writes fail closed |
-| `SUPABASE_SECRET_KEY` | Server secret name recognized only by the source-only Communication Note composition | never passed to a client or used as a credential/fallback there; it is read only to reject equality with the dedicated session-status key | absence is valid; do not add it for this composition |
 
 Optional table-name overrides currently recognized:
 
@@ -343,10 +342,10 @@ configuration evidence, and readiness remains `false`. See
 
 ## Current auth, URL and feature variables
 
-The authenticated zero-argument current-session RPC migration adds no
-environment variable. A later source rewiring is intended to retire the
-dedicated privileged session-status key below; the current composition has not
-made that switch.
+The authenticated zero-argument current-session RPC migration and its
+request-scoped Cookie/authenticated-client source wiring add no environment
+variable. The Communication Note composition does not read a dedicated or
+generic privileged key and has no legacy RPC fallback.
 
 | Variable | Class | Purpose | Boundary |
 |---|---|---|---|
@@ -360,10 +359,9 @@ made that switch.
 | `NEXT_PUBLIC_CARESLINK_SHOW_LEGACY_DEMO_NAV` | Public feature setting | local legacy navigation | must be false/unset for real users |
 | `CARESLINK_ALLOW_COMPANION_MEMORY_STORE` | Server configuration | development-only store fallback | production code rejects missing durable store |
 | `CARESLINK_COMMUNICATION_NOTE_GENERATION_API_ENABLED` | Reserved server configuration | independent M1x gate for `POST /api/ai-documents/communication-note/generate` | exact `true` is still insufficient: compile-time readiness is `false` and both the formal strict-principal resolver and formal submitter are absent, so the route returns `503` before auth/body access; do not configure as an activation step |
-| `CARESLINK_COMMUNICATION_NOTE_PRINCIPAL_COMPOSITION_ENABLED` | Reserved server configuration | source-only strict-principal composition guard | keep false/unset; exact `true` cannot install the formal composition/resolver or bypass `READY=false`, and every target/custody check must also pass |
+| `CARESLINK_COMMUNICATION_NOTE_PRINCIPAL_COMPOSITION_ENABLED` | Reserved server configuration | source-only strict-principal composition guard | keep false/unset; exact `true` cannot install the formal composition/resolver or bypass `READY=false`, and every target/configuration check must also pass |
 | `CARESLINK_COMMUNICATION_NOTE_PRINCIPAL_EXPECTED_SUPABASE_REF` | Reserved non-secret server configuration | binds the source-only composition to one exact configured ref distinct from the pinned known Production ref | keep empty; must be exactly 20 lowercase alphanumeric characters and match both byte-exact canonical Supabase URLs; this source check does not prove branch provenance, health or disposability |
 | `CARESLINK_COMMUNICATION_NOTE_PRINCIPAL_EXPECTED_VERCEL_PROJECT_ID` | Reserved non-secret server configuration | expected project half of the exact Vercel Preview identity check | keep empty; must exactly equal platform-provided `VERCEL_PROJECT_ID`, with `VERCEL=1` and both environment values equal to `preview` |
-| `CARESLINK_COMMUNICATION_NOTE_SESSION_STATUS_PREVIEW_SECRET_KEY` | Reserved server secret | dedicated source-only client for the existing two-argument session-status RPC | keep empty; accepts only `sb_secret_`, never falls back to or reuses generic/privacy-review keys, but remains service-role-equivalent and bypasses RLS. The new zero-argument RPC is source-only, unapplied and unwired, so this variable is not an activation mechanism and is retired only by the later rewiring |
 | `CARESLINK_V1_PRODUCT_API_ENABLED` | Server configuration | master gate for the local shared `/v1` route adapter | only exact `true` passes the first application gate; default/unset is off |
 | `CARESLINK_V1_PRODUCT_API_DURABLE_ADAPTER_ENABLED` | Server configuration | independent gate for request-scoped Supabase persistence and active-session validation | only exact `true`; also requires the master gate, verified Preview target, server configuration, the unapplied database migration and its separate default-off database flag |
 | `CARESLINK_V1_PRODUCT_API_EXPECTED_SUPABASE_REF` | Server configuration | binds the Product API runtime to one reviewed Preview branch | must exactly match the ref parsed from the server Supabase URL; missing/mismatch, non-Preview Vercel environment and the known Production ref all fail closed before any client is created |
@@ -419,7 +417,6 @@ between Preview and Production by hand.
 |---|---|---|
 | Supabase service role | all server-side private data/RPC access | revoke/rotate, redeploy, audit server logs and privileged actions |
 | Dedicated Preview privacy-review key | Preview-only proof issuance | revoke/rotate, keep the Product API gates off, inspect metadata-only proof issuance and redeploy only to the exact reviewed Preview |
-| Dedicated Communication Note session-status key | current source-only Preview composition until authenticated-RPC rewiring; still service-role-equivalent | revoke/rotate, keep all Communication Note generation/formal ports off, inspect privileged access and do not treat rotation as least-privilege remediation |
 | OpenAI API key | model access and spend | rotate, check provider usage/cost, redeploy |
 | fingerprint pepper | pseudonymous quota identity | rotate, expect counters to start a new hash epoch, record change metadata |
 

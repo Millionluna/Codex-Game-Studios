@@ -4,10 +4,13 @@ import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  COMMUNICATION_NOTE_GENERATION_CURRENT_SESSION_STATUS_RPC,
+  type CommunicationNoteGenerationAuthenticatedClient,
+} from "./communication-note-generation-current-session.server";
+import {
   COMMUNICATION_NOTE_GENERATION_PRINCIPAL_RESOLVER,
   createCommunicationNoteGenerationPrincipalResolver,
 } from "./communication-note-generation-principal.server";
-import type { CaresLinkV1ProductApiAuthClient } from "./v1/product-api-auth.server";
 
 vi.mock("server-only", () => ({}));
 
@@ -20,11 +23,11 @@ describe("Communication Note strict provider principal", () => {
   it("keeps the formal principal port absent and the Product master gate fail-closed", async () => {
     expect(COMMUNICATION_NOTE_GENERATION_PRINCIPAL_RESOLVER).toBeUndefined();
     const createCookieAuthClient = vi.fn();
-    const rpc = vi.fn();
+    const validateCurrentSessionAuthority = vi.fn();
     const resolver = createCommunicationNoteGenerationPrincipalResolver({
       env: {},
       createCookieAuthClient,
-      createSessionStatusClient: () => ({ rpc }),
+      validateCurrentSessionAuthority,
     });
     const opaqueRequest = new Proxy({} as Request, {
       get() {
@@ -38,22 +41,18 @@ describe("Communication Note strict provider principal", () => {
       status: 503,
     });
     expect(createCookieAuthClient).not.toHaveBeenCalled();
-    expect(rpc).not.toHaveBeenCalled();
+    expect(validateCurrentSessionAuthority).not.toHaveBeenCalled();
   });
 
-  it.each([
-    `Bearer ${ACCESS_TOKEN}`,
-    `Basic ${ACCESS_TOKEN}`,
-    "",
-  ])(
-    "rejects every Authorization header before cookie Auth or session RPC: %j",
+  it.each([`Bearer ${ACCESS_TOKEN}`, `Basic ${ACCESS_TOKEN}`, "", " "])(
+    "rejects every Authorization header before Cookie Auth or session RPC: %j",
     async (authorization) => {
       const createCookieAuthClient = vi.fn();
-      const rpc = vi.fn();
+      const validateCurrentSessionAuthority = vi.fn();
       const resolver = createCommunicationNoteGenerationPrincipalResolver({
         env: enabledEnv(),
         createCookieAuthClient,
-        createSessionStatusClient: () => ({ rpc }),
+        validateCurrentSessionAuthority,
       });
       const request = new Request("https://careslink.example.test/generate", {
         headers: { authorization },
@@ -67,36 +66,35 @@ describe("Communication Note strict provider principal", () => {
         status: 403,
       });
       expect(createCookieAuthClient).not.toHaveBeenCalled();
-      expect(rpc).not.toHaveBeenCalled();
+      expect(validateCurrentSessionAuthority).not.toHaveBeenCalled();
       expect(JSON.stringify(result)).not.toContain(ACCESS_TOKEN);
     },
   );
 
-  it("sequences verified claims, exact ACTIVE status lookup and authoritative user", async () => {
-    const { client, getClaims, getUser } = authClient();
+  it("uses one exact Cookie client for claims, zero-argument status and user", async () => {
+    const { client, getClaims, rpc, getUser } = authClient();
     const createCookieAuthClient = vi.fn(async () => client);
-    const rpc = vi.fn(async () => ({ data: "ACTIVE", error: null }));
-    const createSessionStatusClient = vi.fn(() => ({ rpc }));
+    const validateCurrentSessionAuthority = vi.fn(() => true);
     const resolver = createCommunicationNoteGenerationPrincipalResolver({
       env: enabledEnv(),
       createCookieAuthClient,
-      createSessionStatusClient,
+      validateCurrentSessionAuthority,
     });
 
     const result = await resolver(cookieRequest());
 
     expect(createCookieAuthClient).toHaveBeenCalledOnce();
     expect(getClaims).toHaveBeenCalledWith();
-    expect(createSessionStatusClient).toHaveBeenCalledOnce();
-    expect(rpc).toHaveBeenCalledWith("resolve_v1_shadow_session_status", {
-      p_user_id: USER_ID,
-      p_session_id: SESSION_ID,
-    });
+    expect(validateCurrentSessionAuthority).toHaveBeenCalledOnce();
+    expect(rpc).toHaveBeenCalledWith(
+      COMMUNICATION_NOTE_GENERATION_CURRENT_SESSION_STATUS_RPC,
+    );
+    expect(rpc.mock.calls[0]).toHaveLength(1);
     expect(getUser).toHaveBeenCalledWith();
     expect(getClaims.mock.invocationCallOrder[0]).toBeLessThan(
-      createSessionStatusClient.mock.invocationCallOrder[0],
+      validateCurrentSessionAuthority.mock.invocationCallOrder[0],
     );
-    expect(createSessionStatusClient.mock.invocationCallOrder[0]).toBeLessThan(
+    expect(validateCurrentSessionAuthority.mock.invocationCallOrder[0]).toBeLessThan(
       rpc.mock.invocationCallOrder[0],
     );
     expect(rpc.mock.invocationCallOrder[0]).toBeLessThan(
@@ -117,28 +115,23 @@ describe("Communication Note strict provider principal", () => {
   it("captures server-owned ports so a retained options object cannot replace them", async () => {
     const { client } = authClient();
     const originalCookieFactory = vi.fn(async () => client);
-    const rpc = vi.fn(async () => ({ data: "ACTIVE", error: null }));
-    const originalSessionFactory = vi.fn(() => ({ rpc }));
+    const originalAuthorityValidator = vi.fn(() => true);
     const options = {
       env: enabledEnv(),
       createCookieAuthClient: originalCookieFactory,
-      createSessionStatusClient: originalSessionFactory,
+      validateCurrentSessionAuthority: originalAuthorityValidator,
     };
-    const resolver = createCommunicationNoteGenerationPrincipalResolver(
-      options,
-    );
+    const resolver = createCommunicationNoteGenerationPrincipalResolver(options);
     const retained = options as Record<string, unknown>;
     retained.env = {};
     retained.createCookieAuthClient = vi.fn(() => {
       throw new Error("replaced Cookie port");
     });
-    retained.createSessionStatusClient = vi.fn(() => {
-      throw new Error("replaced privileged port");
-    });
+    retained.validateCurrentSessionAuthority = vi.fn(() => false);
 
     await expect(resolver(cookieRequest())).resolves.toMatchObject({ ok: true });
     expect(originalCookieFactory).toHaveBeenCalledOnce();
-    expect(originalSessionFactory).toHaveBeenCalledOnce();
+    expect(originalAuthorityValidator).toHaveBeenCalledOnce();
   });
 
   it.each([
@@ -148,14 +141,13 @@ describe("Communication Note strict provider principal", () => {
     },
     { name: "missing claim subject", overrides: { claimUserId: undefined } },
     { name: "malformed session id", overrides: { sessionId: "not-a-uuid" } },
-  ])("rejects $name before the session RPC and getUser", async ({ overrides }) => {
-    const { client, getUser } = authClient(overrides);
-    const rpc = vi.fn(async () => ({ data: "ACTIVE", error: null }));
-    const createSessionStatusClient = vi.fn(() => ({ rpc }));
+  ])("rejects $name before authority validation, RPC and getUser", async ({ overrides }) => {
+    const { client, rpc, getUser } = authClient(overrides);
+    const validateCurrentSessionAuthority = vi.fn(() => true);
     const resolver = createCommunicationNoteGenerationPrincipalResolver({
       env: enabledEnv(),
       createCookieAuthClient: async () => client,
-      createSessionStatusClient,
+      validateCurrentSessionAuthority,
     });
 
     await expect(resolver(cookieRequest())).resolves.toEqual({
@@ -163,58 +155,63 @@ describe("Communication Note strict provider principal", () => {
       reason: "auth_required",
       status: 401,
     });
-    expect(createSessionStatusClient).not.toHaveBeenCalled();
+    expect(validateCurrentSessionAuthority).not.toHaveBeenCalled();
     expect(rpc).not.toHaveBeenCalled();
     expect(getUser).not.toHaveBeenCalled();
   });
 
   it.each([
-    {
-      name: "missing",
-      createSessionStatusClient: vi.fn(() => undefined),
-    },
-    {
-      name: "malformed",
-      createSessionStatusClient: vi.fn(() => ({}) as never),
-    },
+    { name: "false", validate: () => false },
     {
       name: "throwing",
-      createSessionStatusClient: vi.fn(() => {
-        throw new Error("private privileged-client detail");
-      }),
+      validate: () => {
+        throw new Error("private target detail");
+      },
     },
-  ])(
-    "fails closed when the privileged session client is $name",
-    async ({ createSessionStatusClient }) => {
-      const { client, getUser } = authClient();
-      const resolver = createCommunicationNoteGenerationPrincipalResolver({
-        env: enabledEnv(),
-        createCookieAuthClient: async () => client,
-        createSessionStatusClient,
-      });
-
-      const result = await resolver(cookieRequest());
-
-      expect(result).toEqual({
-        ok: false,
-        reason: "unavailable",
-        status: 503,
-      });
-      expect(createSessionStatusClient).toHaveBeenCalledOnce();
-      expect(getUser).not.toHaveBeenCalled();
-      expect(JSON.stringify(result)).not.toContain(
-        "private privileged-client detail",
-      );
-    },
-  );
-
-  it("maps revoked or ineligible provider authority to SESSION_REVOKED before getUser", async () => {
-    const { client, getUser } = authClient();
-    const rpc = vi.fn(async () => ({ data: "REVOKED", error: null }));
+  ])("fails closed when post-claims authority validation is $name", async ({ validate }) => {
+    const { client, getClaims, rpc, getUser } = authClient();
     const resolver = createCommunicationNoteGenerationPrincipalResolver({
       env: enabledEnv(),
       createCookieAuthClient: async () => client,
-      createSessionStatusClient: () => ({ rpc }),
+      validateCurrentSessionAuthority: validate,
+    });
+
+    const result = await resolver(cookieRequest());
+
+    expect(result).toEqual({
+      ok: false,
+      reason: "unavailable",
+      status: 503,
+    });
+    expect(getClaims).toHaveBeenCalledOnce();
+    expect(rpc).not.toHaveBeenCalled();
+    expect(getUser).not.toHaveBeenCalled();
+    expect(JSON.stringify(result)).not.toContain("private target detail");
+  });
+
+  it("fails closed when the authenticated client has no usable RPC port", async () => {
+    const { client, getUser } = authClient();
+    const malformed = { auth: client.auth } as never;
+    const resolver = createCommunicationNoteGenerationPrincipalResolver({
+      env: enabledEnv(),
+      createCookieAuthClient: async () => malformed,
+      validateCurrentSessionAuthority: () => true,
+    });
+
+    await expect(resolver(cookieRequest())).resolves.toEqual({
+      ok: false,
+      reason: "unavailable",
+      status: 503,
+    });
+    expect(getUser).not.toHaveBeenCalled();
+  });
+
+  it("maps revoked or ineligible provider authority before getUser", async () => {
+    const { client, rpc, getUser } = authClient({ status: "REVOKED" });
+    const resolver = createCommunicationNoteGenerationPrincipalResolver({
+      env: enabledEnv(),
+      createCookieAuthClient: async () => client,
+      validateCurrentSessionAuthority: () => true,
     });
 
     await expect(resolver(cookieRequest())).resolves.toEqual({
@@ -222,33 +219,30 @@ describe("Communication Note strict provider principal", () => {
       reason: "session_revoked",
       status: 401,
     });
+    expect(rpc).toHaveBeenCalledWith(
+      COMMUNICATION_NOTE_GENERATION_CURRENT_SESSION_STATUS_RPC,
+    );
     expect(getUser).not.toHaveBeenCalled();
   });
 
   it.each([
     {
       name: "malformed status",
-      rpc: vi.fn(async () => ({ data: "active", error: null })),
+      rpcResult: { data: "active", error: null },
     },
     {
       name: "RPC error",
-      rpc: vi.fn(async () => ({
+      rpcResult: {
         data: "ACTIVE",
         error: { message: "private upstream detail" },
-      })),
+      },
     },
-    {
-      name: "RPC exception",
-      rpc: vi.fn(async () => {
-        throw new Error("private upstream detail");
-      }),
-    },
-  ])("fails closed when the session $name is unavailable", async ({ rpc }) => {
-    const { client, getUser } = authClient();
+  ])("fails closed when the session $name is unavailable", async ({ rpcResult }) => {
+    const { client, getUser } = authClient({ rpcResult });
     const resolver = createCommunicationNoteGenerationPrincipalResolver({
       env: enabledEnv(),
       createCookieAuthClient: async () => client,
-      createSessionStatusClient: () => ({ rpc }),
+      validateCurrentSessionAuthority: () => true,
     });
 
     const result = await resolver(cookieRequest());
@@ -263,10 +257,7 @@ describe("Communication Note strict provider principal", () => {
   });
 
   it.each([
-    {
-      name: "missing authoritative user",
-      overrides: { userId: undefined },
-    },
+    { name: "missing authoritative user", overrides: { userId: undefined } },
     {
       name: "claims and user mismatch",
       overrides: { userId: OTHER_USER_ID },
@@ -276,13 +267,11 @@ describe("Communication Note strict provider principal", () => {
       overrides: { userError: { message: "private Auth failure" } },
     },
   ])("rejects $name after an ACTIVE session", async ({ overrides }) => {
-    const { client } = authClient(overrides);
+    const { client, rpc } = authClient(overrides);
     const resolver = createCommunicationNoteGenerationPrincipalResolver({
       env: enabledEnv(),
       createCookieAuthClient: async () => client,
-      createSessionStatusClient: () => ({
-        rpc: vi.fn(async () => ({ data: "ACTIVE", error: null })),
-      }),
+      validateCurrentSessionAuthority: () => true,
     });
 
     const result = await resolver(cookieRequest());
@@ -292,15 +281,16 @@ describe("Communication Note strict provider principal", () => {
       reason: "auth_required",
       status: 401,
     });
+    expect(rpc).toHaveBeenCalledOnce();
     expect(JSON.stringify(result)).not.toContain("private Auth failure");
   });
 
-  it("fails closed when the cookie Auth client cannot be created", async () => {
-    const rpc = vi.fn();
+  it("fails closed when the Cookie Auth client cannot be created", async () => {
+    const validateCurrentSessionAuthority = vi.fn();
     const resolver = createCommunicationNoteGenerationPrincipalResolver({
       env: enabledEnv(),
       createCookieAuthClient: async () => undefined,
-      createSessionStatusClient: () => ({ rpc }),
+      validateCurrentSessionAuthority,
     });
 
     await expect(resolver(cookieRequest())).resolves.toEqual({
@@ -308,10 +298,47 @@ describe("Communication Note strict provider principal", () => {
       reason: "unavailable",
       status: 503,
     });
-    expect(rpc).not.toHaveBeenCalled();
+    expect(validateCurrentSessionAuthority).not.toHaveBeenCalled();
   });
 
-  it("contains no Workspace fallback, user metadata role or credential logging path", () => {
+  it("keeps interleaved requests on their own exact Cookie clients", async () => {
+    const aClaimsStarted = deferred<void>();
+    const releaseAClaims = deferred<void>();
+    const a = authClient({
+      onGetClaims: async () => {
+        aClaimsStarted.resolve();
+        await releaseAClaims.promise;
+      },
+    });
+    const b = authClient();
+    const createCookieAuthClient = vi
+      .fn<() => Promise<CommunicationNoteGenerationAuthenticatedClient>>()
+      .mockResolvedValueOnce(a.client)
+      .mockResolvedValueOnce(b.client);
+    const resolver = createCommunicationNoteGenerationPrincipalResolver({
+      env: enabledEnv(),
+      createCookieAuthClient,
+      validateCurrentSessionAuthority: () => true,
+    });
+
+    const aResult = resolver(cookieRequest());
+    await aClaimsStarted.promise;
+    const bResult = await resolver(cookieRequest());
+    expect(bResult).toMatchObject({ ok: true });
+    expect(a.rpc).not.toHaveBeenCalled();
+    expect(b.rpc).toHaveBeenCalledOnce();
+    expect(b.getUser).toHaveBeenCalledOnce();
+
+    releaseAClaims.resolve();
+    await expect(aResult).resolves.toMatchObject({ ok: true });
+    expect(a.rpc).toHaveBeenCalledOnce();
+    expect(a.getUser).toHaveBeenCalledOnce();
+    expect(b.rpc).toHaveBeenCalledOnce();
+    expect(b.getUser).toHaveBeenCalledOnce();
+    expect(createCookieAuthClient).toHaveBeenCalledTimes(2);
+  });
+
+  it("contains no legacy RPC, privileged client, metadata role or credential logging path", () => {
     const source = readFileSync(
       join(
         process.cwd(),
@@ -322,11 +349,17 @@ describe("Communication Note strict provider principal", () => {
 
     expect(source).toMatch(/^import "server-only";/);
     expect(source).not.toMatch(
+      /resolve_v1_shadow_session_status|createCaresLinkV1SessionStatusRpcClient|createSessionStatusClient|p_user_id|p_session_id|getSession|service_role|sb_secret_/,
+    );
+    expect(source).not.toMatch(
       /referral-workspace|createWorkspaceAccountFromSupabaseUser|user_metadata|raw_user_meta_data/,
     );
     expect(source).not.toMatch(/console\.|logger\.|request\.json\(|request\.url/);
     expect(source.indexOf('request.headers.has("authorization")')).toBeLessThan(
       source.indexOf("resolveCaresLinkV1ProductApiAuth(request"),
+    );
+    expect(source.indexOf("let requestClient")).toBeGreaterThan(
+      source.indexOf("return async (request: Request)"),
     );
   });
 });
@@ -345,13 +378,13 @@ type AuthClientOverrides = {
   userId?: string;
   claimsError?: { message?: string };
   userError?: { message?: string };
+  status?: "ACTIVE" | "REVOKED";
+  rpcResult?: unknown;
+  onGetClaims?: () => void | Promise<void>;
 };
 
 function authClient(overrides: AuthClientOverrides = {}) {
-  const claimUserId = Object.prototype.hasOwnProperty.call(
-    overrides,
-    "claimUserId",
-  )
+  const claimUserId = Object.prototype.hasOwnProperty.call(overrides, "claimUserId")
     ? overrides.claimUserId
     : USER_ID;
   const sessionId = Object.prototype.hasOwnProperty.call(overrides, "sessionId")
@@ -360,23 +393,41 @@ function authClient(overrides: AuthClientOverrides = {}) {
   const userId = Object.prototype.hasOwnProperty.call(overrides, "userId")
     ? overrides.userId
     : USER_ID;
-  const getClaims = vi.fn(async () =>
-    overrides.claimsError
+  const getClaims = vi.fn(async () => {
+    await overrides.onGetClaims?.();
+    return overrides.claimsError
       ? { data: null, error: overrides.claimsError }
       : {
           data: { claims: { sub: claimUserId, session_id: sessionId } },
           error: null,
-        },
-  );
+        };
+  });
   const getUser = vi.fn(async () =>
     overrides.userError
       ? { data: { user: null }, error: overrides.userError }
       : { data: { user: userId ? { id: userId } : null }, error: null },
   );
+  const rpc = vi.fn(async () =>
+    Object.prototype.hasOwnProperty.call(overrides, "rpcResult")
+      ? overrides.rpcResult
+      : { data: overrides.status ?? "ACTIVE", error: null },
+  );
 
   return {
-    client: { auth: { getClaims, getUser } } as CaresLinkV1ProductApiAuthClient,
+    client: {
+      auth: { getClaims, getUser },
+      rpc,
+    } as CommunicationNoteGenerationAuthenticatedClient,
     getClaims,
     getUser,
+    rpc,
   };
+}
+
+function deferred<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  const promise = new Promise<T>((next) => {
+    resolve = next;
+  });
+  return { promise, resolve };
 }
