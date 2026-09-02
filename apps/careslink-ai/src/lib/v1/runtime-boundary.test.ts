@@ -99,6 +99,8 @@ describe("V1 shadow runtime boundary", () => {
       "src/lib/v1/product-api-runtime.server.ts",
       "src/lib/v1/product-api-session-status.server.ts",
       "src/lib/v1/product-api-supabase.server.ts",
+      "src/lib/communication-note-generation-principal.server.ts",
+      "src/lib/communication-note-generation-principal-composition.server.ts",
     ]) {
       expect(readFileSync(join(process.cwd(), relativePath), "utf8")).toMatch(
         /^import "server-only";/,
@@ -1079,6 +1081,18 @@ describe("V1 shadow runtime boundary", () => {
       process.cwd(),
       "src/lib/v1/runtime-boundary.test.ts",
     );
+    const principalCompositionPath = join(
+      process.cwd(),
+      "src/lib/communication-note-generation-principal-composition.server.ts",
+    );
+    const principalCompositionTestPath = join(
+      process.cwd(),
+      "src/lib/communication-note-generation-principal-composition.server.test.ts",
+    );
+    const sessionStatusPath = join(
+      process.cwd(),
+      "src/lib/v1/product-api-session-status.server.ts",
+    );
     const routeSource = readFileSync(
       join(
         process.cwd(),
@@ -1098,6 +1112,27 @@ describe("V1 shadow runtime boundary", () => {
           "createTestOnlyCommunicationNoteGenerationHandler",
         ),
     );
+    const principalCompositionImporters = walkControlledScriptFiles().filter(
+      (file) =>
+        file !== principalCompositionPath &&
+        file !== boundaryTestPath &&
+        readFileSync(file, "utf8").includes(
+          "communication-note-generation-principal-composition",
+        ),
+    );
+    const principalCompositionSource = readFileSync(
+      principalCompositionPath,
+      "utf8",
+    );
+    const privilegedClientFactoryImporters =
+      walkControlledScriptFiles().filter(
+        (file) =>
+          file !== sessionStatusPath &&
+          file !== boundaryTestPath &&
+          readFileSync(file, "utf8").includes(
+            "createCaresLinkV1SessionStatusRpcClient",
+          ),
+      );
 
     expect(routeSource).toContain("export async function POST");
     expect(routeSource).not.toMatch(
@@ -1107,6 +1142,9 @@ describe("V1 shadow runtime boundary", () => {
     expect(routeSource).toContain(
       "@/lib/communication-note-generation-route.server",
     );
+    expect(routeSource).not.toContain(
+      "communication-note-generation-principal-composition",
+    );
     expect(routeSource).not.toMatch(/@\/lib\/v1|SUPABASE_SERVICE_ROLE_KEY|service_role/i);
     expect(handlerSource).toMatch(/^import "server-only";/);
     expect(handlerSource).not.toMatch(
@@ -1115,7 +1153,23 @@ describe("V1 shadow runtime boundary", () => {
     expect(handlerSource).toContain(
       "COMMUNICATION_NOTE_GENERATION_SUBMITTER = undefined",
     );
+    expect(handlerSource).not.toContain(
+      "communication-note-generation-principal-composition",
+    );
     expect(testOnlyFactoryImporters).toEqual([handlerTestPath]);
+    expect(principalCompositionImporters).toEqual([
+      principalCompositionTestPath,
+    ]);
+    expect(privilegedClientFactoryImporters).toEqual([
+      principalCompositionPath,
+    ]);
+    expect(principalCompositionSource).toMatch(/^import "server-only";/);
+    expect(principalCompositionSource).toContain(
+      "COMMUNICATION_NOTE_GENERATION_FORMAL_PRINCIPAL_COMPOSITION =\n  undefined",
+    );
+    expect(principalCompositionSource).not.toContain(
+      "createCaresLinkV1SessionStatusResolverFromEnv",
+    );
   });
 
   it("keeps service-role repositories outside the client component tree", () => {

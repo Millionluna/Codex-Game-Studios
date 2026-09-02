@@ -24,7 +24,7 @@ describe("Communication Note strict provider principal", () => {
     const resolver = createCommunicationNoteGenerationPrincipalResolver({
       env: {},
       createCookieAuthClient,
-      sessionStatusClient: { rpc },
+      createSessionStatusClient: () => ({ rpc }),
     });
     const opaqueRequest = new Proxy({} as Request, {
       get() {
@@ -53,7 +53,7 @@ describe("Communication Note strict provider principal", () => {
       const resolver = createCommunicationNoteGenerationPrincipalResolver({
         env: enabledEnv(),
         createCookieAuthClient,
-        sessionStatusClient: { rpc },
+        createSessionStatusClient: () => ({ rpc }),
       });
       const request = new Request("https://careslink.example.test/generate", {
         headers: { authorization },
@@ -76,22 +76,27 @@ describe("Communication Note strict provider principal", () => {
     const { client, getClaims, getUser } = authClient();
     const createCookieAuthClient = vi.fn(async () => client);
     const rpc = vi.fn(async () => ({ data: "ACTIVE", error: null }));
+    const createSessionStatusClient = vi.fn(() => ({ rpc }));
     const resolver = createCommunicationNoteGenerationPrincipalResolver({
       env: enabledEnv(),
       createCookieAuthClient,
-      sessionStatusClient: { rpc },
+      createSessionStatusClient,
     });
 
     const result = await resolver(cookieRequest());
 
     expect(createCookieAuthClient).toHaveBeenCalledOnce();
     expect(getClaims).toHaveBeenCalledWith();
+    expect(createSessionStatusClient).toHaveBeenCalledOnce();
     expect(rpc).toHaveBeenCalledWith("resolve_v1_shadow_session_status", {
       p_user_id: USER_ID,
       p_session_id: SESSION_ID,
     });
     expect(getUser).toHaveBeenCalledWith();
     expect(getClaims.mock.invocationCallOrder[0]).toBeLessThan(
+      createSessionStatusClient.mock.invocationCallOrder[0],
+    );
+    expect(createSessionStatusClient.mock.invocationCallOrder[0]).toBeLessThan(
       rpc.mock.invocationCallOrder[0],
     );
     expect(rpc.mock.invocationCallOrder[0]).toBeLessThan(
@@ -109,6 +114,33 @@ describe("Communication Note strict provider principal", () => {
     expect(result.ok && Object.isFrozen(result.principal)).toBe(true);
   });
 
+  it("captures server-owned ports so a retained options object cannot replace them", async () => {
+    const { client } = authClient();
+    const originalCookieFactory = vi.fn(async () => client);
+    const rpc = vi.fn(async () => ({ data: "ACTIVE", error: null }));
+    const originalSessionFactory = vi.fn(() => ({ rpc }));
+    const options = {
+      env: enabledEnv(),
+      createCookieAuthClient: originalCookieFactory,
+      createSessionStatusClient: originalSessionFactory,
+    };
+    const resolver = createCommunicationNoteGenerationPrincipalResolver(
+      options,
+    );
+    const retained = options as Record<string, unknown>;
+    retained.env = {};
+    retained.createCookieAuthClient = vi.fn(() => {
+      throw new Error("replaced Cookie port");
+    });
+    retained.createSessionStatusClient = vi.fn(() => {
+      throw new Error("replaced privileged port");
+    });
+
+    await expect(resolver(cookieRequest())).resolves.toMatchObject({ ok: true });
+    expect(originalCookieFactory).toHaveBeenCalledOnce();
+    expect(originalSessionFactory).toHaveBeenCalledOnce();
+  });
+
   it.each([
     {
       name: "claims verifier error",
@@ -119,10 +151,11 @@ describe("Communication Note strict provider principal", () => {
   ])("rejects $name before the session RPC and getUser", async ({ overrides }) => {
     const { client, getUser } = authClient(overrides);
     const rpc = vi.fn(async () => ({ data: "ACTIVE", error: null }));
+    const createSessionStatusClient = vi.fn(() => ({ rpc }));
     const resolver = createCommunicationNoteGenerationPrincipalResolver({
       env: enabledEnv(),
       createCookieAuthClient: async () => client,
-      sessionStatusClient: { rpc },
+      createSessionStatusClient,
     });
 
     await expect(resolver(cookieRequest())).resolves.toEqual({
@@ -130,9 +163,50 @@ describe("Communication Note strict provider principal", () => {
       reason: "auth_required",
       status: 401,
     });
+    expect(createSessionStatusClient).not.toHaveBeenCalled();
     expect(rpc).not.toHaveBeenCalled();
     expect(getUser).not.toHaveBeenCalled();
   });
+
+  it.each([
+    {
+      name: "missing",
+      createSessionStatusClient: vi.fn(() => undefined),
+    },
+    {
+      name: "malformed",
+      createSessionStatusClient: vi.fn(() => ({}) as never),
+    },
+    {
+      name: "throwing",
+      createSessionStatusClient: vi.fn(() => {
+        throw new Error("private privileged-client detail");
+      }),
+    },
+  ])(
+    "fails closed when the privileged session client is $name",
+    async ({ createSessionStatusClient }) => {
+      const { client, getUser } = authClient();
+      const resolver = createCommunicationNoteGenerationPrincipalResolver({
+        env: enabledEnv(),
+        createCookieAuthClient: async () => client,
+        createSessionStatusClient,
+      });
+
+      const result = await resolver(cookieRequest());
+
+      expect(result).toEqual({
+        ok: false,
+        reason: "unavailable",
+        status: 503,
+      });
+      expect(createSessionStatusClient).toHaveBeenCalledOnce();
+      expect(getUser).not.toHaveBeenCalled();
+      expect(JSON.stringify(result)).not.toContain(
+        "private privileged-client detail",
+      );
+    },
+  );
 
   it("maps revoked or ineligible provider authority to SESSION_REVOKED before getUser", async () => {
     const { client, getUser } = authClient();
@@ -140,7 +214,7 @@ describe("Communication Note strict provider principal", () => {
     const resolver = createCommunicationNoteGenerationPrincipalResolver({
       env: enabledEnv(),
       createCookieAuthClient: async () => client,
-      sessionStatusClient: { rpc },
+      createSessionStatusClient: () => ({ rpc }),
     });
 
     await expect(resolver(cookieRequest())).resolves.toEqual({
@@ -174,7 +248,7 @@ describe("Communication Note strict provider principal", () => {
     const resolver = createCommunicationNoteGenerationPrincipalResolver({
       env: enabledEnv(),
       createCookieAuthClient: async () => client,
-      sessionStatusClient: { rpc },
+      createSessionStatusClient: () => ({ rpc }),
     });
 
     const result = await resolver(cookieRequest());
@@ -206,9 +280,9 @@ describe("Communication Note strict provider principal", () => {
     const resolver = createCommunicationNoteGenerationPrincipalResolver({
       env: enabledEnv(),
       createCookieAuthClient: async () => client,
-      sessionStatusClient: {
+      createSessionStatusClient: () => ({
         rpc: vi.fn(async () => ({ data: "ACTIVE", error: null })),
-      },
+      }),
     });
 
     const result = await resolver(cookieRequest());
@@ -226,7 +300,7 @@ describe("Communication Note strict provider principal", () => {
     const resolver = createCommunicationNoteGenerationPrincipalResolver({
       env: enabledEnv(),
       createCookieAuthClient: async () => undefined,
-      sessionStatusClient: { rpc },
+      createSessionStatusClient: () => ({ rpc }),
     });
 
     await expect(resolver(cookieRequest())).resolves.toEqual({

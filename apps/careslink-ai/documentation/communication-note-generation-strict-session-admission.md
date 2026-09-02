@@ -50,13 +50,48 @@ real route stops at `503 PRODUCT_API_DISABLED` before authority inspection.
 The route never returns the user or session ID, and errors never reflect tokens,
 upstream messages or facts.
 
+## Source-only target and custody composition
+
+The follow-up composition remains outside the route and has a formal export of
+`undefined`. Its executable source factory fails closed unless all of these
+conditions hold together:
+
+1. composition, generation and Product master flags are exact `true`;
+2. `VERCEL=1`, `VERCEL_ENV=preview` and `VERCEL_TARGET_ENV=preview`;
+3. expected and platform-provided Vercel project IDs are valid and identical;
+4. the expected Supabase ref is exactly 20 lowercase alphanumeric characters
+   and is not the known Production ref;
+5. server and public Supabase URLs are both byte-exact
+   `https://<ref>.supabase.co` with no credentials, port, slash, path, query or
+   fragment;
+6. server and public keys are identical `sb_publishable_` values;
+7. the dedicated session-status value is an `sb_secret_` and is neither absent
+   nor equal to the generic secret/service-role or privacy-review credential.
+
+The validated configuration is frozen and rechecked before constructing the
+Cookie client and again after claims, before constructing the privileged
+client. No client is created at module import or composition-factory time. Any
+`Authorization` header creates neither client; invalid claims can create the
+Cookie client but never the privileged client. Successful ordering is fixed as
+`getClaims → dedicated-client factory → exact RPC → getUser`.
+
+This is exact target and credential-custody separation, not database least
+privilege. The current `SECURITY DEFINER` RPC explicitly requires JWT role
+`service_role`, revokes general execution and grants execution only to
+`service_role`. A dedicated `sb_secret_` therefore remains
+service-role-equivalent and bypasses RLS even though application code exposes
+only this RPC through the new client interface.
+
 ## Deliberate limits and next gate
 
-The factory has no ambient service-role or URL composition. Formal installation
-still requires an exact non-Production target guard, approved credential
-custody, least-privilege RPC client and live eligible/revoked-session evidence.
-Existing Web users must also be checked or normalized to the trusted exact
-Provider role expected by the RPC.
+Formal installation first requires a separate migration for an authenticated,
+zero-argument current-session RPC. It must derive only `auth.uid()` and the JWT
+`session_id`, accept no caller-provided identity, revoke
+`PUBLIC`/`anon`/`service_role` execution and grant only `authenticated`, with a
+fixed empty search path and reviewed catalog assertions. Existing Web users
+must also be checked or normalized to the trusted exact Provider role expected
+by the predicate, followed by same-revision live active/revoked evidence on a
+disposable no-data Preview.
 
 Request-time admission is not sufficient by itself. The future durable owner
 enqueue RPC must re-read the active session and privacy authority inside the

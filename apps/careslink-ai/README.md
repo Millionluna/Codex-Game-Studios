@@ -279,14 +279,24 @@ rejects every `Authorization` header before Auth work, verifies JWT claims,
 requires the exact Auth `session_id` to be active for an eligible Provider, and
 then matches the authoritative Auth user. The formal principal resolver and
 submission port both remain `undefined`, so this is not live cookie-session or
-database evidence. The remaining boundary freezes same-origin HTTPS, bounded
+database evidence. A later source-only wrapper now models exact Vercel Preview
+and project binding, a configured ref distinct from the pinned known Production
+ref, byte-exact canonical Supabase URLs, matching
+`sb_publishable_` keys, frozen configuration revalidation and a dedicated,
+no-fallback `sb_secret_` client created only after valid claims. Its formal
+composition export is also `undefined`, and the physical route does not import
+it. That dedicated key remains service-role-equivalent and bypasses RLS; this
+is custody separation, not database least privilege. The remaining boundary
+freezes same-origin HTTPS, bounded
 JSON, exact Communication Note facts, both privacy confirmations, server-side
 dual privacy scanning, idempotency and an owner-safe admission response. A new
 admission returns `202`; an exact replay returns `200` with the current strictly
 parsed job state. It does not connect the composer button, a model, Points,
 payload storage, a worker, Supabase generation RPCs, Preview or Production. See
 `documentation/communication-note-generation-api-m1x.md` and
-`documentation/communication-note-generation-strict-session-admission.md`.
+`documentation/communication-note-generation-strict-session-admission.md`,
+plus the source-only handoff in
+`documentation/communication-note-generation-principal-composition.md`.
 
 ## NDIS Case Note AI Companion
 

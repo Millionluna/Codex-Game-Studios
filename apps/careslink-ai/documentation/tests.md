@@ -3190,14 +3190,20 @@ gate below.
 No UI action was enabled, no owner repository or database was called, and no
 Points, payload vault, worker, provider/model, GCP, Supabase management,
 Preview, Production or deployment action occurred. See
-`documentation/communication-note-generation-api-m1x.md`.
+`documentation/communication-note-generation-api-m1x.md` and
+`documentation/communication-note-generation-principal-composition.md`.
 
-The pure injected strict-principal seam is not live Cookie/Auth/session evidence.
-Activation still requires exact Preview target binding, least-privilege client
-composition, live active/revoked-session proof and same-transaction owner
-admission reauthorization.
+The pure strict-principal and source-only composition seams are not live
+Cookie/Auth/session evidence. The composition now proves exact Vercel
+Preview/project variables, configured-ref/known-Production denial,
+canonical-URL binding and dedicated no-fallback credential custody, but it does
+not query Supabase branch provenance/status and its `sb_secret_` remains
+service-role-equivalent and bypasses RLS.
+Activation still requires an authenticated self-session RPC, formal
+least-privilege installation, live active/revoked-session proof and
+same-transaction owner admission reauthorization.
 
-#### Strict Cookie principal follow-up — local source evidence
+#### Strict Cookie principal and source-only composition — local evidence
 
 The new resolver reuses the Product Auth order `getClaims` → exact
 `resolve_v1_shadow_session_status(user_id, session_id)` → `getUser`. The RPC's
@@ -3208,14 +3214,29 @@ failed. Invalid/missing Cookie identity returns `401 AUTH_REQUIRED`, any
 `Authorization` transport returns `403 FORBIDDEN`, and unavailable authority
 returns `503 PRODUCT_API_DISABLED`.
 
-The formal resolver remains absent, the service RPC is not called by the real
-route, and no target/credential client was composed. The source gate therefore
-proves fail-closed ordering and mapping only, not a live database transaction or
-activation. The exact focused gate, including the session-SQL migration
-contract, passed 8 files / 140 tests; the full Vitest suite passed 203 files /
-2,793 tests; TypeScript, full ESLint, the 73-file Codex
-adapter check, `git diff --check` and the Next.js 16.2.9 Webpack production build
-with 64/64 static pages passed.
+The new composition matrix covers all three application flags, Vercel runtime
+and dual Preview environment values, expected/actual project identity,
+20-character configured Supabase ref distinct from the pinned known Production
+ref, byte-exact canonical URL on both
+server/public variables, matching `sb_publishable_` values, dedicated
+`sb_secret_` presence and generic-key no-fallback/no-reuse. It proves no client
+at import/factory time, no clients for any `Authorization` header, no privileged
+client for invalid claims, the exact
+`getClaims → privileged factory → RPC → getUser` order, frozen configuration
+drift denial, fixed secret-free failures and static route/importer quarantine.
+Injected environment/client ports require a TestOnly capability, the default
+path reads only the process environment, and the low-level privileged factory
+has no other direct external importer than this composition. Its defining
+session-status module still uses the same factory internally for the legacy
+`create...FromEnv` default.
+
+The formal composition and resolver remain absent, the real route does not
+import the composition, and no service RPC is called by the real route. These
+tests prove source ordering, target/custody validation and failure mapping only,
+not a live database transaction or activation. The exact focused gate passed 9
+files / 196 tests; the full Vitest suite passed 204 files / 2,837 tests.
+TypeScript, full ESLint, the 73-file Codex adapter check, `git diff --check` and
+the Next.js 16.2.9 Webpack production build with 64/64 static pages passed.
 
 ### Current live/read-only evidence
 

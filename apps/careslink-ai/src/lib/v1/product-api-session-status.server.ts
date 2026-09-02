@@ -36,7 +36,7 @@ export type CaresLinkV1SessionStatusRpcClient = {
 
 export type CaresLinkV1SessionStatusRpcClientFactory = (
   supabaseUrl: string,
-  serviceRoleKey: string,
+  privilegedServerKey: string,
 ) => CaresLinkV1SessionStatusRpcClient;
 
 /**
@@ -82,7 +82,7 @@ export function createCaresLinkV1SessionStatusResolverFromEnv(
   env: CaresLinkV1SessionStatusEnv =
     process.env as CaresLinkV1SessionStatusEnv,
   createClient: CaresLinkV1SessionStatusRpcClientFactory =
-    createSupabaseSessionStatusClient,
+    createCaresLinkV1SessionStatusRpcClient,
 ): CaresLinkV1SessionStatusResolver | undefined {
   const supabaseUrl = env.SUPABASE_URL ?? env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceRoleKey = env.SUPABASE_SERVICE_ROLE_KEY;
@@ -100,11 +100,11 @@ export function createCaresLinkV1SessionStatusResolverFromEnv(
   }
 }
 
-function createSupabaseSessionStatusClient(
+export function createCaresLinkV1SessionStatusRpcClient(
   supabaseUrl: string,
-  serviceRoleKey: string,
+  privilegedServerKey: string,
 ): CaresLinkV1SessionStatusRpcClient {
-  return createSupabaseClient(supabaseUrl, serviceRoleKey, {
+  return createSupabaseClient(supabaseUrl, privilegedServerKey, {
     auth: {
       autoRefreshToken: false,
       detectSessionInUrl: false,
