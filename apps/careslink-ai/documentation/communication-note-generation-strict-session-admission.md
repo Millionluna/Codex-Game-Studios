@@ -87,6 +87,26 @@ general execution and grants execution only to `authenticated`. Its migration
 remains unapplied, so the source wiring is not live database least-privilege or
 Cookie/Auth evidence.
 
+## Communication Note atomic 20-Point admission — source only
+
+The later Production-unapplied migration
+`20260902063211_add_v1_communication_note_points_admission.sql` closes the
+source-level time-of-check/time-of-use gap for Communication admission. Its
+private coordinator re-reads the current session and privacy authority inside
+the same transaction that admits the durable job and reserves the fixed 20
+Points. Exact same-key replay repeats those checks and is zero-write; an
+authority, expiry or balance failure rolls back the job, payload and all Points
+writes.
+
+The adapter remains `READY=false`, TestOnly and unwired: no route importer,
+caller grant, pool or database URL exists. Paid admitted jobs stay `QUEUED` and
+cannot be claimed, recovered, attempted, cancelled or terminalized through the
+legacy Points functions. This is reserve-only source/local evidence, not a live
+principal installation. A21 is serial rollback-only; a separate five-scenario,
+15-PID local PostgreSQL 16.15 run supplies the concurrency evidence. Neither
+batch used Hosted, Production, a new Preview, deployment, a model or real care
+data.
+
 ## Deliberate limits and next gate
 
 The repository migration supplies the authenticated, zero-argument
@@ -98,12 +118,15 @@ migration remains unapplied and the formal composition/resolver remain absent.
 Formal installation, trusted Provider role normalization and same-revision live
 active/revoked proof on a disposable no-data Preview remain separate.
 
-Request-time admission is not sufficient by itself. The future durable owner
-enqueue RPC must re-read the active session and privacy authority inside the
-same database transaction that accepts the job, closing the time-of-check to
-time-of-use window. Only a registered asynchronous worker may later invoke an
-approved model; the HTTP request thread must not do so.
+Request-time admission is not sufficient by itself. The later source coordinator
+now re-reads the active session and privacy authority inside the same database
+transaction that accepts the job and reserves 20 Points, closing that source
+time-of-check/time-of-use window. Formal caller installation, terminal
+success/commit or failure/cancellation/release, and worker unquarantine remain
+absent. Only a registered asynchronous worker may later invoke an approved
+model; the HTTP request thread must not do so.
 
-This batch creates or contacts no live or ambient client, database connection,
+The strict-session composition batch itself creates or contacts no live or
+ambient client, database connection,
 Preview, Production resource, deployment, payload, Point transaction or model
 call. Tests use only explicit in-memory mock ports.

@@ -298,6 +298,30 @@ Library, Guides, Updates, notifications and account export/delete follow the
 Notes/document/export slice and use the same versioned contract, not Portal-only
 sync rules.
 
+### Communication Note atomic 20-Point admission — source only
+
+This 2026-09-02 post-checkpoint delta supersedes only the roadmap wording above;
+it does not rewrite the 2026-08-26 evidence. A physical Communication generation
+route and durable owner repository now exist in source, but compile-time
+readiness and formal principal/submission exports remain closed and the route
+imports neither repository nor Points adapter.
+
+The sixth Production-unapplied generation migration now atomically rechecks
+session/privacy authority, admits a Communication durable job and reserves the
+fixed 20-Point rate. It creates no welcome grant and changes no legacy credit.
+Fresh admission deliberately leaves the paid job `QUEUED`; the private marker
+quarantines it from claim, recovery, attempts, cancellation and legacy Points
+commit/release. Terminal success/commit and failure/cancellation/release remain a
+future atomic boundary, so this source must not be activated.
+
+The TestOnly adapter returns no private binding or Points ID. Authenticated
+owners may nevertheless read IDs on their own public Points rows under existing
+RLS; the private job-to-Points binding remains inaccessible. Serial A21 and a
+separate five-scenario/15-PID local PostgreSQL 16.15 concurrency run provide
+source/local transaction evidence only. No Hosted or Production database, new
+Preview, deployment, model invocation or real care data was used, and this delta
+does not authorize any of those actions.
+
 ## 6. First safe local batch and evidence
 
 Referral foundation included in this batch:

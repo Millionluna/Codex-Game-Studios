@@ -12,7 +12,7 @@ M1x adds a real HTTP Route Handler boundary but does not activate generation.
 - Formal strict-principal resolver: `undefined`
 - Formal submission port: `undefined`
 - UI connection: absent
-- Model, Points, database, payload vault and worker calls: absent
+- Formal-route model, Points, database, payload-vault and worker calls: absent
 
 The environment value is intentionally insufficient. Even when it is exactly
 `true`, the compile-time latch keeps the formal route closed and returns
@@ -101,20 +101,50 @@ additionally does not import or call:
 
 - the M1r–M1v Preview composition and cloud/provider bridges;
 - `createTestOnlyCaresLinkV1NoteGenerationOwnerRepository`;
+- `createTestOnlyCaresLinkV1CommunicationNotePointsAdmissionRepository`;
 - the OpenAI Communication Note provider;
 - memory or durable Points stores;
 - a payload vault, PostgreSQL client, Supabase management API or GCP resource.
 
 The M1r–M1v terminal port is synthetic Preview evaluation persistence, not a
-product generation port. A future approved implementation must stage a
-retention-bounded payload, bind an active session and server privacy proof,
-reserve 20 Points, call a formal owner admission repository, and let a
-registered asynchronous worker invoke an approved provider. The request thread
-must never bypass that chain by calling the model directly.
+product generation port. The later source-only coordinator described below can
+use the existing durable payload-admission contract, recheck session/privacy,
+admit the job and reserve exactly 20 Points atomically, but it is not a formal route
+dependency or activation mechanism. A future approved implementation must add
+the terminal commit/release transaction and let a registered asynchronous worker
+invoke an approved provider. The request thread must never bypass that chain by
+calling the model directly.
 
 The source guard does not query Supabase branch/control-plane metadata. It does
 not prove that the configured ref is disposable, non-default, healthy or a
 child of Production; those remain live Preview evidence requirements.
+
+## Communication Note atomic 20-Point admission — source only
+
+Migration
+`20260902063211_add_v1_communication_note_points_admission.sql` supplies the
+unapplied private transaction that M1x previously left as a future boundary.
+Fresh admission produces a `QUEUED` job at attempt 0, an `AVAILABLE` payload and
+one reservation at the fixed `2026-08-09.v1-shadow` Communication rate of
+exactly 20 Points. Same-key replay rechecks the binding, current session, privacy
+authority and expiry state and writes nothing. An owner-wide advisory lock plus
+deterministic lot order prevents oversubscription; any failure inside that
+admission statement/transaction rolls back both domains.
+
+The corresponding server adapter is fixed `READY=false`, TestOnly, opens no pool,
+reads no database URL, and has no route importer or caller grant. Its result DTO
+omits private binding and Points IDs. This is an API-minimization guarantee, not
+a claim that public Points IDs are invisible: the authenticated owner retains
+historical RLS reads of their own quote, reservation, allocation and ledger rows.
+
+The paid job deliberately remains `QUEUED` and cannot be claimed, recovered,
+attempted, cancelled or passed through legacy Points commit/release. There is no
+terminal settlement, welcome grant or legacy-credit change. A21 provides serial
+rollback-only evidence; separate local PostgreSQL 16.15 three-client evidence
+covers fixed-20 same-key replay, different-key oversubscription, authority/
+expiry failure and generic terminal-operation denial. It is not Hosted,
+Production, deployment or activation evidence. Full evidence and cleanup facts
+are recorded in `documentation/tests.md`.
 
 ## Remaining activation gates
 
@@ -124,7 +154,9 @@ child of Production; those remain live Preview evidence requirements.
 - trusted Provider role normalization compatible with the RPC's exact
   `app_metadata.role=provider` predicate;
 - live privacy-proof owner/type/schema/hash/expiry binding;
-- Points quote/reserve/job/commit-or-release transaction contract;
+- formal installation of the source-only atomic Communication
+  admission/reservation repository and a separately proven terminal
+  success/commit or failure/cancellation/release transaction;
 - encrypted, retention-bounded payload vault and orphan/purge recovery;
 - formal owner repository factory, least-privilege caller and `EXECUTE` grant,
   with session/privacy reauthorization inside the enqueue transaction;
@@ -132,9 +164,9 @@ child of Production; those remain live Preview evidence requirements.
 - same-revision disposable no-data Preview, deployment and rollback evidence;
 - separate owner approval for any cloud spend, provider call or Production step.
 
-The authenticated current-session migration remains unapplied. The source
-rewiring and its local tests provide no live Cookie/Auth/database evidence, none
-of the remaining approvals and no external-resource change.
+The authenticated current-session and atomic Points-admission migrations remain
+unapplied. Their source/local tests provide no live Cookie/Auth/database
+evidence, none of the remaining approvals and no external-resource change.
 
 ## Local verification
 
@@ -149,3 +181,7 @@ of the remaining approvals and no external-resource change.
 
 These results are source/build evidence only. They do not represent a live
 Preview, a model evaluation, a database gate or Production readiness.
+
+The newer atomic-admission source/local evidence is intentionally reported
+separately in `documentation/tests.md`; the historical M1x counts above are not
+relabelled as an aggregate result for that later batch.

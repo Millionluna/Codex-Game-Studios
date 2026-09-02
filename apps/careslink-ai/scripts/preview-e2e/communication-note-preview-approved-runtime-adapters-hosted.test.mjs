@@ -291,10 +291,14 @@ describe("Communication Note M1n approved runtime Hosted runner policy", () => {
       );
     expect(manifest.paths).toEqual([...manifest.paths].sort());
     expect(new Set(manifest.paths).size).toBe(manifest.paths.length);
+    expect(manifest.paths).toHaveLength(69);
     expect(manifest.paths).toContain("pnpm-lock.yaml");
     expect(manifest.paths).toContain("tsconfig.json");
     expect(manifest.paths).not.toContain("package-lock.json");
-    expect(manifest.migrationVersions).toHaveLength(42);
+    expect(manifest.paths).toContain(
+      "supabase/migrations/20260902063211_add_v1_communication_note_points_admission.sql",
+    );
+    expect(manifest.migrationVersions).toHaveLength(43);
     expect(manifest.migrationVersions.every((version) => /^\d{14}$/.test(version)))
       .toBe(true);
 
@@ -330,7 +334,7 @@ describe("Communication Note M1n approved runtime Hosted runner policy", () => {
     );
   });
 
-  it("passes the exact ordered 42-version migration manifest to preflight", async () => {
+  it("passes the exact ordered 43-version migration manifest to preflight", async () => {
     const appDirectory = fileURLToPath(new URL("../../", import.meta.url));
     const manifest =
       await readCommunicationNotePreviewApprovedRuntimeAdaptersHostedSourceManifest(
@@ -360,6 +364,7 @@ describe("Communication Note M1n approved runtime Hosted runner policy", () => {
       }, manifest.migrationVersions);
     expect(calls).toHaveLength(1);
     expect(calls[0].sql).toContain("array_agg");
+    expect(calls[0].sql).toContain("communication_note_point_admissions");
     expect(calls[0].values[1]).toEqual(manifest.migrationVersions);
   });
 
@@ -426,13 +431,14 @@ describe("Communication Note M1n approved runtime Hosted runner policy", () => {
       memberships_absent: true,
       api_privilege_count: 0,
       verifier_hash_only_count: 3,
-      ledger_counts: [3, 0, 3, 3, 3, 1],
+      ledger_counts: [3, 0, 3, 3, 3, 1, 0],
     };
     await expect(
       COMMUNICATION_NOTE_PREVIEW_APPROVED_RUNTIME_ADAPTERS_HOSTED_TEST_ONLY
         .verifyPostcondition({
           async query(sql) {
             expect(sql).toContain("credential_verifier_sha256 ~");
+            expect(sql).toContain("communication_note_point_admissions");
             return { rowCount: 1, rows: [row] };
           },
         }),

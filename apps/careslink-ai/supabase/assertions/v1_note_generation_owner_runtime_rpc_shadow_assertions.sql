@@ -5,12 +5,19 @@
 -- binding, job, payload, caller credential, route, model, vault object or
 -- Points mutation.
 -- Production must never be the SQL target. On 2026-08-25, official Supabase
--- CLI 2.115.0 executed this exact assertion body in the final disposable
+-- CLI 2.115.0 executed the then-current pre-paid-admission assertion body in
+-- the final disposable
 -- no-data r5 gate: 30/30 migrations, 11/11 rollback suites and the independent
 -- posture postcheck passed. r5 was hosted-role-restore-r5-20260825, id
 -- d68d531a-55e6-4374-be68-494da7542c75 and ref eqqlvqqhvsogusqhzuaq;
 -- deletion and exact id/ref absence were confirmed. Production was never a
 -- SQL target.
+-- That historical pre-admission BEGIN-through-ROLLBACK body was 104506 UTF-8
+-- bytes with SHA-256
+-- 53eb0f2c5265617f00ea37ab946ac9c9746589fddca39236279ba93bb2907b16.
+-- The current admission-aware body is 106523 UTF-8 bytes with SHA-256
+-- 84cce9bf08bb1e9d8b7b2c9de50f8508ca16f94600d463cd5449c93b60172832;
+-- it is locally pinned and remains pending a fresh disposable hosted rerun.
 -- The wall-clock fixtures below distinguish clock time from transaction start
 -- time; they do not claim to replace a separate two-connection lock-wait race.
 
@@ -115,6 +122,7 @@ begin
 
   if v_actual is distinct from array[
     'admission_policy_bindings', 'attempts',
+    'communication_note_point_admissions',
     'communication_note_preview_authorization_revocations',
     'communication_note_preview_authorizations',
     'communication_note_preview_claims',
@@ -241,6 +249,7 @@ begin
           'anon', 'authenticated', 'service_role',
           'careslink_v1_generation_owner',
           'careslink_v1_generation_executor',
+          'careslink_v1_generation_points_admission_executor',
           'careslink_v1_generation_registration_control_executor'
         )
     ) then
@@ -262,6 +271,7 @@ begin
           'anon', 'authenticated', 'service_role',
           'careslink_v1_generation_owner',
           'careslink_v1_generation_executor',
+          'careslink_v1_generation_points_admission_executor',
           'careslink_v1_generation_registration_control_executor'
         )
       )
@@ -376,6 +386,7 @@ begin
     'anon', 'authenticated', 'service_role',
     'careslink_v1_generation_executor',
     'careslink_v1_generation_owner',
+    'careslink_v1_generation_points_admission_executor',
     'careslink_v1_generation_registration_control_executor'
   ] loop
     if has_function_privilege(
@@ -556,6 +567,8 @@ begin
         ('careslink_v1_generation._owner_api_assert_contract(text,text)'::regprocedure::oid),
         ('careslink_v1_generation._owner_api_job_view(uuid,uuid)'::regprocedure::oid),
         ('careslink_v1_generation.admit_and_enqueue_v1_shadow_note_generation_job(uuid,uuid,text,uuid,uuid,uuid,text,text,text,text,text,text,text,text,timestamptz)'::regprocedure::oid),
+        ('careslink_v1_generation._reserve_and_bind_v1_shadow_communication_note_points(uuid,uuid,uuid,boolean)'::regprocedure::oid),
+        ('careslink_v1_generation.admit_and_reserve_v1_shadow_communication_note_generation_job(uuid,uuid,text,uuid,uuid,uuid,text,text,text,text,text,text,text,timestamptz)'::regprocedure::oid),
         ('careslink_v1_generation.get_v1_shadow_note_generation_job_status(uuid,uuid,uuid,text,text)'::regprocedure::oid),
         ('careslink_v1_generation.cancel_v1_shadow_note_generation_job(uuid,uuid,uuid,text,text)'::regprocedure::oid)
     ),
@@ -3049,6 +3062,51 @@ select pg_catalog.set_config(
   pg_catalog.current_setting('careslink.assertion_entry_role'),
   false
 );
+
+-- The historical owner admission path remains unpaid. This check inspects the
+-- durable rows produced above rather than trusting an RPC response envelope.
+set local role careslink_v1_generation_owner;
+alter table careslink_v1_generation.jobs no force row level security;
+alter table careslink_v1_generation.communication_note_point_admissions
+  no force row level security;
+do $$
+begin
+  if exists (
+      select 1
+      from careslink_v1_generation.jobs
+      where communication_note_point_admission_id is not null
+    )
+    or exists (
+      select 1
+      from careslink_v1_generation.communication_note_point_admissions
+    )
+  then
+    raise exception 'legacy owner admission unexpectedly acquired paid marker';
+  end if;
+end
+$$;
+alter table careslink_v1_generation.jobs force row level security;
+alter table careslink_v1_generation.communication_note_point_admissions
+  force row level security;
+select pg_catalog.set_config(
+  'role',
+  pg_catalog.current_setting('careslink.assertion_entry_role'),
+  false
+);
+
+do $$
+begin
+  if exists (select 1 from public.point_wallets)
+    or exists (select 1 from public.point_lots)
+    or exists (select 1 from public.point_quotes)
+    or exists (select 1 from public.point_reservations)
+    or exists (select 1 from public.point_reservation_allocations)
+    or exists (select 1 from public.point_ledger_entries)
+  then
+    raise exception 'legacy owner admission unexpectedly mutated Points';
+  end if;
+end
+$$;
 
 revoke careslink_v1_generation_owner_api_executor from current_user
   granted by current_user;

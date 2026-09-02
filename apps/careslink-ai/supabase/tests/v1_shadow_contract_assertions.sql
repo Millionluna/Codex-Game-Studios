@@ -15,6 +15,17 @@ declare
       'careslink_v1_generation.claim_v1_shadow_note_generation_job(text,text,text,text,text,text)'
     ) is not null;
   v_worker_extension_present boolean;
+  v_points_admission_role_present boolean :=
+    to_regrole('careslink_v1_generation_points_admission_executor') is not null;
+  v_points_admission_table_present boolean :=
+    to_regclass(
+      'careslink_v1_generation.communication_note_point_admissions'
+    ) is not null;
+  v_points_admission_rpc_present boolean :=
+    to_regprocedure(
+      'careslink_v1_generation.admit_and_reserve_v1_shadow_communication_note_generation_job(uuid,uuid,text,uuid,uuid,uuid,text,text,text,text,text,text,text,timestamptz)'
+    ) is not null;
+  v_points_admission_extension_present boolean;
 begin
   if v_worker_policy_table_present is distinct from
     v_worker_claim_rpc_present
@@ -22,6 +33,18 @@ begin
     raise exception 'Partial worker extension detected';
   end if;
   v_worker_extension_present := v_worker_policy_table_present;
+
+  if not (
+    v_points_admission_role_present = v_points_admission_table_present
+    and v_points_admission_table_present = v_points_admission_rpc_present
+  ) then
+    raise exception 'Partial Communication Note Points admission extension detected';
+  end if;
+  v_points_admission_extension_present := v_points_admission_role_present;
+  if v_points_admission_extension_present and not v_worker_extension_present
+  then
+    raise exception 'Points admission extension requires the worker extension';
+  end if;
 
   select count(*) into v_count
   from pg_class
@@ -212,7 +235,58 @@ begin
     raise exception 'Owner SELECT policy identity/table/role set is invalid';
   end if;
 
-  if v_worker_extension_present then
+  if v_points_admission_extension_present then
+    if v_count <> 22 then
+      raise exception
+        'Expected 14 owner, 2 worker and 6 Points admission SELECT policies, found %',
+        v_count;
+    end if;
+
+    if exists (
+      with expected_points_policies(policyname, tablename) as (
+        values
+          ('point_wallets_points_admission_select'::name, 'point_wallets'::name),
+          ('point_lots_points_admission_select'::name, 'point_lots'::name),
+          ('point_quotes_points_admission_select'::name, 'point_quotes'::name),
+          (
+            'point_reservations_points_admission_select'::name,
+            'point_reservations'::name
+          ),
+          (
+            'point_allocations_points_admission_select'::name,
+            'point_reservation_allocations'::name
+          ),
+          (
+            'point_ledger_points_admission_select'::name,
+            'point_ledger_entries'::name
+          )
+      ),
+      actual_points_policies as (
+        select policyname, tablename
+        from pg_policies
+        where schemaname = 'public'
+          and cmd = 'SELECT'
+          and roles =
+            array['careslink_v1_generation_points_admission_executor']::name[]
+          and tablename in (
+            'point_wallets', 'point_lots', 'point_quotes',
+            'point_reservations', 'point_reservation_allocations',
+            'point_ledger_entries'
+          )
+      ),
+      drift as (
+        (select * from expected_points_policies
+         except all select * from actual_points_policies)
+        union all
+        (select * from actual_points_policies
+         except all select * from expected_points_policies)
+      )
+      select 1 from drift
+    ) then
+      raise exception
+        'Points admission canonical SELECT policy identities are invalid';
+    end if;
+  elsif v_worker_extension_present then
     if v_count <> 16 then
       raise exception 'Expected 14 owner and 2 worker SELECT policies, found %',
         v_count;

@@ -29,11 +29,22 @@ import {
 export const CARESLINK_V1_NOTE_GENERATION_OWNER_REPOSITORY_READY =
   false as const;
 
+/**
+ * Purpose-specific source-only adapter for the atomic Communication Note
+ * admission + 20-Point reservation coordinator. It is intentionally not
+ * wired into the Product route or any live database capability.
+ */
+export const CARESLINK_V1_COMMUNICATION_NOTE_POINTS_ADMISSION_REPOSITORY_READY =
+  false as const;
+
 export const CARESLINK_V1_NOTE_GENERATION_OWNER_REPOSITORY_RPC_NAMES = {
   enqueue: "admit_and_enqueue_v1_shadow_note_generation_job",
   get: "get_v1_shadow_note_generation_job_status",
   cancel: "cancel_v1_shadow_note_generation_job",
 } as const;
+
+export const CARESLINK_V1_COMMUNICATION_NOTE_POINTS_ADMISSION_RPC_NAME =
+  "admit_and_reserve_v1_shadow_communication_note_generation_job" as const;
 
 export type CaresLinkV1NoteGenerationOwnerRepositoryQuery = (
   sql: string,
@@ -67,6 +78,23 @@ export type CaresLinkV1NoteGenerationOwnerAdmissionResult = Readonly<{
   created: boolean;
   payloadAccepted: boolean;
   job: CaresLinkV1NoteGenerationDurableOwnerView;
+}>;
+
+export type CaresLinkV1CommunicationNotePointsAdmissionInput = Readonly<
+  Omit<CaresLinkV1NoteGenerationOwnerAdmissionInput, "noteType">
+>;
+
+export type CaresLinkV1CommunicationNotePointsAdmissionResult = Readonly<{
+  created: boolean;
+  payloadAccepted: boolean;
+  pointsReserved: true;
+  job: CaresLinkV1NoteGenerationDurableOwnerView;
+}>;
+
+export type CaresLinkV1CommunicationNotePointsAdmissionRepository = Readonly<{
+  enqueue(
+    input: CaresLinkV1CommunicationNotePointsAdmissionInput,
+  ): Promise<CaresLinkV1CommunicationNotePointsAdmissionResult>;
 }>;
 
 export type CaresLinkV1NoteGenerationOwnerRepository = Readonly<{
@@ -125,6 +153,25 @@ const RPC_CALLS = Object.freeze({
   } satisfies RpcCall),
 });
 
+const COMMUNICATION_POINTS_ADMISSION_RPC_CALL = Object.freeze({
+  sql: `select careslink_v1_generation.admit_and_reserve_v1_shadow_communication_note_generation_job(
+  $1::pg_catalog.uuid,
+  $2::pg_catalog.uuid,
+  $3::pg_catalog.text,
+  $4::pg_catalog.uuid,
+  $5::pg_catalog.uuid,
+  $6::pg_catalog.uuid,
+  $7::pg_catalog.text,
+  $8::pg_catalog.text,
+  $9::pg_catalog.text,
+  $10::pg_catalog.text,
+  $11::pg_catalog.text,
+  $12::pg_catalog.text,
+  $13::pg_catalog.text,
+  $14::pg_catalog.timestamptz
+) as data`,
+} satisfies RpcCall);
+
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const INPUT_UUID_PATTERN =
@@ -152,6 +199,12 @@ const SAFE_DATABASE_MESSAGES = new Set([
   "VALIDATION_ERROR",
 ]);
 
+const COMMUNICATION_POINTS_SAFE_DATABASE_MESSAGES = new Set([
+  ...SAFE_DATABASE_MESSAGES,
+  "POINTS_INSUFFICIENT",
+  "POINT_QUOTE_EXPIRED",
+]);
+
 const FIXED_ERROR_MESSAGES: Readonly<Record<string, string>> = Object.freeze({
   AUTH_REQUIRED: "Authentication is required",
   SESSION_REVOKED: "The authenticated session is no longer active",
@@ -163,6 +216,8 @@ const FIXED_ERROR_MESSAGES: Readonly<Record<string, string>> = Object.freeze({
     "A valid privacy review is required before generation",
   PRIVACY_REVIEW_STALE:
     "Privacy review must be repeated before generation",
+  POINTS_INSUFFICIENT: "The shadow wallet does not have enough points",
+  POINT_QUOTE_EXPIRED: "The point reservation window has expired",
   IDEMPOTENCY_CONFLICT:
     "The idempotency key was already used for different input",
   IDENTITY_LINK_CONFLICT:
@@ -187,8 +242,25 @@ const ENQUEUE_KEYS = [
   "requestHash",
   "sourceLocale",
 ] as const;
+const COMMUNICATION_POINTS_ADMISSION_KEYS = [
+  "cleanedFactsHash",
+  "idempotencyHash",
+  "jobId",
+  "payloadExpiresAt",
+  "payloadHandleHash",
+  "payloadId",
+  "privacyReviewId",
+  "requestHash",
+  "sourceLocale",
+] as const;
 const JOB_ID_KEYS = ["jobId"] as const;
 const ENQUEUE_ENVELOPE_KEYS = ["created", "job", "payloadAccepted"] as const;
+const COMMUNICATION_POINTS_ADMISSION_ENVELOPE_KEYS = [
+  "created",
+  "job",
+  "payloadAccepted",
+  "pointsReserved",
+] as const;
 const JOB_ENVELOPE_KEYS = ["job"] as const;
 const OWNER_JOB_KEYS = [
   "attemptCount",
@@ -292,6 +364,61 @@ export function createTestOnlyCaresLinkV1NoteGenerationOwnerRepository(
   });
 }
 
+export function createTestOnlyCaresLinkV1CommunicationNotePointsAdmissionRepository(
+  options: Readonly<{
+    capability: "TEST_ONLY";
+    query: CaresLinkV1NoteGenerationOwnerRepositoryQuery;
+    principal: CaresLinkV1AuthenticatedPrincipal;
+  }>,
+): CaresLinkV1CommunicationNotePointsAdmissionRepository {
+  let factory: Record<(typeof FACTORY_KEYS)[number], unknown>;
+  let principal: Record<(typeof PRINCIPAL_KEYS)[number], unknown>;
+  try {
+    factory = exactDataRecord(options, FACTORY_KEYS);
+    principal = exactDataRecord(factory.principal, PRINCIPAL_KEYS);
+  } catch {
+    throw unavailable();
+  }
+  if (factory.capability !== "TEST_ONLY" || typeof factory.query !== "function") {
+    throw unavailable();
+  }
+
+  const safePrincipal = Object.freeze({
+    userId: parseInputUuid(principal.userId),
+    sessionId: parseInputUuid(principal.sessionId),
+    transport: parseTransport(principal.transport),
+  });
+  const query = factory.query as CaresLinkV1NoteGenerationOwnerRepositoryQuery;
+
+  return Object.freeze({
+    async enqueue(input) {
+      const prepared = prepareCommunicationPointsAdmission(input);
+      const data = await callQuery(
+        query,
+        COMMUNICATION_POINTS_ADMISSION_RPC_CALL.sql,
+        Object.freeze([
+          safePrincipal.userId,
+          safePrincipal.sessionId,
+          safePrincipal.transport,
+          prepared.jobId,
+          prepared.payloadId,
+          prepared.privacyReviewId,
+          prepared.sourceLocale,
+          CARESLINK_V1_CONTRACT_VERSION,
+          CARESLINK_V1_NOTE_SCHEMA_VERSION,
+          prepared.cleanedFactsHash,
+          prepared.idempotencyHash,
+          prepared.requestHash,
+          prepared.payloadHandleHash,
+          prepared.payloadExpiresAt,
+        ]),
+        COMMUNICATION_POINTS_SAFE_DATABASE_MESSAGES,
+      );
+      return parseCommunicationPointsAdmissionEnvelope(data, prepared);
+    },
+  });
+}
+
 function ownerJobValues(
   principal: Readonly<CaresLinkV1AuthenticatedPrincipal>,
   jobId: string,
@@ -330,6 +457,27 @@ function prepareAdmission(
   }
 }
 
+function prepareCommunicationPointsAdmission(
+  value: unknown,
+): CaresLinkV1CommunicationNotePointsAdmissionInput {
+  try {
+    const input = exactDataRecord(value, COMMUNICATION_POINTS_ADMISSION_KEYS);
+    return Object.freeze({
+      jobId: expectInputUuid(input.jobId),
+      payloadId: expectInputUuid(input.payloadId),
+      sourceLocale: expectInputEnum(input.sourceLocale, CARESLINK_V1_LOCALES),
+      privacyReviewId: expectInputUuid(input.privacyReviewId),
+      cleanedFactsHash: expectInputSha256(input.cleanedFactsHash),
+      idempotencyHash: expectInputSha256(input.idempotencyHash),
+      requestHash: expectInputSha256(input.requestHash),
+      payloadHandleHash: expectInputSha256(input.payloadHandleHash),
+      payloadExpiresAt: expectInputServerTime(input.payloadExpiresAt),
+    });
+  } catch {
+    throw validationError();
+  }
+}
+
 function prepareJobId(value: unknown) {
   try {
     return expectInputUuid(exactDataRecord(value, JOB_ID_KEYS).jobId);
@@ -342,6 +490,7 @@ async function callQuery(
   query: CaresLinkV1NoteGenerationOwnerRepositoryQuery,
   sql: string,
   values: readonly unknown[],
+  safeDatabaseMessages: ReadonlySet<string> = SAFE_DATABASE_MESSAGES,
 ) {
   let result: unknown;
   try {
@@ -349,7 +498,7 @@ async function callQuery(
   } catch (error) {
     let normalized: CaresLinkV1ContractError;
     try {
-      normalized = normalizeDatabaseError(error);
+      normalized = normalizeDatabaseError(error, safeDatabaseMessages);
     } catch {
       normalized = unavailable();
     }
@@ -397,6 +546,37 @@ function parseEnqueueEnvelope(
       throw unavailable();
     }
     return Object.freeze({ created, payloadAccepted, job });
+  } catch {
+    throw unavailable();
+  }
+}
+
+function parseCommunicationPointsAdmissionEnvelope(
+  value: unknown,
+  input: CaresLinkV1CommunicationNotePointsAdmissionInput,
+): CaresLinkV1CommunicationNotePointsAdmissionResult {
+  try {
+    const envelope = exactDataRecord(
+      value,
+      COMMUNICATION_POINTS_ADMISSION_ENVELOPE_KEYS,
+    );
+    const created = expectBoolean(envelope.created);
+    const payloadAccepted = expectBoolean(envelope.payloadAccepted);
+    const pointsReserved = expectBoolean(envelope.pointsReserved);
+    const job = parseOwnerJob(envelope.job);
+    if (
+      !pointsReserved ||
+      job.noteType !== "communication" ||
+      job.status !== "QUEUED" ||
+      job.attemptCount !== 0 ||
+      job.startedAt !== undefined ||
+      job.updatedAt !== job.createdAt ||
+      (created && (job.jobId !== input.jobId || !payloadAccepted)) ||
+      (payloadAccepted && job.jobId !== input.jobId)
+    ) {
+      throw unavailable();
+    }
+    return Object.freeze({ created, payloadAccepted, pointsReserved: true, job });
   } catch {
     throw unavailable();
   }
@@ -547,13 +727,16 @@ function assertJobState(input: Readonly<{
   }
 }
 
-function normalizeDatabaseError(value: unknown): CaresLinkV1ContractError {
+function normalizeDatabaseError(
+  value: unknown,
+  safeDatabaseMessages: ReadonlySet<string>,
+): CaresLinkV1ContractError {
   const code = ownStringProperty(value, "code");
   const message = ownStringProperty(value, "message");
   if (code === "42501") {
     return fixedContractError("FORBIDDEN");
   }
-  if (code === "P0001" && message && SAFE_DATABASE_MESSAGES.has(message)) {
+  if (code === "P0001" && message && safeDatabaseMessages.has(message)) {
     return fixedContractError(message);
   }
   return unavailable();
@@ -572,6 +755,8 @@ function fixedContractError(code: string) {
       | "MIN_CLIENT_VERSION"
       | "PRIVACY_REVIEW_REQUIRED"
       | "PRIVACY_REVIEW_STALE"
+      | "POINTS_INSUFFICIENT"
+      | "POINT_QUOTE_EXPIRED"
       | "IDEMPOTENCY_CONFLICT"
       | "IDENTITY_LINK_CONFLICT"
       | "INVALID_STATE_TRANSITION"

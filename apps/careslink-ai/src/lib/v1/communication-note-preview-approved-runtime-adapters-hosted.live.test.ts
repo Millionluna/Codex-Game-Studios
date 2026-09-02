@@ -289,7 +289,9 @@ const POSTCHECK_SQL = `select
     (select pg_catalog.count(*) from
       careslink_v1_generation.communication_note_preview_dispatch_receipts),
     (select pg_catalog.count(*) from
-      careslink_v1_generation.communication_note_preview_runner_terminals)
+      careslink_v1_generation.communication_note_preview_runner_terminals),
+    (select pg_catalog.count(*) from
+      careslink_v1_generation.communication_note_point_admissions)
   )) as ledger_counts,
   (select pg_catalog.count(*)
     from careslink_v1_runtime_broker.acquisitions) as acquisition_count,
@@ -2081,7 +2083,7 @@ function readSourceManifest() {
       .map((entry) => `supabase/migrations/${entry.name}`)
       .sort();
     if (
-      migrationPaths.length !== 42 ||
+      migrationPaths.length !== 43 ||
       JSON.stringify(migrationPaths) !== JSON.stringify(actualMigrationPaths)
     ) {
       fail(FAILURE_CODES.config);
@@ -2664,7 +2666,7 @@ async function runIndependentPostcheck(
       FAILURE_CODES.postcheck,
     );
     if (
-      JSON.stringify(row.ledger_counts) !== "[3,0,3,3,3,1]" ||
+      JSON.stringify(row.ledger_counts) !== "[3,0,3,3,3,1,0]" ||
       Number(row.acquisition_count) !== 3 ||
       Number(row.revoked_acquisition_count) !== 3 ||
       Number(row.exact_pid_drained_count) !== 3 ||

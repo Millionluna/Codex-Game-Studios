@@ -266,6 +266,7 @@ function createAssertionCommitLossClient({ reconnectFails = false } = {}) {
             reservations_zero: true,
             receipts_zero: true,
             runner_terminals_zero: true,
+            point_admissions_zero: true,
           }],
         };
       }
@@ -466,6 +467,7 @@ function createAssertionCleanupReconnectSuccessClient({
             reservations_zero: true,
             receipts_zero: true,
             runner_terminals_zero: true,
+            point_admissions_zero: true,
           }],
         };
       }
@@ -604,7 +606,7 @@ describe("Communication Note Preview schema rollback assertion runner", () => {
     expect(bundle).toMatchObject({
       fileCount: 20,
       manifestSha256:
-        "a503760e63debffb2038338ba892823728940fb08b15ab6d6991c5d11366fb53",
+        "fa30cd81f60e36dee05566d913a942bb107639e26762131f4e605c52e772197b",
     });
     expect(bundle.scripts).toHaveLength(20);
     expect(STAGES).toEqual({
@@ -847,10 +849,10 @@ describe("Communication Note Preview schema rollback assertion runner", () => {
   it("keeps the CLI contract and successful stdout evidence minimal", async () => {
     const source = await readFile(RUNNER_URL, "utf8");
     expect(POLICY).toEqual({
-      version: "2026-09-02.preview-schema-rollback-assertions.7",
+      version: "2026-09-02.preview-schema-rollback-assertions.8",
       fileCount: 20,
       manifestSha256:
-        "a503760e63debffb2038338ba892823728940fb08b15ab6d6991c5d11366fb53",
+        "fa30cd81f60e36dee05566d913a942bb107639e26762131f4e605c52e772197b",
       applicationName: "careslink-preview-schema-rollback-assertions",
       transportRolePrefix: "careslink_m1gh_assert_transport_",
       actorRolePrefix: "careslink_m1gh_assert_actor_",
@@ -875,6 +877,7 @@ describe("Communication Note Preview schema rollback assertion runner", () => {
     expect(source).toContain("fileCount: 20");
     expect(source).toContain("manifestSha256: ASSERTION_MANIFEST_SHA256");
     expect(source).toContain("passedCount: 20");
+    expect(source).toContain("point_admissions_zero");
     expect(JSON.stringify(POLICY)).not.toContain(SECRET);
     expect(
       new CommunicationNotePreviewSchemaRollbackAssertionError(

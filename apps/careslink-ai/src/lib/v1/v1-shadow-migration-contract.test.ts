@@ -189,6 +189,25 @@ describe("V1 shadow foundation migration contract", () => {
       "if v_worker_policy_table_present is distinct from\n    v_worker_claim_rpc_present",
     );
     expect(sqlAssertions).toContain("Partial worker extension detected");
+    expect(sqlAssertions).toContain(
+      "v_points_admission_role_present boolean :=\n    to_regrole('careslink_v1_generation_points_admission_executor') is not null",
+    );
+    expect(sqlAssertions).toContain(
+      "'careslink_v1_generation.communication_note_point_admissions'",
+    );
+    expect(sqlAssertions).toContain(
+      "'careslink_v1_generation.admit_and_reserve_v1_shadow_communication_note_generation_job(uuid,uuid,text,uuid,uuid,uuid,text,text,text,text,text,text,text,timestamptz)'",
+    );
+    expect(sqlAssertions).toContain(
+      "Partial Communication Note Points admission extension detected",
+    );
+    expect(sqlAssertions).toContain(
+      "Points admission extension requires the worker extension",
+    );
+    expect(ownerPolicyAssertions).toContain(
+      "if v_points_admission_extension_present then",
+    );
+    expect(ownerPolicyAssertions).toContain("if v_count <> 22 then");
     expect(ownerPolicyAssertions).toContain(
       "if v_worker_extension_present then",
     );
@@ -206,6 +225,23 @@ describe("V1 shadow foundation migration contract", () => {
     expect(ownerPolicyAssertions).toContain(
       "Worker canonical SELECT policy identities are invalid",
     );
+    expect(ownerPolicyAssertions).toContain(
+      "Points admission canonical SELECT policy identities are invalid",
+    );
+    for (const [policy, table] of [
+      ["point_wallets_points_admission_select", "point_wallets"],
+      ["point_lots_points_admission_select", "point_lots"],
+      ["point_quotes_points_admission_select", "point_quotes"],
+      ["point_reservations_points_admission_select", "point_reservations"],
+      [
+        "point_allocations_points_admission_select",
+        "point_reservation_allocations",
+      ],
+      ["point_ledger_points_admission_select", "point_ledger_entries"],
+    ] as const) {
+      expect(ownerPolicyAssertions).toContain(`'${policy}'::name`);
+      expect(ownerPolicyAssertions).toContain(`'${table}'::name`);
+    }
     expect(ownerPolicyAssertions).toContain(
       "expected_owner_policies(policyname, tablename, roles)",
     );

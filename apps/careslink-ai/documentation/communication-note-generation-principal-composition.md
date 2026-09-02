@@ -10,7 +10,7 @@ Communication Note principal. It is not installed into the product route.
 - Formal principal resolver: `undefined`
 - Formal submitter: `undefined`
 - Physical route importer: absent
-- UI, worker, provider/model, Points and payload-vault wiring: absent
+- UI, worker, provider/model, formal-route Points and payload-vault wiring: absent
 - Authenticated current-session RPC: source-wired; migration unapplied
 
 Changing environment variables cannot activate the route. The formal route
@@ -90,9 +90,31 @@ The migration remains unapplied, the formal composition/resolver remain
 live Supabase evidence, Production least-privilege evidence or approval to
 activate the route.
 
-## No external effect
+## Communication Note atomic 20-Point admission — source only
 
-No environment was changed, no real key was created or read, and no Supabase
+The later Production-unapplied migration
+`20260902063211_add_v1_communication_note_points_admission.sql` now provides a
+private coordinator that rechecks the active session and privacy authority,
+admits the Communication durable job and reserves exactly 20 Points in the same
+transaction. Exact replay revalidates the binding and writes nothing; the
+owner-wide advisory lock prevents different keys from oversubscribing the same
+wallet.
+
+This does not install the principal composition. The Points-admission adapter is
+still `READY=false` and TestOnly, creates no pool or database URL dependency, and
+has no route importer or caller grant. A paid admitted job stays `QUEUED` and is
+quarantined from claim, recovery, attempts, cancellation and legacy Points
+commit/release until a separate terminal settlement batch exists. It changes no
+welcome grant or legacy credit. Its DTO hides the private binding and Points IDs,
+while existing authenticated-owner RLS continues to expose the owner's own
+public Points row IDs. A21 is serial rollback-only evidence; the independent
+five-scenario/15-PID local PG16 gate is the concurrency evidence. Neither is a
+Hosted, Production, deployment or activation result.
+
+## Principal-composition checkpoint: no external effect
+
+For the principal-composition checkpoint itself, no environment was changed, no
+real key was created or read, and no Supabase
 client or external network connection was opened. The migration was not applied
 to Supabase, Preview, Production or any persistent environment; it was executed
 only in the isolated local rollback gate described below. No Vercel deployment,
@@ -127,9 +149,10 @@ database or live Auth evidence.
 ## Next independent batch
 
 Formally install the reviewed authenticated current-session composition only
-after its remaining release gates are authorized. Trusted role normalization,
-same-transaction session/privacy reauthorization inside owner enqueue, and a
-separately authorized disposable no-data Hosted Preview active/revoked-session
-gate remain independent requirements before any model-backed application work
-can be enabled. `READY`, the formal principal resolver and the physical route
-must remain closed until that evidence exists.
+after its remaining release gates are authorized. The later source coordinator
+now covers same-transaction session/privacy reauthorization plus fixed 20-Point
+reservation, but formal caller installation, trusted role normalization,
+terminal commit/release, and a separately authorized disposable no-data Hosted
+Preview active/revoked-session gate remain independent requirements before any
+model-backed application work can be enabled. `READY`, the formal principal
+resolver and the physical route must remain closed until that evidence exists.

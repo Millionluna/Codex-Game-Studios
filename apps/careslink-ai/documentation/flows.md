@@ -111,9 +111,29 @@ The TypeScript shadow store and Production-unapplied migration define wallets, l
 
 The source-only Communication Note page now has a read-only preview boundary for the current authenticated Provider session. A zero-argument database RPC derives the owner from the active session, pins the server-owned Communication Note rate to 20 Points and returns only that owner's shadow-wallet `available` and `reserved` totals. The server accepts only the exact response contract and fails closed after 1.5 seconds; the UI labels the surface not active. These shadow values must not be described as a consumable real balance. This slice creates no quote, reservation or welcome grant, does not grant/debit or replace legacy credits, and cannot invoke a model, save a Note or export an artifact. Its migration is Production-unapplied, and no Preview or Production deployment was performed.
 
+#### Communication Note atomic 20-Point admission — source only
+
+The next source-only coordinator now rechecks the current session and privacy
+authority, admits the Communication durable job and reserves exactly 20 Points
+within one database transaction. Fresh admission leaves the paid job `QUEUED`
+with attempt `0`; exact replay revalidates the private binding and is write-free.
+An owner-wide advisory lock and deterministic lot allocation prevent two keys
+from oversubscribing the wallet. Any admission, authority or balance failure
+rolls back the durable job, payload and every Points write together.
+
+This flow is deliberately incomplete and unreachable. Paid jobs carrying the
+private admission marker cannot be claimed, recovered, attempted, cancelled or
+passed to legacy Points commit/release. The route imports no admission adapter,
+`READY=false`, and no caller grant or pool exists. The response DTO returns no
+quote, reservation, allocation, ledger or private binding ID. Authenticated
+owners may still read the IDs on their own public Points rows under the existing
+RLS policies; only the private job-to-Points binding is inaccessible. No welcome
+grant or legacy-credit behavior changes, and no Hosted/Production/new Preview,
+deployment, model or real-care-data path was exercised.
+
 ### Intended runtime / not implemented
 
-One wallet owns multiple point lots. A versioned server rate catalog returns a quote before reservation. The next implementation batch must make reservation and durable generation-job admission one atomic transaction, then make terminal success plus commit, or terminal failure plus release to the original lots, atomic. Free account receives one-time 300 welcome Points. Pro and top-ups arrive only through normalized entitlements after provider receipt verification. Existing credit history remains immutable and is migration-mapped, not rewritten.
+One wallet owns multiple point lots. A versioned server rate catalog returns a quote before reservation. The source successor above now models atomic Communication admission plus reservation, but it must not be activated while paid jobs are quarantined. The next transaction boundary must make terminal success plus commit, or terminal failure/cancellation plus release to the original lots, atomic. Free account receives one-time 300 welcome Points only after its separate eligibility and migration decisions are implemented. Pro and top-ups arrive only through normalized entitlements after provider receipt verification. Existing credit history remains immutable and is migration-mapped, not rewritten.
 
 ## 8. Billing
 
