@@ -8,6 +8,7 @@ M1x adds a real HTTP Route Handler boundary but does not activate generation.
 - Runtime: Node.js, dynamic, no-store responses
 - Configuration: `CARESLINK_COMMUNICATION_NOTE_GENERATION_API_ENABLED`
 - Compile-time readiness: `false`
+- Formal principal composition: `undefined`
 - Formal strict-principal resolver: `undefined`
 - Formal submission port: `undefined`
 - UI connection: absent
@@ -80,11 +81,24 @@ and status-specific result/failure invariants before serialization.
 
 ## Deliberate non-integration
 
-The strict-principal factory accepts only explicitly injected Cookie Auth and
-session-status RPC ports. It does not use the loose Workspace-account role
-mapper or create an ambient service-role client. Its formal export remains
-`undefined` until exact non-Production target binding, custody and least
-privilege are approved. The Route Handler also does not import or call:
+The strict-principal factory accepts only explicit Cookie Auth and lazy
+session-status RPC client factories. It does not use the loose
+Workspace-account role mapper. A separate source-only wrapper now validates an
+exact Vercel Preview and project ID, an exact 20-character Supabase ref distinct
+from the pinned known Production ref, byte-exact canonical Supabase URLs,
+matching `sb_publishable_`
+keys and a dedicated `sb_secret_` with no generic-key fallback or reuse. It
+revalidates the frozen configuration before each lazy client boundary, and the
+privileged client cannot be created until verified claims provide canonical
+user/session UUIDs.
+
+That dedicated secret is still service-role-equivalent, bypasses RLS and can
+exercise broader project authority outside this single application-code RPC
+surface. It is not database-level least privilege. The wrapper's formal export
+remains `undefined`, the formal principal resolver remains `undefined`, and the
+Route Handler does not import or call the wrapper. Test environment/client
+injection also requires an explicit TestOnly capability and is statically
+quarantined. The Route Handler additionally does not import or call:
 
 - the M1r–M1v Preview composition and cloud/provider bridges;
 - `createTestOnlyCaresLinkV1NoteGenerationOwnerRepository`;
@@ -99,10 +113,17 @@ reserve 20 Points, call a formal owner admission repository, and let a
 registered asynchronous worker invoke an approved provider. The request thread
 must never bypass that chain by calling the model directly.
 
+The source guard does not query Supabase branch/control-plane metadata. It does
+not prove that the configured ref is disposable, non-default, healthy or a
+child of Production; those remain live Preview evidence requirements.
+
 ## Remaining activation gates
 
-- exact non-Production target-bound, least-privilege formal principal
-  composition and live active/revoked-session evidence;
+- an independently reviewed authenticated self-session RPC that derives
+  `auth.uid()` and JWT `session_id` internally, accepts no caller UUIDs, revokes
+  `PUBLIC`/`anon`/`service_role` execution and grants only `authenticated`;
+- formal installation of that least-privilege principal composition plus live
+  active/revoked-session evidence on a same-revision no-data Preview;
 - trusted Provider role normalization compatible with the RPC's exact
   `app_metadata.role=provider` predicate;
 - live privacy-proof owner/type/schema/hash/expiry binding;
@@ -118,9 +139,9 @@ M1x provides none of those approvals and changes no external resource.
 
 ## Local verification
 
-- focused M1x/strict-principal, Product-auth, session-SQL contract and
-  runtime-boundary tests: 8 files / 140 tests passed;
-- full Vitest suite: 203 files / 2,793 tests passed;
+- focused M1x/principal-composition, Product-auth, session-SQL contract and
+  runtime-boundary tests: 9 files / 196 tests passed;
+- full Vitest suite: 204 files / 2,837 tests passed;
 - TypeScript and full ESLint: passed;
 - Next.js 16.2.9 webpack production build: passed, 64/64 static pages;
 - Codex adapter sync: 73 files passed;
