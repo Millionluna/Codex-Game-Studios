@@ -57,9 +57,9 @@ upstream messages or facts.
 
 ## Source-only target and authenticated-client composition
 
-The follow-up composition remains outside the route and has a formal export of
-`undefined`. Its executable source factory fails closed unless all of these
-conditions hold together:
+The route imports the follow-up composition's formal export, which remains
+`undefined`; it does not install or call the executable source factory. That
+factory fails closed unless all of these conditions hold together:
 
 1. composition, generation and Product master flags are exact `true`;
 2. `VERCEL=1`, `VERCEL_ENV=preview` and `VERCEL_TARGET_ENV=preview`;

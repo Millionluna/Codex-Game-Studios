@@ -10,8 +10,9 @@ M1x adds a real HTTP Route Handler boundary but does not activate generation.
 - Compile-time readiness: `false`
 - Formal principal composition: `undefined`
 - Formal strict-principal resolver: `undefined`
-- Formal submission port: `undefined`
-- UI connection: absent
+- Formal submitter composition: `undefined`
+- UI connection: source-wired by M1y behind a second compile-time and runtime
+  gate; both compile-time latches remain `false`
 - Formal-route model, Points, database, payload-vault and worker calls: absent
 
 The environment value is intentionally insufficient. Even when it is exactly
@@ -94,10 +95,11 @@ neither an argument object nor caller-supplied user/session IDs.
 The Communication Note composition reads no dedicated or generic privileged
 key, creates no privileged client and has no fallback to the legacy
 two-argument service RPC. Its formal export remains `undefined`, the formal
-principal resolver remains `undefined`, and the Route Handler does not import
-or call the wrapper. Test environment/client injection also requires an
-explicit TestOnly capability and is statically quarantined. The Route Handler
-additionally does not import or call:
+principal resolver remains `undefined`, and the Route Handler imports only that
+formal placeholder; it neither installs nor calls the executable wrapper
+factory. Test environment/client injection also requires an explicit TestOnly
+capability and is statically quarantined. The Route Handler additionally does
+not import or call:
 
 - the M1r–M1v Preview composition and cloud/provider bridges;
 - `createTestOnlyCaresLinkV1NoteGenerationOwnerRepository`;
@@ -107,14 +109,16 @@ additionally does not import or call:
 - a payload vault, PostgreSQL client, Supabase management API or GCP resource.
 
 The M1r–M1v terminal port is synthetic Preview evaluation persistence, not a
-product generation port. The later source-only coordinator described below can
-use the existing durable payload-admission contract, recheck session/privacy,
-admit the job and reserve exactly 20 Points atomically, but it is not a formal route
-dependency or activation mechanism. The later terminal-settlement source
-described below completes the database transaction boundary, but a future
-approved implementation must still install a registered asynchronous worker and
-approved provider. The request thread must never bypass that chain by calling
-the model directly.
+product generation port. M1y adds a source-only submitter composition and the
+route imports its formal placeholder, but that formal export remains
+`undefined`. Its TestOnly seam fixes the order as privacy proof, stable
+retention-bounded encrypted-payload staging and atomic 20-Point admission ending
+at a durable `QUEUED` row. It never invokes a worker or provider. The later
+terminal-settlement source described below completes the database transaction
+boundary, but a future approved implementation must still install a registered
+asynchronous worker and approved provider. The request thread must never bypass
+that chain by calling the model directly. See
+`documentation/communication-note-product-integration-m1y.md`.
 
 The source guard does not query Supabase branch/control-plane metadata. It does
 not prove that the configured ref is disposable, non-default, healthy or a
@@ -188,6 +192,7 @@ teardown. The pinned hashes and scenario-level evidence are recorded in
 - formal owner repository factory, least-privilege caller and `EXECUTE` grant,
   with session/privacy reauthorization inside the enqueue transaction;
 - registered worker runtime and approved provider/model policy;
+- independent UI activation plus an owner-authorized canonical document viewer;
 - same-revision disposable no-data Preview, deployment and rollback evidence;
 - separate owner approval for any cloud spend, provider call or Production step.
 

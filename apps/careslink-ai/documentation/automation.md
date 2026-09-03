@@ -1202,7 +1202,8 @@ Preview/project identity, a configured ref distinct from the pinned known
 Production ref, canonical Supabase URLs and matching publishable keys. It reads
 no dedicated or generic privileged key, creates no privileged client and has no
 fallback to the legacy two-argument service RPC. The formal wrapper export
-remains `undefined`, and the route does not import it. The authenticated
+remains `undefined`; M1y makes the route import only that placeholder without
+calling or installing the executable factory. The authenticated
 current-session migration remains unapplied, so this is not live
 Cookie/Auth/database evidence. The wrapper does not query Supabase branch
 provenance or health.
@@ -1214,10 +1215,11 @@ scanners before accepting a strictly owner-safe admission response. Fresh
 admission returns `202`; exact replay
 returns `200` with the current durable job state, including valid terminal state.
 Duplicate JSON properties and unsafe/temporally inconsistent job envelopes fail
-closed. It imports no M1r–M1v composition,
-OpenAI provider, owner repository, Points store or cloud bridge. No queue,
-schedule, retry worker, model call, payload storage, database connection,
-Preview, Production resource or deployment was added.
+closed. The request path invokes no M1r–M1v composition, OpenAI provider,
+worker, Points store or cloud bridge. M1y's uninstalled TestOnly submitter uses
+only an owner-repository contract plus explicit privacy/payload ports and stops
+at durable `QUEUED` admission. No schedule, retry worker, model call, database
+connection, Preview, Production resource or deployment was added.
 
 A future activation batch must formally install the reviewed strict-principal
 composition only after trusted Provider roles are normalized and server privacy

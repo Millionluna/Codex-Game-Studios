@@ -3309,10 +3309,12 @@ RPC state.
 The composition no longer reads any dedicated or generic privileged key,
 constructs no privileged client and has no fallback to the legacy two-argument
 service RPC. The legacy resolver remains available to the separate Product API
-path. Static boundaries keep the new current-session module server-only and out
-of the physical route. `READY=false`, the formal composition/resolver/submitter
-remain absent, the authenticated current-session migration remains unapplied,
-and no Preview, Production, deployment, data or model action occurred.
+path. Static boundaries keep the new current-session module server-only; M1y
+later made the physical route import only the formal composition placeholder,
+without installing or calling the executable factory. `READY=false`, the
+formal composition/resolver/submitter remain absent, the authenticated
+current-session migration remains unapplied, and no Preview, Production,
+deployment, data or model action occurred.
 
 The current focused gate passed 4 files / 98 tests, and the full Vitest suite
 passed 206 files / 2,860 tests. TypeScript, full ESLint, the Next.js Webpack
@@ -3508,6 +3510,37 @@ syntax, the Next.js 16.2.9 Turbopack production build with 64/64 generated
 pages, the 26-static-chunk client boundary, the 73-file adapter sync and
 `git diff --check` all passed. Independent SQL/security review reported zero P0,
 zero P1 and zero remaining P2 findings for this source-only batch.
+
+### Communication Note product integration M1y — source/build evidence
+
+M1y source-wires the provider Communication Note page through a strict browser
+client and M1x to an uninstalled product submitter composition. The TestOnly
+composition fixes privacy proof → stable retention-bounded encrypted staging →
+atomic 20-Point admission order and ends at the durable database `QUEUED` row;
+the request thread has no worker/provider/model invocation. Both UI/API
+compile-time latches remain `false`, both formal compositions remain
+`undefined`, and exact environment `true` values cannot activate the path.
+
+The focused application/UI/client/route/composition/runtime-boundary gate passed
+8 files / 135 tests. It covers zero-request default-off and unaffordable Points
+states; exact three-key request bodies; duplicate-submit exclusion; identical
+body/idempotency replay; one bounded polling chain; terminal stop; pending
+request Abort; strict Cookie principal projection; PostgreSQL timestamptz proof
+normalization; exact private-field/state DTO rejection; response-loss replay;
+and cleanup only after a validated `payloadAccepted=false` envelope. The full
+Vitest suite passed 216 files / 3,049 tests. TypeScript, zero-warning full
+ESLint, the Next.js 16.2.9 Webpack production build with 64/64 generated pages,
+the 100-static-chunk client-boundary scan, 73-file Codex adapter sync and
+`git diff --check` all passed. Independent UI and integration/security reviews
+reported zero remaining P0/P1/P2 findings.
+
+This is source/build evidence only. No Supabase migration or grant was applied,
+no Preview or Production resource was changed, no real care data was used, no
+worker or provider was invoked, and no model call, deployment or activation
+occurred. The formal vault/policy/KMS/backup binding, usable worker vault grant,
+approved registration/catalog, owner job/document recovery and current-revision
+no-data Preview gate remain required; see
+`documentation/communication-note-product-integration-m1y.md`.
 
 ### Current live/read-only evidence
 

@@ -13,6 +13,7 @@ import {
 import {
   COMMUNICATION_NOTE_GENERATION_API_PATH,
   COMMUNICATION_NOTE_GENERATION_FAILURE_CODES,
+  getCommunicationNoteGenerationErrorMessage,
   type CommunicationNoteGenerationAdmission,
   type CommunicationNoteGenerationFailureCode,
   type CommunicationNoteGenerationFreshJob,
@@ -20,12 +21,13 @@ import {
   type CommunicationNoteGenerationResult,
 } from "./communication-note-generation-contract";
 import { isCommunicationNoteGenerationApiEnabled } from "./communication-note-generation-feature";
+import { COMMUNICATION_NOTE_GENERATION_FORMAL_PRINCIPAL_COMPOSITION } from "./communication-note-generation-principal-composition.server";
 import {
-  COMMUNICATION_NOTE_GENERATION_PRINCIPAL_RESOLVER,
   type CommunicationNoteGenerationPrincipalResolution,
   type CommunicationNoteGenerationPrincipalResolver,
   type CommunicationNoteGenerationProviderPrincipal,
 } from "./communication-note-generation-principal.server";
+import { COMMUNICATION_NOTE_GENERATION_FORMAL_SUBMITTER_COMPOSITION } from "./communication-note-generation-submitter-composition.server";
 import { scanCaresLinkV1CleanedFacts } from "./v1/privacy-review-scanner.server";
 import {
   CARESLINK_V1_GENERATION_STATUSES,
@@ -105,9 +107,10 @@ export type TestOnlyCommunicationNoteGenerationRouteOptions = Readonly<{
 
 const DEFAULT_DEPENDENCIES: CommunicationNoteGenerationRouteDependencies = {
   isRuntimeEnabled: isCommunicationNoteGenerationApiEnabled,
-  getSubmitter: () => COMMUNICATION_NOTE_GENERATION_SUBMITTER,
+  getSubmitter: () =>
+    COMMUNICATION_NOTE_GENERATION_FORMAL_SUBMITTER_COMPOSITION,
   getPrincipalResolver: () =>
-    COMMUNICATION_NOTE_GENERATION_PRINCIPAL_RESOLVER,
+    COMMUNICATION_NOTE_GENERATION_FORMAL_PRINCIPAL_COMPOSITION,
   createCorrelationId: randomUUID,
 };
 
@@ -241,7 +244,7 @@ async function handleRequest(
       if (!code) return disabledResponse(correlationId, headers);
       return errorResponse(
         code,
-        fixedContractMessage(code),
+        getCommunicationNoteGenerationErrorMessage(code),
         CARESLINK_V1_HTTP_STATUS_BY_ERROR_CODE[code],
         correlationId,
         headers,
@@ -264,7 +267,7 @@ function principalFailureResponse(
       return resolution.status === 401
         ? errorResponse(
             "AUTH_REQUIRED",
-            fixedContractMessage("AUTH_REQUIRED"),
+            getCommunicationNoteGenerationErrorMessage("AUTH_REQUIRED"),
             401,
             correlationId,
             headers,
@@ -274,7 +277,7 @@ function principalFailureResponse(
       return resolution.status === 401
         ? errorResponse(
             "SESSION_REVOKED",
-            fixedContractMessage("SESSION_REVOKED"),
+            getCommunicationNoteGenerationErrorMessage("SESSION_REVOKED"),
             401,
             correlationId,
             headers,
@@ -284,7 +287,7 @@ function principalFailureResponse(
       return resolution.status === 403
         ? errorResponse(
             "FORBIDDEN",
-            fixedContractMessage("FORBIDDEN"),
+            getCommunicationNoteGenerationErrorMessage("FORBIDDEN"),
             403,
             correlationId,
             headers,
@@ -1000,45 +1003,11 @@ function createResponseHeaders(correlationId: string) {
 function disabledResponse(correlationId: string, headers: Headers) {
   return errorResponse(
     "PRODUCT_API_DISABLED",
-    "Communication Note generation is unavailable",
+    getCommunicationNoteGenerationErrorMessage("PRODUCT_API_DISABLED"),
     503,
     correlationId,
     headers,
   );
-}
-
-function fixedContractMessage(code: CaresLinkV1ErrorCode) {
-  switch (code) {
-    case "PRODUCT_API_DISABLED":
-      return "Communication Note generation is unavailable";
-    case "AUTH_REQUIRED":
-      return "Authentication is required";
-    case "SESSION_REVOKED":
-      return "The authenticated session is no longer active";
-    case "FORBIDDEN":
-      return "The request is not permitted";
-    case "MINIMUM_FACTS_REQUIRED":
-      return "Required cleaned facts are missing or empty";
-    case "PRIVACY_REVIEW_REQUIRED":
-      return "Privacy review is required before generation";
-    case "PRIVACY_REVIEW_STALE":
-      return "Privacy review must be repeated before generation";
-    case "IDEMPOTENCY_CONFLICT":
-    case "IDENTITY_LINK_CONFLICT":
-      return "The idempotent generation request conflicts with existing work";
-    case "POINTS_INSUFFICIENT":
-      return "There are not enough Points for this generation request";
-    case "POINT_QUOTE_EXPIRED":
-      return "The Points quote has expired";
-    case "RATE_LIMITED":
-      return "Too many generation requests were submitted";
-    case "GENERATION_FAILED":
-      return "Communication Note generation failed";
-    default:
-      return code === "VALIDATION_ERROR"
-        ? "The Communication Note generation request is invalid"
-        : "The Communication Note generation request could not be completed";
-  }
 }
 
 function knownContractErrorCode(value: unknown) {

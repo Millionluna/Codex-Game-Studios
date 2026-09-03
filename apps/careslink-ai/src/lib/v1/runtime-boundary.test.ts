@@ -1090,6 +1090,18 @@ describe("V1 shadow runtime boundary", () => {
       process.cwd(),
       "src/lib/communication-note-generation-principal-composition.server.test.ts",
     );
+    const submitterCompositionPath = join(
+      process.cwd(),
+      "src/lib/communication-note-generation-submitter-composition.server.ts",
+    );
+    const submitterCompositionTestPath = join(
+      process.cwd(),
+      "src/lib/communication-note-generation-submitter-composition.server.test.ts",
+    );
+    const applicationBoundaryTestPath = join(
+      process.cwd(),
+      "src/lib/communication-note-generation-application-boundary.test.ts",
+    );
     const currentSessionPath = join(
       process.cwd(),
       "src/lib/communication-note-generation-current-session.server.ts",
@@ -1127,6 +1139,18 @@ describe("V1 shadow runtime boundary", () => {
     );
     const principalCompositionSource = readFileSync(
       principalCompositionPath,
+      "utf8",
+    );
+    const submitterCompositionImporters = walkControlledScriptFiles().filter(
+      (file) =>
+        file !== submitterCompositionPath &&
+        file !== boundaryTestPath &&
+        readFileSync(file, "utf8").includes(
+          "communication-note-generation-submitter-composition",
+        ),
+    );
+    const submitterCompositionSource = readFileSync(
+      submitterCompositionPath,
       "utf8",
     );
     const privilegedClientFactoryImporters =
@@ -1172,13 +1196,21 @@ describe("V1 shadow runtime boundary", () => {
     expect(handlerSource).toContain(
       "COMMUNICATION_NOTE_GENERATION_SUBMITTER = undefined",
     );
-    expect(handlerSource).not.toContain(
+    expect(handlerSource).toContain(
       "communication-note-generation-principal-composition",
     );
     expect(testOnlyFactoryImporters).toEqual([handlerTestPath]);
-    expect(principalCompositionImporters).toEqual([
-      principalCompositionTestPath,
-    ]);
+    expect(principalCompositionImporters).toEqual(
+      [handlerPath, handlerTestPath, principalCompositionTestPath].sort(),
+    );
+    expect(submitterCompositionImporters).toEqual(
+      [
+        applicationBoundaryTestPath,
+        handlerPath,
+        handlerTestPath,
+        submitterCompositionTestPath,
+      ].sort(),
+    );
     expect(privilegedClientFactoryImporters).toEqual([]);
     expect(currentSessionImporters).toEqual(
       [
@@ -1207,6 +1239,16 @@ describe("V1 shadow runtime boundary", () => {
     );
     expect(principalCompositionSource).not.toMatch(
       /CARESLINK_COMMUNICATION_NOTE_SESSION_STATUS_PREVIEW_SECRET_KEY|SUPABASE_SECRET_KEY|SUPABASE_SERVICE_ROLE_KEY|CARESLINK_V1_PRIVACY_REVIEW_PREVIEW_SERVICE_ROLE_KEY|createCaresLinkV1SessionStatusRpcClient|resolve_v1_shadow_session_status|service_role|sb_secret_/,
+    );
+    expect(submitterCompositionSource).toMatch(/^import "server-only";/);
+    expect(submitterCompositionSource).toContain(
+      "CARESLINK_COMMUNICATION_NOTE_SUBMITTER_COMPOSITION_READY =\n  false",
+    );
+    expect(submitterCompositionSource).toContain(
+      "COMMUNICATION_NOTE_GENERATION_FORMAL_SUBMITTER_COMPOSITION =\n  undefined",
+    );
+    expect(submitterCompositionSource).not.toMatch(
+      /openai-communication-note-provider|runNext|registered-worker|process\.env/,
     );
     expect(currentSessionSource).toMatch(/^import "server-only";/);
     expect(currentSessionSource).toContain(

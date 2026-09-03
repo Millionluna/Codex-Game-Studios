@@ -3,14 +3,17 @@
 ## Status
 
 This server-only, source-only composition factory implements the strict
-Communication Note principal. It is not installed into the product route.
+Communication Note principal. The product route now imports only its formal
+placeholder; the executable factory is not installed or called.
 
 - Compile-time generation readiness: `false`
 - Formal principal composition: `undefined`
 - Formal principal resolver: `undefined`
 - Formal submitter: `undefined`
-- Physical route importer: absent
-- UI, worker, provider/model, formal-route Points and payload-vault wiring: absent
+- Physical route importer: formal `undefined` placeholder only
+- UI: source-wired by M1y behind an independent closed compile/runtime gate
+- Worker and provider/model wiring: absent; Points and payload-vault ports exist
+  only in the uninstalled TestOnly submitter composition
 - Authenticated current-session RPC: source-wired; migration unapplied
 
 Changing environment variables cannot activate the route. The formal route
@@ -59,7 +62,8 @@ not install the formal composition or resolver.
 
 Test environment and client ports require an explicit TestOnly capability. The
 default path can read only the process environment supplied by the deployment
-platform. Static importer tests restrict the composition to its own test,
+platform. Static importer tests restrict executable factory construction to its
+own test while allowing the route to import the formal `undefined` placeholder,
 quarantine the authenticated current-session resolver inside the strict
 principal stack, and prove the Communication Note composition does not import
 the legacy low-level privileged factory or service-only RPC. The legacy module
@@ -85,10 +89,10 @@ authoritative user. No dedicated or generic privileged key is read, no
 privileged client is constructed, and no legacy RPC fallback exists on this
 path.
 
-The migration remains unapplied, the formal composition/resolver remain
-`undefined`, and the route remains disconnected. Therefore this batch is not
-live Supabase evidence, Production least-privilege evidence or approval to
-activate the route.
+The migration remains unapplied and the formal composition/resolver remain
+`undefined`; importing that placeholder does not connect the route. Therefore
+this batch is not live Supabase evidence, Production least-privilege evidence or
+approval to activate the route.
 
 ## Communication Note atomic 20-Point admission — source only
 

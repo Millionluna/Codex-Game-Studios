@@ -11,7 +11,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import Image from "next/image";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   COMMUNICATION_NOTE_COMPOSER_FIELDS,
   COMMUNICATION_NOTE_COMPOSER_LOCALES,
@@ -30,22 +30,32 @@ import {
   UNAVAILABLE_COMMUNICATION_NOTE_POINTS_PREVIEW,
   type CommunicationNotePointsPreview,
 } from "../../../lib/communication-note-points-preview";
+import {
+  submitCommunicationNoteGeneration,
+  type CommunicationNoteGenerationClientResult,
+} from "../../../lib/communication-note-generation-client";
+import type { CommunicationNoteGenerationJob } from "../../../lib/communication-note-generation-contract";
 
 type CommunicationNoteComposerProps = {
   locale: CommunicationNoteComposerLocale;
   pointsPreview?: CommunicationNotePointsPreview;
   unsupportedLocale?: boolean;
+  /** Server-owned capability flag. Production keeps this false until rollout. */
+  generationAvailable?: boolean;
 };
 
 const INITIAL_CONFIRMATIONS: CommunicationNoteComposerConfirmations = {
   reviewedNoIdentifiers: false,
   processingAuthorityConfirmed: false,
 };
+const GENERATION_POLL_INTERVAL_MS = 1_500;
+const GENERATION_MAX_AUTOMATIC_POLLS = 40;
 
 export function CommunicationNoteComposer({
   locale,
   pointsPreview = UNAVAILABLE_COMMUNICATION_NOTE_POINTS_PREVIEW,
   unsupportedLocale = false,
+  generationAvailable = false,
 }: CommunicationNoteComposerProps) {
   const copy = getCommunicationNoteComposerCopy(locale);
   const surface = getSurfaceCopy(locale);
@@ -57,6 +67,38 @@ export function CommunicationNoteComposer({
   const [confirmations, setConfirmations] =
     useState<CommunicationNoteComposerConfirmations>(INITIAL_CONFIRMATIONS);
   const errorSummaryRef = useRef<HTMLDivElement>(null);
+  const mountedRef = useRef(true);
+  const inFlightRef = useRef(false);
+  const requestRef = useRef<
+    Readonly<{ body: string; idempotencyKey: string }> | undefined
+  >(undefined);
+  const abortControllerRef = useRef<AbortController | undefined>(undefined);
+  const replayTimerRef = useRef<
+    ReturnType<typeof setTimeout> | undefined
+  >(undefined);
+  const automaticPollCountRef = useRef(0);
+  const [generationJob, setGenerationJob] =
+    useState<CommunicationNoteGenerationJob>();
+  const [generationError, setGenerationError] = useState<string>();
+  const [generationPending, setGenerationPending] = useState(false);
+  const [requestLocked, setRequestLocked] = useState(false);
+  const generationCopy = getGenerationSurfaceCopy(locale);
+
+  function clearReplayTimer() {
+    if (replayTimerRef.current !== undefined) {
+      clearTimeout(replayTimerRef.current);
+      replayTimerRef.current = undefined;
+    }
+  }
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      abortControllerRef.current?.abort();
+      clearReplayTimer();
+    };
+  }, []);
 
   const issueByField = useMemo(() => {
     const issues = new Map<
@@ -84,6 +126,83 @@ export function CommunicationNoteComposer({
     reviewIsCurrent ? review : undefined,
     confirmations,
   );
+  const canGenerate = Boolean(
+    generationAvailable &&
+      readySubmission &&
+      pointsPreview.status === "AVAILABLE" &&
+      pointsPreview.canAfford &&
+      !requestLocked,
+  );
+
+  async function replayGenerationStatus() {
+    const request = requestRef.current;
+    if (!request || inFlightRef.current) return;
+    clearReplayTimer();
+    inFlightRef.current = true;
+    setGenerationPending(true);
+    setGenerationError(undefined);
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+    try {
+      const result = await submitCommunicationNoteGeneration({
+        ...request,
+        signal: controller.signal,
+      });
+      if (!mountedRef.current || requestRef.current !== request) return;
+      handleGenerationResult(result, request);
+    } catch {
+      if (!mountedRef.current || controller.signal.aborted) return;
+      setGenerationError(generationCopy.transportError);
+    } finally {
+      if (requestRef.current === request) inFlightRef.current = false;
+      if (abortControllerRef.current === controller) {
+        abortControllerRef.current = undefined;
+      }
+      if (mountedRef.current) setGenerationPending(false);
+    }
+  }
+
+  function handleGenerationResult(
+    result: CommunicationNoteGenerationClientResult,
+    request: Readonly<{ body: string; idempotencyKey: string }>,
+  ) {
+    clearReplayTimer();
+    if (!result.ok) {
+      setGenerationError(generationCopy.error(result.error.code));
+      return;
+    }
+    const job = result.admission.job;
+    setGenerationJob(job);
+    if (job.status === "QUEUED" || job.status === "RUNNING") {
+      if (
+        automaticPollCountRef.current >= GENERATION_MAX_AUTOMATIC_POLLS
+      ) {
+        setGenerationError(generationCopy.pollingPaused);
+        return;
+      }
+      replayTimerRef.current = setTimeout(() => {
+        replayTimerRef.current = undefined;
+        if (requestRef.current === request) {
+          automaticPollCountRef.current += 1;
+          void replayGenerationStatus();
+        }
+      }, GENERATION_POLL_INTERVAL_MS);
+    }
+  }
+
+  async function submitGeneration(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!canGenerate || !readySubmission || inFlightRef.current) return;
+    const request = Object.freeze({
+      body: JSON.stringify(readySubmission),
+      idempotencyKey: window.crypto.randomUUID(),
+    });
+    clearReplayTimer();
+    automaticPollCountRef.current = 0;
+    setRequestLocked(true);
+    requestRef.current = request;
+    await replayGenerationStatus();
+  }
 
   function resetReview() {
     setReviewIsCurrent(false);
@@ -202,10 +321,10 @@ export function CommunicationNoteComposer({
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <span className="workspace-status-pill workspace-status-pill--warning">
-                {surface.localOnly}
+                {generationAvailable ? generationCopy.connected : surface.localOnly}
               </span>
               <span className="text-xs font-semibold text-muted">
-                {surface.generationOffline}
+                {generationAvailable ? generationCopy.serverGeneration : surface.generationOffline}
               </span>
             </div>
             <h1 className="document-title mt-4 max-w-4xl sm:text-[2.75rem]">
@@ -232,12 +351,13 @@ export function CommunicationNoteComposer({
           </ol>
         </section>
 
-        <div className="case-note-workspace mt-5">
-          <section
-            role="form"
-            aria-label={surface.formLabel}
-            className="document-paper overflow-hidden"
-          >
+        <form
+          className="case-note-workspace mt-5"
+          onSubmit={submitGeneration}
+          aria-busy={generationPending}
+          aria-label={surface.formLabel}
+        >
+          <section className="document-paper overflow-hidden">
             <div className="border-b border-line p-5 sm:p-6">
               <div className="flex items-start gap-3">
                 <div className="grid size-10 shrink-0 place-items-center rounded-md bg-[#e3f0e9] text-brand">
@@ -246,7 +366,7 @@ export function CommunicationNoteComposer({
                 <div>
                   <h2 className="text-lg font-semibold">{surface.formTitle}</h2>
                   <p className="mt-1 text-sm leading-6 text-muted">
-                    {surface.memoryBoundary}
+                    {generationAvailable ? generationCopy.memoryBoundary : surface.memoryBoundary}
                   </p>
                 </div>
               </div>
@@ -274,6 +394,7 @@ export function CommunicationNoteComposer({
                   hint={surface.dateTimeHint}
                   value={draft.occurred_at}
                   onChange={(value) => updateTextField("occurred_at", value)}
+                  disabled={requestLocked}
                 />
                 <ComposerField
                   field="contact_channel"
@@ -288,6 +409,7 @@ export function CommunicationNoteComposer({
                   onChange={(value) =>
                     updateTextField("contact_channel", value)
                   }
+                  disabled={requestLocked}
                 />
               </div>
 
@@ -304,6 +426,7 @@ export function CommunicationNoteComposer({
                 value={draft.parties_by_role.join("\n")}
                 onChange={updateParties}
                 multiline
+                disabled={requestLocked}
               />
 
               <ComposerField
@@ -319,6 +442,7 @@ export function CommunicationNoteComposer({
                 onChange={(value) => updateTextField("observable_facts", value)}
                 multiline
                 rows={5}
+                disabled={requestLocked}
               />
 
               <ComposerField
@@ -334,6 +458,7 @@ export function CommunicationNoteComposer({
                 onChange={(value) => updateTextField("action_taken", value)}
                 multiline
                 rows={4}
+                disabled={requestLocked}
               />
 
               <ComposerField
@@ -345,6 +470,7 @@ export function CommunicationNoteComposer({
                 optionalLabel={copy.optionalLabel}
                 multiline
                 rows={3}
+                disabled={requestLocked}
               />
 
               <ComposerField
@@ -356,6 +482,7 @@ export function CommunicationNoteComposer({
                 optionalLabel={copy.optionalLabel}
                 multiline
                 rows={3}
+                disabled={requestLocked}
               />
 
               {reviewIsCurrent && review?.validationIssues.length ? (
@@ -373,6 +500,7 @@ export function CommunicationNoteComposer({
                 type="button"
                 onClick={runLocalReview}
                 className="jade-action w-full"
+                disabled={requestLocked}
               >
                 <ShieldCheck className="size-4" aria-hidden="true" />
                 {copy.reviewAction}
@@ -469,6 +597,7 @@ export function CommunicationNoteComposer({
                           reviewedNoIdentifiers: checked,
                         }))
                       }
+                      disabled={requestLocked}
                     />
                     <Confirmation
                       id="communication-note-processing-authority"
@@ -482,6 +611,7 @@ export function CommunicationNoteComposer({
                           processingAuthorityConfirmed: checked,
                         }))
                       }
+                      disabled={requestLocked}
                     />
                     <p className="text-xs leading-5 text-muted">
                       {surface.authorityBoundary}
@@ -514,15 +644,17 @@ export function CommunicationNoteComposer({
                           className="text-sm font-semibold text-foreground"
                         >
                           <span lang="en-AU">Points</span>
-                          {surface.pointsTitle}
+                          {generationAvailable ? generationCopy.pointsTitle : surface.pointsTitle}
                         </h3>
                         <p className="mt-1 text-sm leading-6 text-foreground">
-                          {getPointsBalanceText(pointsPreview, surface, locale)}
+                          {generationAvailable
+                            ? generationCopy.pointsBalance(pointsPreview, locale)
+                            : getPointsBalanceText(pointsPreview, surface, locale)}
                         </p>
                       </div>
                     </div>
                     <span className="workspace-status-pill shrink-0">
-                      {surface.pointsReadOnly}
+                      {generationAvailable ? generationCopy.pointsStatus : surface.pointsReadOnly}
                     </span>
                   </div>
 
@@ -548,18 +680,20 @@ export function CommunicationNoteComposer({
                   ) : null}
 
                   <p className="mt-3 text-xs leading-5 text-foreground">
-                    {surface.pointsBoundary}
+                    {generationAvailable ? generationCopy.pointsBoundary : surface.pointsBoundary}
                   </p>
                 </section>
 
                 <button
-                  type="button"
-                  disabled
+                  type="submit"
+                  disabled={!canGenerate}
                   aria-describedby="communication-note-generation-boundary"
                   className="coral-action w-full"
                 >
                   <LockKeyhole className="size-4" aria-hidden="true" />
-                  {readySubmission
+                  {generationAvailable
+                    ? generationCopy.action
+                    : readySubmission
                     ? surface.readyButOffline
                     : surface.generationUnavailable}
                 </button>
@@ -567,8 +701,23 @@ export function CommunicationNoteComposer({
                   id="communication-note-generation-boundary"
                   className="mt-3 text-center text-xs leading-5 text-muted"
                 >
-                  {surface.generationBoundary}
+                  {generationAvailable
+                    ? generationCopy.boundary(pointsPreview.status === "AVAILABLE" ? formatPointsNumber(pointsPreview.generationCostPoints, locale) : undefined)
+                    : surface.generationBoundary}
                 </p>
+                {generationJob ? (
+                  <p role="status" aria-live="polite" className="mt-3 text-sm leading-6 text-foreground">
+                    {generationCopy.status(generationJob.status)}
+                  </p>
+                ) : null}
+                {generationError ? (
+                  <div role="alert" className="mt-3 border border-[#efc7c7] bg-[#fff2f2] px-3 py-2 text-sm text-danger">
+                    {generationError}
+                    <button type="button" className="taito-secondary mt-2 w-full" onClick={() => void replayGenerationStatus()}>
+                      {generationCopy.checkStatus}
+                    </button>
+                  </div>
+                ) : null}
               </div>
             </div>
           </section>
@@ -579,7 +728,7 @@ export function CommunicationNoteComposer({
               <p className="micro-label">{surface.boundaryTitle}</p>
             </div>
             <ul className="mt-4 grid gap-3 text-sm leading-6 text-muted">
-              {surface.boundaries.map((boundary) => (
+              {(generationAvailable ? generationCopy.boundaries : surface.boundaries).map((boundary) => (
                 <li key={boundary} className="flex gap-2">
                   <CheckCircle2
                     className="mt-1 size-4 shrink-0 text-brand"
@@ -596,7 +745,7 @@ export function CommunicationNoteComposer({
               {surface.privacyNotice}
             </a>
           </aside>
-        </div>
+        </form>
       </div>
     </main>
   );
@@ -614,6 +763,7 @@ function ComposerField({
   optionalLabel,
   multiline = false,
   rows = 3,
+  disabled = false,
 }: {
   field: CommunicationNoteComposerField;
   label: string;
@@ -626,6 +776,7 @@ function ComposerField({
   optionalLabel?: string;
   multiline?: boolean;
   rows?: number;
+  disabled?: boolean;
 }) {
   const fieldId = `communication-note-${field}`;
   const hintId = hint ? `${fieldId}-hint` : undefined;
@@ -642,6 +793,7 @@ function ComposerField({
     className,
     autoComplete: "off",
     spellCheck: false,
+    disabled,
   };
 
   return (
@@ -691,11 +843,13 @@ function Confirmation({
   checked,
   label,
   onChange,
+  disabled = false,
 }: {
   id: string;
   checked: boolean;
   label: string;
   onChange(checked: boolean): void;
+  disabled?: boolean;
 }) {
   return (
     <label
@@ -706,6 +860,7 @@ function Confirmation({
         id={id}
         type="checkbox"
         checked={checked}
+        disabled={disabled}
         onChange={(event) => onChange(event.target.checked)}
         className="mt-1 size-4 accent-[#0b5c4d]"
       />
@@ -795,6 +950,107 @@ export function buildCommunicationNoteWorkspaceHref(
 ) {
   const supportedLocale = locale === "zh-Hant" ? "en" : locale;
   return `${path}?lang=${encodeURIComponent(supportedLocale)}`;
+}
+
+type GenerationSurfaceCopy = Readonly<{
+  connected: string;
+  serverGeneration: string;
+  memoryBoundary: string;
+  pointsBoundary: string;
+  pointsTitle: string;
+  pointsStatus: string;
+  boundaries: readonly string[];
+  pointsBalance(preview: CommunicationNotePointsPreview, locale: CommunicationNoteComposerLocale): string;
+  action: string;
+  checkStatus: string;
+  transportError: string;
+  pollingPaused: string;
+  boundary(cost?: string): string;
+  status(status: CommunicationNoteGenerationJob["status"]): string;
+  error(code: string): string;
+}>;
+
+function getGenerationSurfaceCopy(
+  locale: CommunicationNoteComposerLocale,
+): GenerationSurfaceCopy {
+  if (locale === "zh-Hans") {
+    return {
+      connected: "安全服务器生成",
+      serverGeneration: "安全队列 · 异步生成",
+      memoryBoundary: "本地隐私检查完成并确认后，清理后的事实会发送至 CaresLink 服务器。",
+      pointsBoundary: "提交后由服务器重新核验并预留 Points；页面不会自行扣减余额。",
+      pointsTitle: " · 服务器核验",
+      pointsStatus: "服务器管理",
+      boundaries: ["只有完成本地检查并确认的清理事实才会发送至服务器。", "生成任务与正式草稿由服务器保存；页面离开不会取消任务。", "本工作流不提供临床、法律、护理、监管或合规建议。"],
+      pointsBalance: connectedPointsBalanceZhHans,
+      action: "提交生成 Communication Note",
+      checkStatus: "安全查询状态",
+      transportError: "暂时无法确认生成状态。可使用相同请求安全查询；离开页面不会取消服务器任务。",
+      pollingPaused: "自动状态查询已暂停。任务可能仍在服务器运行；请使用相同请求安全查询状态。",
+      boundary: (cost) => `服务器将在接纳请求时重新核验${cost ? `并预留 ${cost} Points` : " Points"}。AI 会异步生成并保存正式草稿；内容不构成专业建议。`,
+      status: generationStatusZhHans,
+      error: generationErrorZhHans,
+    };
+  }
+  if (locale === "zh-Hant") {
+    return {
+      connected: "安全伺服器生成",
+      serverGeneration: "安全佇列 · 非同步生成",
+      memoryBoundary: "本機私隱檢查完成並確認後，清理後的事實會傳送至 CaresLink 伺服器。",
+      pointsBoundary: "提交後由伺服器重新核驗並預留 Points；頁面不會自行扣減餘額。",
+      pointsTitle: " · 伺服器核驗",
+      pointsStatus: "伺服器管理",
+      boundaries: ["只有完成本機檢查並確認的清理事實才會傳送至伺服器。", "生成任務與正式草稿由伺服器儲存；離開頁面不會取消任務。", "本工作流程不提供臨床、法律、護理、監管或合規建議。"],
+      pointsBalance: connectedPointsBalanceZhHant,
+      action: "提交生成 Communication Note",
+      checkStatus: "安全查詢狀態",
+      transportError: "暫時無法確認生成狀態。可使用相同請求安全查詢；離開頁面不會取消伺服器任務。",
+      pollingPaused: "自動狀態查詢已暫停。任務可能仍在伺服器運行；請使用相同請求安全查詢狀態。",
+      boundary: (cost) => `伺服器將在接納請求時重新核驗${cost ? `並預留 ${cost} Points` : " Points"}。AI 會非同步生成並儲存正式草稿；內容不構成專業建議。`,
+      status: generationStatusZhHant,
+      error: generationErrorZhHant,
+    };
+  }
+  return {
+    connected: "Secure server generation",
+    serverGeneration: "Secure queue · asynchronous generation",
+    memoryBoundary: "After local privacy review and confirmation, cleaned facts are sent to the CaresLink server.",
+    pointsBoundary: "The server rechecks and reserves Points on submission. This page never subtracts the balance itself.",
+    pointsTitle: " · server verified",
+    pointsStatus: "Server managed",
+    boundaries: ["Only cleaned facts that pass local review and confirmation are sent to the server.", "The generation job and canonical draft are saved server-side; leaving does not cancel the job.", "This workflow does not provide clinical, legal, care, regulatory or compliance advice."],
+    pointsBalance: (preview, numberLocale) => preview.status === "AVAILABLE"
+      ? `Page-load balance snapshot: ${formatPointsNumber(preview.availablePoints, numberLocale)} available · ${formatPointsNumber(preview.reservedPoints, numberLocale)} reserved`
+      : preview.status === "NOT_READY" ? "The Points balance is not ready for this account." : "The Points rate and balance are unavailable.",
+    action: "Submit Communication Note generation",
+    checkStatus: "Check status safely",
+    transportError: "Generation status cannot be confirmed right now. You can safely replay the same request; leaving this page does not cancel server work.",
+    pollingPaused: "Automatic status checks have paused. The job may still be running on the server; check the same request safely.",
+    boundary: (cost) => `On admission the server rechecks eligibility${cost ? ` and reserves ${cost} Points` : " and the Points cost"}. AI generation is asynchronous and saves a canonical draft. It is not professional advice.`,
+    status: (status) => ({
+      QUEUED: "Generation queued. Points are reserved by the server.",
+      RUNNING: "Generation is running. Leaving this page does not cancel server work.",
+      SUCCEEDED: "Communication Note draft generated and saved by the server.",
+      FAILED: "Communication Note generation failed. The server has finalised the job.",
+      CANCELLED: "Communication Note generation was cancelled by the server.",
+    })[status],
+    error: () => "The server did not confirm whether this exact request was accepted. To avoid duplicate work, this page stays locked; check the same request safely.",
+  };
+}
+
+function generationStatusZhHans(status: CommunicationNoteGenerationJob["status"]) {
+  return ({ QUEUED: "生成任务已排队，Points 已由服务器预留。", RUNNING: "正在生成；离开页面不会取消服务器任务。", SUCCEEDED: "Communication Note 草稿已由服务器生成并保存。", FAILED: "生成失败，服务器已结束该任务。", CANCELLED: "服务器已取消生成任务。" })[status];
+}
+function generationStatusZhHant(status: CommunicationNoteGenerationJob["status"]) {
+  return ({ QUEUED: "生成任務已排隊，Points 已由伺服器預留。", RUNNING: "正在生成；離開頁面不會取消伺服器任務。", SUCCEEDED: "Communication Note 草稿已由伺服器生成並儲存。", FAILED: "生成失敗，伺服器已結束該任務。", CANCELLED: "伺服器已取消生成任務。" })[status];
+}
+function generationErrorZhHans() { return "服务器未确认是否已接纳此精确请求。为避免重复生成，页面会保持锁定；请使用相同请求安全查询状态。"; }
+function generationErrorZhHant() { return "伺服器未確認是否已接納此精確請求。為避免重複生成，頁面會保持鎖定；請使用相同請求安全查詢狀態。"; }
+function connectedPointsBalanceZhHans(preview: CommunicationNotePointsPreview, locale: CommunicationNoteComposerLocale) {
+  return preview.status === "AVAILABLE" ? `页面载入时余额：可用 ${formatPointsNumber(preview.availablePoints, locale)} · 已预留 ${formatPointsNumber(preview.reservedPoints, locale)}` : preview.status === "NOT_READY" ? "此账户的 Points 余额尚未就绪。" : "Points 费率和余额不可用。";
+}
+function connectedPointsBalanceZhHant(preview: CommunicationNotePointsPreview, locale: CommunicationNoteComposerLocale) {
+  return preview.status === "AVAILABLE" ? `頁面載入時餘額：可用 ${formatPointsNumber(preview.availablePoints, locale)} · 已預留 ${formatPointsNumber(preview.reservedPoints, locale)}` : preview.status === "NOT_READY" ? "此帳戶的 Points 餘額尚未就緒。" : "Points 費率和餘額不可用。";
 }
 
 type SurfaceCopy = {

@@ -6,6 +6,7 @@ import {
   type CommunicationNoteComposerLocale,
 } from "../../../lib/communication-note-composer";
 import { isCommunicationNoteComposerEnabled } from "../../../lib/communication-note-composer-feature";
+import { isCommunicationNoteGenerationUiEnabled } from "../../../lib/communication-note-generation-feature";
 import { resolveCommunicationNotePointsPreview } from "../../../lib/communication-note-points-preview.server";
 import { resolveWorkspaceAccountFromSupabaseSession } from "../../../lib/referral-workspace-session";
 import { CARESLINK_AI_NOINDEX_ROBOTS } from "../../../lib/seo-policy";
@@ -69,6 +70,7 @@ export default async function CommunicationNotePage({
       locale={localeResult.locale}
       pointsPreview={pointsPreview}
       unsupportedLocale={localeResult.unsupported}
+      generationAvailable={isCommunicationNoteGenerationUiEnabled()}
     />
   );
 }
