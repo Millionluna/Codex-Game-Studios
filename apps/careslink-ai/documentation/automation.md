@@ -1322,6 +1322,39 @@ issuer/connector or independently observed quiescence exists. Formal adapters
 remain `undefined`, readiness remains `false`, and nothing is scheduled or
 deployed.
 
+### Communication Note provider trust M2b — source only
+
+M2b narrows the KMS half of the M2a boundary to one owned provider sequence:
+exact Vercel Preview OIDC claims, a fresh custom audience and `jti`, Google STS,
+the pinned WIF provider, and two pinned service-account impersonations. The
+first credential request authenticates the exact parent `CryptoKey` plus numeric
+`CryptoKeyVersion`; a second independent credential request can cross the private WeakMap
+boundary only once for one M2a `rawEncrypt`. Caller-supplied M2a posture or
+credentials are not accepted.
+
+Google STS acceptance is the authentication authority for the exact custom
+token; local claim parsing is not a separate JWKS-verification claim. Both
+service-account credential requests use the same principal and scope, so their
+separate local lifecycles are not independent IAM purpose isolation and do not
+assume Google returns different token strings.
+
+The exact-allowlist Node HTTPS transport performs public-address DNS preflight,
+pins resolution into each request, rechecks the connected peer, verifies TLS,
+rejects redirects and retries, bounds every request to five seconds and the
+whole preparation chain to 30 seconds, and applies endpoint-specific byte and
+header limits. Mutable body/chunk copies are scrubbed. Immutable JavaScript JWT
+and access-token strings cannot be reliably zeroized; M2b drops references but
+makes no string-zeroization claim.
+
+Formal factories/singletons remain closed (`READY=false`, singleton exports
+`undefined`, formal preparation fixed-failure). Only the exact `TEST_ONLY`
+capability can run the source seam, which has no route, worker or scheduler
+importer. The tests use mocked provider/HTTPS boundaries; no live cloud call,
+resource, deployment, Preview/Production change, real care data or model call
+belongs to this batch. The GCS raw-token DTO and independent WIF/IAM/KMS IAM
+control-plane attestation remain required before formal composition. See
+`documentation/communication-note-secure-submission-provider-trust-m2b.md`.
+
 ### Communication Note atomic 20-Point admission — source only
 
 Migration

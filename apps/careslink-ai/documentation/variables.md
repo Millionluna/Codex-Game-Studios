@@ -442,6 +442,33 @@ approved trust source, runtime or deployment configuration. Provider resource
 names, database credentials, DSNs, access tokens and private key material must
 not be added to this file or client configuration.
 
+## Secure-submission M2b provider trust
+
+M2b adds no environment variables and no `.env.example` entry. The source pins
+the Vercel team/project/Preview identity, Google WIF provider, runtime service
+account, project and region as reviewed policy constants. The exact numeric KMS
+version and exact caller abort signal are accepted only through the frozen
+`TEST_ONLY` source seam; they are not ambient configuration and do not activate
+the formal factory.
+
+The base Vercel token is obtained through the supported synchronous
+platform-token accessor, which may use the request-context header or Vercel's
+own injected `VERCEL_OIDC_TOKEN`. That platform input is not a new CaresLink
+configuration variable. Custom-audience exchange, STS, service-account access
+tokens and KMS requests use the owned exact-allowlist HTTPS transport. No token,
+service-account JSON, Application Default Credential, proxy, Google client
+configuration or generic endpoint override may be supplied through a
+caller-configured environment variable. The two independently requested short-lived access-token results
+remain private and are not projected by the one-use trust handle.
+
+Mutable request/response byte copies are scrubbed. JWT and access-token values
+are immutable JavaScript strings, so reference release is not a reliable
+zeroization guarantee and must not be documented as one. Formal trust and
+transport singletons stay `undefined`, both readiness latches stay `false`, and
+the formal preparation factory fails closed. Do not add deployment variables
+until live WIF/IAM/KMS IAM evidence, the GCS raw-token redesign, an authorized
+no-data Preview gate and separate activation approval are complete.
+
 ## Platform-provided variables
 
 `NODE_ENV`, `VERCEL`, `VERCEL_ENV`, `VERCEL_TARGET_ENV`, `VERCEL_PROJECT_ID`,
