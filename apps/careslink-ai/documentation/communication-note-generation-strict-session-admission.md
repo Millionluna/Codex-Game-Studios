@@ -87,6 +87,42 @@ general execution and grants execution only to `authenticated`. Its migration
 remains unapplied, so the source wiring is not live database least-privilege or
 Cookie/Auth evidence.
 
+## Communication Note atomic 20-Point admission — source only
+
+The later Production-unapplied migration
+`20260902063211_add_v1_communication_note_points_admission.sql` closes the
+source-level time-of-check/time-of-use gap for Communication admission. Its
+private coordinator re-reads the current session and privacy authority inside
+the same transaction that admits the durable job and reserves the fixed 20
+Points. Exact same-key replay repeats those checks and is zero-write; an
+authority, expiry or balance failure rolls back the job, payload and all Points
+writes.
+
+The adapter remains `READY=false`, TestOnly and unwired: no route importer,
+caller grant, pool or database URL exists. The successor terminal-settlement
+migration replaces the temporary paid-job quarantine without exposing the
+legacy Points functions or installing a runtime principal. A21 is serial
+rollback-only; a separate five-scenario, 15-PID local PostgreSQL 16.15 run
+supplies the admission concurrency evidence. Neither batch used Hosted,
+Production, a new Preview, deployment, a model or real care data.
+
+## Communication Note atomic Points terminal settlement — source only
+
+The later Production-unapplied migration
+`20260902121601_add_v1_communication_note_points_terminal_settlement.sql`
+admits marked paid jobs to the registered worker only while the exact 20-Point
+reservation remains usable. It atomically commits success with canonical
+artifact, provider and purge evidence; releases exact source lots on permanent
+failure/cancellation; and keeps the reservation on retry. Post-lock lease,
+fence, reservation and worker-policy margins fail closed. Per-registration
+recovery turns prevent paid/unpaid and paid queued/running starvation. It adds a
+non-login purpose role but no runtime membership, route, pool or credential.
+
+The final isolated PostgreSQL 16.15 gate passed the exact 20-migration chain,
+all six terminal/concurrency groups, permanent ACL postcheck and complete
+cleanup. `documentation/tests.md` records the exact hashes and non-production
+evidence boundary.
+
 ## Deliberate limits and next gate
 
 The repository migration supplies the authenticated, zero-argument
@@ -98,12 +134,16 @@ migration remains unapplied and the formal composition/resolver remain absent.
 Formal installation, trusted Provider role normalization and same-revision live
 active/revoked proof on a disposable no-data Preview remain separate.
 
-Request-time admission is not sufficient by itself. The future durable owner
-enqueue RPC must re-read the active session and privacy authority inside the
-same database transaction that accepts the job, closing the time-of-check to
-time-of-use window. Only a registered asynchronous worker may later invoke an
-approved model; the HTTP request thread must not do so.
+Request-time admission is not sufficient by itself. The later source coordinator
+now re-reads the active session and privacy authority inside the same database
+transaction that accepts the job and reserves 20 Points, closing that source
+time-of-check/time-of-use window. The successor now supplies the source-level
+terminal commit/release and worker unquarantine boundaries. Formal caller and
+principal installation plus live disposable-Preview evidence remain absent.
+Only a registered asynchronous worker may later invoke an approved model; the
+HTTP request thread must not do so.
 
-This batch creates or contacts no live or ambient client, database connection,
+The strict-session composition batch itself creates or contacts no live or
+ambient client, database connection,
 Preview, Production resource, deployment, payload, Point transaction or model
 call. Tests use only explicit in-memory mock ports.

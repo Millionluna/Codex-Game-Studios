@@ -967,10 +967,10 @@ describe("V1 Note owner runtime RPC shadow migration contract", () => {
     expect(assertionsPath).toBe(
       "supabase/assertions/v1_note_generation_owner_runtime_rpc_shadow_assertions.sql",
     );
-    expect(Buffer.byteLength(assertions, "utf8")).toBe(105_549);
+    expect(Buffer.byteLength(assertions, "utf8")).toBe(107_980);
     expect(
       createHash("sha256").update(assertions, "utf8").digest("hex"),
-    ).toBe("b699e5967fd487656dc34c398b61c464396b26d40d48fc1bfbe8c53f3c423a3b");
+    ).toBe("f090107425a2830a40c1db18ebd75da9030369614303e6b84d0a880eea03d3a3");
     for (const marker of [
       "Manual rollback-only assertions for a fresh disposable PostgreSQL 16+ database",
       "after every repository migration has been applied",
@@ -982,6 +982,11 @@ describe("V1 Note owner runtime RPC shadow migration contract", () => {
       "11/11 rollback suites",
       "hosted-role-restore-r5-20260825",
       "deletion and exact id/ref absence were confirmed",
+      "historical pre-admission BEGIN-through-ROLLBACK body was 104506 UTF-8 bytes",
+      "53eb0f2c5265617f00ea37ab946ac9c9746589fddca39236279ba93bb2907b16",
+      "current admission-aware body is 106523 UTF-8 bytes",
+      "84cce9bf08bb1e9d8b7b2c9de50f8508ca16f94600d463cd5449c93b60172832",
+      "pending a fresh disposable hosted rerun",
     ]) {
       expect(normalizedHeader).toContain(marker);
     }
@@ -990,10 +995,10 @@ describe("V1 Note owner runtime RPC shadow migration contract", () => {
     expect(assertionBody.startsWith("begin;\n")).toBe(true);
     expect(assertionBody.endsWith("rollback;\n")).toBe(true);
     expect(assertionBody).not.toMatch(/^commit\s*;/im);
-    expect(Buffer.byteLength(assertionBody, "utf8")).toBe(104_506);
+    expect(Buffer.byteLength(assertionBody, "utf8")).toBe(106_523);
     expect(
       createHash("sha256").update(assertionBody, "utf8").digest("hex"),
-    ).toBe("53eb0f2c5265617f00ea37ab946ac9c9746589fddca39236279ba93bb2907b16");
+    ).toBe("84cce9bf08bb1e9d8b7b2c9de50f8508ca16f94600d463cd5449c93b60172832");
 
     for (const marker of [
       "owner runtime RPC shadow requires PostgreSQL 16 or newer",
@@ -1032,6 +1037,8 @@ describe("V1 Note owner runtime RPC shadow migration contract", () => {
       "RUNNING owner cancellation terminal set drifted",
       "owner API executor direct sensitive read was accepted",
       "owner assertion did not restore hard-off/binding/RLS",
+      "legacy owner admission unexpectedly acquired paid marker",
+      "legacy owner admission unexpectedly mutated Points",
       "assertion-only owner access cleanup failed",
     ]) {
       expect(assertionBody).toContain(marker);
@@ -1044,6 +1051,7 @@ describe("V1 Note owner runtime RPC shadow migration contract", () => {
       "communication_note_preview_dispatch_receipts",
       "communication_note_preview_dispatch_reservations",
       "communication_note_preview_runner_terminals",
+      "communication_note_point_admissions",
     ]) {
       expect(normalizedAssertionBody).toContain(successorTable);
     }
@@ -1075,6 +1083,15 @@ describe("V1 Note owner runtime RPC shadow migration contract", () => {
     );
     expect(normalizedAssertionBody).toContain(
       "('careslink_v1_generation._registration_accepts_new_work(text)'::regprocedure::oid)",
+    );
+    expect(normalizedAssertionBody).toContain(
+      "('careslink_v1_generation._reserve_and_bind_v1_shadow_communication_note_points(uuid,uuid,uuid,boolean)'::regprocedure::oid)",
+    );
+    expect(normalizedAssertionBody).toContain(
+      "('careslink_v1_generation.admit_and_reserve_v1_shadow_communication_note_generation_job(uuid,uuid,text,uuid,uuid,uuid,text,text,text,text,text,text,text,timestamptz)'::regprocedure::oid)",
+    );
+    expect(normalizedAssertionBody).toContain(
+      "'careslink_v1_generation_points_admission_executor'",
     );
     expect(normalizedAssertionBody).toContain(
       "('worker_registration_retirements', 'SELECT')",

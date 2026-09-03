@@ -1,6 +1,8 @@
 # CaresLink AI Test Evidence
 
-> Evidence date: 2026-08-26. This document separates **Existing**, **Proposed**, and **Gaps**. Passing current tests does not mean Product Baseline V1.0 is implemented.
+> Evidence date: 2026-08-26, with source/local-only evidence updated through
+> 2026-09-02. This document separates **Existing**, **Proposed**, and **Gaps**.
+> Passing current tests does not mean Product Baseline V1.0 is implemented.
 
 ## Existing
 
@@ -3265,25 +3267,26 @@ synthetic `.invalid` Auth fixtures and no care data. The temporary server and
 directory were removed afterward. No Supabase environment migration apply,
 Preview, Production, deployment or live route changed.
 
-The current atomic source pins are: 41 migrations; ordered basename/entry
-digests `bb85d720f970ec57ee1916df7c682041b21c9fb131488c33a9dae1830f20bf90`
-and `698630978aaa34ab51f72f1c3b9ffaf93763459b848f5416c1a8e90284eb7c75`;
-transactional policy `2026-09-02.preview-transactional-migrations.8` with 21
+At that atomic source checkpoint, the pins were: 42 migrations; ordered basename/entry
+digests `94cc5a7af76da30b3bf66a518f48cd30b2afbdcd3005339317b1458fcb226057`
+and `76792a55f9bef01b4c455aaccfb2e6eaf2255d7f7f5104c37f829d3c1a825ddf`;
+transactional policy `2026-09-02.preview-transactional-migrations.9` with 22
 outer wrappers and manifest
-`73ec29a2c60ee3479548f70a6d7718782ec86185d8f34287633ebb623ed1fec7`;
-A19 assertion SHA-256
-`4b9096cbe06d36378b4bd799aa115de6da452a5acd29b60eb6d8cb2fdb491006`;
-rollback policy `2026-09-02.preview-schema-rollback-assertions.6` with 19 files
+`d0213ba6e2d5e04ff46bd034ac47680081ea6161b9e2b5ee5fa63864aefc150d`;
+A19/A20 assertion SHA-256 values
+`4b9096cbe06d36378b4bd799aa115de6da452a5acd29b60eb6d8cb2fdb491006`
+and `b03fa8acf981f1bec7eba08002323682d033f0073f9d2bc05eed31c8e7b63654`;
+rollback policy `2026-09-02.preview-schema-rollback-assertions.7` with 20 files
 and manifest
-`6370a375828a1005315a9b090cbaead139944fdc66a903f9939f948524d3cf4d`;
+`a503760e63debffb2038338ba892823728940fb08b15ab6d6991c5d11366fb53`;
 preflight
 `preflight.communication.openai.synthetic-preview.2026-09-02.authenticated-current-session.v1`
 with digest
-`b0709121adf8d3c03c5c2112e0f9acaff0f5d79ca0f6f3460909067833629787`;
+`1b3ead75f957fdfb75488b65b2a336ea1e203f1b8619687092473b1d2fe1e02b`;
 and coordinator
 `coordinator.communication.openai.synthetic-preview.2026-09-02.authenticated-current-session.v1`
 with digest
-`ea496d6f2e08680b5f8d7515228a1e39d307d38e3f195fb1a361b0875330303b`.
+`11d951e443754fbd8a5a771ea4cdf95bfda4ec8f935f195de531cfea39542401`.
 The M1l 40-migration/A01–A18 pins remain historical evidence for that earlier
 revision and are not relabelled as current evidence.
 
@@ -3315,6 +3318,196 @@ The current focused gate passed 4 files / 98 tests, and the full Vitest suite
 passed 206 files / 2,860 tests. TypeScript, full ESLint, the Next.js Webpack
 production build with 64/64 static pages, the 73-file adapter sync, the fresh
 client-boundary scan across 100 static chunk files and `git diff --check` passed.
+
+#### Communication Note shadow Points preview — current source/local evidence
+
+Migration `20260902052755_add_v1_communication_note_points_preview.sql` is a
+6,918-byte additive source artifact with SHA-256
+`5615844b3e5786b5d6256bafb08e0e8707fe83d28d4239cf01d7cf584beb1c08`.
+It adds the zero-argument authenticated-only
+`public.get_v1_communication_note_points_preview()` function. The function
+reuses current-session authority, fixes the shadow catalog rate at 20 Points,
+and reads only the current Provider's active/shadow wallet. Available and
+reserved totals are computed in one statement snapshot; an elapsed reservation
+deadline does not release a row whose durable status remains `RESERVED`. The
+function performs no DML and has no access to the legacy three-credit Pilot.
+
+The Communication Note page authorizes the account and Provider role before the
+single Points RPC, using the same request-scoped Cookie client. Its server
+resolver accepts only the exact `AVAILABLE` or `NOT_READY` DTO, fails closed to
+the unit-only `UNAVAILABLE` DTO, and applies a 1.5-second deadline with
+PostgREST `AbortSignal` cancellation when supported. The client component only
+renders the explicitly inactive shadow preview: balance, reserved total and the
+20-Point future generation rate. Static tests deny client-side network,
+storage, cookie, cache and service-worker I/O across the component and all of
+its direct local modules. No reserve, grant, debit, generation job, model call,
+save or export path was enabled.
+
+The 19,845-byte rollback-only A20 assertion has SHA-256
+`b03fa8acf981f1bec7eba08002323682d033f0073f9d2bc05eed31c8e7b63654`.
+An isolated PostgreSQL 16.15 run proved the exact function owner, empty search
+path and two-role grant boundary; Provider A returned 42 available / 20
+reserved, Provider B returned 7 / 0 without cross-owner leakage, a walletless
+Provider returned `NOT_READY`, and an expired session was denied. Exact
+before/after snapshots across six Points and two legacy-credit tables were
+unchanged. Final rollback left all synthetic Auth and Points fixtures at zero,
+and the temporary cluster was removed.
+
+The current focused gate passed 12 files / 160 tests, and the full Vitest suite
+passed 208 files / 2,904 tests. TypeScript, full ESLint, the Next.js 16.2.9
+Webpack production build with 64/64 static pages, the 73-file adapter sync, the
+fresh client-boundary scan across 100 static chunk files and `git diff --check`
+passed. The migration remains unapplied: no external Supabase environment,
+Preview, Production or deployment action occurred.
+
+#### Communication Note atomic 20-Point admission — source only
+
+Migration
+`20260902063211_add_v1_communication_note_points_admission.sql` adds an
+unapplied, default-off Communication-only coordinator that admits the durable
+job and reserves exactly 20 Points in one database transaction. Fresh success
+creates a `QUEUED` job with attempt `0`, an `AVAILABLE` payload, the fixed
+`2026-08-09.v1-shadow` 20-Point quote, one `RESERVED` reservation and its exact
+lot allocation and `RESERVE` ledger entry. Exact same-key replay revalidates the
+binding, current session, privacy authority and expiry state and writes nothing.
+The owner-wide advisory lock and deterministic lot order prevent
+oversubscription. A failure in either admission or reservation rolls back the
+whole statement.
+
+This is reservation only. A marked paid job remains `QUEUED` and is excluded
+from claim and recovery; attempts, cancellation and legacy Points
+commit/release are denied while the private binding exists. No terminal success,
+failure, commit or release path is added. The batch neither grants the proposed
+300 welcome Points nor changes the legacy credit system. Its owner-safe
+coordinator/adapter DTO returns no quote, reservation, allocation, ledger or
+private binding ID. This does not make all Points IDs secret: the authenticated
+owner retains the historical RLS ability to read their own public Points rows
+and IDs, while the private job-to-Points binding remains inaccessible.
+
+The fifth generation purpose role is `NOLOGIN`, `NOINHERIT` and
+`NOBYPASSRLS`. On PostgreSQL 16 its only creator-management edge is from
+`postgres` with `ADMIN=true`, `INHERIT=false`, `SET=false`; it has zero runtime
+members, the migration-time `SET` edge is revoked, and temporary `TRIGGER`
+privilege on `public.point_reservations` ends false. The migration adds the
+fifteenth forced-RLS private generation table. The server adapter remains
+`READY=false`, is available only through an explicit TestOnly factory, creates
+no pool, reads no database URL and has no route importer or caller grant.
+
+The rollback-only A21 database assertion passed serially with 34 `DO` blocks
+and 6 savepoints. It is transaction/catalog evidence, not concurrency evidence.
+At that admission-only revision, the transactional migration manifest included
+43 migrations. The current terminal-settlement revision includes 44. The Hosted
+schema-rollback runner remains A01–A20; A21 is a standalone, isolated-local
+serial rollback-only gate and is not part of that Hosted runner. The older M1x
+pins above remain historical 42/A01–A20 evidence for their exact revision. The
+true multi-client evidence below used its separate local concurrency
+orchestration and must not be inferred from A21.
+
+The admission gate at that exact revision used a fresh empty PostgreSQL 16.15
+cluster and applied migrations #1–#43, one file per transaction. The minimum
+Supabase-compatible bootstrap required the exact Hosted-compatible `postgres`
+schema `USAGE` bridge after #25; #26–#43 then passed. The bridge was revoked
+before teardown, and effective `postgres` schema `USAGE` and `CREATE` were both
+false at the final check. This paragraph is historical admission evidence and
+does not claim that migration #44 ran in that cluster.
+
+The true-concurrency runner used 15 distinct backend PIDs across five
+three-client scenarios, and every waiter was observed behind the exact expected
+advisory-lock blocker. Same-key concurrency produced one create plus two
+write-free replays, one 20-Point reservation and lot remainder 10. Two different
+keys against a 30-Point wallet produced one success plus one
+`POINTS_INSUFFICIENT`, again leaving 10. Session expiry and privacy expiry
+each failed as expected with zero writes and lot remainder 30; payload
+expiry returned the contract's `PRIVACY_REVIEW_STALE`, also with zero writes and
+lot remainder 30. Generic commit and release were denied for the bound paid
+reservation. The concurrency static contract passed 1 file / 12 tests.
+
+Two cleanup attempts each exposed a distinct fixture foreign-key ordering bug—
+first binding↔job, then job↔payload—and each whole transaction rolled back
+safely. The third, corrected exact-scoped cleanup committed without `TRUNCATE`:
+both protection triggers were enabled (`O`), the job-to-payload foreign key was
+validated, all scoped fixture, business and Points rows were zero, runner and
+support objects were absent, temporary schema `USAGE` was revoked, and the
+cluster was deleted. This is local PG16 source/schema/transaction evidence only;
+there was no Hosted or Production database, new Preview, deployment, activation,
+model call or real care data.
+
+#### Communication Note atomic Points terminal settlement — source/local only
+
+Migration
+`20260902121601_add_v1_communication_note_points_terminal_settlement.sql`
+adds the default-off terminal coordinator, a separate non-login settlement
+purpose role, an immutable settlement table and a per-registration recovery-turn
+table. Its SHA-256 is
+`6e5148f3e080ab767f586c27c86490ac1c05b80deed864f48783c331bbf41afd`.
+The current 44-entry transactional manifest digest is
+`033aaf2aa8eafe98f6d9cfd6888c247ffc0a43289b95aca319447a380da2d3f0`.
+
+A fresh passwordless PostgreSQL 16.15 Homebrew cluster with no TCP listener and
+an owned `0700` Unix socket applied the exact 20-migration dependency chain from
+that pinned manifest. The local runner used setup SHA
+`a2dd25412d376d88892cfcc074ea4fcfe4cdb8a45e0992242006e36282437466`,
+cleanup SHA
+`8da5bdca78c46c38d5654459669fd030cbbf9b82a6c126bec01e96e284665c88`
+and normalized source revision
+`0d67bccd29b384a0aab23c8291f9f40c5134d07e3e82bfada2947cf100058bc2`.
+All six exact dynamic scenario groups passed:
+
+- permanent worker failure released 20 Points, denied generic commit/release,
+  kept the terminal job immutable, and made response-loss replay write-free;
+  unmarked generic Communication jobs were also denied by the paid outer entry
+  at `QUEUED`, `RUNNING` and `FAILED` with zero Points writes;
+- retry retained `RESERVED`; attempt two committed exactly 20 Points beside the
+  canonical document/revision, sync change, mutation receipt, provider evidence
+  and purge outbox; historical retry, same-idempotency and post-document-change
+  replays wrote nothing;
+- queued expiry and concurrent recovery observed the exact blockers, preserved
+  per-registration isolation and processed paid/unpaid plus paid queued/running
+  lanes without deadlock or starvation;
+- a grant with about 848 ms remaining settled `DENIED_SETTLED` and released the
+  original 20-Point allocation;
+- incomplete fence, stale heartbeat and stale fence replay were denied; owner
+  cancellation and its replay released exactly 20 Points once.
+- the timing-boundary group held the payload lock across `max_queue_age`,
+  returned exact `IDLE` with zero attempt writes, and then recovered the queued
+  job while releasing 20 Points; it also proved direct permanent failure uses a
+  post-blocker terminal time; the denied-authority path began its caller
+  transaction before claim, blocked on the Points reservation, then persisted
+  one shared terminal time no earlier than blocker release across its ACK,
+  attempt, job, reservation, settlement, ledger, payload and purge outbox while
+  exact replay remained write-free; direct success starting before claim but
+  crossing the fence/lease boundary returned `LEASE_EXPIRED` with zero
+  document, settlement, evidence or outbox writes.
+
+The run completed in about 12.5 seconds. Runner quiescence, exact SQL cleanup,
+the independent role/RLS/ACL/zero-fixture postcheck, graceful PostgreSQL stop and
+exact temporary-root deletion were all true; forced stop was false. Static
+coverage also pins the absence of `-infinity` timestamp subtraction, the
+settlement helpers' exact owner/search-path/execute ACLs, schema `CREATE`
+closure and the settlement role's lack of direct extension access.
+
+The reviewed claim and direct-terminal timing refinements are now closed.
+Claim rechecks `max_queue_age` after its payload and reservation locks. Direct
+success/failure sample the persisted terminal clock after the payload lock;
+success also revalidates the initiating session at that final time, and the
+dynamic gate proves the expired fence/lease branch is write-free.
+
+The adjacent denied-authority terminal-time P2 is now closed. Migration 44
+redefines the exact `_settle_denied_authority(..., p_at)` identity without
+changing its wire contract: active settlement acquires the job, attempt,
+payload, ordered issued-grant and Points reservation locks before sampling one
+wall clock, while exact replay remains validation-only and returns the stored
+terminal time. This conclusion is limited to terminal persistence after denial;
+it does not broaden the predecessor authorize/consume authority model. The
+entire slice remains default-off and creates no runtime principal or activation
+authority.
+
+The current focused timing/pin gate passed 6 files / 93 tests and the full
+Vitest suite passed 213 files / 3,004 tests. TypeScript, full ESLint, Node
+syntax, the Next.js 16.2.9 Turbopack production build with 64/64 generated
+pages, the 26-static-chunk client boundary, the 73-file adapter sync and
+`git diff --check` all passed. Independent SQL/security review reported zero P0,
+zero P1 and zero remaining P2 findings for this source-only batch.
 
 ### Current live/read-only evidence
 
@@ -3357,7 +3550,10 @@ The following suites are required before the corresponding V1 slice can be calle
 
 ### Points and Billing
 
-- Add concurrent SQL transaction races for reserve/commit/release and rate-version rollover. The isolated serial RPC/RLS matrix has passed, but concurrency remains unproved (`AI-PTS-001-007`, `APP-PTS-001-005`).
+- Repeat the now-proved Communication-only admission and terminal-settlement
+  matrix through the formal runtime principal on a disposable no-data Hosted
+  Preview, and add rate-version rollover. Hosted activation and catalog rollover
+  races remain unproved (`AI-PTS-001-007`, `APP-PTS-001-005`).
 - Legacy-credit migration replay/reconciliation/rollback tests (`AI-MIG-002/003`).
 - Stripe/Apple/Google receipt uniqueness, webhook replay, restore, refund/revoke and daily reconciliation tests (`AI-ENT-001`, `AI-BILL-001-005`, `APP-PAY-001-005`).
 
@@ -3384,9 +3580,14 @@ The following suites are required before the corresponding V1 slice can be calle
 
 1. The native App exists in a separate repository and is outside this task; this AI repository does not execute or attest its iOS/Android, offline, purchase or store gates.
 2. The OpenAPI/TypeScript contract and default-off durable `/v1` route adapter now exist, but there is no Preview- or Production-served Product API, generated client package, schema registry or previous-version compatibility fixture.
-3. The registration-retention source worktree passed its historical 1,381 tests across 125 files and all three focused migration contracts 39/39, with the `r21` 1,377-test / 124-file result, the `r9` 1,337-test / 122-file result and earlier baselines retained. The strict-local harness batch subsequently passed 1,400 tests across the same 125 files. All five Note types share a Production-unapplied private metadata/RPC layer with nine worker RPC identities, three newer owner RPC identities and one separately owned graceful-retirement control identity, but no caller execute grant. Deleted PostgreSQL 17.6 disposable `r9` proved the exact 14-migration, seven-suite and independent postcheck gate; deleted `r20` closed the PostgreSQL 17.6 true two-session claim/session/privacy race gate; deleted `r21` closed Attempt 1 historical replay across Attempt 2 success and post-purge state; deleted `r22` closed the hosted registration historical-retention gate with the exact 15/15 manifest, 7/7 suites and independent postcheck. The earlier disposable local PostgreSQL 16.15 gate closed its recorded engine, serial and true-two-session path with 27/27 repository migrations, exact V1 15/15, 7/7 suites and 3/3 races. The later owner-runtime PG16.15 run passed the new owner, additive-aware worker and durable rollback suites, independent posture postcheck and auth-session lock-wait race; #1-#24 and #26-#28 applied non-super, including fresh exact final #28, while #25 remained an explicit bootstrap-superuser transition. Migration #29 supplies graceful retirement with 14 forced-RLS tables. Its local strict rollback assertion passed inside the final clean 29/29 migration, 9/9 aggregate, independent posture and two-ordering retirement/claim race gate. Deleted Hosted r5 subsequently passed the exact 30/30 migration manifest, all 11 rollback suites and the independent owner/role/RLS/ACL/hard-off/zero-fixture postcheck. No worker/owner Preview or local cluster is retained. The five types still lack emergency revocation, attempt listing, a deployed worker, nested exact-key database vectors, account-delete/purge and orphan recovery, provider-start binding, safe sequential numeric parsing, real vault/KMS/retention, caller credentials/grants/routes, hosted GoTrue/PostgREST, real provider/model/STT integration, Points and complete per-type golden sets; runtime activation remains open.
+3. The registration-retention source worktree passed its historical 1,381 tests across 125 files and all three focused migration contracts 39/39, with the `r21` 1,377-test / 124-file result, the `r9` 1,337-test / 122-file result and earlier baselines retained. The strict-local harness batch subsequently passed 1,400 tests across the same 125 files. All five Note types share a Production-unapplied private metadata/RPC layer with nine worker RPC identities, three newer owner RPC identities and one separately owned graceful-retirement control identity, but no caller execute grant. Deleted PostgreSQL 17.6 disposable `r9` proved the exact 14-migration, seven-suite and independent postcheck gate; deleted `r20` closed the PostgreSQL 17.6 true two-session claim/session/privacy race gate; deleted `r21` closed Attempt 1 historical replay across Attempt 2 success and post-purge state; deleted `r22` closed the hosted registration historical-retention gate with the exact 15/15 manifest, 7/7 suites and independent postcheck. The earlier disposable local PostgreSQL 16.15 gate closed its recorded engine, serial and true-two-session path with 27/27 repository migrations, exact V1 15/15, 7/7 suites and 3/3 races. The later owner-runtime PG16.15 run passed the new owner, additive-aware worker and durable rollback suites, independent posture postcheck and auth-session lock-wait race; #1-#24 and #26-#28 applied non-super, including fresh exact final #28, while #25 remained an explicit bootstrap-superuser transition. Migration #29 supplies graceful retirement with 14 forced-RLS tables. Its local strict rollback assertion passed inside the final clean 29/29 migration, 9/9 aggregate, independent posture and two-ordering retirement/claim race gate. Deleted Hosted r5 subsequently passed the exact 30/30 migration manifest, all 11 rollback suites and the independent owner/role/RLS/ACL/hard-off/zero-fixture postcheck. No worker/owner Preview or local cluster is retained. The five types still lack emergency revocation, attempt listing, a deployed worker, nested exact-key database vectors, account-delete/purge and orphan recovery, provider-start binding, safe sequential numeric parsing, real vault/KMS/retention, caller credentials/grants/routes, hosted GoTrue/PostgREST, real provider/model/STT integration and complete per-type golden sets; runtime activation remains open.
 4. Canonical document/revision/checkpoint states exist as memory/domain contracts plus historical isolated schema/RPC evidence and a Production-unapplied mobile-sync migration draft that was clean-applied only on a deleted disposable branch; there is no retained schema activation, editor, renderer or cross-device recovery E2E.
-5. Points lots/rates/reservations passed isolated serial database tests but remain shadow-only. There is no runtime entitlement integration, welcome eligibility decision, concurrent reservation proof or legacy-credit conversion/reconciliation test.
+5. Points lots/rates/reservations remain shadow-only. Communication Note now has
+   local PG16 proof for fixed 20-Point atomic admission/reservation and terminal
+   commit/release, including retry, replay, cancellation and recovery
+   concurrency. It still has no formal runtime entitlement integration,
+   disposable Hosted proof, welcome eligibility decision, rate-rollover race or
+   legacy-credit conversion/reconciliation test.
 6. No payment provider sandbox, webhook replay, refund or reconciliation harness exists.
 7. No content editorial state, Guide, Daily Brief, notification or email/cron service exists.
 8. No signed PIA/data-map/subprocessor/NDB evidence is represented in automated tests.

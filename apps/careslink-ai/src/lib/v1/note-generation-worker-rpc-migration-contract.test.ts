@@ -1413,19 +1413,21 @@ describe("V1 Note registered-worker RPC shadow migration contract", () => {
       "d68d531a-55e6-4374-be68-494da7542c75",
       "eqqlvqqhvsogusqhzuaq",
       "deletion and exact id/ref absence were confirmed",
-      "current post-r5 proowner-hardened BEGIN-through-ROLLBACK source",
+      "historical post-r5 proowner-hardened BEGIN-through-ROLLBACK source",
       "163950 bytes",
       "ad3d5ffca482e76a530602c43ca16ad3adbbf9afb5742b156fe0b106044308cb",
-      "local PostgreSQL 16.15 and static-contract evidence only",
+      "current paid-admission-aware BEGIN-through-ROLLBACK body is 169122 bytes",
+      "c24c4399618768ff6e1ae10b159a83f76b1eca619fe73b621c519369d90e8ec0",
+      "local/static-contract evidence only",
       "independent postcheck separately proved the earlier invariant",
     ]) {
       expect(assertionHeader).toContain(marker);
     }
     expect(assertionBodyStart).toBeGreaterThanOrEqual(0);
-    expect(Buffer.byteLength(assertionBody, "utf8")).toBe(163_950);
+    expect(Buffer.byteLength(assertionBody, "utf8")).toBe(169_122);
     expect(
       createHash("sha256").update(assertionBody, "utf8").digest("hex"),
-    ).toBe("ad3d5ffca482e76a530602c43ca16ad3adbbf9afb5742b156fe0b106044308cb");
+    ).toBe("c24c4399618768ff6e1ae10b159a83f76b1eca619fe73b621c519369d90e8ec0");
     expect(assertions).toContain("transaction-only TEST_ONLY fixtures");
     expect(assertions).toContain("pg_get_function_identity_arguments");
     expect(assertions).toContain("aclexplode(");
@@ -1453,6 +1455,7 @@ describe("V1 Note registered-worker RPC shadow migration contract", () => {
       "communication_note_preview_dispatch_receipts",
       "communication_note_preview_dispatch_reservations",
       "communication_note_preview_runner_terminals",
+      "communication_note_point_admissions",
     ]) {
       expect(assertionBody).toContain(successorTable);
     }
@@ -1482,6 +1485,10 @@ describe("V1 Note registered-worker RPC shadow migration contract", () => {
       "worker executor schema privilege drifted",
       "worker RPC public wrapper unexpectedly exists",
       "worker RPC signature drifted",
+      "paid job claim quarantine source drifted",
+      "paid job recovery quarantine source drifted",
+      "paid attempt INSERT gate posture drifted",
+      "worker executor can access paid admission state",
       "serial claim envelope leaked or drifted",
       "serial claim arbitration or active-attempt invariant failed",
       "heartbeat envelope drifted",
@@ -1554,6 +1561,9 @@ describe("V1 Note registered-worker RPC shadow migration contract", () => {
     ]) {
       expect(assertions).toContain(marker);
     }
+    expect(normalizeSql(assertionBody)).toContain(
+      "length(v_marker) <> 7",
+    );
   });
 });
 

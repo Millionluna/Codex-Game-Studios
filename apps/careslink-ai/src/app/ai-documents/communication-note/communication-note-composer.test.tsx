@@ -15,6 +15,17 @@ const localeSentinels = {
   "zh-Hant": ["溝通記錄", "僅保留在瀏覽器記憶體"],
 } as const;
 
+const availablePointsPreview = {
+  status: "AVAILABLE" as const,
+  unit: "POINTS" as const,
+  serviceCode: "note.communication.generate" as const,
+  catalogVersion: "2026-08-09.v1-shadow",
+  generationCostPoints: 20,
+  availablePoints: 300,
+  reservedPoints: 20,
+  canAfford: true,
+};
+
 describe("Communication Note composer UI", () => {
   it.each(["en", "zh-Hans", "zh-Hant"] as const)(
     "renders all seven contract fields and the local-only boundary in %s",
@@ -81,13 +92,98 @@ describe("Communication Note composer UI", () => {
       'aria-describedby="communication-note-generation-boundary"',
     );
     expect(markup).toContain(
-      "No model, Product API, Points, save or export action is connected",
+      "This shadow preview is read only and not active. Viewing it does not reserve or use Points",
     );
     expect(markup).not.toContain(">Save<");
     expect(markup).not.toContain(">Export<");
     expect(markup).not.toContain(">Download<");
     expect(markup).not.toContain("credits remaining");
   });
+
+  it.each([
+    ["en", "Shadow balance: 300 available · 20 already reserved", "If this preview is activated, a generation would cost 20 Points.", "not active"],
+    ["zh-Hans", "预览余额：可用 300 · 已有预扣 20", "此预览正式启用后，每次生成预计需要 20 Points。", "尚未启用"],
+    ["zh-Hant", "預覽餘額：可用 300 · 已有預扣 20", "此預覽正式啟用後，每次產生預計需要 20 Points。", "尚未啟用"],
+  ] as const)(
+    "renders the server-owned Points preview in %s",
+    (locale, balance, cost, inactive) => {
+      const markup = renderToStaticMarkup(
+        createElement(CommunicationNoteComposer, {
+          locale,
+          pointsPreview: availablePointsPreview,
+        }),
+      );
+
+      const visibleText = markup.replace(/<[^>]+>/g, "");
+      expect(visibleText).toContain(balance);
+      expect(visibleText).toContain(cost);
+      expect(markup).toContain('disabled=""');
+      expect(markup).toContain('<span lang="en-AU">Points</span>');
+      expect(visibleText).toContain("20 Points");
+      expect(visibleText).toContain(inactive);
+      expect(markup).not.toMatch(/(?:3 credits|1 credit|account credit)/i);
+    },
+  );
+
+  it("distinguishes an unready wallet, insufficient balance and unavailable preview", () => {
+    const notReady = renderToStaticMarkup(
+      createElement(CommunicationNoteComposer, {
+        locale: "en",
+        pointsPreview: {
+          status: "NOT_READY",
+          unit: "POINTS",
+          serviceCode: "note.communication.generate",
+          catalogVersion: "2026-08-09.v1-shadow",
+          generationCostPoints: 20,
+        },
+      }),
+    );
+    const insufficient = renderToStaticMarkup(
+      createElement(CommunicationNoteComposer, {
+        locale: "en",
+        pointsPreview: {
+          ...availablePointsPreview,
+          availablePoints: 10,
+          canAfford: false,
+        },
+      }),
+    );
+    const unavailable = renderToStaticMarkup(
+      createElement(CommunicationNoteComposer, {
+        locale: "en",
+        pointsPreview: { status: "UNAVAILABLE", unit: "POINTS" },
+      }),
+    );
+
+    expect(notReady).toContain("The shadow balance is not ready");
+    expect(notReady.replace(/<[^>]+>/g, "")).toContain(
+      "a generation would cost 20 Points",
+    );
+    expect(insufficient).toContain("shadow balance would not cover");
+    expect(unavailable).toContain("shadow rate and balance are unavailable");
+    expect(unavailable).not.toContain("a generation would cost");
+  });
+
+  it.each(["en", "zh-Hans", "zh-Hant"] as const)(
+    "formats large Point values and marks the English unit in %s",
+    (locale) => {
+      const markup = renderToStaticMarkup(
+        createElement(CommunicationNoteComposer, {
+          locale,
+          pointsPreview: {
+            ...availablePointsPreview,
+            availablePoints: 1_234_567,
+            reservedPoints: 1_234,
+          },
+        }),
+      );
+      const visibleText = markup.replace(/<[^>]+>/g, "");
+
+      expect(visibleText).toContain("1,234,567");
+      expect(visibleText).toContain("1,234");
+      expect(markup).toContain('<span lang="en-AU">Points</span>');
+    },
+  );
 
   it("keeps the Traditional Chinese surface independent from Simplified Chinese", () => {
     const markup = renderToStaticMarkup(

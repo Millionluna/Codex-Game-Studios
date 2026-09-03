@@ -251,6 +251,27 @@ describe("CaresLink V1 registered worker composite adapter", () => {
     ).resolves.toBeUndefined();
   });
 
+  it("rejects Points bindings added to the frozen claim wire contract", async () => {
+    const harness = createHarness();
+    harness.respond.set(
+      CARESLINK_V1_REGISTERED_WORKER_ADAPTER_RPC_NAMES.claimNext,
+      {
+        status: "CLAIMED",
+        claim: {
+          ...harness.claim,
+          pointsAdmission: {
+            reservationReferenceHash: sha256("private-reservation"),
+            points: 20,
+          },
+        },
+      },
+    );
+
+    await expect(
+      harness.adapter.store.claimNext(harness.claimInput()),
+    ).rejects.toMatchObject({ reason: "INTERNAL_FAILURE" });
+  });
+
   it("authorizes then consumes one vault grant without putting facts in RPC metadata or logs", async () => {
     const logs = [
       vi.spyOn(console, "log").mockImplementation(() => undefined),
@@ -496,6 +517,11 @@ describe("CaresLink V1 registered worker composite adapter", () => {
     ["purge event hash", (value: Record<string, unknown>) => {
       value.purgeEventReferenceHash = "not-a-sha256";
     }],
+    ["private Points settlement", (value: Record<string, unknown>) => {
+      value.pointsSettlement = {
+        reservationReferenceHash: sha256("private-reservation"),
+      };
+    }],
   ] as const;
 
   it.each(["authorize", "consume"] as const)(
@@ -551,6 +577,9 @@ describe("CaresLink V1 registered worker composite adapter", () => {
       baseRevisionId: null,
     });
     expect(result).not.toHaveProperty("canonicalContent");
+    expect(JSON.stringify(result).toLowerCase()).not.toMatch(
+      /points|reservation|quote|lot|ledger|resultref/,
+    );
     expect(harness.atomicSuccess).not.toHaveProperty("canonicalContent");
     expect(harness.atomicSuccess).not.toHaveProperty("providerEvidence");
     expect(harness.rpc).toHaveBeenCalledWith(
@@ -574,6 +603,11 @@ describe("CaresLink V1 registered worker composite adapter", () => {
     }],
     ["extra top key", (value: Record<string, unknown>): void => {
       value.extra = true;
+    }],
+    ["private Points settlement", (value: Record<string, unknown>): void => {
+      value.pointsSettlement = {
+        reservationReferenceHash: sha256("private-reservation"),
+      };
     }],
     ["mutation kind drift", (value: Record<string, unknown>): void => {
       (value.mutationReceipt as Record<string, unknown>).mutationKind =
@@ -677,6 +711,12 @@ describe("CaresLink V1 registered worker composite adapter", () => {
       return value;
     }],
     ["extra settlement key", (h: ReturnType<typeof createHarness>) => ({ ...h.atomicRetrySettlement, extra: true })],
+    ["private Points settlement", (h: ReturnType<typeof createHarness>) => ({
+      ...h.atomicRetrySettlement,
+      pointsSettlement: {
+        reservationReferenceHash: sha256("private-reservation"),
+      },
+    })],
   ] as const)("rejects malformed atomic settlement: %s", async (_label, response) => {
     const harness = createHarness();
     harness.respond.set(

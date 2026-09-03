@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   }),
   createServerClient: vi.fn(),
   resolveAccount: vi.fn(),
+  resolvePointsPreview: vi.fn(),
 }));
 
 vi.mock("next/navigation", () => ({
@@ -23,6 +24,9 @@ vi.mock("../../../lib/supabase-server", () => ({
 vi.mock("../../../lib/referral-workspace-session", () => ({
   resolveWorkspaceAccountFromSupabaseSession: mocks.resolveAccount,
 }));
+vi.mock("../../../lib/communication-note-points-preview.server", () => ({
+  resolveCommunicationNotePointsPreview: mocks.resolvePointsPreview,
+}));
 
 import CommunicationNotePage, { dynamic, generateMetadata } from "./page";
 
@@ -32,13 +36,25 @@ const provider = {
   name: "Synthetic provider",
   email: "provider@example.com",
 };
+const serverClient = { auth: {} };
+const availablePointsPreview = {
+  status: "AVAILABLE" as const,
+  unit: "POINTS" as const,
+  serviceCode: "note.communication.generate" as const,
+  catalogVersion: "2026-08-09.v1-shadow",
+  generationCostPoints: 20,
+  availablePoints: 300,
+  reservedPoints: 20,
+  canAfford: true,
+};
 
 describe("Communication Note page boundary", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.stubEnv("CARESLINK_COMMUNICATION_NOTE_COMPOSER_ENABLED", "true");
-    mocks.createServerClient.mockResolvedValue({ auth: {} });
+    mocks.createServerClient.mockResolvedValue(serverClient);
     mocks.resolveAccount.mockResolvedValue(provider);
+    mocks.resolvePointsPreview.mockResolvedValue(availablePointsPreview);
   });
 
   afterEach(() => {
@@ -56,6 +72,7 @@ describe("Communication Note page boundary", () => {
 
     expect(mocks.notFound).toHaveBeenCalledTimes(1);
     expect(mocks.createServerClient).not.toHaveBeenCalled();
+    expect(mocks.resolvePointsPreview).not.toHaveBeenCalled();
   });
 
   it("redirects a signed-out request with only the fixed path and exact locale", async () => {
@@ -83,6 +100,7 @@ describe("Communication Note page boundary", () => {
     expect(redirectHref).not.toMatch(
       /must-not-survive|0412|private-content|participantName|observable_facts/,
     );
+    expect(mocks.resolvePointsPreview).not.toHaveBeenCalled();
   });
 
   it("renders the exact Traditional Chinese composer for a provider", async () => {
@@ -94,10 +112,19 @@ describe("Communication Note page boundary", () => {
     expect(markup).toContain("溝通記錄");
     expect(markup).toContain("本機隱私檢查");
     expect(markup).toContain("產生功能尚未連接");
+    expect(markup).toContain("預覽餘額：可用 300 · 已有預扣 20");
+    expect(markup.replace(/<[^>]+>/g, "")).toContain(
+      "此預覽正式啟用後，每次產生預計需要 20 Points",
+    );
     expect(markup).toContain('name="occurred_at"');
     expect(markup).toContain('name="parties_by_role"');
     expect(markup).not.toContain("沟通记录");
     expect(markup).not.toContain("participant@example.com");
+    expect(mocks.resolveAccount).toHaveBeenCalledWith(serverClient);
+    expect(mocks.resolvePointsPreview).toHaveBeenCalledWith(serverClient);
+    expect(mocks.resolveAccount.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.resolvePointsPreview.mock.invocationCallOrder[0],
+    );
   });
 
   it.each(["admin", "referral_source"] as const)(
@@ -110,8 +137,39 @@ describe("Communication Note page boundary", () => {
           searchParams: Promise.resolve({ lang: "zh-Hant" }),
         }),
       ).rejects.toThrow("redirect:/ai-documents?lang=en");
+      expect(mocks.resolvePointsPreview).not.toHaveBeenCalled();
     },
   );
+
+  it("renders a fail-closed Points state without hiding the local composer", async () => {
+    mocks.resolvePointsPreview.mockResolvedValueOnce({
+      status: "UNAVAILABLE",
+      unit: "POINTS",
+    });
+
+    const element = await CommunicationNotePage({
+      searchParams: Promise.resolve({ lang: "en" }),
+    });
+    const markup = renderToStaticMarkup(createElement(() => element));
+
+    expect(markup).toContain("The shadow rate and balance are unavailable");
+    expect(markup).toContain("Generation unavailable");
+    expect(markup).toContain('name="observable_facts"');
+    expect(markup).not.toContain("3 credits");
+  });
+
+  it("never reads Points when account resolution fails", async () => {
+    mocks.resolveAccount.mockRejectedValueOnce(new Error("account unavailable"));
+
+    await expect(
+      CommunicationNotePage({
+        searchParams: Promise.resolve({ lang: "en" }),
+      }),
+    ).rejects.toThrow("account unavailable");
+
+    expect(mocks.resolveAccount).toHaveBeenCalledWith(serverClient);
+    expect(mocks.resolvePointsPreview).not.toHaveBeenCalled();
+  });
 
   it("makes an unsupported locale fallback explicit instead of using Simplified Chinese", async () => {
     const element = await CommunicationNotePage({

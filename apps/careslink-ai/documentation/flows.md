@@ -109,9 +109,51 @@ Export must bind to a specific revision and shared renderer/template version. Re
 
 The TypeScript shadow store and Production-unapplied migration define wallets, lots, versioned rates, quotes, allocation rows, reservations and an append-only ledger. On a disposable Supabase branch, real service-role RPC tests proved earliest-expiring lot allocation, quote/reserve/commit, quote/reserve/release to original lots, replay safety, conflicting replay rejection, expiry, insufficient balance and cross-owner denial. Real JWT tests proved owner-only reads and denied direct writes/RPC execution to anon, providers and a test-only platform service actor. No welcome lot was automatically granted and the current monthly credit system remains the sole runtime entitlement.
 
+The source-only Communication Note page now has a read-only preview boundary for the current authenticated Provider session. A zero-argument database RPC derives the owner from the active session, pins the server-owned Communication Note rate to 20 Points and returns only that owner's shadow-wallet `available` and `reserved` totals. The server accepts only the exact response contract and fails closed after 1.5 seconds; the UI labels the surface not active. These shadow values must not be described as a consumable real balance. This slice creates no quote, reservation or welcome grant, does not grant/debit or replace legacy credits, and cannot invoke a model, save a Note or export an artifact. Its migration is Production-unapplied, and no Preview or Production deployment was performed.
+
+#### Communication Note atomic 20-Point admission — source only
+
+The next source-only coordinator now rechecks the current session and privacy
+authority, admits the Communication durable job and reserves exactly 20 Points
+within one database transaction. Fresh admission leaves the paid job `QUEUED`
+with attempt `0`; exact replay revalidates the private binding and is write-free.
+An owner-wide advisory lock and deterministic lot allocation prevent two keys
+from oversubscribing the wallet. Any admission, authority or balance failure
+rolls back the durable job, payload and every Points write together.
+
+The route still imports no admission adapter, `READY=false`, and no caller grant
+or pool exists. The response DTO returns no quote, reservation, allocation,
+ledger or private binding ID. Authenticated owners may still read the IDs on
+their own public Points rows under the existing RLS policies; only the private
+job-to-Points binding is inaccessible. No welcome grant or legacy-credit
+behavior changes.
+
+#### Communication Note atomic terminal Points settlement — source only
+
+The next Production-unapplied migration admits marked paid jobs to the existing
+registered-worker path only while their exact 20-Point reservation remains live.
+A successful worker terminal transaction must persist and cross-check the
+canonical document and first revision, sync change, mutation receipt, provider
+evidence and purge outbox before it commits that reservation. Permanent failure
+or cancellation releases the exact allocation back to its original lots. A
+retryable lease expiry leaves the reservation `RESERVED` and requeues the same
+job; no second quote, reservation or `RESERVE` ledger row is created.
+
+Fresh post-lock clocks guard heartbeat, authorization, fence replay and success
+commit, including the approved worker policy's provider and commit safety
+margins. Recovery alternates paid and unpaid work, then paid queued and running
+work, per registration so one backlog cannot permanently retain reserved
+Points. Old worker/owner envelopes remain unchanged, and generic Points
+commit/release continues to reject the bound reservation.
+
+The entire flow remains source/local only and unreachable from a product route:
+no runtime principal receives the settlement purpose role, no Hosted or
+Production migration was applied, and no deployment, model call or real care
+data was used.
+
 ### Intended runtime / not implemented
 
-One wallet owns multiple point lots. A versioned server rate catalog returns a quote before reservation. Reserve allocates from approved lots; successful persisted output commits; no usable result releases to the same lots. Free account receives one-time 300 welcome Points. Pro and top-ups arrive only through normalized entitlements after provider receipt verification. Existing credit history remains immutable and is migration-mapped, not rewritten.
+One wallet owns multiple point lots. A versioned server rate catalog returns a quote before reservation. The source successors above now model atomic Communication admission, reservation and terminal commit/release, but they must not be activated until formal runtime-principal installation, disposable no-data Hosted evidence, product integration and separate activation approval are complete. Free account receives one-time 300 welcome Points only after its separate eligibility and migration decisions are implemented. Pro and top-ups arrive only through normalized entitlements after provider receipt verification. Existing credit history remains immutable and is migration-mapped, not rewritten.
 
 ## 8. Billing
 

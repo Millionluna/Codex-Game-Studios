@@ -22,6 +22,23 @@ vi.mock("next/image", async () => {
 
 import { CommunicationNoteComposer } from "./communication-note-composer";
 
+const AVAILABLE_POINTS_PREVIEW = {
+  status: "AVAILABLE" as const,
+  unit: "POINTS" as const,
+  serviceCode: "note.communication.generate" as const,
+  catalogVersion: "2026-08-09.v1-shadow",
+  generationCostPoints: 20,
+  availablePoints: 300,
+  reservedPoints: 0,
+  canAfford: true,
+};
+
+const LOCAL_CLIENT_MODULE_PATHS = [
+  "src/app/ai-documents/communication-note/communication-note-composer.tsx",
+  "src/lib/communication-note-composer.ts",
+  "src/lib/communication-note-points-preview.ts",
+] as const;
+
 const FIELD_NAMES = [
   "occurred_at",
   "contact_channel",
@@ -103,19 +120,20 @@ afterEach(async () => {
 
 describe("Communication Note composer browser boundary", () => {
   it("keeps every local-only client module free of network and persistence APIs", () => {
-    const source = readFileSync(
-      resolve(
-        process.cwd(),
-        "src/app/ai-documents/communication-note/communication-note-composer.tsx",
-      ),
-      "utf8",
-    );
+    for (const relativePath of LOCAL_CLIENT_MODULE_PATHS) {
+      const source = readFileSync(
+        resolve(process.cwd(), relativePath),
+        "utf8",
+      );
 
-    expect(source).not.toMatch(
-      /\b(?:fetch|XMLHttpRequest|WebSocket|EventSource|sendBeacon|localStorage|sessionStorage)\b/,
-    );
-    expect(source).not.toMatch(/["'`]\/api\//);
-    expect(source).not.toMatch(/\bhistory\.(?:pushState|replaceState)\b/);
+      expect(source, relativePath).not.toMatch(
+        /\b(?:fetch|XMLHttpRequest|WebSocket|EventSource|sendBeacon|localStorage|sessionStorage|indexedDB|caches|serviceWorker)\b|document\.cookie/,
+      );
+      expect(source, relativePath).not.toMatch(/["'`]\/api\//);
+      expect(source, relativePath).not.toMatch(
+        /\bhistory\.(?:pushState|replaceState)\b/,
+      );
+    }
   });
 
   it("exposes labelled controls and moves focus to linked validation errors", async () => {
@@ -152,7 +170,11 @@ describe("Communication Note composer browser boundary", () => {
     const boundaryId = generationButton.getAttribute("aria-describedby");
     expect(boundaryId).toBe("communication-note-generation-boundary");
     expect(document.getElementById(boundaryId ?? "")?.textContent).toContain(
-      "No model, Product API, Points, save or export action",
+      "This shadow preview is read only and not active. Viewing it does not reserve or use Points",
+    );
+    expect(text()).toContain("Shadow balance: 300 available · 0 already reserved");
+    expect(text()).toContain(
+      "If this preview is activated, a generation would cost 20 Points",
     );
 
     await clickButton("Review facts and privacy");
@@ -275,7 +297,12 @@ describe("Communication Note composer browser boundary", () => {
 
 async function renderComposer() {
   await act(async () => {
-    root.render(<CommunicationNoteComposer locale="en" />);
+    root.render(
+      <CommunicationNoteComposer
+        locale="en"
+        pointsPreview={AVAILABLE_POINTS_PREVIEW}
+      />,
+    );
   });
 }
 

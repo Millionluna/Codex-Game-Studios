@@ -221,7 +221,7 @@ async function loadSourceRevisionMaterial(appDirectory) {
       .map((entry) => `supabase/migrations/${entry.name}`)
       .sort();
     if (
-      migrationPaths.length !== 41 ||
+      migrationPaths.length !== 44 ||
       JSON.stringify(migrationPaths) !== JSON.stringify(actualMigrationPaths)
     ) {
       fail("M1N_APPROVED_RUNTIME_ADAPTERS_HOSTED_SOURCE_REVISION_FAILED");
@@ -648,7 +648,7 @@ async function connectPreferredAdmin(Client, candidates, certificate) {
 async function verifyPreflight(admin, expectedMigrationVersions) {
   if (
     !Array.isArray(expectedMigrationVersions) ||
-    expectedMigrationVersions.length !== 41 ||
+    expectedMigrationVersions.length !== 44 ||
     expectedMigrationVersions.some((version) => !/^\d{14}$/.test(version))
   ) {
     fail("M1N_APPROVED_RUNTIME_ADAPTERS_HOSTED_PREFLIGHT_FAILED");
@@ -681,6 +681,7 @@ async function verifyPreflight(admin, expectedMigrationVersions) {
         union all select 1 from careslink_v1_generation.communication_note_preview_dispatch_reservations
         union all select 1 from careslink_v1_generation.communication_note_preview_dispatch_receipts
         union all select 1 from careslink_v1_generation.communication_note_preview_runner_terminals
+        union all select 1 from careslink_v1_generation.communication_note_point_admissions
       ) as generation_empty,
       not exists (
         select 1 from pg_catalog.pg_roles
@@ -956,7 +957,8 @@ async function verifyPostcondition(admin) {
         (select pg_catalog.count(*) from careslink_v1_generation.communication_note_preview_claims),
         (select pg_catalog.count(*) from careslink_v1_generation.communication_note_preview_dispatch_reservations),
         (select pg_catalog.count(*) from careslink_v1_generation.communication_note_preview_dispatch_receipts),
-        (select pg_catalog.count(*) from careslink_v1_generation.communication_note_preview_runner_terminals)
+        (select pg_catalog.count(*) from careslink_v1_generation.communication_note_preview_runner_terminals),
+        (select pg_catalog.count(*) from careslink_v1_generation.communication_note_point_admissions)
       ) as ledger_counts`);
     const row = result.rows[0];
     if (
@@ -969,7 +971,7 @@ async function verifyPostcondition(admin) {
       row.memberships_absent !== true ||
       Number(row.api_privilege_count) !== 0 ||
       Number(row.verifier_hash_only_count) !== 3 ||
-      JSON.stringify(row.ledger_counts) !== "[3,0,3,3,3,1]"
+      JSON.stringify(row.ledger_counts) !== "[3,0,3,3,3,1,0]"
     ) {
       fail("M1N_APPROVED_RUNTIME_ADAPTERS_HOSTED_POSTCHECK_FAILED");
     }

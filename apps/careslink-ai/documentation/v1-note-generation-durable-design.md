@@ -1,6 +1,6 @@
 # V1 Note generation durable design handoff
 
-> Status: default-off design plus five Production-unapplied migrations. The
+> Status: default-off design plus six Production-unapplied migrations. The
 > schema-only foundation passed its historical deleted-`r4` gate; at source HEAD
 > `c7b70e9f84b9b804779039711b85cc7eda55bd57`, the exact worker RPC bundle passed
 > isolated PostgreSQL 17.6 migration/assertion evidence on deleted disposable
@@ -32,7 +32,9 @@ This handoff does not authorize or implement:
 - a served route, worker deployment or feature activation;
 - raw cleaned-facts persistence;
 - a real model or STT call;
-- Points quote, reserve, commit, release or cutover;
+- Points cutover; later Communication-only source additions reserve exactly 20
+  Points at admission and settle terminal state atomically, but remain
+  default-off and unwired;
 - Production migration, grants, traffic or data changes.
 
 The application readiness latch and every related runtime capability remain
@@ -313,10 +315,11 @@ does not create a checkpoint yet: the existing checkpoint job foreign key
 targets the incompatible historical `public.generation_jobs`, so a new
 versioned checkpoint binding requires a separate design.
 
-Points remain completely outside this transaction. Later settlement may commit
-only after this transaction has persisted a usable canonical revision; every
-failure, cancellation or timeout must release a reservation to its original
-lots.
+Points remain completely outside this terminal-result transaction. The later
+Communication-only source addition reserves 20 Points in the separate admission
+transaction described below. Settlement may commit only after this transaction
+has persisted a usable canonical revision; every failure, cancellation or
+timeout must release a reservation to its original lots.
 
 ## 8. ACL, RLS and RPC exposure
 
@@ -1014,7 +1017,8 @@ It is not hosted GoTrue/PostgREST parity, a retained Preview, caller credential
 or grant, served route, deployment, model/STT, payload-vault or end-to-end
 evidence. Attempt listing, real vault/KMS/retention and orphan recovery, hosted
 Auth/Data API validation, account deletion, provider/model/STT integration and
-Points remain activation blockers. The subsequent migration below now supplies
+terminal Points settlement/runtime integration remain activation blockers. The
+subsequent migration below now supplies
 graceful registration retirement without changing the immutable `APPROVED`
 manifest; emergency revocation remains a separate blocker.
 
@@ -1906,8 +1910,9 @@ Detailed handoff is in
 Repository migration
 `20260902012628_add_v1_authenticated_current_session_status_rpc.sql` adds the
 independent zero-argument `public.resolve_v1_current_session_status()` source
-identity. It is not a sixth generation migration and does not change the five
-Production-unapplied durable-generation migrations described above. The new
+identity. At that checkpoint it was not a sixth generation migration and did
+not change the five then-current Production-unapplied durable-generation
+migrations. The later Communication admission migration below is the sixth. The new
 RPC derives the owner and exact session only from request Auth, keeps the
 trusted Provider/session predicates, fixes an empty `search_path`, and grants
 execution only to `authenticated`.
@@ -1923,3 +1928,116 @@ remains false. Formal installation, same-transaction owner session/privacy
 reauthorization and a separately authorized no-data Hosted Preview remain
 required. All 40-migration M1l Hosted pins above remain historical evidence for
 their exact revision.
+
+## Communication Note atomic 20-Point admission — source only
+
+Migration
+`20260902063211_add_v1_communication_note_points_admission.sql` adds a
+Communication-only private coordinator that calls durable owner admission and
+the fixed shadow Points allocator within one database transaction. It accepts
+no historical durable Communication job for backfill or retroactive charging.
+Fresh success creates a `QUEUED` job at attempt 0, an `AVAILABLE` payload, the
+fixed `2026-08-09.v1-shadow` quote for exactly 20 Points, one `RESERVED`
+reservation, exact source-lot allocations and one `RESERVE` ledger entry. Any
+failure inside that admission statement/transaction rolls all of those writes
+back. At this checkpoint, later terminal failure left the reservation
+quarantined; the successor section below closes that source boundary. Same-key
+replay revalidates the
+job/binding/reservation aggregate plus current session, privacy authority and
+expiry state before returning the original result without writes.
+
+The migration adds the fifteenth forced-RLS private generation table for the
+one-to-one owner-safe job/quote/reservation binding and the fifth purpose role,
+`careslink_v1_generation_points_admission_executor`. The role is
+`NOLOGIN`/`NOINHERIT`/`NOBYPASSRLS`; on PostgreSQL 16 it has zero runtime members
+and the only creator-management edge is from `postgres` with `ADMIN=true`,
+`INHERIT=false`, `SET=false`. The migration-time `SET` edge is revoked, and its
+temporary `TRIGGER` privilege on `public.point_reservations` ends false. Public
+API, `service_role` and `authenticator` have no coordinator execution.
+
+At this checkpoint the boundary stopped after reservation. The private marker
+kept each paid job `QUEUED` and out of claim and recovery, while attempt
+insertion, cancellation, job-state mutation and legacy Points commit/release
+were denied. The successor below replaces that quarantine without exposing the
+legacy terminal functions. Neither addition creates a welcome grant or alters
+legacy credits. The coordinator and TestOnly
+adapter return only `{created,payloadAccepted,pointsReserved:true,job}`; they do
+not return the quote, reservation, allocation, ledger or private binding IDs.
+Existing authenticated-owner RLS still permits reading the owner's own public
+Points row IDs; the private binding remains inaccessible.
+
+The adapter is fixed `READY=false`, creates no pool, reads no database URL and
+has neither a route importer nor a caller grant. The current transactional
+migration manifest includes 44 migrations. The Hosted schema-rollback runner
+remains A01–A20; A21 passed only as a standalone, isolated-local serial
+rollback-only gate with 34 `DO` blocks and 6 savepoints. It is neither part of
+that Hosted runner nor concurrency evidence.
+
+A separately orchestrated fresh empty PostgreSQL 16.15 gate applied #1–#43 in
+individual file transactions. The minimum bootstrap needed the exact
+Hosted-compatible `postgres` schema `USAGE` bridge after #25; #26–#43 then
+passed. Teardown revoked the bridge and proved effective `postgres` schema
+`USAGE=false` and `CREATE=false`.
+
+True-concurrency evidence used 15 distinct PIDs in five three-client scenarios,
+with every waiter observed behind the exact expected advisory blocker. Same-key
+calls produced one create plus two write-free replays, one 20-Point reservation
+and lot remainder 10. Different keys against a 30-Point wallet produced one
+success plus one `POINTS_INSUFFICIENT`, also leaving 10. Session expiry and
+privacy expiry each failed with zero writes and lot remainder 30;
+payload expiry returned `PRIVACY_REVIEW_STALE` with the same zero-write
+result. Generic commit/release was denied for the bound reservation. The static
+concurrency contract passed 1 file / 12 tests.
+
+Two exact-scoped cleanup attempts found distinct foreign-key ordering defects—
+first binding↔job, then job↔payload—and each whole transaction rolled back
+safely. The third, corrected order committed with both protection triggers
+enabled (`O`), the jobs-to-payload foreign key validated, all scoped fixture,
+business and Points rows at zero, runner/support absent and temporary schema
+`USAGE` revoked; the cluster was then deleted. This is source/local PG16
+transaction evidence only—no Hosted or Production database, new Preview,
+deployment, activation, model call or real care data. The next independent
+database batch below supplies the source/local terminal transaction; product
+principal installation and activation remain separate.
+
+## Communication Note atomic Points terminal settlement — source only
+
+Migration
+`20260902121601_add_v1_communication_note_points_terminal_settlement.sql`
+adds the sixth purpose role,
+`careslink_v1_generation_points_settlement_executor`, plus immutable settlement
+and per-registration recovery-turn tables. The role is
+`NOLOGIN`/`NOINHERIT`/`NOBYPASSRLS`, has no runtime member and owns only the
+minimum security-definer helpers needed to mutate the paid aggregate. API,
+owner, worker and admission roles receive no generic settlement capability;
+generic public Points commit/release remains blocked for a bound reservation.
+
+The job terminal coordinator and Points mutation form one transaction. Success
+requires an exact 20-Point reservation plus the matching first canonical
+document/revision, sync change, mutation receipt, provider evidence and payload
+purge outbox before it appends one `COMMIT` ledger row. Permanent worker failure
+and owner cancellation append one `RELEASE` and restore the exact allocation
+lots. Retryable lease expiry records the attempt and requeues the job without
+settling or releasing the reservation. Exact response-loss and same-key replays
+assert the immutable aggregate and perform zero writes, even after a later legal
+document edit or tombstone.
+
+Claim, recovery, heartbeat, payload authorization and fence replay all
+revalidate the paid reservation. Blocking paths use fresh post-lock clocks;
+authorization retains both provider deadline and commit safety margin, while
+fence replay and success retain the commit margin. Recovery alternates
+paid/unpaid and paid queued/running priority per worker registration, including
+batch size one, and falls through from an empty lane instead of reporting a
+false zero. Existing external owner/worker JSON envelopes do not gain a Points
+or settlement field.
+
+This migration is still Production-unapplied, default-off and unwired. It
+creates no runtime credential, route, deployment, provider request, model call,
+welcome grant, legacy-credit mutation or real care data.
+
+The final isolated PostgreSQL 16.15 gate applied the exact 20-migration
+dependency chain and passed all six terminal/concurrency groups. It also proved
+unmarked cross-surface denial, deterministic recovery fairness, permanent ACL
+closure, zero scoped residue, graceful shutdown and exact temporary-root
+deletion. The pinned migration, setup, cleanup and normalized source hashes are
+recorded in `documentation/tests.md`.

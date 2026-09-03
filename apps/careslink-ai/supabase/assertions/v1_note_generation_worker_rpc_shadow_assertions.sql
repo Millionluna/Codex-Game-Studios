@@ -61,16 +61,19 @@
 -- d68d531a-55e6-4374-be68-494da7542c75 and ref eqqlvqqhvsogusqhzuaq;
 -- deletion and exact id/ref absence were confirmed. Production was never a
 -- SQL target.
--- The current post-r5 proowner-hardened BEGIN-through-ROLLBACK source is
+-- The historical post-r5 proowner-hardened BEGIN-through-ROLLBACK source was
 -- 163950 bytes with SHA-256
 -- ad3d5ffca482e76a530602c43ca16ad3adbbf9afb5742b156fe0b106044308cb.
 -- It moves the two migration-entry reader ownership checks from the one-time
 -- postcheck into this committed suite, recognizes the six later isolated
 -- Communication Note tables in the schema inventory and keeps the sensitive
--- metadata scan scoped to the worker domain. This exact augmented body has
--- local PostgreSQL 16.15 and static-contract evidence only until a fresh
--- disposable Preview reruns it; the deleted-r5 independent postcheck
--- separately proved the earlier invariant.
+-- metadata scan scoped to the worker domain.
+-- The current paid-admission-aware BEGIN-through-ROLLBACK body is 169122 bytes
+-- with SHA-256
+-- c24c4399618768ff6e1ae10b159a83f76b1eca619fe73b621c519369d90e8ec0.
+-- It has local/static-contract evidence only until a fresh disposable Preview
+-- reruns it; the deleted-r5 independent postcheck separately proved the
+-- earlier invariant.
 
 \set ON_ERROR_STOP on
 
@@ -148,7 +151,8 @@ begin
     'communication_note_preview_claims',
     'communication_note_preview_dispatch_receipts',
     'communication_note_preview_dispatch_reservations',
-    'communication_note_preview_runner_terminals'
+    'communication_note_preview_runner_terminals',
+    'communication_note_point_admissions'
   ] loop
     if to_regclass(
       format('careslink_v1_generation.%I', v_successor_table)
@@ -352,6 +356,8 @@ alter table careslink_v1_generation.provider_evidence
   no force row level security;
 alter table careslink_v1_generation.payload_purge_outbox
   no force row level security;
+alter table careslink_v1_generation.communication_note_point_admissions
+  no force row level security;
 
 do $$
 declare
@@ -401,6 +407,10 @@ begin
     or (
       select count(*) from careslink_v1_generation.payload_purge_outbox
     ) <> 0
+    or (
+      select count(*)
+      from careslink_v1_generation.communication_note_point_admissions
+    ) <> 0
     or v_owner_extension_fixture_count <> 0
   then
     raise exception 'worker RPC migration persisted policy or business fixtures';
@@ -412,6 +422,7 @@ begin
     where column_metadata.table_schema = 'careslink_v1_generation'
       and column_metadata.table_name in (
         'admission_policy_bindings', 'attempts', 'jobs', 'payload_grants',
+        'communication_note_point_admissions',
         'payload_policies', 'payload_purge_outbox', 'payloads',
         'provider_evidence', 'provider_policies', 'settings',
         'worker_policies', 'worker_registration_provider_policies',
@@ -647,6 +658,127 @@ begin
 end
 $$;
 
+-- The paid-admission successor replaces both worker queue-entry paths. Pin
+-- the claim/recovery source fences and the all-attempt INSERT gate without
+-- exercising paid work in this historical worker suite.
+do $$
+declare
+  v_claim text;
+  v_recovery text;
+  v_marker constant text :=
+    'communication_note_point_admission_id is null';
+begin
+  select procedure.prosrc into v_claim
+  from pg_proc as procedure
+  where procedure.oid =
+    'careslink_v1_generation.claim_v1_shadow_note_generation_job(text,text,text,text,text,text)'::regprocedure;
+  select procedure.prosrc into v_recovery
+  from pg_proc as procedure
+  where procedure.oid =
+    'careslink_v1_generation.recover_v1_shadow_note_generation_expired(text,text,text,text,text,text)'::regprocedure;
+
+  if (length(v_claim) - length(replace(v_claim, v_marker, ''))) /
+      length(v_marker) <> 2
+    or position('_registration_accepts_new_work(' in v_claim) = 0
+    or position(v_marker in v_claim) <
+      position('_registration_accepts_new_work(' in v_claim)
+    or position(v_marker in v_claim) >
+      position('for update of job skip locked' in v_claim)
+    or position(v_marker in substring(
+      v_claim from position('for update of job skip locked' in v_claim)
+    )) = 0
+  then
+    raise exception 'paid job claim quarantine source drifted';
+  end if;
+
+  if (length(v_recovery) - length(replace(v_recovery, v_marker, ''))) /
+      length(v_marker) <> 7
+    or (
+      length(v_recovery) - length(replace(
+        v_recovery,
+        'for update of job skip locked',
+        ''
+      ))
+    ) / length('for update of job skip locked') <> 2
+    or position(v_marker in v_recovery) >
+      position('for update of job skip locked' in v_recovery)
+    or position(v_marker in substring(
+      v_recovery from position('for update of job skip locked' in v_recovery)
+    )) = 0
+  then
+    raise exception 'paid job recovery quarantine source drifted';
+  end if;
+
+  if (
+    select count(*)
+    from pg_trigger as trigger_metadata
+    join pg_proc as procedure
+      on procedure.oid = trigger_metadata.tgfoid
+    where trigger_metadata.tgrelid =
+        'careslink_v1_generation.attempts'::regclass
+      and trigger_metadata.tgname =
+        'attempts_communication_note_paid_admission_gate'
+      and not trigger_metadata.tgisinternal
+      and trigger_metadata.tgenabled = 'O'
+      and trigger_metadata.tgtype = 7
+      and trigger_metadata.tgqual is null
+      and procedure.proname =
+        '_guard_v1_shadow_communication_note_paid_attempt'
+      and procedure.proowner =
+        'careslink_v1_generation_points_admission_executor'::regrole
+      and procedure.prosecdef
+      and procedure.provolatile = 'v'
+      and procedure.proconfig is not null
+      and cardinality(procedure.proconfig) = 1
+      and procedure.proconfig[1] in ('search_path=', 'search_path=""')
+  ) <> 1 then
+    raise exception 'paid attempt INSERT gate posture drifted';
+  end if;
+
+  if has_table_privilege(
+      'careslink_v1_generation_executor',
+      'careslink_v1_generation.communication_note_point_admissions',
+      'SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER'
+    )
+    or has_any_column_privilege(
+      'careslink_v1_generation_executor',
+      'careslink_v1_generation.communication_note_point_admissions',
+      'SELECT, INSERT, UPDATE, REFERENCES'
+    )
+    or has_function_privilege(
+      'careslink_v1_generation_executor',
+      'careslink_v1_generation._reserve_and_bind_v1_shadow_communication_note_points(uuid,uuid,uuid,boolean)',
+      'EXECUTE'
+    )
+    or has_function_privilege(
+      'careslink_v1_generation_executor',
+      'careslink_v1_generation.admit_and_reserve_v1_shadow_communication_note_generation_job(uuid,uuid,text,uuid,uuid,uuid,text,text,text,text,text,text,text,timestamptz)',
+      'EXECUTE'
+    )
+    or exists (
+      select 1
+      from unnest(array[
+        'service_rate_versions', 'service_rates', 'point_wallets',
+        'point_lots', 'point_quotes', 'point_reservations',
+        'point_reservation_allocations', 'point_ledger_entries'
+      ]::text[]) as protected_table(table_name)
+      where has_table_privilege(
+        'careslink_v1_generation_executor',
+        format('public.%I', protected_table.table_name),
+        'SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER'
+      )
+        or has_any_column_privilege(
+          'careslink_v1_generation_executor',
+          format('public.%I', protected_table.table_name),
+          'SELECT, INSERT, UPDATE, REFERENCES'
+        )
+    )
+  then
+    raise exception 'worker executor can access paid admission state';
+  end if;
+end
+$$;
+
 -- The remaining blocks install only transaction-local TEST_ONLY catalogs and
 -- fixtures, exercise all nine RPC states and restore role/RLS scaffolding.
 -- No migration, route, runtime grant, model, vault, Points or Production
@@ -705,6 +837,7 @@ create temporary table rpc_assertion_point_snapshot (
 insert into rpc_assertion_point_snapshot (object_name, row_count) values
   ('point_wallets', (select count(*) from public.point_wallets)),
   ('point_lots', (select count(*) from public.point_lots)),
+  ('point_quotes', (select count(*) from public.point_quotes)),
   ('point_reservations', (select count(*) from public.point_reservations)),
   (
     'point_reservation_allocations',
@@ -1622,6 +1755,8 @@ alter table careslink_v1_generation.payloads force row level security;
 alter table careslink_v1_generation.payload_grants force row level security;
 alter table careslink_v1_generation.provider_evidence force row level security;
 alter table careslink_v1_generation.payload_purge_outbox
+  force row level security;
+alter table careslink_v1_generation.communication_note_point_admissions
   force row level security;
 
 select pg_catalog.set_config(
@@ -4929,6 +5064,8 @@ begin
         (select count(*) from public.point_wallets)
       when 'point_lots' then
         (select count(*) from public.point_lots)
+      when 'point_quotes' then
+        (select count(*) from public.point_quotes)
       when 'point_reservations' then
         (select count(*) from public.point_reservations)
       when 'point_reservation_allocations' then

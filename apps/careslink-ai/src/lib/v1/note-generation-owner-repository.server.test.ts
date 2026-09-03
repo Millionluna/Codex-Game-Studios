@@ -741,6 +741,8 @@ describe("CaresLink V1 Note generation owner repository", () => {
     [{ code: "P0001", message: "AUTH_REQUIRED" }],
     [{ code: "P0001", message: "FORBIDDEN" }],
     [{ code: "P0001", message: "MINIMUM_FACTS_REQUIRED" }],
+    [{ code: "P0001", message: "POINTS_INSUFFICIENT" }],
+    [{ code: "P0001", message: "POINT_QUOTE_EXPIRED" }],
     ["raw thrown secret"],
   ])("collapses an unapproved database error %#", async (databaseError) => {
     const repository = createRepository(rejectingQuery(databaseError));

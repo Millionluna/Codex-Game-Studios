@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -65,6 +66,25 @@ const migrationCases = [
     ],
     sessionUserRequired: true,
   },
+  {
+    name: "Communication Note Points admission",
+    path: "supabase/migrations/20260902063211_add_v1_communication_note_points_admission.sql",
+    roles: [
+      "careslink_v1_generation_executor",
+      "careslink_v1_generation_points_admission_executor",
+      "careslink_v1_generation_owner",
+      "careslink_v1_generation_executor",
+      "careslink_v1_generation_points_admission_executor",
+      "careslink_v1_generation_points_admission_executor",
+      "careslink_v1_generation_owner_api_executor",
+      "careslink_v1_generation_executor",
+      "careslink_v1_generation_points_admission_executor",
+      "careslink_v1_generation_owner",
+      "careslink_v1_generation_points_admission_executor",
+      "careslink_v1_generation_owner_api_executor",
+      "careslink_v1_generation_executor",
+    ],
+  },
 ] as const;
 
 const migrations = migrationCases.map((migrationCase) => ({
@@ -107,8 +127,8 @@ const assertionCases = [
   {
     name: "owner runtime assertion",
     path: "supabase/assertions/v1_note_generation_owner_runtime_rpc_shadow_assertions.sql",
-    roleSwitches: 22,
-    restores: 22,
+    roleSwitches: 23,
+    restores: 23,
     rollbackClosesLastRole: false,
     checksBootstrapMembership: true,
     adjacentSwitches: [],
@@ -175,6 +195,16 @@ const assertionCases = [
     rollbackClosesLastRole: false,
     checksBootstrapMembership: false,
     adjacentSwitches: [],
+  },
+  {
+    name: "Communication Note Points admission assertion",
+    path: "supabase/tests/v1_communication_note_points_admission_assertions.sql",
+    roleSwitches: 37,
+    restores: 38,
+    rollbackClosesLastRole: false,
+    checksBootstrapMembership: false,
+    adjacentSwitches: [],
+    standaloneRestoreEventIndexes: [58],
   },
 ] as const;
 const assertionsWithRoleWindows = assertionCases.map((assertionCase) => ({
@@ -346,13 +376,18 @@ describe("V1 Note migration entry-role restoration contract", () => {
 
   it.each(assertionsWithRoleWindows)(
     "$name bounds fixture role transitions with entry restoration or rollback",
-    ({
+    (assertion) => {
+      const {
       adjacentSwitches,
       restores,
       roleSwitches: expectedRoleSwitches,
       rollbackClosesLastRole,
       source,
-    }) => {
+      } = assertion;
+      const standaloneRestoreEventIndexes: number[] =
+        "standaloneRestoreEventIndexes" in assertion
+          ? [...assertion.standaloneRestoreEventIndexes]
+          : [];
       const captures = matches(source, assertionCapturePattern);
       const roleSwitches = matches(source, assertionSetRolePattern);
       const roleRestores = matches(source, assertionRestorePattern);
@@ -370,10 +405,18 @@ describe("V1 Note migration entry-role restoration contract", () => {
       ].sort((left, right) => left.index - right.index);
       expect(roleEvents[0].kind).toBe("switch");
       for (const [index, event] of roleEvents.entries()) {
-        if (event.kind === "restore") {
+        if (
+          event.kind === "restore" &&
+          !standaloneRestoreEventIndexes.includes(index)
+        ) {
           expect(roleEvents[index - 1]?.kind).toBe("switch");
         }
       }
+      expect(roleEvents.flatMap((event, index) =>
+        event.kind === "restore" && roleEvents[index - 1]?.kind !== "switch"
+          ? [index]
+          : []
+      )).toEqual(standaloneRestoreEventIndexes);
       expect(
         roleEvents.flatMap((event, eventIndex) => {
           const nextEvent = roleEvents[eventIndex + 1];
@@ -411,6 +454,27 @@ describe("V1 Note migration entry-role restoration contract", () => {
       expect(source).not.toContain("v_session_super");
     },
   );
+
+  it("pins A21 as a standalone isolated-cluster serial assertion", () => {
+    const assertion = assertionsWithRoleWindows.find(
+      (entry) => entry.name === "Communication Note Points admission assertion",
+    );
+    expect(assertion).toBeDefined();
+    expect(Buffer.byteLength(assertion?.source ?? "", "utf8")).toBe(113_138);
+    expect(createHash("sha256").update(assertion?.source ?? "", "utf8")
+      .digest("hex")).toBe(
+      "e6f4571d2df1c5468f8a7e309ae9ac12349e02745f215f5bfa33e39ee78f97a9",
+    );
+    for (const marker of [
+      "one-backend/serial-only",
+      "A21 requires an isolated-cluster superuser entry role",
+      "same-key race, oversubscription race, lock-wait expiry",
+      "separate two-client",
+      "A21 outer rollback left test-only state",
+    ]) {
+      expect(assertion?.source).toContain(marker);
+    }
+  });
 });
 
 function matches(source: string, pattern: RegExp) {

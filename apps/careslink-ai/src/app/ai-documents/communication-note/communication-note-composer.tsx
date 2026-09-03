@@ -4,6 +4,7 @@ import {
   AlertTriangle,
   ArrowLeft,
   CheckCircle2,
+  Coins,
   Languages,
   LockKeyhole,
   MessageSquareText,
@@ -25,9 +26,14 @@ import {
   type CommunicationNoteComposerReview,
   type CommunicationNoteComposerValidationIssue,
 } from "../../../lib/communication-note-composer";
+import {
+  UNAVAILABLE_COMMUNICATION_NOTE_POINTS_PREVIEW,
+  type CommunicationNotePointsPreview,
+} from "../../../lib/communication-note-points-preview";
 
 type CommunicationNoteComposerProps = {
   locale: CommunicationNoteComposerLocale;
+  pointsPreview?: CommunicationNotePointsPreview;
   unsupportedLocale?: boolean;
 };
 
@@ -38,6 +44,7 @@ const INITIAL_CONFIRMATIONS: CommunicationNoteComposerConfirmations = {
 
 export function CommunicationNoteComposer({
   locale,
+  pointsPreview = UNAVAILABLE_COMMUNICATION_NOTE_POINTS_PREVIEW,
   unsupportedLocale = false,
 }: CommunicationNoteComposerProps) {
   const copy = getCommunicationNoteComposerCopy(locale);
@@ -491,6 +498,60 @@ export function CommunicationNoteComposer({
               </fieldset>
 
               <div className="border-t border-line pt-5">
+                <section
+                  aria-labelledby="communication-note-points-title"
+                  className="mb-5 border border-line bg-brand-soft p-4"
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex min-w-0 items-start gap-3">
+                      <Coins
+                        className="mt-0.5 size-5 shrink-0 text-brand"
+                        aria-hidden="true"
+                      />
+                      <div>
+                        <h3
+                          id="communication-note-points-title"
+                          className="text-sm font-semibold text-foreground"
+                        >
+                          <span lang="en-AU">Points</span>
+                          {surface.pointsTitle}
+                        </h3>
+                        <p className="mt-1 text-sm leading-6 text-foreground">
+                          {getPointsBalanceText(pointsPreview, surface, locale)}
+                        </p>
+                      </div>
+                    </div>
+                    <span className="workspace-status-pill shrink-0">
+                      {surface.pointsReadOnly}
+                    </span>
+                  </div>
+
+                  {pointsPreview.status !== "UNAVAILABLE" ? (
+                    <div className="mt-4 border-t border-line pt-3">
+                      <p className="text-sm font-semibold text-foreground">
+                        {surface.pointsCost(
+                          formatPointsNumber(
+                            pointsPreview.generationCostPoints,
+                            locale,
+                          ),
+                        )}
+                        <span lang="en-AU">Points</span>
+                        {surface.pointsSentenceEnd}
+                      </p>
+                      {pointsPreview.status === "AVAILABLE" &&
+                      !pointsPreview.canAfford ? (
+                        <p className="mt-1 text-xs font-semibold leading-5 text-danger">
+                          {surface.pointsInsufficient}
+                        </p>
+                      ) : null}
+                    </div>
+                  ) : null}
+
+                  <p className="mt-3 text-xs leading-5 text-foreground">
+                    {surface.pointsBoundary}
+                  </p>
+                </section>
+
                 <button
                   type="button"
                   disabled
@@ -759,6 +820,15 @@ type SurfaceCopy = {
   confirmationTitle: string;
   confirmationLocked: string;
   authorityBoundary: string;
+  pointsTitle: string;
+  pointsReadOnly: string;
+  pointsNotReady: string;
+  pointsUnavailable: string;
+  pointsInsufficient: string;
+  pointsBoundary: string;
+  pointsBalance(available: string, reserved: string): string;
+  pointsCost(cost: string): string;
+  pointsSentenceEnd: string;
   generationUnavailable: string;
   readyButOffline: string;
   generationBoundary: string;
@@ -803,10 +873,22 @@ const SURFACE_COPY: Record<CommunicationNoteComposerLocale, SurfaceCopy> = {
       "Complete a clean local review before the confirmations become available.",
     authorityBoundary:
       "Processing authority does not state or replace participant consent.",
+    pointsTitle: " preview · not active",
+    pointsReadOnly: "Not active",
+    pointsNotReady: "The shadow balance is not ready for this account.",
+    pointsUnavailable: "The shadow rate and balance are unavailable.",
+    pointsInsufficient: "The shadow balance would not cover this generation.",
+    pointsBoundary:
+      "Viewing this preview does not reserve or use Points. Shadow balances cannot yet be spent in this workflow.",
+    pointsBalance: (available, reserved) =>
+      `Shadow balance: ${available} available · ${reserved} already reserved`,
+    pointsCost: (cost) =>
+      `If this preview is activated, a generation would cost ${cost} `,
+    pointsSentenceEnd: ".",
     generationUnavailable: "Generation unavailable",
     readyButOffline: "Ready locally · generation unavailable",
     generationBoundary:
-      "No model, Product API, Points, save or export action is connected in this release slice.",
+      "This shadow preview is read only and not active. Viewing it does not reserve or use Points; model generation, save and export remain unavailable.",
     boundaryTitle: "Current boundary",
     boundaries: [
       "No facts leave this browser tab.",
@@ -849,10 +931,21 @@ const SURFACE_COPY: Record<CommunicationNoteComposerLocale, SurfaceCopy> = {
     confirmationTitle: "为后续生成步骤进行确认",
     confirmationLocked: "完成无明显标识符的本地复核后，才能进行两项确认。",
     authorityBoundary: "处理权限确认不代表或替代 participant consent。",
+    pointsTitle: " 预览（尚未启用）",
+    pointsReadOnly: "尚未启用",
+    pointsNotReady: "此账户的预览余额尚未就绪。",
+    pointsUnavailable: "暂时无法读取预览费率和余额。",
+    pointsInsufficient: "此预览余额预计不足以完成本次生成。",
+    pointsBoundary:
+      "查看此预览不会造成预扣或使用；此流程目前不能消费预览余额。",
+    pointsBalance: (available, reserved) =>
+      `预览余额：可用 ${available} · 已有预扣 ${reserved}`,
+    pointsCost: (cost) => `此预览正式启用后，每次生成预计需要 ${cost} `,
+    pointsSentenceEnd: "。",
     generationUnavailable: "生成功能不可用",
     readyButOffline: "本地已准备 · 生成功能不可用",
     generationBoundary:
-      "此版本未连接模型、Product API、Points、保存或导出操作。",
+      "此预览尚未启用。查看预览不会造成预扣或使用；模型生成、保存和导出仍不可用。",
     boundaryTitle: "当前边界",
     boundaries: [
       "事实不会离开当前浏览器标签页。",
@@ -893,10 +986,21 @@ const SURFACE_COPY: Record<CommunicationNoteComposerLocale, SurfaceCopy> = {
     confirmationTitle: "為後續產生步驟進行確認",
     confirmationLocked: "完成無明顯識別符的本機複核後，才能進行兩項確認。",
     authorityBoundary: "處理權限確認不代表或取代 participant consent。",
+    pointsTitle: " 預覽（尚未啟用）",
+    pointsReadOnly: "尚未啟用",
+    pointsNotReady: "此帳戶的預覽餘額尚未就緒。",
+    pointsUnavailable: "暫時無法讀取預覽費率和餘額。",
+    pointsInsufficient: "此預覽餘額預計不足以完成本次產生。",
+    pointsBoundary:
+      "查看此預覽不會造成預扣或使用；此流程目前不能消費預覽餘額。",
+    pointsBalance: (available, reserved) =>
+      `預覽餘額：可用 ${available} · 已有預扣 ${reserved}`,
+    pointsCost: (cost) => `此預覽正式啟用後，每次產生預計需要 ${cost} `,
+    pointsSentenceEnd: "。",
     generationUnavailable: "產生功能不可用",
     readyButOffline: "本機已準備 · 產生功能不可用",
     generationBoundary:
-      "此版本未連接模型、Product API、Points、儲存或匯出操作。",
+      "此預覽尚未啟用。查看預覽不會造成預扣或使用；模型產生、儲存和匯出仍不可用。",
     boundaryTitle: "目前邊界",
     boundaries: [
       "事實不會離開目前瀏覽器分頁。",
@@ -915,4 +1019,30 @@ const SURFACE_COPY: Record<CommunicationNoteComposerLocale, SurfaceCopy> = {
 
 function getSurfaceCopy(locale: CommunicationNoteComposerLocale) {
   return SURFACE_COPY[locale];
+}
+
+function getPointsBalanceText(
+  preview: CommunicationNotePointsPreview,
+  surface: SurfaceCopy,
+  locale: CommunicationNoteComposerLocale,
+) {
+  if (preview.status === "AVAILABLE") {
+    return surface.pointsBalance(
+      formatPointsNumber(preview.availablePoints, locale),
+      formatPointsNumber(preview.reservedPoints, locale),
+    );
+  }
+  if (preview.status === "NOT_READY") {
+    return surface.pointsNotReady;
+  }
+  return surface.pointsUnavailable;
+}
+
+function formatPointsNumber(
+  value: number,
+  locale: CommunicationNoteComposerLocale,
+) {
+  return new Intl.NumberFormat(locale === "en" ? "en-AU" : locale).format(
+    value,
+  );
 }
