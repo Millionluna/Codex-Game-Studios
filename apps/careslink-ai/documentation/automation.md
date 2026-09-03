@@ -2,7 +2,7 @@
 
 > Current-state automation inventory audited 2026-08-09; source-only
 > security-contract and isolated local database evidence updated through
-> 2026-09-02. No background worker, cron, payment webhook or
+> 2026-09-03. No background worker, cron, payment webhook or
 > notification automation exists in the audited application.
 
 ## Current LLM automation
@@ -35,6 +35,11 @@ Profile rewrite, share card, referral message, bilingual intro and handover chec
 - Vercel Analytics is wrapped by `src/components/safe-vercel-analytics.tsx` to remove unsafe URL/query detail.
 - Metadata event routes accept fixed event/attribution vocabularies; no note body is intentionally recorded.
 - Portal Referral intake, source detail, Assignment M1a and Provider Response M1b are synchronous request/transaction paths, not automation. They use a request-scoped cookie Supabase client and fourteen restricted public database RPCs in total—three intake, two source-detail, six assignment and three provider-response. The assignment "queue" and provider offer "inbox" are bounded read models, not background job queues; these paths use no `service_role`, OpenAI call, worker, cron, notification or unattended retry.
+- Communication Note M1z is also not automation. It conditionally installs the
+  formal Cookie principal behind the complete exact Preview binding, but its
+  UI/API compile-time latches remain `false` and the formal submitter and
+  maintenance exports remain `undefined`. Its stager and maintenance factories
+  require explicit injected ports and no scheduler imports them.
 
 ## Current approvals and human review
 
@@ -47,6 +52,7 @@ Profile rewrite, share card, referral message, bilingual intro and handover chec
 
 | Control | Current effect | Limitation |
 |---|---|---|
+| Communication Note UI/API/principal gates | the formal Cookie principal can be constructed only when all exact Product/API/principal, Vercel Preview/project, non-Production Supabase ref, canonical URL and publishable-key checks agree | UI and API compile-time readiness remain `false`; the formal submitter, stager and maintenance are absent, so environment values cannot enable submission, storage, cleanup or model work |
 | Remove/disable `OPENAI_API_KEY` | generation fails closed | coarse; no per-service incident mode |
 | Google OAuth feature flag | hides/disables Google path honestly | not a session/device kill switch |
 | account/IP quota | limits NDIS model volume | not a budget-aware cost circuit breaker |
@@ -56,7 +62,7 @@ Profile rewrite, share card, referral message, bilingual intro and handover chec
 | V1 shadow-read flag | enables only metadata hash/status comparison after successful projection | cannot enable write or replace the legacy response |
 | Portal API + durable-adapter + independent operation gate | base gates exact `true`, `VERCEL_ENV=preview`, an exact non-Production Supabase ref, the selected intake/detail/assignment/provider-response/follow-up application gate, the master database row and its matching operation row are required | any failed gate stops before a client or private body read where applicable; the five operation slices do not enable one another, including through direct Data API calls. Exact-current Assignment retains its deleted-Preview Hosted Cookie evidence. Provider Response implementation source `f45b19c596edd0bdbe01eba17e6e5fa136df5225` adds active-offer-first selection, request timeouts, principal-boundary command clearing and 6/6 local true-concurrency scenarios. Exact gate source HEAD `44f3bd68699dc953e2666bf033dac2b5e26a4d30` passed the fresh no-data Hosted re-gate on deleted ref `nhupgyxczlvtddycrgyw`: 33/33 migrations, 14/14 rollback suites, real GoTrue SSR-cookie/Data API assertions 14/14 and exact-current active-first/non-null-cursor checks 2/2. Teardown left every Auth/Portal fixture domain at zero, all five then-current flags disabled, three deletion probes passed and Production remained healthy at 19 migrations. M1b remains default-off and Production-unapplied. Follow-up M1c adds a sixth default-off flag plus accepted-provider private detail and fixed-code mutation; its no-TCP, private-Unix-socket PostgreSQL 16.15 local lifecycle passed all 8/8 replay/competition/revocation/ownership races twice with exact cleanup and a SHA-pinned live harness. It still has no Hosted Auth/Data API evidence. No runtime is retained or deployed, and no merge, activation, history/audit/export automation or Vercel/Production deployment was added |
 
-Source-only worker/provider policy schemas now define immutable digests, explicit timing/retry fields and content-free model usage/cost evidence. A source-only registered-worker v2 facade proves authorize/consume, heartbeat/deadline, finish-reason, retry, fencing and response-loss ordering. The default-off adapter maps that facade to nine privileged RPC calls and a one-time vault-consume port. The earlier CLI-generated metadata foundation passed its historical deleted-`r4` PostgreSQL 17 schema/cross-domain gate. At source HEAD `c7b70e9f84b9b804779039711b85cc7eda55bd57`, the subsequent `20260821071044_add_v1_note_generation_worker_rpc_shadow.sql` passed the exact deleted-`r9` PostgreSQL 17.6 migration/assertion gate: 14/14 migrations and seven rollback suites. Its executor-only RLS policies, object ACLs, nine executor-owned `SECURITY DEFINER` functions with `search_path=''`, hard-off settings and empty catalogs/registrations passed an independent postcheck. Deleted no-data `r20` later passed the three true two-session PostgreSQL 17.6 claim/session/privacy races through verified Session Pooler TLS, then removed the temporary runner, support surface and branch. Deleted no-data `r21` then passed the fixed Attempt-2 historical replay and post-purge lifecycle gate without duplicate canonical/evidence/outbox side effects. This is isolated schema/transaction evidence, not runtime automation: no API role or `service_role` has RPC `EXECUTE`, the runtime registry is empty, every factory is `TEST_ONLY`, and readiness is false. There is still no approved runtime model-policy registry, deployed worker, payload vault/KMS/retention contract, per-service budget threshold, validated fallback model switch, served job-cancellation control or central incident dashboard.
+Source-only worker/provider policy schemas now define immutable digests, explicit timing/retry fields and content-free model usage/cost evidence. A source-only registered-worker v2 facade proves authorize/consume, heartbeat/deadline, finish-reason, retry, fencing and response-loss ordering. The default-off adapter maps that facade to nine privileged RPC calls and a one-time vault-consume port. The earlier CLI-generated metadata foundation passed its historical deleted-`r4` PostgreSQL 17 schema/cross-domain gate. At source HEAD `c7b70e9f84b9b804779039711b85cc7eda55bd57`, the subsequent `20260821071044_add_v1_note_generation_worker_rpc_shadow.sql` passed the exact deleted-`r9` PostgreSQL 17.6 migration/assertion gate: 14/14 migrations and seven rollback suites. Its executor-only RLS policies, object ACLs, nine executor-owned `SECURITY DEFINER` functions with `search_path=''`, hard-off settings and empty catalogs/registrations passed an independent postcheck. Deleted no-data `r20` later passed the three true two-session PostgreSQL 17.6 claim/session/privacy races through verified Session Pooler TLS, then removed the temporary runner, support surface and branch. Deleted no-data `r21` then passed the fixed Attempt-2 historical replay and post-purge lifecycle gate without duplicate canonical/evidence/outbox side effects. This is isolated schema/transaction evidence, not runtime automation: no API role or `service_role` has RPC `EXECUTE`, the runtime registry is empty, every factory is `TEST_ONLY`, and readiness is false. M1z now provides source-only encrypted staging and maintenance contracts, but there is still no approved runtime model-policy registry, deployed worker, live KMS/private-store/retention adapter, per-service budget threshold, validated fallback model switch, served job-cancellation control or central incident dashboard.
 
 Communication provider-evaluation M1d introduced the server-only OpenAI
 Responses request/parser contract, and M1e froze the exact model, AU-storage
@@ -1232,6 +1238,66 @@ the HTTP request thread to call a model directly. See
 `documentation/communication-note-generation-api-m1x.md` and
 `documentation/communication-note-generation-principal-composition.md`.
 
+### Communication Note secure submission runtime M1z — source only
+
+M1z adds provider-neutral secure-submission cores without scheduling or
+activating them. The formal Cookie principal is now installed as a conditional
+source composition: it resolves only after exact Product/API/principal gates,
+Vercel Preview/project identity, canonical non-Production Supabase ref/URLs and
+matching publishable keys pass. The request-scoped Cookie client remains lazy,
+and the API compile-time latch still prevents request/auth/body access. The
+formal submitter remains `undefined`.
+
+The encrypted-payload stager core validates the canonical Communication facts
+and their hash/size before generating a fresh 32-byte DEK and 12-byte IV. It
+uses AES-256-GCM with a 16-byte tag, canonical AAD and a fully qualified numeric
+KMS key-version resource. KMS wrapping and atomic private-object
+create-if-absent are injected ports. Exact owner/idempotency/request replay
+returns the original safe receipt; changed requests and stored-binding drift
+fail closed. The receipt contains only IDs, hashes, expiry and immutable policy
+versions—never plaintext, a DEK, wrapped-key bytes or an object locator. The
+formal stager export remains absent.
+
+The new Production-unapplied migration defines a 19-argument private
+policy-bound Communication Note + fixed-20-Point admission function and a
+separate credentialless `NOLOGIN` caller shell. It atomically binds the existing
+three-field payload-policy digest plus encryption profile, exact KMS-version
+hash and backup disposition to the approved catalog and final job/payload row.
+The caller receives no login, Data API identity, service-role fallback or
+runtime membership. The owner repository now has a provider-neutral
+injected-query factory, but it opens no pool and resolves no credential; its
+readiness remains `false`.
+
+The maintenance core exposes `reconcileStaged(limit, now)` and
+`sweepExpired(limit, now)` over injected atomic-lease, exact-admission and
+exact-delete ports. Accepted payloads are retained, rejected payloads are
+deleted, and missing/ambiguous admission remains untouched before expiry and is
+deleted only at or after expiry. Any candidate/admission/delete binding mismatch
+is quarantined. Only `DELETED` or a durable same-binding `ALREADY_DELETED`
+tombstone is success; bare `NOT_FOUND` is not. Unknown delete results remain
+replayable. The formal maintenance singleton is `undefined`, and there is no
+cron, worker or scheduler.
+
+The M1z focused source gate passed 232/232 tests, and the complete local suite
+passed 3101/3101 across 219 files. TypeScript, zero-warning ESLint, optimized
+Next.js build, the 27-static-chunk client boundary, 73-file adapter sync and
+diff checks also passed. No migration or grant was applied to a Supabase/Hosted
+database, no cloud/KMS/Secret Manager/private store was created, no Preview or
+Production resource was changed, no deployment occurred and no real care data
+or model request was used. Actual KMS,
+private-object-store, purpose-caller query credential and maintenance
+persistence adapters remain required. See
+`documentation/communication-note-secure-submission-runtime-m1z.md`.
+
+The exact final migration passed a private-Unix-socket PostgreSQL 16
+Hosted-like empty-state commit. A separate synthetic paid-row cluster hit the
+explicit non-retroactive-history preflight and rolled the migration back with
+no caller, KMS column or temporary SET membership left behind. This is local
+schema/transaction evidence only, not a Supabase/Hosted apply or runtime.
+The corresponding PostgreSQL 16.15 terminal-settlement harness now uses the
+19-argument bound coordinator and passed its 21 selected migrations plus 6/6
+concurrency/settlement scenarios with complete SQL and filesystem teardown.
+
 ### Communication Note atomic 20-Point admission — source only
 
 Migration
@@ -1316,8 +1382,8 @@ hashes and scenario evidence.
 
 ## Inactive shadow automation contracts
 
-- The contract and migrations define generation/export job states. Source-only memory contracts model leases, recovery, retry policy, provider evidence and single-use payload grants, and the registered-worker v2 facade composes those boundaries without a payload locator. All seven generation migrations remain Production-unapplied; deleted `r9` supplied isolated PostgreSQL 17.6 execution evidence for database-clock claim/heartbeat/fence/commit/settle/resolve/recover/authorize/consume logic and payload/grant/evidence/purge-outbox metadata, deleted `r20` supplied the three true two-session race results, and deleted `r21` supplied exact historical transient-retry/success replay through payload/outbox purge. The later local owner-repository gate covers the three private owner RPCs, migration #29 adds the non-login control-executor-owned graceful-retirement identity, admission adds the fifth purpose role/private binding table, and terminal settlement adds the sixth purpose role plus settlement/recovery-turn tables—none has a runtime caller. There is still no caller grant. Normal consume deliberately settles `DENIED_SETTLED` / `PAYLOAD_UNAVAILABLE` and returns no vault grant, locator or facts; the historical rollback-only `TEST_ONLY` `CONSUMED` fixture proves only scripted canonical transaction atomicity. There is still no payload vault, queue service, deployed worker, live retry loop or served cancellation endpoint.
-- No worker automation may be scheduled yet. Deleted `r20` closed the PostgreSQL 17.6 true two-session claim/session/privacy race gate, deleted `r21` closed the fixed Attempt-2 historical replay gate, deleted `r22` closed the hosted registration-retention gate, the earlier isolated local PostgreSQL 16.15 run closed its recorded engine/serial/true-two-session version gate, and deleted `r5` closed its historical Hosted 30/30 migration, then-current 11/11 assertion and independent posture gate. Owner admission/enqueue/status/cancel and graceful worker-registration retirement now have source, local SQL and deleted-Hosted schema/transaction boundaries; Communication has source/local fixed-20 admission and terminal-settlement boundaries. Emergency revocation, attempt listing, nested database exact-key envelopes, account-delete/purge and orphan recovery, sequential JSON numeric parsing hardening, and the payload-vault/KMS/retention, caller/route, hosted Auth/Data API, model/STT and runtime-activation blocks remain unproved explicit governance.
+- The contract and migrations define generation/export job states. Source-only memory contracts model leases, recovery, retry policy, provider evidence and single-use payload grants, and the registered-worker v2 facade composes those boundaries without a payload locator. All eight generation migrations remain Production-unapplied; deleted `r9` supplied isolated PostgreSQL 17.6 execution evidence for database-clock claim/heartbeat/fence/commit/settle/resolve/recover/authorize/consume logic and payload/grant/evidence/purge-outbox metadata, deleted `r20` supplied the three true two-session race results, and deleted `r21` supplied exact historical transient-retry/success replay through payload/outbox purge. The later local owner-repository gate covers the three private owner RPCs, migration #29 adds the non-login control-executor-owned graceful-retirement identity, admission adds the fifth purpose role/private binding table, terminal settlement adds the sixth purpose role plus settlement/recovery-turn tables, and M1z adds the source-only policy/KMS-bound admission caller—none has a runtime credential. There is still no installed caller. Normal consume deliberately settles `DENIED_SETTLED` / `PAYLOAD_UNAVAILABLE` and returns no vault grant, locator or facts; the historical rollback-only `TEST_ONLY` `CONSUMED` fixture proves only scripted canonical transaction atomicity. M1z supplies provider-neutral encrypted staging and maintenance cores, but there is still no live payload-vault/KMS/private-store adapter, queue service, deployed worker, live retry loop or served cancellation endpoint.
+- No worker automation may be scheduled yet. Deleted `r20` closed the PostgreSQL 17.6 true two-session claim/session/privacy race gate, deleted `r21` closed the fixed Attempt-2 historical replay gate, deleted `r22` closed the hosted registration-retention gate, the earlier isolated local PostgreSQL 16.15 run closed its recorded engine/serial/true-two-session version gate, and deleted `r5` closed its historical Hosted 30/30 migration, then-current 11/11 assertion and independent posture gate. Owner admission/enqueue/status/cancel and graceful worker-registration retirement now have source, local SQL and deleted-Hosted schema/transaction boundaries; Communication has source/local fixed-20 admission and terminal-settlement boundaries plus M1z encrypted-staging, exact policy/KMS admission and maintenance source cores. Emergency revocation, attempt listing, account-delete/purge and orphan recovery, sequential JSON numeric parsing hardening, and the live vault/KMS/private-store/query-credential adapters, caller/route, hosted Auth/Data API, model/STT and runtime-activation blocks remain unproved explicit governance.
 - The source follow-up for the two #26 readers and five #30 Portal functions is
   complete: their seven exact `pg_proc.proowner` signature checks now live in
   the maintained worker and Portal-intake rollback suites. The enhanced worker
@@ -1345,7 +1411,7 @@ hashes and scenario evidence.
 
 | Capability | Current status |
 |---|---|
-| generation worker/queue | absent at runtime; all six generation migrations are Production-unapplied and exist on no retained Preview. The worker RPC migration contains nine private worker identities, the registration-retention migration adds its index/foreign key, the owner-runtime migration adds three private owner identities plus a default-empty admission binding, migration #29 adds one separately owned graceful-retirement control identity plus the fourteenth forced-RLS table, and the Communication admission migration adds the fifth purpose role plus the fifteenth private table. Paid admitted jobs remain deliberately `QUEUED` and invisible to claim/recovery/attempt/cancel/legacy terminalization. Settings/catalog/registration remain fail-closed, no API/service role has coordinator `EXECUTE`, the canonical registration remains immutable `APPROVED`, and the source-only registry plus worker/owner database-adapter factories remain empty/`TEST_ONLY` |
+| generation worker/queue | absent at runtime; all eight generation migrations are Production-unapplied and exist on no retained Preview. M1z adds only a source-level encrypted stager, exact policy/KMS-bound admission shell and reconciliation/sweep core; it installs no scheduler, query credential, KMS/private-store adapter or usable worker vault grant. Paid jobs remain default-off, settings/catalog/registration remain fail-closed, no API/service role has the new coordinator `EXECUTE`, and the formal submitter/maintenance plus worker runtime remain absent |
 | transcription worker | absent |
 | export worker/artifact cleanup | absent |
 | claim cleanup cron | absent; expired rows become unclaimable and are opportunistically cleaned |

@@ -1,7 +1,7 @@
 # CaresLink AI Test Evidence
 
 > Evidence date: 2026-08-26, with source/local-only evidence updated through
-> 2026-09-02. This document separates **Existing**, **Proposed**, and **Gaps**.
+> 2026-09-03. This document separates **Existing**, **Proposed**, and **Gaps**.
 > Passing current tests does not mean Product Baseline V1.0 is implemented.
 
 ## Existing
@@ -3541,6 +3541,55 @@ occurred. The formal vault/policy/KMS/backup binding, usable worker vault grant,
 approved registration/catalog, owner job/document recovery and current-revision
 no-data Preview gate remain required; see
 `documentation/communication-note-product-integration-m1y.md`.
+
+### Communication Note secure submission runtime M1z — source-only evidence
+
+M1z is the successor source checkpoint and does not rewrite the M1y snapshot
+above. The route now imports a formal Cookie-principal composition that resolves
+only when every exact Product/API/principal flag, Vercel Preview/project,
+non-Production Supabase ref, canonical URL and matching publishable-key binding
+passes. The client remains request-scoped and lazy. UI/API compile-time
+readiness stays `false`, while the formal submitter, encrypted stager and
+maintenance compositions remain `undefined`.
+
+Focused tests cover the provider-neutral encrypted-payload stager's strict
+canonical facts/hash/size checks; per-object 32-byte DEK and 12-byte IV;
+AES-256-GCM 16-byte tag; canonical AAD; exact numeric KMS-version binding;
+conditional create; same-request replay, changed-request conflict and policy
+rotation; safe receipts; and exact-binding abort without plaintext, locator or
+key leakage. They also cover the 19-argument private policy/KMS-bound
+Communication + fixed-20-Point admission source, the separate `NOLOGIN` caller,
+exact repository parameter order and safe result parsing.
+
+Maintenance tests cover accepted retention, rejected deletion,
+missing/ambiguous deferral before expiry, deletion at expiry equality, candidate/
+admission/delete binding mismatches, durable tombstone replay after a lost
+delete response, bare `NOT_FOUND` rejection, concurrent disjoint leases, batch
+limits and content-free summaries/errors. Principal/submitter/runtime-boundary
+tests retain the default-off ordering and import restrictions.
+
+The M1z focused gate passed **232/232 tests**. The complete local Vitest suite
+passed **3101/3101 tests across 219 files**. TypeScript, zero-warning ESLint,
+the optimized Next.js build, the M1r–M1u client boundary across 27 static
+chunks, 73-file adapter sync and `git diff --check` also passed.
+
+The exact final migration passed two fresh private-Unix-socket PostgreSQL 16
+Hosted-like gates. The zero-paid-row path committed with exactly one inert
+bootstrap ADMIN/non-INHERIT/non-SET caller edge and no temporary SET-edge
+residue. A synthetic one-paid-row path failed with
+`V1_POLICY_BOUND_ADMISSION_EXISTING_PAID_ROWS_UNSAFE` and rolled back the caller,
+both KMS columns and every temporary membership.
+The updated PostgreSQL 16.15 terminal-settlement harness also passed 21 selected
+migrations and 6/6 scenarios through SQL cleanup, independent postcheck, server
+shutdown and temporary-root removal.
+
+No database migration or grant was applied to a Supabase/Hosted target, no
+cloud/KMS/Secret Manager/private object-store resource was created, no Preview
+or Production target changed, no deployment occurred and no real care data or
+model call was used. Real KMS,
+private-object-store, purpose-caller query credential and persistent maintenance
+adapters remain absent. See
+`documentation/communication-note-secure-submission-runtime-m1z.md`.
 
 ### Current live/read-only evidence
 

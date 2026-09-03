@@ -49,6 +49,7 @@ begin
         'careslink.cn_points_terminal.worker_identity_hash',
         'careslink.cn_points_terminal.worker_policy_digest',
         'careslink.cn_points_terminal.payload_policy_digest',
+        'careslink.cn_points_terminal.kms_key_version_resource_hash',
         'careslink.cn_points_terminal.registration_digest',
         'careslink.cn_points_terminal.secondary_registration_digest'
       ]::pg_catalog.text[]) as custom_guc(name)
@@ -116,8 +117,14 @@ begin
     or pg_catalog.to_regrole(
       'careslink_v1_generation_points_settlement_executor'
     ) is null
+    or pg_catalog.to_regrole(
+      'careslink_v1_generation_points_admission_caller'
+    ) is null
     or pg_catalog.to_regprocedure(
       'careslink_v1_generation.admit_and_reserve_v1_shadow_communication_note_generation_job(uuid,uuid,text,uuid,uuid,uuid,text,text,text,text,text,text,text,timestamptz)'
+    ) is null
+    or pg_catalog.to_regprocedure(
+      'careslink_v1_generation.admit_and_reserve_v1_bound_communication_note_generation_job(uuid,uuid,text,uuid,uuid,uuid,text,text,text,text,text,text,text,timestamptz,text,text,text,text,text)'
     ) is null
     or pg_catalog.to_regclass(
       'careslink_v1_generation.communication_note_point_admissions'
@@ -343,6 +350,12 @@ select pg_catalog.set_config(
   true
 );
 
+select pg_catalog.set_config(
+  'careslink.cn_points_terminal.kms_key_version_resource_hash',
+  pg_catalog.repeat('8', 64),
+  true
+);
+
 insert into communication_points_terminal_settlement_policy_values (
   note_type,
   service_code,
@@ -533,11 +546,15 @@ from communication_points_terminal_settlement_policy_values as policy;
 
 insert into careslink_v1_generation.payload_policies (
   policy_version, status, encryption_profile_version,
-  backup_disposition_version, policy_digest, shadow_only
+  kms_key_version_resource_hash, backup_disposition_version, policy_digest,
+  shadow_only
 ) values (
   'payload.communication-terminal-concurrency.20260902.v1',
   'APPROVED',
   'encryption.test-only.v1',
+  pg_catalog.current_setting(
+    'careslink.cn_points_terminal.kms_key_version_resource_hash'
+  ),
   'backup.test-only.v1',
   pg_catalog.current_setting(
     'careslink.cn_points_terminal.payload_policy_digest'
@@ -1089,6 +1106,7 @@ set search_path = ''
 as $$
 declare
   v_fixture record;
+  v_payload_policy record;
   v_now pg_catalog.timestamptz;
   v_payload_expires_at pg_catalog.timestamptz;
   v_cleaned_facts_hash pg_catalog.text;
@@ -1110,6 +1128,25 @@ begin
   if v_fixture.owner_id is null then
     raise exception
       'COMMUNICATION_POINTS_TERMINAL_SETTLEMENT_CONCURRENCY_CASE_INVALID';
+  end if;
+
+  select
+    policy.policy_version,
+    policy.policy_digest,
+    policy.encryption_profile_version,
+    policy.kms_key_version_resource_hash,
+    policy.backup_disposition_version
+  into v_payload_policy
+  from careslink_v1_generation.payload_policies as policy
+  where policy.policy_version =
+      'payload.communication-terminal-concurrency.20260902.v1'
+    and policy.status = 'APPROVED'
+    and policy.shadow_only is true;
+  if not found
+    or v_payload_policy.kms_key_version_resource_hash is null
+  then
+    raise exception
+      'COMMUNICATION_POINTS_TERMINAL_SETTLEMENT_CONCURRENCY_FIXTURE_MISSING';
   end if;
 
   v_now := pg_catalog.date_trunc(
@@ -1135,7 +1172,7 @@ begin
   );
 
   return
-    careslink_v1_generation.admit_and_reserve_v1_shadow_communication_note_generation_job(
+    careslink_v1_generation.admit_and_reserve_v1_bound_communication_note_generation_job(
       v_fixture.owner_id,
       v_fixture.session_id,
       'BEARER',
@@ -1149,7 +1186,12 @@ begin
       v_fixture.idempotency_hash,
       v_fixture.request_hash,
       v_fixture.payload_handle_hash,
-      v_payload_expires_at
+      v_payload_expires_at,
+      v_payload_policy.policy_version,
+      v_payload_policy.policy_digest,
+      v_payload_policy.encryption_profile_version,
+      v_payload_policy.kms_key_version_resource_hash,
+      v_payload_policy.backup_disposition_version
     );
 end;
 $$;
@@ -3588,6 +3630,7 @@ begin
       from pg_catalog.unnest(array[
         'careslink_v1_cn_points_terminal_support._assert_runner()'::pg_catalog.regprocedure,
         'careslink_v1_cn_points_terminal_support._fixture(text)'::pg_catalog.regprocedure,
+        'careslink_v1_generation.admit_and_reserve_v1_bound_communication_note_generation_job(uuid,uuid,text,uuid,uuid,uuid,text,text,text,text,text,text,text,timestamptz,text,text,text,text,text)'::pg_catalog.regprocedure,
         'public.commit_shadow_points(uuid,uuid,text,timestamptz)'::pg_catalog.regprocedure,
         'public.release_shadow_points(uuid,uuid,text,text,timestamptz)'::pg_catalog.regprocedure
       ]) as denied(procedure_oid)

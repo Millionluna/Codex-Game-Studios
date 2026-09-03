@@ -68,12 +68,12 @@ export type CommunicationNoteGenerationPrincipalCompositionOptions =
   }>;
 
 /**
- * Approval remains absent. The source factory below models exact target and
- * authenticated Cookie-client checks, but it does not install the database
- * capability or make this composition reachable from the formal route.
+ * Formal source composition. Module evaluation validates only the immutable
+ * deployment configuration; the request-scoped Cookie client remains lazy.
+ * Invalid, default-off and Production configurations resolve to `undefined`.
  */
 export const COMMUNICATION_NOTE_GENERATION_FORMAL_PRINCIPAL_COMPOSITION =
-  undefined as CommunicationNoteGenerationPrincipalResolver | undefined;
+  createCommunicationNoteGenerationPrincipalComposition();
 
 export function resolveCommunicationNoteGenerationPrincipalCompositionGuard(
   env: CommunicationNoteGenerationPrincipalCompositionEnv =

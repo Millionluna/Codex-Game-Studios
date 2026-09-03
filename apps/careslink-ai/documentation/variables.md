@@ -1,6 +1,6 @@
 # CaresLink AI Variables
 
-> Variable inventory audited from code on 2026-09-02. No secret values are recorded here. Product Baseline V1 target variables are not configured or authorized by this document.
+> Variable inventory audited from code on 2026-09-03. No secret values are recorded here. Product Baseline V1 target variables are not configured or authorized by this document.
 
 ## Classification
 
@@ -340,12 +340,27 @@ removed. That is database-gate evidence, not Production, deployment or product
 configuration evidence, and readiness remains `false`. See
 `documentation/communication-note-preview-runtime-credential-broker-m1l.md`.
 
+Communication Note M1z adds no environment variable, secret name or
+`.env.example` entry. The AES-256-GCM stager and reconciliation/sweep cores take
+frozen policy and capability ports by explicit injection; they do not discover
+a KMS key, private bucket/object locator, database DSN, caller credential or
+scheduler from the environment. The exact numeric KMS key-version resource is
+an immutable private policy input whose digest crosses admission, not a new
+application variable. The new `NOLOGIN` database caller is a credentialless
+role shell and cannot be made usable by assigning an existing service-role key
+or generic database URL. Real KMS, private object-store, direct-query credential
+and maintenance persistence adapters require separately reviewed custody and
+configuration contracts.
+
 ## Current auth, URL and feature variables
 
 The authenticated zero-argument current-session RPC migration and its
-request-scoped Cookie/authenticated-client source wiring add no environment
-variable. The Communication Note composition does not read a dedicated or
-generic privileged key and has no legacy RPC fallback.
+request-scoped Cookie/authenticated-client source wiring add no new environment
+variable. The formal Cookie principal is now conditionally constructed from the
+existing exact Preview-bound variables below, but it does not read a dedicated
+or generic privileged key and has no legacy RPC fallback. Failed binding leaves
+the formal principal absent; even a valid binding cannot bypass the UI/API
+compile-time latches or the absent formal submitter.
 
 | Variable | Class | Purpose | Boundary |
 |---|---|---|---|
@@ -358,11 +373,11 @@ generic privileged key and has no legacy RPC fallback.
 | `CARESLINK_ENABLE_DEMO_AUTH` | Server configuration | local/test demo auth | must be false/unset in production |
 | `NEXT_PUBLIC_CARESLINK_SHOW_LEGACY_DEMO_NAV` | Public feature setting | local legacy navigation | must be false/unset for real users |
 | `CARESLINK_ALLOW_COMPANION_MEMORY_STORE` | Server configuration | development-only store fallback | production code rejects missing durable store |
-| `CARESLINK_COMMUNICATION_NOTE_GENERATION_API_ENABLED` | Reserved server configuration | independent M1x gate for `POST /api/ai-documents/communication-note/generate` | exact `true` is still insufficient: compile-time readiness is `false` and both the formal strict-principal resolver and formal submitter are absent, so the route returns `503` before auth/body access; do not configure as an activation step |
-| `CARESLINK_COMMUNICATION_NOTE_GENERATION_UI_ENABLED` | Reserved server configuration | independent M1y gate for sending reviewed Communication Note facts from the page to M1x | keep false/unset; exact `true` is insufficient because the UI compile-time latch, API compile-time latch and both formal server compositions remain closed |
-| `CARESLINK_COMMUNICATION_NOTE_PRINCIPAL_COMPOSITION_ENABLED` | Reserved server configuration | source-only strict-principal composition guard | keep false/unset; exact `true` cannot install the formal composition/resolver or bypass `READY=false`, and every target/configuration check must also pass |
-| `CARESLINK_COMMUNICATION_NOTE_PRINCIPAL_EXPECTED_SUPABASE_REF` | Reserved non-secret server configuration | binds the source-only composition to one exact configured ref distinct from the pinned known Production ref | keep empty; must be exactly 20 lowercase alphanumeric characters and match both byte-exact canonical Supabase URLs; this source check does not prove branch provenance, health or disposability |
-| `CARESLINK_COMMUNICATION_NOTE_PRINCIPAL_EXPECTED_VERCEL_PROJECT_ID` | Reserved non-secret server configuration | expected project half of the exact Vercel Preview identity check | keep empty; must exactly equal platform-provided `VERCEL_PROJECT_ID`, with `VERCEL=1` and both environment values equal to `preview` |
+| `CARESLINK_COMMUNICATION_NOTE_GENERATION_API_ENABLED` | Reserved server configuration | independent M1x gate for `POST /api/ai-documents/communication-note/generate` and one condition of the formal Cookie-principal composition | exact `true` is still insufficient: API compile-time readiness is `false` and the formal submitter is absent, so the route returns `503` before auth/body access; do not configure as an activation step |
+| `CARESLINK_COMMUNICATION_NOTE_GENERATION_UI_ENABLED` | Reserved server configuration | independent M1y gate for sending reviewed Communication Note facts from the page to M1x | keep false/unset; exact `true` is insufficient because both UI/API compile-time latches remain `false` and the formal submitter/stager/maintenance path is absent |
+| `CARESLINK_COMMUNICATION_NOTE_PRINCIPAL_COMPOSITION_ENABLED` | Reserved server configuration | exact guard for the now-conditionally-installed formal Cookie-principal composition | keep false/unset outside a separately reviewed Preview; exact `true` constructs a resolver only when every Product/API, Vercel Preview/project, Supabase ref/URL and publishable-key check also passes, and it still cannot bypass API `READY=false` or the absent submitter |
+| `CARESLINK_COMMUNICATION_NOTE_PRINCIPAL_EXPECTED_SUPABASE_REF` | Reserved non-secret server configuration | binds the conditional formal principal to one exact configured ref distinct from the pinned known Production ref | keep empty outside an authorized Preview; must be exactly 20 lowercase alphanumeric characters and match both byte-exact canonical Supabase URLs; this source check does not prove branch provenance, health or disposability |
+| `CARESLINK_COMMUNICATION_NOTE_PRINCIPAL_EXPECTED_VERCEL_PROJECT_ID` | Reserved non-secret server configuration | expected project half of the conditional formal principal's exact Vercel Preview identity check | keep empty outside an authorized Preview; must exactly equal platform-provided `VERCEL_PROJECT_ID`, with `VERCEL=1` and both environment values equal to `preview` |
 | `CARESLINK_V1_PRODUCT_API_ENABLED` | Server configuration | master gate for the local shared `/v1` route adapter | only exact `true` passes the first application gate; default/unset is off |
 | `CARESLINK_V1_PRODUCT_API_DURABLE_ADAPTER_ENABLED` | Server configuration | independent gate for request-scoped Supabase persistence and active-session validation | only exact `true`; also requires the master gate, verified Preview target, server configuration, the unapplied database migration and its separate default-off database flag |
 | `CARESLINK_V1_PRODUCT_API_EXPECTED_SUPABASE_REF` | Server configuration | binds the Product API runtime to one reviewed Preview branch | must exactly match the ref parsed from the server Supabase URL; missing/mismatch, non-Preview Vercel environment and the known Production ref all fail closed before any client is created |

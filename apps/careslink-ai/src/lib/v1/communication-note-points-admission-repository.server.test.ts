@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   CARESLINK_V1_COMMUNICATION_NOTE_POINTS_ADMISSION_REPOSITORY_READY,
   CARESLINK_V1_COMMUNICATION_NOTE_POINTS_ADMISSION_RPC_NAME,
+  createCaresLinkV1CommunicationNotePointsAdmissionRepository,
   createTestOnlyCaresLinkV1CommunicationNotePointsAdmissionRepository,
   type CaresLinkV1CommunicationNotePointsAdmissionInput,
   type CaresLinkV1NoteGenerationOwnerRepositoryQuery,
@@ -33,8 +34,13 @@ const IDEMPOTENCY_HASH = "b".repeat(64);
 const REQUEST_HASH = "c".repeat(64);
 const PAYLOAD_HANDLE_HASH = "d".repeat(64);
 const CONTENT_HASH = "e".repeat(64);
+const PAYLOAD_POLICY_SNAPSHOT_HASH = "f".repeat(64);
+const KMS_KEY_VERSION_RESOURCE_HASH = "1".repeat(64);
+const PAYLOAD_POLICY_VERSION = "payload.communication.2026-09-03.v1";
+const ENCRYPTION_PROFILE_VERSION = "envelope-aes256-gcm.2026-09-03.v1";
+const BACKUP_DISPOSITION_VERSION = "no-backup.2026-09-03.v1";
 
-const ADMISSION_SQL = `select careslink_v1_generation.admit_and_reserve_v1_shadow_communication_note_generation_job(
+const ADMISSION_SQL = `select careslink_v1_generation.admit_and_reserve_v1_bound_communication_note_generation_job(
   $1::pg_catalog.uuid,
   $2::pg_catalog.uuid,
   $3::pg_catalog.text,
@@ -48,7 +54,12 @@ const ADMISSION_SQL = `select careslink_v1_generation.admit_and_reserve_v1_shado
   $11::pg_catalog.text,
   $12::pg_catalog.text,
   $13::pg_catalog.text,
-  $14::pg_catalog.timestamptz
+  $14::pg_catalog.timestamptz,
+  $15::pg_catalog.text,
+  $16::pg_catalog.text,
+  $17::pg_catalog.text,
+  $18::pg_catalog.text,
+  $19::pg_catalog.text
 ) as data`;
 
 describe("CaresLink V1 Communication Note Points admission repository", () => {
@@ -57,7 +68,7 @@ describe("CaresLink V1 Communication Note Points admission repository", () => {
       CARESLINK_V1_COMMUNICATION_NOTE_POINTS_ADMISSION_REPOSITORY_READY,
     ).toBe(false);
     expect(CARESLINK_V1_COMMUNICATION_NOTE_POINTS_ADMISSION_RPC_NAME).toBe(
-      "admit_and_reserve_v1_shadow_communication_note_generation_job",
+      "admit_and_reserve_v1_bound_communication_note_generation_job",
     );
     expect(Object.isFrozen(createHarness(admissionEnvelope()).repository)).toBe(
       true,
@@ -99,7 +110,25 @@ describe("CaresLink V1 Communication Note Points admission repository", () => {
     }
   });
 
-  it("issues one exact 14-argument Communication-only admission query", async () => {
+  it("accepts only an exact server-injected query core and keeps TestOnly as a delegate", () => {
+    const query = vi.fn();
+    const core = createCaresLinkV1CommunicationNotePointsAdmissionRepository({
+      principal: principal(),
+      query,
+    });
+    expect(Object.isFrozen(core)).toBe(true);
+    expect(() =>
+      createCaresLinkV1CommunicationNotePointsAdmissionRepository({
+        principal: principal(),
+        query,
+        databaseUrl: "postgresql://must-not-be-resolved-here",
+      } as Parameters<
+        typeof createCaresLinkV1CommunicationNotePointsAdmissionRepository
+      >[0]),
+    ).toThrowError(expect.objectContaining({ code: "PRODUCT_API_DISABLED" }));
+  });
+
+  it("issues one exact 19-argument policy-bound Communication admission query", async () => {
     const { repository, query } = createHarness(admissionEnvelope());
 
     await expect(repository.enqueue(admission())).resolves.toEqual({
@@ -135,6 +164,11 @@ describe("CaresLink V1 Communication Note Points admission repository", () => {
       REQUEST_HASH,
       PAYLOAD_HANDLE_HASH,
       PAYLOAD_EXPIRES_AT,
+      PAYLOAD_POLICY_VERSION,
+      PAYLOAD_POLICY_SNAPSHOT_HASH,
+      ENCRYPTION_PROFILE_VERSION,
+      KMS_KEY_VERSION_RESOURCE_HASH,
+      BACKUP_DISPOSITION_VERSION,
     ]);
     expect(Object.isFrozen(values)).toBe(true);
   });
@@ -322,6 +356,26 @@ describe("CaresLink V1 Communication Note Points admission repository", () => {
     ["invalid job UUID", { ...admission(), jobId: "invalid" }],
     ["uppercase digest", { ...admission(), requestHash: "C".repeat(64) }],
     [
+      "invalid payload policy version",
+      { ...admission(), payloadPolicyVersion: "bad policy version" },
+    ],
+    [
+      "uppercase payload policy snapshot",
+      { ...admission(), payloadPolicySnapshotHash: "F".repeat(64) },
+    ],
+    [
+      "invalid encryption profile version",
+      { ...admission(), encryptionProfileVersion: "bad/profile" },
+    ],
+    [
+      "invalid KMS resource hash",
+      { ...admission(), kmsKeyVersionResourceHash: "not-a-hash" },
+    ],
+    [
+      "invalid backup disposition version",
+      { ...admission(), backupDispositionVersion: "" },
+    ],
+    [
       "noncanonical expiry",
       { ...admission(), payloadExpiresAt: "2026-09-02T01:30:00Z" },
     ],
@@ -373,6 +427,11 @@ function admission(): CaresLinkV1CommunicationNotePointsAdmissionInput {
     requestHash: REQUEST_HASH,
     payloadHandleHash: PAYLOAD_HANDLE_HASH,
     payloadExpiresAt: PAYLOAD_EXPIRES_AT,
+    payloadPolicyVersion: PAYLOAD_POLICY_VERSION,
+    payloadPolicySnapshotHash: PAYLOAD_POLICY_SNAPSHOT_HASH,
+    encryptionProfileVersion: ENCRYPTION_PROFILE_VERSION,
+    kmsKeyVersionResourceHash: KMS_KEY_VERSION_RESOURCE_HASH,
+    backupDispositionVersion: BACKUP_DISPOSITION_VERSION,
   };
 }
 

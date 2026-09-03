@@ -55,6 +55,7 @@ const PROOF_EXPIRES_AT = "2026-08-20T00:30:00.000Z";
 const TEST_POLICY: CaresLinkV1NoteGenerationPayloadPolicy = {
   policyVersion: "test-only.policy.v1",
   encryptionProfileVersion: "test-only.no-encryption",
+  kmsKeyVersionResourceHash: "0".repeat(64),
   backupDispositionVersion: "test-only.no-backup",
 };
 
@@ -91,6 +92,9 @@ describe("CaresLink V1 Note generation payload contract", () => {
         metadata: { noteType, state: "STAGED", shadowOnly: true },
       });
       expect(staged.metadata.policySnapshotHash).toMatch(/^[a-f0-9]{64}$/);
+      expect(staged.metadata.kmsKeyVersionResourceHash).toBe(
+        TEST_POLICY.kmsKeyVersionResourceHash,
+      );
       expect(staged.metadata).not.toHaveProperty("cleanedFacts");
       expect(staged.metadata).not.toHaveProperty("payloadHandle");
 

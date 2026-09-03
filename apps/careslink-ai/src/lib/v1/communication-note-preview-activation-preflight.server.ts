@@ -51,11 +51,11 @@ export type CaresLinkV1CommunicationNotePreviewActivationBlockedReason =
 
 export const CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_DATABASE_EVIDENCE_PINS =
   deepFreeze({
-    migrationCount: 44,
+    migrationCount: 45,
     orderedMigrationBasenamesSha256:
-      "80743dc1d26c9ec055adbf2aefd7485df486f05110cc56a4294d1022751e6efc",
+      "9fb562c0a5434597d5287dc6868f721d238f6f6ff7eb397eb4bbadbcf66af55d",
     orderedMigrationEntriesSha256:
-      "3e76160b37330897fadbcfe05740eb3e005b6d7286958065396761c14326c012",
+      "bce464e4a300f611b4fe1f0134bfa4a0517a8c3bffc901d4bc89cee498e36fc2",
     authorityMigrationSha256:
       "94f83498ea04053e7238a95bb9be0bb8a38ad0a76fa0e751390419800da51f7f",
     custodyMigrationSha256:
@@ -74,6 +74,8 @@ export const CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_DATABASE_EVIDENCE_PINS =
       "64dcb8c57f2c73d3fbd5adc99e3261f8e2e0ddd8e8efcf5cca52c12ca34ba5aa",
     pointsTerminalSettlementMigrationSha256:
       "6e5148f3e080ab767f586c27c86490ac1c05b80deed864f48783c331bbf41afd",
+    encryptedPayloadAdmissionMigrationSha256:
+      "f264ca0b7569c72273613e451b9742269d36fce290dcc0991f874d7426164f3f",
     runnerTerminalAssertionSha256:
       "0f8192bccf46101103c301fcfd2b00cb818dd6725425a952777f697db8ea8172",
   } as const);
@@ -165,7 +167,7 @@ export type CaresLinkV1CommunicationNotePreviewActivationPreflightPolicy =
     Readonly<{ policyDigest: string }>;
 
 export const CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_ACTIVATION_PREFLIGHT_POLICY_DIGEST =
-  "5eed52f738170b7cd8817c6ca8b713a992d18e071aee94518fdc870eb6004d41" as const;
+  "2ca9c1530b17bcd2725afab1205554c04f2e966bd2105cb174f262c0e8772a1a" as const;
 
 if (
   createCanonicalSha256(ACTIVATION_PREFLIGHT_POLICY_CORE) !==
@@ -312,7 +314,7 @@ export type CaresLinkV1CommunicationNotePreviewActivationPreflightCandidate =
       persistent: false;
       withData: false;
       productionExcluded: true;
-      migrationCount: 44;
+      migrationCount: 45;
       orderedMigrationBasenamesSha256: string;
       orderedMigrationEntriesSha256: string;
       authorityMigrationSha256: string;
@@ -324,6 +326,7 @@ export type CaresLinkV1CommunicationNotePreviewActivationPreflightCandidate =
       runnerTerminalAcceptedUsageMigrationSha256: string;
       runtimeCredentialBrokerMigrationSha256: string;
       pointsTerminalSettlementMigrationSha256: string;
+      encryptedPayloadAdmissionMigrationSha256: string;
       runnerTerminalAssertionSha256: string;
       runnerTerminalContract: "SIGNED_SOURCE_ONLY_DEFAULT_OFF";
       runnerTerminalExecutorRole:
@@ -989,6 +992,7 @@ function validateDatabase(
     "runnerTerminalAcceptedUsageMigrationSha256",
     "runtimeCredentialBrokerMigrationSha256",
     "pointsTerminalSettlementMigrationSha256",
+    "encryptedPayloadAdmissionMigrationSha256",
     "runnerTerminalAssertionSha256",
     "runnerTerminalContract",
     "runnerTerminalExecutorRole",
@@ -1078,7 +1082,7 @@ function validateDatabase(
     persistent: false as const,
     withData: false as const,
     productionExcluded: true as const,
-    migrationCount: 44 as const,
+    migrationCount: 45 as const,
     orderedMigrationBasenamesSha256: requireEvidencePin(
       object.orderedMigrationBasenamesSha256,
       "orderedMigrationBasenamesSha256",
@@ -1122,6 +1126,10 @@ function validateDatabase(
     pointsTerminalSettlementMigrationSha256: requireEvidencePin(
       object.pointsTerminalSettlementMigrationSha256,
       "pointsTerminalSettlementMigrationSha256",
+    ),
+    encryptedPayloadAdmissionMigrationSha256: requireEvidencePin(
+      object.encryptedPayloadAdmissionMigrationSha256,
+      "encryptedPayloadAdmissionMigrationSha256",
     ),
     runnerTerminalAssertionSha256: requireEvidencePin(
       object.runnerTerminalAssertionSha256,
@@ -1366,6 +1374,7 @@ function validatePurposeSeparation(input: Readonly<{
     input.database.runnerTerminalAcceptedUsageMigrationSha256,
     input.database.runtimeCredentialBrokerMigrationSha256,
     input.database.pointsTerminalSettlementMigrationSha256,
+    input.database.encryptedPayloadAdmissionMigrationSha256,
     input.database.runnerTerminalAssertionSha256,
     ...input.database.callerBindings.map(
       (caller) => caller.loginIdentityHmac,

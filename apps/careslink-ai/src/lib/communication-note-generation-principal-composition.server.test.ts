@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   COMMUNICATION_NOTE_GENERATION_CURRENT_SESSION_STATUS_RPC,
@@ -12,7 +12,6 @@ import {
   CARESLINK_COMMUNICATION_NOTE_PRINCIPAL_COMPOSITION_TEST_CAPABILITY,
   CARESLINK_COMMUNICATION_NOTE_PRINCIPAL_EXPECTED_SUPABASE_REF_FLAG,
   CARESLINK_COMMUNICATION_NOTE_PRINCIPAL_EXPECTED_VERCEL_PROJECT_ID_FLAG,
-  COMMUNICATION_NOTE_GENERATION_FORMAL_PRINCIPAL_COMPOSITION,
   createCommunicationNoteGenerationPrincipalComposition,
   resolveCommunicationNoteGenerationPrincipalCompositionGuard,
   type CommunicationNoteGenerationPrincipalCompositionEnv,
@@ -31,13 +30,15 @@ const PUBLISHABLE_KEY =
 const PRIVATE_VALUE = "sb_secret_1234567890abcdefghijklmnopqrstuvwxyz";
 
 describe("Communication Note principal composition", () => {
-  it("keeps the formal composition absent and constructs no client at import or factory time", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.resetModules();
+  });
+
+  it("constructs no client at guarded factory time", () => {
     const createCookieAuthClient = vi.fn();
     const env = enabledEnv();
 
-    expect(
-      COMMUNICATION_NOTE_GENERATION_FORMAL_PRINCIPAL_COMPOSITION,
-    ).toBeUndefined();
     expect(CARESLINK_COMMUNICATION_NOTE_PRINCIPAL_COMPOSITION_FLAG).toBe(
       "CARESLINK_COMMUNICATION_NOTE_PRINCIPAL_COMPOSITION_ENABLED",
     );
@@ -73,6 +74,40 @@ describe("Communication Note principal composition", () => {
     expect(resolver).toBeTypeOf("function");
     expect(createCookieAuthClient).not.toHaveBeenCalled();
     expect(JSON.stringify(guard)).not.toContain(PRIVATE_VALUE);
+  });
+
+  it("formally installs only the guarded Preview resolver and keeps its Cookie client lazy", async () => {
+    stubProcessEnv(enabledEnv());
+    vi.resetModules();
+    const formalModule = await import(
+      "./communication-note-generation-principal-composition.server"
+    );
+    const resolver =
+      formalModule.COMMUNICATION_NOTE_GENERATION_FORMAL_PRINCIPAL_COMPOSITION;
+
+    expect(resolver).toBeTypeOf("function");
+    if (!resolver) throw new Error("formal Preview resolver was not installed");
+
+    // The formally installed resolver remains bound to its import-time snapshot;
+    // drift makes the first request fail before the Cookie-client factory runs.
+    vi.stubEnv("VERCEL_ENV", "production");
+    await expect(resolver(cookieRequest())).resolves.toEqual({
+      ok: false,
+      reason: "unavailable",
+      status: 503,
+    });
+  });
+
+  it("keeps the formal composition absent for Production even when every explicit flag is true", async () => {
+    stubProcessEnv({ ...enabledEnv(), VERCEL_ENV: "production" });
+    vi.resetModules();
+    const formalModule = await import(
+      "./communication-note-generation-principal-composition.server"
+    );
+
+    expect(
+      formalModule.COMMUNICATION_NOTE_GENERATION_FORMAL_PRINCIPAL_COMPOSITION,
+    ).toBeUndefined();
   });
 
   it.each([
@@ -456,7 +491,7 @@ describe("Communication Note principal composition", () => {
 
     expect(source).toMatch(/^import "server-only";/);
     expect(source).toContain(
-      "COMMUNICATION_NOTE_GENERATION_FORMAL_PRINCIPAL_COMPOSITION =\n  undefined",
+      "COMMUNICATION_NOTE_GENERATION_FORMAL_PRINCIPAL_COMPOSITION =\n  createCommunicationNoteGenerationPrincipalComposition()",
     );
     expect(source).not.toMatch(
       /CARESLINK_COMMUNICATION_NOTE_SESSION_STATUS_PREVIEW_SECRET_KEY|SUPABASE_SECRET_KEY|SUPABASE_SERVICE_ROLE_KEY|CARESLINK_V1_PRIVACY_REVIEW_PREVIEW_SERVICE_ROLE_KEY|createCaresLinkV1SessionStatusRpcClient|resolve_v1_shadow_session_status|parseDedicatedSecretKey|dedicatedPrivilegedKey|privileged_key_unavailable|credential_reuse_denied|service_role|sb_secret_/,
@@ -545,4 +580,10 @@ function setEnv(
   value: string,
 ) {
   (env as Record<string, string | undefined>)[key] = value;
+}
+
+function stubProcessEnv(env: CommunicationNoteGenerationPrincipalCompositionEnv) {
+  for (const [key, value] of Object.entries(env)) {
+    if (value !== undefined) vi.stubEnv(key, value);
+  }
 }
