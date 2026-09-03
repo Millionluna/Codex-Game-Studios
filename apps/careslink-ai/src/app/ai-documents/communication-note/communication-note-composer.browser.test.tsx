@@ -99,6 +99,10 @@ beforeEach(() => {
 
 afterEach(async () => {
   await act(async () => root.unmount());
+  if (vi.isFakeTimers()) {
+    vi.clearAllTimers();
+    vi.useRealTimers();
+  }
   container.remove();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
@@ -141,8 +145,10 @@ describe("Communication Note composer browser boundary", () => {
 
     expect(container.querySelectorAll("main")).toHaveLength(1);
     expect(container.querySelectorAll("h1")).toHaveLength(1);
-    expect(container.querySelectorAll("form")).toHaveLength(0);
-    expect(container.querySelectorAll('[role="form"]')).toHaveLength(1);
+    expect(container.querySelectorAll("form")).toHaveLength(1);
+    expect(container.querySelector("form")?.getAttribute("aria-label")).toBe(
+      "Communication Note structured facts",
+    );
     expect(container.querySelectorAll("fieldset legend").length).toBeGreaterThan(
       0,
     );
@@ -164,7 +170,7 @@ describe("Communication Note composer browser boundary", () => {
     expect(getField("stated_outcome").required).toBe(false);
     expect(getField("follow_up").required).toBe(false);
     expect(container.querySelector("button:not([type])")).toBeNull();
-    expect(container.querySelectorAll('button[type="submit"]')).toHaveLength(0);
+    expect(container.querySelectorAll('button[type="submit"]')).toHaveLength(1);
 
     const generationButton = getDisabledGenerationButton();
     const boundaryId = generationButton.getAttribute("aria-describedby");
@@ -265,8 +271,8 @@ describe("Communication Note composer browser boundary", () => {
     expect(window.history.state).toEqual({ boundary: "safe-baseline" });
     expect(io.pushState).not.toHaveBeenCalled();
     expect(io.replaceState).not.toHaveBeenCalled();
-    expect(container.querySelector("form")).toBeNull();
-    expect(container.querySelector('button[type="submit"]')).toBeNull();
+    expect(container.querySelector("form")).not.toBeNull();
+    expect(container.querySelector('button[type="submit"]')).not.toBeNull();
 
     const navigationSurface = [
       window.location.href,
@@ -293,17 +299,287 @@ describe("Communication Note composer browser boundary", () => {
     expect(container.querySelector('input[type="checkbox"]')).toBeNull();
     expectNoBrowserIo(io);
   });
+
+  it("submits immutable reviewed bytes once and safely replays the same idempotency key", async () => {
+    vi.useFakeTimers();
+    const idempotencyKey = "11111111-1111-4111-8111-111111111111";
+    vi.spyOn(window.crypto, "randomUUID").mockReturnValue(idempotencyKey);
+    const createdAt = "2026-09-03T02:00:00.000Z";
+    const fetcher = vi.fn()
+      .mockResolvedValueOnce({
+        status: 202,
+        json: async () => ({ created: true, job: {
+          jobId: "22222222-2222-4222-8222-222222222222",
+          status: "QUEUED", noteType: "communication",
+          serviceCode: "note.communication.generate", attemptCount: 0,
+          createdAt, updatedAt: createdAt,
+        } }),
+      })
+      .mockResolvedValueOnce({
+        status: 200,
+        json: async () => ({ created: false, job: {
+          jobId: "22222222-2222-4222-8222-222222222222",
+          status: "RUNNING", noteType: "communication",
+          serviceCode: "note.communication.generate", attemptCount: 1,
+          createdAt, updatedAt: "2026-09-03T02:00:01.000Z",
+          startedAt: "2026-09-03T02:00:00.500Z",
+        } }),
+      });
+    vi.stubGlobal("fetch", fetcher);
+
+    await renderComposer(true);
+    await fillFields({
+      occurred_at: "2026-09-01T14:30:00+10:00",
+      contact_channel: "Phone",
+      parties_by_role: "Support worker\nFamily representative",
+      observable_facts: "The family representative requested an update.",
+      action_taken: "The support worker provided the recorded update.",
+      stated_outcome: "The family representative acknowledged the update.",
+      follow_up: "The support worker will record any further contact.",
+    });
+    await submitLocalReview();
+    for (const checkbox of container.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')) {
+      await act(async () => checkbox.click());
+    }
+
+    const submit = container.querySelector<HTMLButtonElement>('button[type="submit"]');
+    expect(submit?.disabled).toBe(false);
+    await act(async () => {
+      submit?.click();
+      submit?.click();
+    });
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    const firstInit = fetcher.mock.calls[0]?.[1] as RequestInit;
+    const firstBody = firstInit.body;
+    expect(firstInit.headers).toEqual({
+      "Content-Type": "application/json",
+      "Idempotency-Key": idempotencyKey,
+    });
+    const parsedBody = JSON.parse(String(firstBody)) as Record<string, unknown>;
+    expect(Object.keys(parsedBody).sort()).toEqual([
+      "cleanedFacts",
+      "privacyReview",
+      "sourceLocale",
+    ]);
+    expect(parsedBody).toMatchObject({
+      privacyReview: {
+        reviewedNoIdentifiers: true,
+        processingAuthorityConfirmed: true,
+      },
+    });
+    expect(String(firstBody)).not.toMatch(
+      /userId|ownerUserId|sessionId|accessToken|authorization/i,
+    );
+    expect(getField("observable_facts").disabled).toBe(true);
+    expect(text()).toContain("Points are reserved by the server");
+    expect(vi.getTimerCount()).toBe(1);
+    expect(
+      [...container.querySelectorAll<HTMLButtonElement>("button")].some(
+        (button) => button.textContent?.includes("Check status safely"),
+      ),
+    ).toBe(false);
+
+    await act(async () => vi.advanceTimersByTimeAsync(1500));
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    const secondInit = fetcher.mock.calls[1]?.[1] as RequestInit;
+    expect(secondInit.body).toBe(firstBody);
+    expect(secondInit.headers).toEqual(firstInit.headers);
+    expect(text()).toContain("Generation is running");
+    expect(vi.getTimerCount()).toBe(1);
+
+    const signal = secondInit.signal as AbortSignal;
+    await act(async () => root.unmount());
+    root = createRoot(container);
+    expect(signal.aborted).toBe(false);
+    expect(vi.getTimerCount()).toBe(0);
+    vi.useRealTimers();
+  });
+
+  it("stops polling after a terminal response", async () => {
+    vi.useFakeTimers();
+    vi.spyOn(window.crypto, "randomUUID").mockReturnValue(
+      "11111111-1111-4111-8111-111111111111",
+    );
+    const createdAt = "2026-09-03T02:00:00.000Z";
+    const fetcher = vi
+      .fn()
+      .mockResolvedValueOnce({
+        status: 202,
+        json: async () => ({
+          created: true,
+          job: {
+            jobId: "22222222-2222-4222-8222-222222222222",
+            status: "QUEUED",
+            noteType: "communication",
+            serviceCode: "note.communication.generate",
+            attemptCount: 0,
+            createdAt,
+            updatedAt: createdAt,
+          },
+        }),
+      })
+      .mockResolvedValueOnce({
+        status: 200,
+        json: async () => ({
+          created: false,
+          job: {
+            jobId: "22222222-2222-4222-8222-222222222222",
+            status: "FAILED",
+            noteType: "communication",
+            serviceCode: "note.communication.generate",
+            attemptCount: 1,
+            createdAt,
+            updatedAt: "2026-09-03T02:00:02.000Z",
+            startedAt: "2026-09-03T02:00:00.500Z",
+            finishedAt: "2026-09-03T02:00:02.000Z",
+            failureCode: "GENERATION_FAILED",
+          },
+        }),
+      });
+    vi.stubGlobal("fetch", fetcher);
+
+    await prepareConnectedSubmission();
+    await act(async () =>
+      container.querySelector<HTMLButtonElement>('button[type="submit"]')?.click(),
+    );
+    expect(vi.getTimerCount()).toBe(1);
+    await act(async () => vi.advanceTimersByTimeAsync(1_500));
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    expect(text()).toContain("generation failed");
+    expect(vi.getTimerCount()).toBe(0);
+    await act(async () => vi.advanceTimersByTimeAsync(15_000));
+    expect(fetcher).toHaveBeenCalledTimes(2);
+  });
+
+  it("pauses after 40 automatic polls and keeps manual replay byte-identical", async () => {
+    vi.useFakeTimers();
+    const idempotencyKey = "11111111-1111-4111-8111-111111111111";
+    vi.spyOn(window.crypto, "randomUUID").mockReturnValue(idempotencyKey);
+    const createdAt = "2026-09-03T02:00:00.000Z";
+    let callCount = 0;
+    const fetcher = vi.fn(
+      async (_input: RequestInfo | URL, _init?: RequestInit) => {
+        void _input;
+        void _init;
+        callCount += 1;
+        const created = callCount === 1;
+        return {
+          status: created ? 202 : 200,
+          json: async () => ({
+            created,
+            job: {
+              jobId: "22222222-2222-4222-8222-222222222222",
+              status: "QUEUED",
+              noteType: "communication",
+              serviceCode: "note.communication.generate",
+              attemptCount: 0,
+              createdAt,
+              updatedAt: createdAt,
+            },
+          }),
+        };
+      },
+    );
+    vi.stubGlobal("fetch", fetcher);
+
+    await prepareConnectedSubmission();
+    await act(async () =>
+      container.querySelector<HTMLButtonElement>('button[type="submit"]')?.click(),
+    );
+    const firstInit = fetcher.mock.calls[0]?.[1] as RequestInit;
+
+    await act(async () => vi.advanceTimersByTimeAsync(40 * 1_500));
+    expect(fetcher).toHaveBeenCalledTimes(41);
+    expect(text()).toContain("Automatic status checks have paused");
+    expect(vi.getTimerCount()).toBe(0);
+
+    await clickButton("Check status safely");
+    expect(fetcher).toHaveBeenCalledTimes(42);
+    const manualInit = fetcher.mock.calls[41]?.[1] as RequestInit;
+    expect(manualInit.body).toBe(firstInit.body);
+    expect(manualInit.headers).toEqual(firstInit.headers);
+    expect(manualInit.headers).toEqual({
+      "Content-Type": "application/json",
+      "Idempotency-Key": idempotencyKey,
+    });
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("aborts an in-flight status request when the composer unmounts", async () => {
+    let requestSignal: AbortSignal | undefined;
+    const fetcher = vi.fn(
+      async (_input: RequestInfo | URL, init?: RequestInit) => {
+        requestSignal = init?.signal ?? undefined;
+        return await new Promise<Pick<Response, "json" | "status">>(() => {});
+      },
+    );
+    vi.stubGlobal("fetch", fetcher);
+
+    await prepareConnectedSubmission();
+    act(() => {
+      container.querySelector<HTMLButtonElement>('button[type="submit"]')?.click();
+    });
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(requestSignal?.aborted).toBe(false);
+
+    await act(async () => root.unmount());
+    root = createRoot(container);
+    expect(requestSignal?.aborted).toBe(true);
+  });
+
+  it.each([
+    { status: "UNAVAILABLE" as const, unit: "POINTS" as const },
+    {
+      status: "NOT_READY" as const,
+      unit: "POINTS" as const,
+      serviceCode: "note.communication.generate" as const,
+      catalogVersion: "2026-09.test",
+      generationCostPoints: 20,
+    },
+    { ...AVAILABLE_POINTS_PREVIEW, canAfford: false, availablePoints: 0 },
+  ])("keeps generation at zero requests when Points cannot admit it", async (pointsPreview) => {
+    const fetcher = vi.fn();
+    vi.stubGlobal("fetch", fetcher);
+    await renderComposer(true, pointsPreview);
+    const submit = container.querySelector<HTMLButtonElement>('button[type="submit"]');
+    expect(submit?.disabled).toBe(true);
+    await act(async () => submit?.click());
+    expect(fetcher).not.toHaveBeenCalled();
+  });
 });
 
-async function renderComposer() {
+async function renderComposer(
+  generationAvailable = false,
+  pointsPreview: React.ComponentProps<typeof CommunicationNoteComposer>["pointsPreview"] = AVAILABLE_POINTS_PREVIEW,
+) {
   await act(async () => {
     root.render(
       <CommunicationNoteComposer
         locale="en"
-        pointsPreview={AVAILABLE_POINTS_PREVIEW}
+        pointsPreview={pointsPreview}
+        generationAvailable={generationAvailable}
       />,
     );
   });
+}
+
+async function prepareConnectedSubmission() {
+  await renderComposer(true);
+  await fillFields({
+    occurred_at: "2026-09-01T14:30:00+10:00",
+    contact_channel: "Phone",
+    parties_by_role: "Support worker\nFamily representative",
+    observable_facts: "The family representative requested an update.",
+    action_taken: "The support worker provided the recorded update.",
+    stated_outcome: "The family representative acknowledged the update.",
+    follow_up: "The support worker will record any further contact.",
+  });
+  await submitLocalReview();
+  for (const checkbox of container.querySelectorAll<HTMLInputElement>(
+    'input[type="checkbox"]',
+  )) {
+    await act(async () => checkbox.click());
+  }
 }
 
 function getField(fieldName: (typeof FIELD_NAMES)[number]) {
@@ -368,7 +644,7 @@ async function clickButton(label: string) {
 
 function getDisabledGenerationButton() {
   const button = container.querySelector<HTMLButtonElement>(
-    'button[type="button"][disabled][aria-describedby="communication-note-generation-boundary"]',
+    'button[type="submit"][disabled][aria-describedby="communication-note-generation-boundary"]',
   );
   if (!button) {
     throw new Error("Disabled generation boundary was not rendered");

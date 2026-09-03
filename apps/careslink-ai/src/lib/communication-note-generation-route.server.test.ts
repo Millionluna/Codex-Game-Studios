@@ -21,6 +21,8 @@ import {
   COMMUNICATION_NOTE_GENERATION_PRINCIPAL_RESOLVER,
   type CommunicationNoteGenerationPrincipalResolution,
 } from "./communication-note-generation-principal.server";
+import { COMMUNICATION_NOTE_GENERATION_FORMAL_PRINCIPAL_COMPOSITION } from "./communication-note-generation-principal-composition.server";
+import { COMMUNICATION_NOTE_GENERATION_FORMAL_SUBMITTER_COMPOSITION } from "./communication-note-generation-submitter-composition.server";
 import { stringifyCaresLinkV1CanonicalJson } from "./v1/canonical-json";
 import { CaresLinkV1ContractError } from "./v1/shared-contracts";
 
@@ -93,6 +95,8 @@ describe("Communication Note generation server route", () => {
     vi.stubEnv("CARESLINK_COMMUNICATION_NOTE_GENERATION_API_ENABLED", "true");
     expect(COMMUNICATION_NOTE_GENERATION_SUBMITTER).toBeUndefined();
     expect(COMMUNICATION_NOTE_GENERATION_PRINCIPAL_RESOLVER).toBeUndefined();
+    expect(COMMUNICATION_NOTE_GENERATION_FORMAL_SUBMITTER_COMPOSITION).toBeUndefined();
+    expect(COMMUNICATION_NOTE_GENERATION_FORMAL_PRINCIPAL_COMPOSITION).toBeUndefined();
     const request = new Proxy({} as Request, {
       get() {
         throw new Error("request must remain opaque");
@@ -676,6 +680,12 @@ describe("Communication Note generation server route", () => {
     );
     expect(source).toContain(
       "COMMUNICATION_NOTE_GENERATION_SUBMITTER = undefined",
+    );
+    expect(source).toContain(
+      "COMMUNICATION_NOTE_GENERATION_FORMAL_SUBMITTER_COMPOSITION",
+    );
+    expect(source).toContain(
+      "COMMUNICATION_NOTE_GENERATION_FORMAL_PRINCIPAL_COMPOSITION",
     );
   });
 });

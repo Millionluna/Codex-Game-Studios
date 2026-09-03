@@ -77,9 +77,11 @@ describe("Communication Note composer UI", () => {
       expect(control).not.toContain('required=""');
     }
     expect(markup).not.toContain('type="checkbox"');
-    expect(markup).toContain('role="form"');
-    expect(markup).not.toContain("<form");
-    expect(markup).not.toContain('type="submit"');
+    expect(markup).toContain(
+      'aria-label="Communication Note structured facts"',
+    );
+    expect(markup).toContain("<form");
+    expect(markup).toContain('type="submit"');
   });
 
   it("shows a disabled, explained generation action without save, Points or export promises", () => {

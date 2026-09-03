@@ -431,7 +431,7 @@ describe("Communication Note principal composition", () => {
     expect(JSON.stringify(result)).not.toContain(PRIVATE_VALUE);
   });
 
-  it("keeps the composition server-only, source-only and out of the formal route", () => {
+  it("keeps the composition server-only and imports only its absent formal placeholder", () => {
     const source = readFileSync(
       join(
         process.cwd(),
@@ -467,8 +467,14 @@ describe("Communication Note principal composition", () => {
     expect(route).not.toContain(
       "communication-note-generation-principal-composition",
     );
-    expect(handler).not.toContain(
+    expect(handler).toContain(
       "communication-note-generation-principal-composition",
+    );
+    expect(handler).toContain(
+      "COMMUNICATION_NOTE_GENERATION_FORMAL_PRINCIPAL_COMPOSITION",
+    );
+    expect(handler).not.toContain(
+      "createCommunicationNoteGenerationPrincipalComposition",
     );
   });
 });

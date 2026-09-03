@@ -132,3 +132,40 @@ export type CommunicationNoteGenerationAdmission =
 export type CommunicationNoteGenerationResponse =
   | CommunicationNoteGenerationAdmission
   | CommunicationNoteGenerationErrorResponse;
+
+/** One browser-safe message vocabulary shared by the route and its client. */
+export function getCommunicationNoteGenerationErrorMessage(
+  code: CaresLinkV1ErrorCode,
+) {
+  switch (code) {
+    case "PRODUCT_API_DISABLED":
+      return "Communication Note generation is unavailable";
+    case "AUTH_REQUIRED":
+      return "Authentication is required";
+    case "SESSION_REVOKED":
+      return "The authenticated session is no longer active";
+    case "FORBIDDEN":
+      return "The request is not permitted";
+    case "MINIMUM_FACTS_REQUIRED":
+      return "Required cleaned facts are missing or empty";
+    case "PRIVACY_REVIEW_REQUIRED":
+      return "Privacy review is required before generation";
+    case "PRIVACY_REVIEW_STALE":
+      return "Privacy review must be repeated before generation";
+    case "IDEMPOTENCY_CONFLICT":
+    case "IDENTITY_LINK_CONFLICT":
+      return "The idempotent generation request conflicts with existing work";
+    case "POINTS_INSUFFICIENT":
+      return "There are not enough Points for this generation request";
+    case "POINT_QUOTE_EXPIRED":
+      return "The Points quote has expired";
+    case "RATE_LIMITED":
+      return "Too many generation requests were submitted";
+    case "GENERATION_FAILED":
+      return "Communication Note generation failed";
+    default:
+      return code === "VALIDATION_ERROR"
+        ? "The Communication Note generation request is invalid"
+        : "The Communication Note generation request could not be completed";
+  }
+}
