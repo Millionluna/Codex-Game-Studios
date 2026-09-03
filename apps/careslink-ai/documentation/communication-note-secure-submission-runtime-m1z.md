@@ -199,3 +199,13 @@ rewrite those historical snapshots. It records the successor state: the formal
 principal is now conditionally installed, while the submission, vault,
 maintenance, database-caller, worker-consume and activation boundaries remain
 closed.
+
+M2a subsequently implements default-off exact-version KMS, private GCS and
+purpose-session database protocol adapters. Their fresh posture brands and
+cleanup/quiescence receipts validate explicitly injected claims only: they do
+not establish authenticated live KMS posture, exact-bucket propagation/history
+claims or independently observed database termination. M2a does not change
+this M1z checkpoint's historical verification totals and does not close live
+credential, resource-posture, formal-composition, Hosted Preview or activation
+gates. See
+`documentation/communication-note-secure-submission-provider-adapters-m2a.md`.

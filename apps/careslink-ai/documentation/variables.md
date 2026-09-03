@@ -348,9 +348,9 @@ scheduler from the environment. The exact numeric KMS key-version resource is
 an immutable private policy input whose digest crosses admission, not a new
 application variable. The new `NOLOGIN` database caller is a credentialless
 role shell and cannot be made usable by assigning an existing service-role key
-or generic database URL. Real KMS, private object-store, direct-query credential
-and maintenance persistence adapters require separately reviewed custody and
-configuration contracts.
+or generic database URL. At the M1z checkpoint, real KMS, private-object-store,
+direct-query credential and maintenance-persistence adapters still required
+separately reviewed custody and configuration contracts.
 
 ## Current auth, URL and feature variables
 
@@ -418,6 +418,29 @@ secret.
 The privacy proof TTL is a code/contract constant of 1800 seconds for this
 temporary Preview gate. It is not configured through an environment variable
 and is not a Production retention or product decision.
+
+## Secure-submission M2a source adapters
+
+M2a introduces no environment variables. The exact numeric KMS version, fresh
+branded key-version posture, GCP project/location/exact-bucket/prefix policy,
+fresh bucket-posture evidence, WIF credential custody, disposable Preview
+database target, pinned CA and purpose-session resolver are constructor-injected
+server-only capabilities. Database destruction/revocation/quiescence receipts
+are injected results as well. None of these values may fall back to a generic
+DSN, `SUPABASE_SERVICE_ROLE_KEY`, Application Default Credentials or an ambient
+Google access token.
+
+The KMS posture brand validates an injected claim; it does not authenticate its
+control-plane origin. The GCS posture requires injected claims for 30-second
+settings propagation and absence of historical noncurrent/soft-deleted
+versions, but it does not authenticate those claims or prove that retained or
+backup copies are absent/expired/purged. Database cleanup receipts do not
+become independently observed termination merely because they pass source
+validation. The formal KMS, GCS and Points-admission adapters therefore remain
+`undefined`. Adding placeholders to `.env.example` would incorrectly imply an
+approved trust source, runtime or deployment configuration. Provider resource
+names, database credentials, DSNs, access tokens and private key material must
+not be added to this file or client configuration.
 
 ## Platform-provided variables
 
