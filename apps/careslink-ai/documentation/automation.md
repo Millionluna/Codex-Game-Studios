@@ -1284,9 +1284,9 @@ Next.js build, the 27-static-chunk client boundary, 73-file adapter sync and
 diff checks also passed. No migration or grant was applied to a Supabase/Hosted
 database, no cloud/KMS/Secret Manager/private store was created, no Preview or
 Production resource was changed, no deployment occurred and no real care data
-or model request was used. Actual KMS,
+or model request was used. At the M1z checkpoint, actual KMS,
 private-object-store, purpose-caller query credential and maintenance
-persistence adapters remain required. See
+persistence adapters remained required. See
 `documentation/communication-note-secure-submission-runtime-m1z.md`.
 
 The exact final migration passed a private-Unix-socket PostgreSQL 16
@@ -1297,6 +1297,30 @@ schema/transaction evidence only, not a Supabase/Hosted apply or runtime.
 The corresponding PostgreSQL 16.15 terminal-settlement harness now uses the
 19-argument bound coordinator and passed its 21 selected migrations plus 6/6
 concurrency/settlement scenarios with complete SQL and filesystem teardown.
+
+### Communication Note provider adapters M2a — source only
+
+M2a supplies default-off protocol implementations for exact-version Cloud KMS
+wrapping, an exact private GCS bucket and one-shot Points admission over a
+purpose-scoped physical PostgreSQL session. KMS construction now requires a
+fresh module-branded exact-resource posture claim; GCS rechecks its normalized
+exact-bucket posture before each credential request and requires injected claims
+that settings were effective for at least 30 seconds with no historical
+noncurrent or soft-deleted versions; and the database adapter requires at least
+25 seconds of lease/target validity for its 12-second query, two sequential
+five-second cleanup windows and a three-second scheduling margin. Database
+cleanup receipts must report
+session termination, zero active statements, settled/cancelled in-flight work,
+atomic late-issuance blocking, zero active sessions and complete revocation or
+non-issuance.
+
+These are validation boundaries over explicitly injected capabilities and
+claims, not live trust. No authenticated WIF/control-plane issuer, exact KMS or
+bucket resource, post-change bucket propagation proof, historical
+noncurrent/soft-deleted/retained/backup-copy purge evidence, database credential
+issuer/connector or independently observed quiescence exists. Formal adapters
+remain `undefined`, readiness remains `false`, and nothing is scheduled or
+deployed.
 
 ### Communication Note atomic 20-Point admission — source only
 
@@ -1382,8 +1406,8 @@ hashes and scenario evidence.
 
 ## Inactive shadow automation contracts
 
-- The contract and migrations define generation/export job states. Source-only memory contracts model leases, recovery, retry policy, provider evidence and single-use payload grants, and the registered-worker v2 facade composes those boundaries without a payload locator. All eight generation migrations remain Production-unapplied; deleted `r9` supplied isolated PostgreSQL 17.6 execution evidence for database-clock claim/heartbeat/fence/commit/settle/resolve/recover/authorize/consume logic and payload/grant/evidence/purge-outbox metadata, deleted `r20` supplied the three true two-session race results, and deleted `r21` supplied exact historical transient-retry/success replay through payload/outbox purge. The later local owner-repository gate covers the three private owner RPCs, migration #29 adds the non-login control-executor-owned graceful-retirement identity, admission adds the fifth purpose role/private binding table, terminal settlement adds the sixth purpose role plus settlement/recovery-turn tables, and M1z adds the source-only policy/KMS-bound admission caller—none has a runtime credential. There is still no installed caller. Normal consume deliberately settles `DENIED_SETTLED` / `PAYLOAD_UNAVAILABLE` and returns no vault grant, locator or facts; the historical rollback-only `TEST_ONLY` `CONSUMED` fixture proves only scripted canonical transaction atomicity. M1z supplies provider-neutral encrypted staging and maintenance cores, but there is still no live payload-vault/KMS/private-store adapter, queue service, deployed worker, live retry loop or served cancellation endpoint.
-- No worker automation may be scheduled yet. Deleted `r20` closed the PostgreSQL 17.6 true two-session claim/session/privacy race gate, deleted `r21` closed the fixed Attempt-2 historical replay gate, deleted `r22` closed the hosted registration-retention gate, the earlier isolated local PostgreSQL 16.15 run closed its recorded engine/serial/true-two-session version gate, and deleted `r5` closed its historical Hosted 30/30 migration, then-current 11/11 assertion and independent posture gate. Owner admission/enqueue/status/cancel and graceful worker-registration retirement now have source, local SQL and deleted-Hosted schema/transaction boundaries; Communication has source/local fixed-20 admission and terminal-settlement boundaries plus M1z encrypted-staging, exact policy/KMS admission and maintenance source cores. Emergency revocation, attempt listing, account-delete/purge and orphan recovery, sequential JSON numeric parsing hardening, and the live vault/KMS/private-store/query-credential adapters, caller/route, hosted Auth/Data API, model/STT and runtime-activation blocks remain unproved explicit governance.
+- The contract and migrations define generation/export job states. Source-only memory contracts model leases, recovery, retry policy, provider evidence and single-use payload grants, and the registered-worker v2 facade composes those boundaries without a payload locator. All eight generation migrations remain Production-unapplied; deleted `r9` supplied isolated PostgreSQL 17.6 execution evidence for database-clock claim/heartbeat/fence/commit/settle/resolve/recover/authorize/consume logic and payload/grant/evidence/purge-outbox metadata, deleted `r20` supplied the three true two-session race results, and deleted `r21` supplied exact historical transient-retry/success replay through payload/outbox purge. The later local owner-repository gate covers the three private owner RPCs, migration #29 adds the non-login control-executor-owned graceful-retirement identity, admission adds the fifth purpose role/private binding table, terminal settlement adds the sixth purpose role plus settlement/recovery-turn tables, and M1z adds the source-only policy/KMS-bound admission caller—none has a runtime credential. There is still no installed caller. Normal consume deliberately settles `DENIED_SETTLED` / `PAYLOAD_UNAVAILABLE` and returns no vault grant, locator or facts; the historical rollback-only `TEST_ONLY` `CONSUMED` fixture proves only scripted canonical transaction atomicity. M1z supplies provider-neutral encrypted staging and maintenance cores; M2a adds default-off exact-version KMS, private GCS and one-shot Points-admission source adapters. Their fresh posture brands and cleanup receipts remain injected validation claims, not live trust; they still have no installed WIF or database credential issuer, authenticated exact-resource/provenance proof, bucket propagation/history-purge evidence, independently observed database quiescence, formal composition, queue service, deployed worker, live retry loop or served cancellation endpoint.
+- No worker automation may be scheduled yet. Deleted `r20` closed the PostgreSQL 17.6 true two-session claim/session/privacy race gate, deleted `r21` closed the fixed Attempt-2 historical replay gate, deleted `r22` closed the hosted registration-retention gate, the earlier isolated local PostgreSQL 16.15 run closed its recorded engine/serial/true-two-session version gate, and deleted `r5` closed its historical Hosted 30/30 migration, then-current 11/11 assertion and independent posture gate. Owner admission/enqueue/status/cancel and graceful worker-registration retirement now have source, local SQL and deleted-Hosted schema/transaction boundaries; Communication has source/local fixed-20 admission and terminal-settlement boundaries plus M1z encrypted-staging, exact policy/KMS admission and maintenance source cores. M2a's provider protocol adapters remain uncomposed and unproved against live resources. Emergency revocation, attempt listing, account-delete/purge and orphan recovery, sequential JSON numeric parsing hardening, real credential issuers/transports, caller/route, hosted Auth/Data API, model/STT and runtime-activation blocks remain explicit governance gaps.
 - The source follow-up for the two #26 readers and five #30 Portal functions is
   complete: their seven exact `pg_proc.proowner` signature checks now live in
   the maintained worker and Portal-intake rollback suites. The enhanced worker
@@ -1411,7 +1435,7 @@ hashes and scenario evidence.
 
 | Capability | Current status |
 |---|---|
-| generation worker/queue | absent at runtime; all eight generation migrations are Production-unapplied and exist on no retained Preview. M1z adds only a source-level encrypted stager, exact policy/KMS-bound admission shell and reconciliation/sweep core; it installs no scheduler, query credential, KMS/private-store adapter or usable worker vault grant. Paid jobs remain default-off, settings/catalog/registration remain fail-closed, no API/service role has the new coordinator `EXECUTE`, and the formal submitter/maintenance plus worker runtime remain absent |
+| generation worker/queue | absent at runtime; all eight generation migrations are Production-unapplied and exist on no retained Preview. M1z adds the source-level encrypted stager, exact policy/KMS-bound admission shell and reconciliation/sweep core; M2a adds default-off KMS/GCS/purpose-session protocol adapters but installs no credential issuer, authenticated exact resource, propagated/history-clean bucket proof, independently observed database quiescence, scheduler, formal composition or usable worker vault grant. Paid jobs remain default-off, settings/catalog/registration remain fail-closed, no API/service role has the new coordinator `EXECUTE`, and the formal submitter/maintenance plus worker runtime remain absent |
 | transcription worker | absent |
 | export worker/artifact cleanup | absent |
 | claim cleanup cron | absent; expired rows become unclaimable and are opportunistically cleaned |
