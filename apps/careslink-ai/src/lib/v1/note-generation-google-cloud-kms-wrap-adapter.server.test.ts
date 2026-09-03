@@ -14,6 +14,7 @@ import {
   createCaresLinkV1NoteGenerationGoogleCloudKmsKeyVersionPostureAttestation,
   createCaresLinkV1NoteGenerationGoogleCloudKmsWrapAdapter,
   type CaresLinkV1NoteGenerationGoogleCloudKmsAccessTokenCredential,
+  type CaresLinkV1NoteGenerationGoogleCloudKmsAccessTokenConsumer,
   type CaresLinkV1NoteGenerationGoogleCloudKmsAccessTokenRequest,
   type CaresLinkV1NoteGenerationGoogleCloudKmsFetchRequest,
   type CaresLinkV1NoteGenerationGoogleCloudKmsKeyVersionPostureAttestation,
@@ -268,6 +269,39 @@ describe("Communication Note Google Cloud KMS wrap adapter", () => {
     expect(harness.fetch).not.toHaveBeenCalled();
   });
 
+  it("clears the copied DEK when later AAD validation fails", async () => {
+    const copiedDeks: Uint8Array[] = [];
+    const originalFrom = Uint8Array.from;
+    const fromSpy = vi.spyOn(Uint8Array, "from").mockImplementation(
+      ((value: unknown) => {
+        const copy = Reflect.apply(originalFrom, Uint8Array, [
+          value,
+        ]) as Uint8Array;
+        if (
+          copy.byteLength === DEK.byteLength &&
+          copy.every((byte, index) => byte === DEK[index])
+        ) {
+          copiedDeks.push(copy);
+        }
+        return copy;
+      }) as typeof Uint8Array.from,
+    );
+    try {
+      const harness = createHarness();
+      await expect(
+        harness.adapter.wrapDataEncryptionKey(
+          wrapInput({ additionalAuthenticatedData: new Uint8Array() }),
+        ),
+      ).rejects.toMatchObject(FIXED_FAILURE);
+      expect(harness.consumeAccessToken).not.toHaveBeenCalled();
+      expect(harness.fetch).not.toHaveBeenCalled();
+      expect(copiedDeks).toHaveLength(1);
+      expect(copiedDeks[0]).toEqual(new Uint8Array(DEK.byteLength));
+    } finally {
+      fromSpy.mockRestore();
+    }
+  });
+
   it("requires a fresh exact-principal credential and sanitizes custody failures", async () => {
     const sentinel = "RAW_CREDENTIAL_PROVIDER_FAILURE";
     const credentials: unknown[] = [
@@ -301,7 +335,7 @@ describe("Communication Note Google Cloud KMS wrap adapter", () => {
     expect(JSON.stringify(failure)).not.toContain(ACCESS_TOKEN);
   });
 
-  it("requires exactly one awaited credential callback per wrap", async () => {
+  it("requires exactly one synchronously returned credential operation per wrap", async () => {
     const noCallback = createHarness({ callbackMode: "NONE" });
     await expect(
       noCallback.adapter.wrapDataEncryptionKey(wrapInput()),
@@ -312,33 +346,61 @@ describe("Communication Note Google Cloud KMS wrap adapter", () => {
     await expect(
       duplicate.adapter.wrapDataEncryptionKey(wrapInput()),
     ).rejects.toMatchObject(FIXED_FAILURE);
-    expect(duplicate.fetch).toHaveBeenCalledTimes(1);
+    expect(duplicate.fetch).not.toHaveBeenCalled();
   });
 
-  it("never sends HTTP for an unawaited credential callback", async () => {
-    const harness = createHarness({ callbackMode: "UNAWAITED" });
+  it.each([
+    "UNAWAITED",
+    "THEN_BEFORE_RETURN",
+    "PROMISE_RESOLVE_BEFORE_RETURN",
+    "ASYNC_AWAIT",
+    "ASYNC_RETURN",
+    "REJECTED_WRAPPER_WITH_POISONED_CATCH",
+  ] as const)(
+    "never sends HTTP when custody uses the callback as %s",
+    async (callbackMode) => {
+      const harness = createHarness({ callbackMode });
+      await expect(
+        harness.adapter.wrapDataEncryptionKey(wrapInput()),
+      ).rejects.toMatchObject(FIXED_FAILURE);
+      expect(harness.fetch).not.toHaveBeenCalled();
+    },
+  );
+
+  it("makes retained operations inert without permitting a second HTTP call", async () => {
+    const beforeAdoption = createHarness({
+      callbackMode: "RETAIN_AFTER_RETURN",
+    });
+    const pending = beforeAdoption.adapter.wrapDataEncryptionKey(wrapInput());
+    expect(beforeAdoption.retainedCredentialOperations).toHaveLength(1);
+    const competingAdoption = Promise.resolve(
+      beforeAdoption.retainedCredentialOperations[0],
+    );
+    await expect(pending).rejects.toMatchObject(FIXED_FAILURE);
+    await expect(competingAdoption).resolves.toBeUndefined();
+    expect(beforeAdoption.fetch).not.toHaveBeenCalled();
+
+    const afterClose = createHarness({ callbackMode: "RETAIN_AFTER_RETURN" });
+    const wrapped = await afterClose.adapter.wrapDataEncryptionKey(wrapInput());
+    expect(afterClose.fetch).toHaveBeenCalledTimes(1);
+    await expect(
+      Promise.resolve(afterClose.retainedCredentialOperations[0]),
+    ).resolves.toBeUndefined();
+    expect(afterClose.fetch).toHaveBeenCalledTimes(1);
+    wrapped.wrappedDataEncryptionKey.fill(0);
+  });
+
+  it("makes a callback arriving after custody returned inert and non-rejecting", async () => {
+    const harness = createHarness({ callbackMode: "LATE_AFTER_RETURN" });
     await expect(
       harness.adapter.wrapDataEncryptionKey(wrapInput()),
     ).rejects.toMatchObject(FIXED_FAILURE);
-    expect(harness.fetch).not.toHaveBeenCalled();
-  });
-
-  it("makes a callback arriving after the credential deadline inert and non-rejecting", async () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date("2026-09-03T04:00:00.000Z"));
-    const harness = createHarness({ callbackMode: "LATE_AFTER_TIMEOUT" });
-    const pending = expect(
-      harness.adapter.wrapDataEncryptionKey(wrapInput()),
-    ).rejects.toMatchObject(FIXED_FAILURE);
-    await vi.advanceTimersByTimeAsync(5_000);
-    await pending;
 
     expect(harness.deferredConsumers).toHaveLength(1);
     await expect(
       Promise.resolve(harness.deferredConsumers[0]?.(credential())),
     ).resolves.toBeUndefined();
     expect(harness.fetch).not.toHaveBeenCalled();
-    expect(vi.getTimerCount()).toBe(0);
   });
 
   it.each([
@@ -390,6 +452,7 @@ describe("Communication Note Google Cloud KMS wrap adapter", () => {
       { contentType: "text/plain" },
       { responseUrl: "https://attacker.invalid/redirect" },
       { redirected: true },
+      { unexpected: true },
       { body: new Uint8Array(64 * 1_024 + 1) },
       { body: Uint8Array.from([0xff, 0xfe]) },
     ]) {
@@ -402,6 +465,90 @@ describe("Communication Note Google Cloud KMS wrap adapter", () => {
       );
     }
   });
+
+  it("clears decoded ciphertext when later IV decoding fails", async () => {
+    const decodedCiphertexts: Uint8Array[] = [];
+    const originalFrom = Uint8Array.from;
+    const fromSpy = vi.spyOn(Uint8Array, "from").mockImplementation(
+      ((value: unknown) => {
+        const copy = Reflect.apply(originalFrom, Uint8Array, [
+          value,
+        ]) as Uint8Array;
+        if (
+          copy.byteLength === CIPHERTEXT.byteLength &&
+          copy.every((byte, index) => byte === CIPHERTEXT[index])
+        ) {
+          decodedCiphertexts.push(copy);
+        }
+        return copy;
+      }) as typeof Uint8Array.from,
+    );
+    try {
+      const harness = createHarness({
+        responseOverride: {
+          initializationVector: Buffer.from(
+            INITIALIZATION_VECTOR.slice(0, 11),
+          ).toString("base64"),
+        },
+      });
+      await expect(
+        harness.adapter.wrapDataEncryptionKey(wrapInput()),
+      ).rejects.toMatchObject(FIXED_FAILURE);
+      expect(decodedCiphertexts).toHaveLength(1);
+      expect(decodedCiphertexts[0]).toEqual(
+        new Uint8Array(CIPHERTEXT.byteLength),
+      );
+    } finally {
+      fromSpy.mockRestore();
+    }
+  });
+
+  it.each([
+    ["callback candidate transfer", 1],
+    ["inner operation adoption", 2],
+    ["outer result adoption", 6],
+  ] as const)(
+    "clears a completed wrapped result when abort wins the %s race",
+    async (_label, microtaskDepth) => {
+      const harness = createHarness();
+      const retainedWrappedResults: Uint8Array[] = [];
+      const originalEncode = TextEncoder.prototype.encode;
+      const encodeSpy = vi
+        .spyOn(TextEncoder.prototype, "encode")
+        .mockImplementation(function (
+          this: TextEncoder,
+          input?: string,
+        ): ReturnType<TextEncoder["encode"]> {
+          const encoded = Reflect.apply(originalEncode, this, [
+            input,
+          ]) as ReturnType<TextEncoder["encode"]>;
+          if (
+            typeof input === "string" &&
+            input.includes(
+              CARESLINK_V1_NOTE_GENERATION_GOOGLE_CLOUD_KMS_WRAPPED_DATA_KEY_FORMAT_VERSION,
+            )
+          ) {
+            retainedWrappedResults.push(encoded);
+            scheduleAfterMicrotasks(microtaskDepth, () =>
+              harness.controller.abort(),
+            );
+          }
+          return encoded;
+        });
+      try {
+        await expect(
+          harness.adapter.wrapDataEncryptionKey(wrapInput()),
+        ).rejects.toMatchObject(FIXED_FAILURE);
+        expect(harness.fetch).toHaveBeenCalledTimes(1);
+        expect(retainedWrappedResults).toHaveLength(1);
+        expect(retainedWrappedResults[0]).toEqual(
+          new Uint8Array(retainedWrappedResults[0]?.byteLength),
+        );
+      } finally {
+        encodeSpy.mockRestore();
+      }
+    },
+  );
 
   it("propagates root abort before credential access and enforces one absolute five-second deadline", async () => {
     const beforeAccess = createHarness();
@@ -449,6 +596,25 @@ describe("Communication Note Google Cloud KMS wrap adapter", () => {
     );
     expect(vi.getTimerCount()).toBe(0);
   });
+
+  it("observes a transport rejection that settles after the deadline", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-09-03T04:00:00.000Z"));
+    const harness = createHarness({
+      lateFetch: true,
+      lateFetchFailure: true,
+    });
+    const pending = expect(
+      harness.adapter.wrapDataEncryptionKey(wrapInput()),
+    ).rejects.toMatchObject(FIXED_FAILURE);
+    await vi.advanceTimersByTimeAsync(5_000);
+    await pending;
+
+    harness.releaseLateFetch();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(harness.retainedResponseBodies).toHaveLength(0);
+    expect(vi.getTimerCount()).toBe(0);
+  });
 });
 
 type HarnessOptions = Readonly<{
@@ -459,17 +625,20 @@ type HarnessOptions = Readonly<{
     | "NONE"
     | "TWICE"
     | "UNAWAITED"
-    | "LATE_AFTER_TIMEOUT";
+    | "THEN_BEFORE_RETURN"
+    | "PROMISE_RESOLVE_BEFORE_RETURN"
+    | "ASYNC_AWAIT"
+    | "ASYNC_RETURN"
+    | "REJECTED_WRAPPER_WITH_POISONED_CATCH"
+    | "RETAIN_AFTER_RETURN"
+    | "LATE_AFTER_RETURN";
   postureValue?: unknown;
   responseOverride?: Readonly<Record<string, unknown>>;
   httpOverride?: Readonly<Record<string, unknown>>;
   hangFetch?: boolean;
   lateFetch?: boolean;
+  lateFetchFailure?: boolean;
 }>;
-
-type CredentialConsumer = (
-  value: CaresLinkV1NoteGenerationGoogleCloudKmsAccessTokenCredential,
-) => PromiseLike<void>;
 
 function createHarness(options: HarnessOptions = {}) {
   const controller = new AbortController();
@@ -477,7 +646,8 @@ function createHarness(options: HarnessOptions = {}) {
   const retainedRequestBodies: Uint8Array[] = [];
   const retainedResponseBodies: Uint8Array[] = [];
   const credentialRequests: CaresLinkV1NoteGenerationGoogleCloudKmsAccessTokenRequest[] = [];
-  const deferredConsumers: CredentialConsumer[] = [];
+  const deferredConsumers: CaresLinkV1NoteGenerationGoogleCloudKmsAccessTokenConsumer[] = [];
+  const retainedCredentialOperations: ReturnType<CaresLinkV1NoteGenerationGoogleCloudKmsAccessTokenConsumer>[] = [];
   let releaseLateFetch: (() => void) | undefined;
   const fetch = vi.fn(
     async (request: CaresLinkV1NoteGenerationGoogleCloudKmsFetchRequest) => {
@@ -491,8 +661,12 @@ function createHarness(options: HarnessOptions = {}) {
         return new Promise<never>(() => undefined);
       }
       if (options.lateFetch) {
-        return new Promise<unknown>((resolve) => {
+        return new Promise<unknown>((resolve, reject) => {
           releaseLateFetch = () => {
+            if (options.lateFetchFailure) {
+              reject(new Error("LATE_FETCH_FAILURE_TEST_ONLY"));
+              return;
+            }
             const response = gcpResponse(
               request,
               options.responseOverride,
@@ -514,11 +688,9 @@ function createHarness(options: HarnessOptions = {}) {
   );
   const fetchPort = Object.freeze({ fetch });
   const consumeAccessToken = vi.fn(
-    async (
+    (
       request: unknown,
-      consumer: (
-        value: CaresLinkV1NoteGenerationGoogleCloudKmsAccessTokenCredential,
-      ) => PromiseLike<void>,
+      consumer: CaresLinkV1NoteGenerationGoogleCloudKmsAccessTokenConsumer,
     ) => {
       credentialRequests.push(
         request as CaresLinkV1NoteGenerationGoogleCloudKmsAccessTokenRequest,
@@ -526,29 +698,62 @@ function createHarness(options: HarnessOptions = {}) {
       if (options.credentialFailure) {
         throw new Error(options.credentialFailure);
       }
-      if (options.callbackMode === "NONE") return;
+      if (options.callbackMode === "NONE") return Promise.resolve();
+      const credentialValue = (options.credentialValue ?? credential()) as
+        CaresLinkV1NoteGenerationGoogleCloudKmsAccessTokenCredential;
       if (options.callbackMode === "UNAWAITED") {
-        void consumer(
-          (options.credentialValue ?? credential()) as
-            CaresLinkV1NoteGenerationGoogleCloudKmsAccessTokenCredential,
-        );
-        return;
+        void consumer(credentialValue);
+        return Promise.resolve();
       }
-      if (options.callbackMode === "LATE_AFTER_TIMEOUT") {
+      if (options.callbackMode === "THEN_BEFORE_RETURN") {
+        const callbackOperation = consumer(credentialValue);
+        void callbackOperation.then(
+          () => undefined,
+          () => undefined,
+        );
+        return callbackOperation;
+      }
+      if (options.callbackMode === "PROMISE_RESOLVE_BEFORE_RETURN") {
+        const callbackOperation = consumer(credentialValue);
+        const assimilation = Promise.resolve(callbackOperation);
+        void assimilation.catch(() => undefined);
+        return callbackOperation;
+      }
+      if (options.callbackMode === "ASYNC_AWAIT") {
+        return (async () => {
+          await consumer(credentialValue);
+        })();
+      }
+      if (options.callbackMode === "ASYNC_RETURN") {
+        return (async () => consumer(credentialValue))();
+      }
+      if (options.callbackMode === "REJECTED_WRAPPER_WITH_POISONED_CATCH") {
+        void consumer(credentialValue);
+        const rejected = Promise.reject(
+          new Error("REJECTED_CREDENTIAL_WRAPPER_TEST_ONLY"),
+        );
+        Object.defineProperty(rejected, "catch", {
+          configurable: false,
+          enumerable: false,
+          get() {
+            throw new Error("POISONED_CATCH_TEST_ONLY");
+          },
+        });
+        return rejected;
+      }
+      if (options.callbackMode === "LATE_AFTER_RETURN") {
         deferredConsumers.push(consumer);
         return new Promise<never>(() => undefined);
       }
-      await consumer(
-        (options.credentialValue ?? credential()) as
-          CaresLinkV1NoteGenerationGoogleCloudKmsAccessTokenCredential,
-      );
-      if (options.callbackMode === "TWICE") {
-        try {
-          await consumer(credential());
-        } catch {
-          // A malicious custody port may suppress the replay error.
-        }
+      const callbackOperation = consumer(credentialValue);
+      if (options.callbackMode === "RETAIN_AFTER_RETURN") {
+        retainedCredentialOperations.push(callbackOperation);
       }
+      if (options.callbackMode === "TWICE") {
+        const replayOperation = Promise.resolve(consumer(credential()));
+        void replayOperation.catch(() => undefined);
+      }
+      return callbackOperation;
     },
   );
   const credentialPort = Object.freeze({ consumeAccessToken });
@@ -569,6 +774,7 @@ function createHarness(options: HarnessOptions = {}) {
     retainedResponseBodies,
     credentialRequests,
     deferredConsumers,
+    retainedCredentialOperations,
     releaseLateFetch() {
       if (releaseLateFetch === undefined) throw new Error("no late response");
       const release = releaseLateFetch;
@@ -587,6 +793,13 @@ function retainResponseBody(value: unknown, retained: Uint8Array[]) {
     const body = (value as Readonly<{ body: unknown }>).body;
     if (body instanceof Uint8Array) retained.push(body);
   }
+}
+
+function scheduleAfterMicrotasks(depth: number, action: () => void) {
+  queueMicrotask(() => {
+    if (depth <= 1) action();
+    else scheduleAfterMicrotasks(depth - 1, action);
+  });
 }
 
 function posture(

@@ -3597,7 +3597,8 @@ M2a adds three server-only, constructor-injected protocol adapters without
 installing any formal runtime singleton. KMS wrapping is pinned to the M1u
 project/region and one numeric `CryptoKeyVersion`; a fresh branded posture must
 bind `RAW_ENCRYPT_DECRYPT`, `AES_256_GCM`, `SOFTWARE` and `ENABLED` before a
-short-lived credential callback can issue one bounded `rawEncrypt`. GCS uses an
+short-lived credential can issue one bounded `rawEncrypt` through the exact
+synchronous direct-return callback handshake. GCS uses an
 exact private bucket, digest-only object names, metadata-first generation and
 metageneration-pinned reads, `ifGenerationMatch=0` create, and same-name CAS
 tombstones. Its posture requires the protection settings to have been effective
@@ -3609,12 +3610,13 @@ bounds, a 3-second scheduling margin, a 25-second minimum credential remainder,
 and exact destruction/revocation quiescence receipts.
 
 Focused tests cover wrong KMS project/region/version and altered/stale posture;
-CRC32C/AAD/IV/tag validation; ignored, repeated and late credential callbacks;
+CRC32C/AAD/IV/tag validation; ignored, `.then`-read, Promise-assimilated,
+awaited, wrapped, repeated and late credential callbacks;
 normal, rejected and late transport-buffer clearing; GCS create/read/replay,
 generation races, response-loss recovery, tombstone binding, propagation and
 history claims; and database target, role, RPC, timeout, late-completion,
 session-destruction and atomic revocation constraints. The focused gate passed
-**137/137 tests across 7 files**. The full Vitest suite passed **3157/3157 tests
+**149/149 tests across 7 files**. The full Vitest suite passed **3169/3169 tests
 across 222 files**. TypeScript, zero-warning full ESLint, the Next.js 16.2.9
 Turbopack production build with 64/64 generated pages, the 27-static-chunk
 M1r–M1v client-boundary scan, 73-file adapter sync and diff checks all passed.
@@ -3622,7 +3624,9 @@ M1r–M1v client-boundary scan, 73-file adapter sync and diff checks all passed.
 Independent review findings for KMS algorithm posture, ignored/late work,
 database cleanup quiescence, credential lifetime, GCS protection propagation,
 historical generations and response-buffer clearing were remediated. Final
-scoped review reported no remaining P0/P1/P2 finding. Every formal adapter
+review also corrected the redirecting GCS `alt=media` URL to the direct
+`/download/storage/v1` endpoint. Final scoped review reported no remaining
+P0/P1/P2 finding. Every formal adapter
 export remains `undefined` and every readiness latch remains `false`. The
 posture brands and evidence digests validate injected structure, freshness and
 binding; they do not establish trusted live control-plane evidence. No WIF or

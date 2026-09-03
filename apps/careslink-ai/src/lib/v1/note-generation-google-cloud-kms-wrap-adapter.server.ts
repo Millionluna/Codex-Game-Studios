@@ -89,19 +89,32 @@ export type CaresLinkV1NoteGenerationGoogleCloudKmsAccessTokenCredential =
     principal: typeof RUNTIME_SERVICE_ACCOUNT;
   }>;
 
+declare const CARESLINK_V1_GOOGLE_CLOUD_KMS_CREDENTIAL_OPERATION: unique symbol;
+
+export type CaresLinkV1NoteGenerationGoogleCloudKmsCredentialOperation =
+  PromiseLike<void> &
+    Readonly<{
+      [CARESLINK_V1_GOOGLE_CLOUD_KMS_CREDENTIAL_OPERATION]: true;
+    }>;
+
+export type CaresLinkV1NoteGenerationGoogleCloudKmsAccessTokenConsumer = (
+  credential: CaresLinkV1NoteGenerationGoogleCloudKmsAccessTokenCredential,
+) => CaresLinkV1NoteGenerationGoogleCloudKmsCredentialOperation;
+
 export type CaresLinkV1NoteGenerationGoogleCloudKmsCredentialPort = Readonly<{
   /**
-   * Supplies one short-lived access token only during the awaited callback.
+   * Supplies one short-lived access token by calling `consumer` exactly once,
+   * synchronously, and directly returning the exact PromiseLike produced by
+   * that call. The port must not read `.then`, await, wrap, assimilate or retain
+   * the result; only this adapter is allowed to adopt the opaque operation.
    * The injected custody layer must already have verified the exact Vercel WIF
    * binding and impersonated the pinned runtime service account. Implementations
    * must not persist or expose the callback result.
    */
   consumeAccessToken(
     request: CaresLinkV1NoteGenerationGoogleCloudKmsAccessTokenRequest,
-    consumer: (
-      credential: CaresLinkV1NoteGenerationGoogleCloudKmsAccessTokenCredential,
-    ) => PromiseLike<void>,
-  ): PromiseLike<void>;
+    consumer: CaresLinkV1NoteGenerationGoogleCloudKmsAccessTokenConsumer,
+  ): CaresLinkV1NoteGenerationGoogleCloudKmsCredentialOperation;
 }>;
 
 export type CaresLinkV1NoteGenerationGoogleCloudKmsKeyVersionPostureAttestation =
@@ -187,6 +200,8 @@ export function createCaresLinkV1NoteGenerationGoogleCloudKmsWrapAdapter(
       let input: ParsedWrapInput | undefined;
       let deadline: Deadline | undefined;
       let operation: Promise<WrappedResult> | undefined;
+      let result: WrappedResult | undefined;
+      let resultReturned = false;
       try {
         validateBrandedKeyVersionPostureAttestation(
           options.keyVersionPostureAttestation,
@@ -201,21 +216,21 @@ export function createCaresLinkV1NoteGenerationGoogleCloudKmsWrapAdapter(
         requireNotAborted(deadline.signal);
         operation = consumeCredentialAndWrap(options, input, deadline.signal);
         void operation.catch(() => undefined);
-        const result = await settleBeforeAbort(operation, deadline.signal);
-        try {
-          validateBrandedKeyVersionPostureAttestation(
-            options.keyVersionPostureAttestation,
-            options.expectedKmsKeyVersionResource,
-            0,
-          );
-        } catch {
-          result.wrappedDataEncryptionKey.fill(0);
-          throw unavailable();
-        }
+        result = await operation;
+        requireNotAborted(deadline.signal);
+        validateBrandedKeyVersionPostureAttestation(
+          options.keyVersionPostureAttestation,
+          options.expectedKmsKeyVersionResource,
+          0,
+        );
+        resultReturned = true;
         return result;
       } catch {
         throw unavailable();
       } finally {
+        if (!resultReturned && result !== undefined) {
+          scrubBytes(result.wrappedDataEncryptionKey);
+        }
         deadline?.close();
         input?.plaintextDataEncryptionKey.fill(0);
         input?.additionalAuthenticatedData.fill(0);
@@ -305,28 +320,42 @@ function parseWrapInput(
   value: unknown,
   expectedKmsKeyVersionResource: string,
 ): ParsedWrapInput {
-  const input = exactDataRecord(value, [
-    "kmsKeyVersionResource",
-    "plaintextDataEncryptionKey",
-    "additionalAuthenticatedData",
-  ]);
-  const kmsKeyVersionResource = requireNumericKmsKeyVersionResource(
-    input.kmsKeyVersionResource,
-  );
-  if (kmsKeyVersionResource !== expectedKmsKeyVersionResource) {
-    throw unavailable();
-  }
-  return Object.freeze({
-    kmsKeyVersionResource,
-    plaintextDataEncryptionKey: requireExactBytes(
+  let plaintextDataEncryptionKey: Uint8Array | undefined;
+  let additionalAuthenticatedData: Uint8Array | undefined;
+  try {
+    const input = exactDataRecord(value, [
+      "kmsKeyVersionResource",
+      "plaintextDataEncryptionKey",
+      "additionalAuthenticatedData",
+    ]);
+    const kmsKeyVersionResource = requireNumericKmsKeyVersionResource(
+      input.kmsKeyVersionResource,
+    );
+    if (kmsKeyVersionResource !== expectedKmsKeyVersionResource) {
+      throw unavailable();
+    }
+    plaintextDataEncryptionKey = requireExactBytes(
       input.plaintextDataEncryptionKey,
       DATA_ENCRYPTION_KEY_BYTES,
-    ),
-    additionalAuthenticatedData: requireBytes(
+    );
+    additionalAuthenticatedData = requireBytes(
       input.additionalAuthenticatedData,
       ADDITIONAL_AUTHENTICATED_DATA_MAXIMUM_BYTES,
-    ),
-  });
+    );
+    return Object.freeze({
+      kmsKeyVersionResource,
+      plaintextDataEncryptionKey,
+      additionalAuthenticatedData,
+    });
+  } catch {
+    if (plaintextDataEncryptionKey !== undefined) {
+      scrubBytes(plaintextDataEncryptionKey);
+    }
+    if (additionalAuthenticatedData !== undefined) {
+      scrubBytes(additionalAuthenticatedData);
+    }
+    throw unavailable();
+  }
 }
 
 async function consumeCredentialAndWrap(
@@ -335,76 +364,153 @@ async function consumeCredentialAndWrap(
   signal: AbortSignal,
 ): Promise<WrappedResult> {
   let callbackOpen = true;
+  let callbackArmed = false;
   let callbackCount = 0;
   let callbackViolation = false;
+  let thenClaimCount = 0;
   let callbackStarted = false;
   let callbackSettled = false;
   let callbackFailure = false;
   let wrapped: WrappedResult | undefined;
-  const consumer = (
+  let issuedOperation:
+    | CaresLinkV1NoteGenerationGoogleCloudKmsCredentialOperation
+    | undefined;
+
+  const inertThen = <TResult1 = void, TResult2 = never>(
+    onfulfilled?: ((value: void) => TResult1 | PromiseLike<TResult1>) | null,
+    onrejected?:
+      | ((reason: unknown) => TResult2 | PromiseLike<TResult2>)
+      | null,
+  ): PromiseLike<TResult1 | TResult2> => {
+    const settlement = Promise.resolve().then(onfulfilled, onrejected);
+    void settlement.catch(() => undefined);
+    return settlement;
+  };
+
+  const consumer: CaresLinkV1NoteGenerationGoogleCloudKmsAccessTokenConsumer = (
     credentialValue: CaresLinkV1NoteGenerationGoogleCloudKmsAccessTokenCredential,
-  ): PromiseLike<void> => {
+  ): CaresLinkV1NoteGenerationGoogleCloudKmsCredentialOperation => {
     if (!callbackOpen || callbackCount !== 0) {
       callbackViolation = true;
-      return Promise.resolve();
+      return Object.freeze({
+        then: inertThen,
+      }) as CaresLinkV1NoteGenerationGoogleCloudKmsCredentialOperation;
     }
     callbackCount += 1;
     let callbackOperation: Promise<void> | undefined;
-    return Object.freeze({
-      then<TResult1 = void, TResult2 = never>(
-        onfulfilled?:
-          | ((value: void) => TResult1 | PromiseLike<TResult1>)
-          | null,
-        onrejected?:
-          | ((reason: unknown) => TResult2 | PromiseLike<TResult2>)
-          | null,
-      ): PromiseLike<TResult1 | TResult2> {
-        if (callbackOperation === undefined) {
-          if (!callbackOpen || callbackStarted) {
-            callbackViolation = true;
-            callbackOperation = Promise.resolve();
-          } else {
-            callbackStarted = true;
-            callbackOperation = (async () => {
-              try {
-                requireNotAborted(signal);
-                const credential = requireCredential(credentialValue);
-                wrapped = await rawEncrypt(
-                  options.fetchRequest,
-                  input,
-                  credential.accessToken,
-                  signal,
-                );
-              } catch {
-                callbackFailure = true;
-              } finally {
-                callbackSettled = true;
-              }
-            })();
-            void callbackOperation.catch(() => undefined);
-          }
+    const authorizedThen = <TResult1 = void, TResult2 = never>(
+      onfulfilled?: ((value: void) => TResult1 | PromiseLike<TResult1>) | null,
+      onrejected?:
+        | ((reason: unknown) => TResult2 | PromiseLike<TResult2>)
+        | null,
+    ): PromiseLike<TResult1 | TResult2> => {
+      if (
+        !callbackOpen ||
+        !callbackArmed ||
+        callbackViolation ||
+        signal.aborted
+      ) {
+        return inertThen(onfulfilled, onrejected);
+      }
+      if (callbackOperation === undefined) {
+        if (callbackStarted) {
+          callbackViolation = true;
+          return inertThen(onfulfilled, onrejected);
         }
-        return callbackOperation.then(onfulfilled, onrejected);
+        callbackStarted = true;
+        callbackOperation = (async () => {
+          let candidate: WrappedResult | undefined;
+          try {
+            requireNotAborted(signal);
+            const credential = requireCredential(credentialValue);
+            candidate = await rawEncrypt(
+              options.fetchRequest,
+              input,
+              credential.accessToken,
+              signal,
+            );
+            requireNotAborted(signal);
+            if (!callbackOpen || callbackViolation) throw unavailable();
+            wrapped = candidate;
+            candidate = undefined;
+          } catch {
+            callbackFailure = true;
+          } finally {
+            if (candidate !== undefined) {
+              scrubBytes(candidate.wrappedDataEncryptionKey);
+            }
+            callbackSettled = true;
+          }
+        })();
+        void callbackOperation.catch(() => undefined);
+      }
+      const settlement = callbackOperation.then(onfulfilled, onrejected);
+      void settlement.catch(() => undefined);
+      return settlement;
+    };
+    const operation = Object.defineProperty({}, "then", {
+      configurable: false,
+      enumerable: false,
+      get() {
+        if (!callbackOpen) return inertThen;
+        if (!callbackArmed) {
+          callbackViolation = true;
+          return inertThen;
+        }
+        thenClaimCount += 1;
+        if (thenClaimCount !== 1) {
+          callbackViolation = true;
+          return inertThen;
+        }
+        return authorizedThen;
       },
-    });
+    }) as CaresLinkV1NoteGenerationGoogleCloudKmsCredentialOperation;
+    issuedOperation = Object.freeze(operation);
+    return issuedOperation;
   };
 
+  let credentialReturn:
+    | CaresLinkV1NoteGenerationGoogleCloudKmsCredentialOperation
+    | undefined;
   try {
-    const credentialOperation = Promise.resolve(
-      options.consumeAccessToken(
-        Object.freeze({
-          purpose: CREDENTIAL_PURPOSE,
-          audience: ACCESS_TOKEN_AUDIENCE,
-          scope: CLOUD_PLATFORM_SCOPE,
-          expectedPrincipal: RUNTIME_SERVICE_ACCOUNT,
-          timeoutMs: REQUEST_TIMEOUT_MS,
-          signal,
-        }),
-        consumer,
-      ),
+    credentialReturn = options.consumeAccessToken(
+      Object.freeze({
+        purpose: CREDENTIAL_PURPOSE,
+        audience: ACCESS_TOKEN_AUDIENCE,
+        scope: CLOUD_PLATFORM_SCOPE,
+        expectedPrincipal: RUNTIME_SERVICE_ACCOUNT,
+        timeoutMs: REQUEST_TIMEOUT_MS,
+        signal,
+      }),
+      consumer,
     );
-    void credentialOperation.catch(() => undefined);
-    await settleBeforeAbort(credentialOperation, signal);
+  } catch {
+    callbackOpen = false;
+    throw unavailable();
+  }
+  if (
+    issuedOperation === undefined ||
+    credentialReturn !== issuedOperation ||
+    callbackCount !== 1 ||
+    callbackViolation
+  ) {
+    callbackOpen = false;
+    observeRejectedCredentialReturnBestEffort(
+      credentialReturn,
+      issuedOperation,
+    );
+    throw unavailable();
+  }
+
+  callbackArmed = true;
+  try {
+    await settleBeforeAbort(issuedOperation, signal);
+  } catch {
+    if (wrapped !== undefined) {
+      scrubBytes(wrapped.wrappedDataEncryptionKey);
+      wrapped = undefined;
+    }
+    throw unavailable();
   } finally {
     callbackOpen = false;
   }
@@ -412,13 +518,17 @@ async function consumeCredentialAndWrap(
     callbackViolation ||
     callbackFailure ||
     callbackCount !== 1 ||
+    thenClaimCount !== 1 ||
     !callbackStarted ||
     !callbackSettled ||
+    signal.aborted ||
     !wrapped
   ) {
+    if (wrapped !== undefined) {
+      scrubBytes(wrapped.wrappedDataEncryptionKey);
+    }
     throw unavailable();
   }
-  requireNotAborted(signal);
   return wrapped;
 }
 
@@ -507,7 +617,6 @@ async function rawEncrypt(
 }
 
 function parseJsonResponse(value: unknown, expectedUrl: string) {
-  let rawBody: Uint8Array | undefined;
   let body: Uint8Array | undefined;
   try {
     const response = exactDataRecord(value, [
@@ -517,12 +626,6 @@ function parseJsonResponse(value: unknown, expectedUrl: string) {
       "redirected",
       "body",
     ]);
-    if (
-      response.body instanceof Uint8Array &&
-      !nodeTypes.isProxy(response.body)
-    ) {
-      rawBody = response.body;
-    }
     if (
       response.status !== 200 ||
       response.responseUrl !== expectedUrl ||
@@ -540,8 +643,11 @@ function parseJsonResponse(value: unknown, expectedUrl: string) {
   } catch {
     throw unavailable();
   } finally {
-    if (body !== undefined) scrubBytes(body);
-    if (rawBody !== undefined) scrubBytes(rawBody);
+    try {
+      if (body !== undefined) scrubBytes(body);
+    } finally {
+      scrubTransportResponseBodyBestEffort(value);
+    }
   }
 }
 
@@ -576,15 +682,17 @@ function parseRawEncryptResponse(
     throw unavailable();
   }
 
-  const ciphertext = decodeCanonicalBase64(
-    response.ciphertext,
-    RAW_AES_GCM_CIPHERTEXT_BYTES,
-  );
-  const initializationVector = decodeCanonicalBase64(
-    response.initializationVector,
-    RAW_AES_GCM_IV_BYTES,
-  );
+  let ciphertext: Uint8Array | undefined;
+  let initializationVector: Uint8Array | undefined;
   try {
+    ciphertext = decodeCanonicalBase64(
+      response.ciphertext,
+      RAW_AES_GCM_CIPHERTEXT_BYTES,
+    );
+    initializationVector = decodeCanonicalBase64(
+      response.initializationVector,
+      RAW_AES_GCM_IV_BYTES,
+    );
     const ciphertextCrc32c = requireMatchingCrc32c(
       response.ciphertextCrc32c,
       ciphertext,
@@ -621,8 +729,8 @@ function parseRawEncryptResponse(
       wrappedDataEncryptionKey,
     });
   } finally {
-    ciphertext.fill(0);
-    initializationVector.fill(0);
+    if (ciphertext !== undefined) scrubBytes(ciphertext);
+    if (initializationVector !== undefined) scrubBytes(initializationVector);
   }
 }
 
@@ -892,6 +1000,41 @@ function requireBytes(value: unknown, maximumBytes: number) {
     throw unavailable();
   }
   return Uint8Array.from(value);
+}
+
+function observeRejectedCredentialReturnBestEffort(
+  value: unknown,
+  issuedOperation:
+    | CaresLinkV1NoteGenerationGoogleCloudKmsCredentialOperation
+    | undefined,
+) {
+  if (value === issuedOperation) return;
+  try {
+    if (nodeTypes.isPromise(value) && !nodeTypes.isProxy(value)) {
+      observeNativePromiseRejectionBestEffort(value);
+      return;
+    }
+    observeNativePromiseRejectionBestEffort(Promise.resolve(value));
+  } catch {
+    // The custody handshake is already closed. Never project or leave an
+    // asynchronously rejected wrapper unobserved.
+  }
+}
+
+function observeNativePromiseRejectionBestEffort(value: Promise<unknown>) {
+  try {
+    const settlement = Reflect.apply(Promise.prototype.then, value, [
+      undefined,
+      () => undefined,
+    ]) as Promise<unknown>;
+    Reflect.apply(Promise.prototype.then, settlement, [
+      undefined,
+      () => undefined,
+    ]);
+  } catch {
+    // Invalid custody output remains unavailable. This avoids consulting an
+    // own `.catch` property while keeping cleanup strictly best effort.
+  }
 }
 
 function scrubBytes(value: Uint8Array) {

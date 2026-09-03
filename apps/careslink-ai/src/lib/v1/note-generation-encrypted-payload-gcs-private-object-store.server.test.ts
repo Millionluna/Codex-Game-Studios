@@ -252,7 +252,7 @@ describe("Communication Note encrypted payload GCS private object store", () => 
       `/storage/v1/b/${BUCKET}/o/${encodeURIComponent(EXPECTED_OBJECT_NAME)}?projection=noAcl`,
     );
     expect(harness.requests[1].url).toBe(
-      `https://storage.googleapis.com/storage/v1/b/${BUCKET}/o/${encodeURIComponent(EXPECTED_OBJECT_NAME)}?alt=media&generation=1&ifGenerationMatch=1&ifMetagenerationMatch=1`,
+      `https://storage.googleapis.com/download/storage/v1/b/${BUCKET}/o/${encodeURIComponent(EXPECTED_OBJECT_NAME)}?alt=media&generation=1&ifGenerationMatch=1&ifMetagenerationMatch=1`,
     );
     expect(harness.requests.every((request) =>
       new URL(request.url).origin === "https://storage.googleapis.com",

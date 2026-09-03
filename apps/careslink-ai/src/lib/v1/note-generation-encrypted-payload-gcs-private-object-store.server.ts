@@ -1259,7 +1259,7 @@ function mediaUrl(
   generation: string,
   metageneration: string,
 ) {
-  return `${GCS_ORIGIN}/storage/v1/b/${encodeURIComponent(locator.bucket)}/o/${encodeURIComponent(locator.objectName)}?alt=media&generation=${generation}&ifGenerationMatch=${generation}&ifMetagenerationMatch=${metageneration}`;
+  return `${GCS_ORIGIN}/download/storage/v1/b/${encodeURIComponent(locator.bucket)}/o/${encodeURIComponent(locator.objectName)}?alt=media&generation=${generation}&ifGenerationMatch=${generation}&ifMetagenerationMatch=${metageneration}`;
 }
 
 function uploadUrl(

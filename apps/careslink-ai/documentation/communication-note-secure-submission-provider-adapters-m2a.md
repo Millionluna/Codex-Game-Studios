@@ -25,7 +25,7 @@ It is not cloud-posture, Hosted Preview, deployment or activation evidence.
 the M1z data-key-wrap port to one exact numeric
 `CryptoKeyVersion:rawEncrypt` request. Its constructor requires the exact key
 version pin plus a fresh, module-branded key-version posture attestation, an
-injected one-callback credential custodian and an injected bounded HTTPS
+injected synchronous single-use credential handoff and an injected bounded HTTPS
 transport. It performs no environment, Application Default Credential or
 control-plane discovery.
 
@@ -39,7 +39,10 @@ For each call the adapter:
    `SOFTWARE` protection and `ENABLED` state, both before the request and before
    returning its result;
 4. accepts only a short-lived token for the exact Preview runtime service
-   account and consumes it within one awaited callback;
+   account when custody synchronously calls the consumer exactly once and
+   directly returns that exact opaque operation; reading `.then`, awaiting,
+   assimilating, wrapping or replaying it before ownership transfer fails
+   before HTTP;
 5. sends the plaintext/AAD CRC32C values to the exact numeric `rawEncrypt`
    endpoint with redirects disabled, automatic retries fixed to zero and one
    absolute five-second abort deadline;
@@ -52,6 +55,13 @@ For each call the adapter:
 
 The adapter clears its mutable plaintext, AAD, request-body and decoded
 response copies. Fixed failures contain no provider body, token or key bytes.
+This source contract does not acquire WIF credentials asynchronously. A future
+live custodian must acquire and validate a fresh token upstream, then perform
+the exact synchronous handoff without caching or exposing it; no such issuer or
+custodian is installed here. The injected port contract also forbids retaining
+the handed-off operation. The adapter makes a competing adoption fail before
+HTTP and makes post-close use inert, but source alone cannot attest that a
+future custody implementation did not retain the reference.
 Cloud KMS does not return the configured algorithm in `rawEncrypt` responses,
 so the envelope's algorithm assertion depends on the required constructor
 posture rather than on the response. The module's posture factory only checks
@@ -174,6 +184,8 @@ evidence.
 References:
 
 - [Cloud KMS rawEncrypt](https://docs.cloud.google.com/kms/docs/reference/rest/v1/projects.locations.keyRings.cryptoKeys.cryptoKeyVersions/rawEncrypt)
+- [Cloud Storage request endpoints](https://docs.cloud.google.com/storage/docs/request-endpoints)
+- [Cloud Storage JSON API status codes](https://docs.cloud.google.com/storage/docs/json_api/v1/status-codes)
 - [Cloud Storage request preconditions](https://docs.cloud.google.com/storage/docs/request-preconditions)
 - [Cloud Storage soft delete](https://docs.cloud.google.com/storage/docs/soft-delete)
 - [Cloud Storage Object Versioning](https://docs.cloud.google.com/storage/docs/object-versioning)
@@ -181,18 +193,19 @@ References:
 
 ## Verification at this checkpoint
 
-The final focused gate passed **137/137 tests across 7 files**. The complete
-local Vitest suite passed **3157/3157 tests across 222 files**. TypeScript,
+The final focused gate passed **149/149 tests across 7 files**. The complete
+local Vitest suite passed **3169/3169 tests across 222 files**. TypeScript,
 zero-warning full ESLint, the optimized Next.js 16.2.9 Turbopack build with
 64/64 generated pages, the M1r–M1v client boundary across 27 static chunks,
 73-file adapter sync and tracked/untracked diff checks also passed.
 
 Independent protocol/security review first identified late credential/session
-work, incomplete response-buffer clearing, unproved KMS algorithm posture, and
-GCS propagation/history gaps. The reviewed source now fails closed on those
-conditions; the final scoped review has no remaining P0/P1/P2 finding. No live
-network, Supabase, GCP, Hosted Preview or Production test belongs to this
-batch.
+work, incomplete response-buffer clearing, unproved KMS algorithm posture,
+GCS propagation/history gaps and the redirecting `alt=media` endpoint. The
+reviewed source now uses the direct `/download/storage/v1` media path and fails
+closed on those conditions; the final scoped review has no remaining P0/P1/P2
+finding. No live network, Supabase, GCP, Hosted Preview or Production test
+belongs to this batch.
 
 ## Remaining implementation and approval gates
 
