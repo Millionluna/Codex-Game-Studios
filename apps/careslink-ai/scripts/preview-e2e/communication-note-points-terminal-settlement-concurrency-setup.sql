@@ -689,7 +689,15 @@ from (values
   ('da321000-0000-4000-8000-000000000001'::pg_catalog.uuid,
     'da320000-0000-4000-8000-000000000001'::pg_catalog.uuid),
   ('da331000-0000-4000-8000-000000000001'::pg_catalog.uuid,
-    'da330000-0000-4000-8000-000000000001'::pg_catalog.uuid)
+    'da330000-0000-4000-8000-000000000001'::pg_catalog.uuid),
+  ('da351000-0000-4000-8000-000000000001'::pg_catalog.uuid,
+    'da100000-0000-4000-8000-000000000001'::pg_catalog.uuid),
+  ('db351000-0000-4000-8000-000000000001'::pg_catalog.uuid,
+    'da100000-0000-4000-8000-000000000001'::pg_catalog.uuid),
+  ('dd351000-0000-4000-8000-000000000001'::pg_catalog.uuid,
+    'da100000-0000-4000-8000-000000000001'::pg_catalog.uuid),
+  ('dc351000-0000-4000-8000-000000000001'::pg_catalog.uuid,
+    'da100000-0000-4000-8000-000000000001'::pg_catalog.uuid)
 ) as fixture(session_id, owner_id);
 
 insert into public.privacy_reviews (
@@ -741,7 +749,19 @@ from (values
     '7', '8', 'privacy.communication.admission.privacy'),
   ('da332000-0000-4000-8000-000000000001'::pg_catalog.uuid,
     'da330000-0000-4000-8000-000000000001'::pg_catalog.uuid,
-    '9', 'a', 'privacy.communication.admission.payload')
+    '9', 'a', 'privacy.communication.admission.payload'),
+  ('da352000-0000-4000-8000-000000000001'::pg_catalog.uuid,
+    'da100000-0000-4000-8000-000000000001'::pg_catalog.uuid,
+    'b', '1', 'privacy.communication.terminal.timing-boundaries'),
+  ('db352000-0000-4000-8000-000000000001'::pg_catalog.uuid,
+    'da100000-0000-4000-8000-000000000001'::pg_catalog.uuid,
+    'c', '7', 'privacy.communication.terminal.clock'),
+  ('dd352000-0000-4000-8000-000000000001'::pg_catalog.uuid,
+    'da100000-0000-4000-8000-000000000001'::pg_catalog.uuid,
+    'e', 'f', 'privacy.communication.terminal.denied-clock'),
+  ('dc352000-0000-4000-8000-000000000001'::pg_catalog.uuid,
+    'da100000-0000-4000-8000-000000000001'::pg_catalog.uuid,
+    'd', 'd', 'privacy.communication.terminal.success-clock')
 ) as fixture(
   privacy_id, owner_id, fact_digit, request_digit, mutation_id
 );
@@ -849,7 +869,7 @@ begin
     or coalesce(
       pg_catalog.current_setting('application_name', true),
       ''
-    ) !~ '^careslink-cn-terminal-(terminal-failure|retry-success-replay|queued-expiry-recovery|short-grant-denial|authority-bounds-cancel)-(a|b|observer)$'
+    ) !~ '^careslink-cn-terminal-(terminal-failure|retry-success-replay|queued-expiry-recovery|short-grant-denial|authority-bounds-cancel|timing-boundaries)-(a|b|observer)$'
   then
     raise exception
       'COMMUNICATION_POINTS_TERMINAL_SETTLEMENT_CONCURRENCY_CALLER_UNSAFE';
@@ -927,6 +947,42 @@ as $$
       repeat('a', 64), repeat('a', 64), repeat('b', 64)
     ),
     (
+      'timing-boundaries',
+      'da100000-0000-4000-8000-000000000001'::pg_catalog.uuid,
+      'da351000-0000-4000-8000-000000000001'::pg_catalog.uuid,
+      'da352000-0000-4000-8000-000000000001'::pg_catalog.uuid,
+      'da350000-0000-4000-8000-000000000001'::pg_catalog.uuid,
+      'da360000-0000-4000-8000-000000000001'::pg_catalog.uuid,
+      repeat('4', 64), repeat('1', 64), repeat('3', 64)
+    ),
+    (
+      'terminal-clock',
+      'da100000-0000-4000-8000-000000000001'::pg_catalog.uuid,
+      'db351000-0000-4000-8000-000000000001'::pg_catalog.uuid,
+      'db352000-0000-4000-8000-000000000001'::pg_catalog.uuid,
+      'db350000-0000-4000-8000-000000000001'::pg_catalog.uuid,
+      'db360000-0000-4000-8000-000000000001'::pg_catalog.uuid,
+      repeat('6', 64), repeat('7', 64), repeat('8', 64)
+    ),
+    (
+      'success-clock',
+      'da100000-0000-4000-8000-000000000001'::pg_catalog.uuid,
+      'dc351000-0000-4000-8000-000000000001'::pg_catalog.uuid,
+      'dc352000-0000-4000-8000-000000000001'::pg_catalog.uuid,
+      'dc350000-0000-4000-8000-000000000001'::pg_catalog.uuid,
+      'dc360000-0000-4000-8000-000000000001'::pg_catalog.uuid,
+      repeat('9', 64), repeat('d', 64), repeat('e', 64)
+    ),
+    (
+      'denied-clock',
+      'da100000-0000-4000-8000-000000000001'::pg_catalog.uuid,
+      'dd351000-0000-4000-8000-000000000001'::pg_catalog.uuid,
+      'dd352000-0000-4000-8000-000000000001'::pg_catalog.uuid,
+      'dd350000-0000-4000-8000-000000000001'::pg_catalog.uuid,
+      'dd360000-0000-4000-8000-000000000001'::pg_catalog.uuid,
+      repeat('2', 64), repeat('f', 64), repeat('0', 64)
+    ),
+    (
       'paid-running-recovery',
       'da100000-0000-4000-8000-000000000001'::pg_catalog.uuid,
       'da110000-0000-4000-8000-000000000001'::pg_catalog.uuid,
@@ -991,7 +1047,8 @@ begin
         'retry-success-replay',
         'queued-expiry-recovery',
         'short-grant-denial',
-        'authority-bounds-cancel'
+        'authority-bounds-cancel',
+        'timing-boundaries'
       ]::pg_catalog.text[]) as scenario(case_name)
       cross join lateral
         careslink_v1_cn_points_terminal_support._fixture(
@@ -1161,6 +1218,146 @@ end;
 $$;
 
 create function
+  careslink_v1_cn_points_terminal_support.age_queue_deadline(
+    p_case pg_catalog.text,
+    p_remaining_ms pg_catalog.int4
+  )
+returns pg_catalog.text
+language plpgsql
+volatile
+security definer
+set search_path = ''
+as $$
+declare
+  v_fixture record;
+  v_deadline pg_catalog.timestamptz;
+  v_max_queue_age_ms pg_catalog.int8;
+begin
+  perform
+    careslink_v1_cn_points_terminal_support._assert_runner();
+  if p_case <> 'timing-boundaries'
+    or p_remaining_ms is null
+    or p_remaining_ms < 250
+    or p_remaining_ms > 3000
+  then
+    raise exception
+      'COMMUNICATION_POINTS_TERMINAL_SETTLEMENT_CONCURRENCY_EXPIRY_INVALID';
+  end if;
+
+  select * into v_fixture
+  from careslink_v1_cn_points_terminal_support._fixture(p_case);
+  select policy.max_queue_age_ms
+  into v_max_queue_age_ms
+  from careslink_v1_generation.jobs as job
+  join careslink_v1_generation.worker_policies as policy
+    on policy.version = job.worker_policy_version
+   and policy.policy_digest = job.worker_policy_digest
+  where job.id = v_fixture.job_id
+    and job.owner_user_id = v_fixture.owner_id
+    and job.status = 'QUEUED'
+    and job.attempt_count = 0
+  for update of job;
+  if v_max_queue_age_ms is null then
+    raise exception
+      'COMMUNICATION_POINTS_TERMINAL_SETTLEMENT_CONCURRENCY_FIXTURE_MISSING';
+  end if;
+
+  v_deadline := pg_catalog.date_trunc(
+    'milliseconds',
+    pg_catalog.clock_timestamp() +
+      p_remaining_ms * interval '1 millisecond'
+  );
+  update careslink_v1_generation.jobs as job
+  set created_at =
+    v_deadline - v_max_queue_age_ms * interval '1 millisecond'
+  where job.id = v_fixture.job_id
+    and job.owner_user_id = v_fixture.owner_id
+    and job.status = 'QUEUED'
+    and job.attempt_count = 0;
+  if not found then
+    raise exception
+      'COMMUNICATION_POINTS_TERMINAL_SETTLEMENT_CONCURRENCY_FIXTURE_MISSING';
+  end if;
+
+  return careslink_v1_generation._server_time(v_deadline);
+end;
+$$;
+
+create function
+  careslink_v1_cn_points_terminal_support.hold_payload_lock(
+    p_case pg_catalog.text
+  )
+returns pg_catalog.bool
+language plpgsql
+volatile
+security definer
+set search_path = ''
+as $$
+declare
+  v_fixture record;
+begin
+  perform
+    careslink_v1_cn_points_terminal_support._assert_runner();
+  if p_case not in (
+    'timing-boundaries', 'terminal-clock', 'success-clock'
+  ) then
+    raise exception
+      'COMMUNICATION_POINTS_TERMINAL_SETTLEMENT_CONCURRENCY_CASE_INVALID';
+  end if;
+  select * into v_fixture
+  from careslink_v1_cn_points_terminal_support._fixture(p_case);
+  perform payload.id
+  from careslink_v1_generation.payloads as payload
+  where payload.id = v_fixture.payload_id
+    and payload.job_id = v_fixture.job_id
+    and payload.owner_user_id = v_fixture.owner_id
+  for update;
+  if not found then
+    raise exception
+      'COMMUNICATION_POINTS_TERMINAL_SETTLEMENT_CONCURRENCY_FIXTURE_MISSING';
+  end if;
+  return true;
+end;
+$$;
+
+create function
+  careslink_v1_cn_points_terminal_support.hold_point_reservation_lock(
+    p_case pg_catalog.text
+  )
+returns pg_catalog.bool
+language plpgsql
+volatile
+security definer
+set search_path = ''
+as $$
+declare
+  v_fixture record;
+begin
+  perform
+    careslink_v1_cn_points_terminal_support._assert_runner();
+  if p_case <> 'denied-clock'
+    or pg_catalog.current_setting('application_name') <>
+      'careslink-cn-terminal-timing-boundaries-observer'
+  then
+    raise exception
+      'COMMUNICATION_POINTS_TERMINAL_SETTLEMENT_CONCURRENCY_CALLER_UNSAFE';
+  end if;
+  select * into v_fixture
+  from careslink_v1_cn_points_terminal_support._fixture(p_case);
+  if v_fixture.job_id is null then
+    raise exception
+      'COMMUNICATION_POINTS_TERMINAL_SETTLEMENT_CONCURRENCY_CASE_INVALID';
+  end if;
+  perform
+    careslink_v1_generation._lock_v1_shadow_communication_note_point_reservation(
+      v_fixture.job_id,
+      v_fixture.owner_id
+    );
+  return true;
+end;
+$$;
+
+create function
   careslink_v1_cn_points_terminal_support.consume_grant_test_only(
     p_job_id pg_catalog.uuid,
     p_grant_id pg_catalog.uuid
@@ -1189,6 +1386,10 @@ begin
       (
         'da335000-0000-4000-8000-000000000001'::pg_catalog.uuid,
         'da330000-0000-4000-8000-000000000001'::pg_catalog.uuid
+      ),
+      (
+        'dc350000-0000-4000-8000-000000000001'::pg_catalog.uuid,
+        'da100000-0000-4000-8000-000000000001'::pg_catalog.uuid
       )
     )
     and job.status = 'RUNNING'
@@ -1348,8 +1549,16 @@ begin
     immediate;
   select job.* into v_job
   from careslink_v1_generation.jobs as job
-  join careslink_v1_cn_points_terminal_support._fixture(
-    'retry-success-replay'
+  join (
+    select retry_fixture.*
+    from careslink_v1_cn_points_terminal_support._fixture(
+      'retry-success-replay'
+    ) as retry_fixture
+    union all
+    select timing_fixture.*
+    from careslink_v1_cn_points_terminal_support._fixture(
+      'success-clock'
+    ) as timing_fixture
   ) as fixture
     on fixture.job_id = job.id
    and fixture.owner_id = job.owner_user_id
@@ -1595,6 +1804,10 @@ begin
     'jobStatus', job.status,
     'attemptCount', job.attempt_count,
     'jobFailureReason', job.failure_reason,
+    'jobFinishedAt', case
+      when job.finished_at is null then null
+      else careslink_v1_generation._server_time(job.finished_at)
+    end,
     'resultDocumentId', job.result_document_id,
     'resultRevisionId', job.result_revision_id,
     'resultContentHash', job.result_content_hash,
@@ -1610,6 +1823,13 @@ begin
             'status', attempt.status,
             'failureReason', attempt.failure_reason,
             'terminalTransactionId', attempt.terminal_transaction_id,
+            'acquiredAt', careslink_v1_generation._server_time(
+              attempt.acquired_at
+            ),
+            'finishedAt', case
+              when attempt.finished_at is null then null
+              else careslink_v1_generation._server_time(attempt.finished_at)
+            end,
             'baseDelayMs', attempt.settlement_base_delay_ms,
             'jitterMs', attempt.settlement_jitter_ms,
             'retryDelayMs', attempt.settlement_retry_delay_ms,
@@ -1635,6 +1855,10 @@ begin
     'reservationExpiresAt', careslink_v1_generation._server_time(
       reservation.expires_at
     ),
+    'reservationTerminalAt', case
+      when reservation.terminal_at is null then null
+      else careslink_v1_generation._server_time(reservation.terminal_at)
+    end,
     'settlementCount', (
       select pg_catalog.count(*)::pg_catalog.int4
       from careslink_v1_generation.communication_note_point_settlements
@@ -1647,6 +1871,10 @@ begin
     'settlementAttemptId', settlement.attempt_id,
     'settlementAttemptNumber', settlement_attempt.attempt_number,
     'settlementReason', settlement.reason_code,
+    'settlementSettledAt', case
+      when settlement.settled_at is null then null
+      else careslink_v1_generation._server_time(settlement.settled_at)
+    end,
     'settlementPoints', settlement.points,
     'settlementAllocationPoints', settlement.allocation_points,
     'settlementRestoredPoints', settlement.restored_points,
@@ -1666,6 +1894,10 @@ begin
         and terminal_ledger.event in ('COMMIT', 'RELEASE', 'EXPIRE')
     ),
     'terminalLedgerEvent', terminal_ledger.event,
+    'terminalLedgerCreatedAt', case
+      when terminal_ledger.created_at is null then null
+      else careslink_v1_generation._server_time(terminal_ledger.created_at)
+    end,
     'lotRemaining', (
       select pg_catalog.sum(lot.remaining_points)::pg_catalog.int4
       from public.point_lots as lot
@@ -1716,8 +1948,18 @@ begin
     ),
     'payloadState', payload.state,
     'payloadRevokeReason', payload.revoke_reason,
+    'payloadRevokedAt', case
+      when payload.revoked_at is null then null
+      else careslink_v1_generation._server_time(payload.revoked_at)
+    end,
     'outboxCount', (
       select pg_catalog.count(*)::pg_catalog.int4
+      from careslink_v1_generation.payload_purge_outbox as outbox
+      where outbox.job_id = v_fixture.job_id
+        and outbox.owner_user_id = v_fixture.owner_id
+    ),
+    'outboxRequestedAt', (
+      select careslink_v1_generation._server_time(outbox.requested_at)
       from careslink_v1_generation.payload_purge_outbox as outbox
       where outbox.job_id = v_fixture.job_id
         and outbox.owner_user_id = v_fixture.owner_id
@@ -3047,6 +3289,9 @@ revoke all on function
   careslink_v1_cn_points_terminal_support.admit_case(pg_catalog.text, pg_catalog.int4),
   careslink_v1_cn_points_terminal_support.hold_paid_recovery_lock(),
   careslink_v1_cn_points_terminal_support.hold_job_lock(pg_catalog.text),
+  careslink_v1_cn_points_terminal_support.age_queue_deadline(pg_catalog.text, pg_catalog.int4),
+  careslink_v1_cn_points_terminal_support.hold_payload_lock(pg_catalog.text),
+  careslink_v1_cn_points_terminal_support.hold_point_reservation_lock(pg_catalog.text),
   careslink_v1_cn_points_terminal_support.consume_grant_test_only(pg_catalog.uuid, pg_catalog.uuid),
   careslink_v1_cn_points_terminal_support.assert_incomplete_fence_denied(pg_catalog.uuid, pg_catalog.uuid),
   careslink_v1_cn_points_terminal_support.commit_success_test_only(pg_catalog.uuid, pg_catalog.uuid, pg_catalog.text, pg_catalog.uuid, pg_catalog.text),
@@ -3072,6 +3317,9 @@ grant execute on function
   careslink_v1_cn_points_terminal_support.admit_case(pg_catalog.text, pg_catalog.int4),
   careslink_v1_cn_points_terminal_support.hold_paid_recovery_lock(),
   careslink_v1_cn_points_terminal_support.hold_job_lock(pg_catalog.text),
+  careslink_v1_cn_points_terminal_support.age_queue_deadline(pg_catalog.text, pg_catalog.int4),
+  careslink_v1_cn_points_terminal_support.hold_payload_lock(pg_catalog.text),
+  careslink_v1_cn_points_terminal_support.hold_point_reservation_lock(pg_catalog.text),
   careslink_v1_cn_points_terminal_support.consume_grant_test_only(pg_catalog.uuid, pg_catalog.uuid),
   careslink_v1_cn_points_terminal_support.assert_incomplete_fence_denied(pg_catalog.uuid, pg_catalog.uuid),
   careslink_v1_cn_points_terminal_support.commit_success_test_only(pg_catalog.uuid, pg_catalog.uuid, pg_catalog.text, pg_catalog.uuid, pg_catalog.text),
@@ -3102,6 +3350,10 @@ grant execute on function
   careslink_v1_generation.authorize_v1_shadow_note_generation_payload_attempt(
     pg_catalog.uuid, pg_catalog.uuid, pg_catalog.uuid, pg_catalog.text,
     pg_catalog.text
+  ),
+  careslink_v1_generation.consume_v1_shadow_note_generation_payload_grant(
+    pg_catalog.uuid, pg_catalog.uuid, pg_catalog.uuid, pg_catalog.text,
+    pg_catalog.text, pg_catalog.uuid
   ),
   careslink_v1_generation.settle_v1_shadow_note_generation_failure(
     pg_catalog.uuid, pg_catalog.uuid, pg_catalog.text, pg_catalog.text,
@@ -3301,6 +3553,7 @@ begin
         'careslink_v1_generation.heartbeat_v1_shadow_note_generation_attempt(uuid,uuid,text,text,text,text)'::pg_catalog.regprocedure,
         'careslink_v1_generation.fence_v1_shadow_note_generation_attempt(uuid,uuid,text,text,text,text)'::pg_catalog.regprocedure,
         'careslink_v1_generation.authorize_v1_shadow_note_generation_payload_attempt(uuid,uuid,uuid,text,text)'::pg_catalog.regprocedure,
+        'careslink_v1_generation.consume_v1_shadow_note_generation_payload_grant(uuid,uuid,uuid,text,text,uuid)'::pg_catalog.regprocedure,
         'careslink_v1_generation.settle_v1_shadow_note_generation_failure(uuid,uuid,text,text,text,text,text,jsonb)'::pg_catalog.regprocedure,
         'careslink_v1_generation.resolve_v1_shadow_note_generation_attempt(uuid,uuid,text,text,text,text)'::pg_catalog.regprocedure,
         'careslink_v1_generation.recover_v1_shadow_note_generation_expired(text,text,text,text,text,text)'::pg_catalog.regprocedure,
@@ -3310,6 +3563,9 @@ begin
         'careslink_v1_cn_points_terminal_support.admit_case(text,integer)'::pg_catalog.regprocedure,
         'careslink_v1_cn_points_terminal_support.hold_paid_recovery_lock()'::pg_catalog.regprocedure,
         'careslink_v1_cn_points_terminal_support.hold_job_lock(text)'::pg_catalog.regprocedure,
+        'careslink_v1_cn_points_terminal_support.age_queue_deadline(text,integer)'::pg_catalog.regprocedure,
+        'careslink_v1_cn_points_terminal_support.hold_payload_lock(text)'::pg_catalog.regprocedure,
+        'careslink_v1_cn_points_terminal_support.hold_point_reservation_lock(text)'::pg_catalog.regprocedure,
         'careslink_v1_cn_points_terminal_support.consume_grant_test_only(uuid,uuid)'::pg_catalog.regprocedure,
         'careslink_v1_cn_points_terminal_support.assert_incomplete_fence_denied(uuid,uuid)'::pg_catalog.regprocedure,
         'careslink_v1_cn_points_terminal_support.commit_success_test_only(uuid,uuid,text,uuid,text)'::pg_catalog.regprocedure,

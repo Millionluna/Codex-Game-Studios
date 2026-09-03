@@ -169,7 +169,7 @@ prevent paid/unpaid and paid queued/running starvation. This remains an
 unapplied, default-off source boundary—not a route, provider call or activation.
 
 The final isolated PostgreSQL 16.15 gate passed its exact 20-migration chain,
-all five terminal/concurrency groups, permanent ACL postcheck and complete
+all six terminal/concurrency groups, permanent ACL postcheck and complete
 teardown. The pinned hashes and scenario-level evidence are recorded in
 `documentation/tests.md`; they are local evidence only.
 

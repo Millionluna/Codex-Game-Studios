@@ -34,6 +34,9 @@ begin
       'careslink_v1_generation._success_envelope(uuid,uuid,text)'
     ) is null
     or pg_catalog.to_regprocedure(
+      'careslink_v1_generation._settle_denied_authority(uuid,uuid,uuid,text,text,timestamp with time zone)'
+    ) is null
+    or pg_catalog.to_regprocedure(
       'careslink_v1_generation._failure_envelope(uuid,uuid,text)'
     ) is null
     or pg_catalog.to_regprocedure(
@@ -2573,6 +2576,12 @@ begin
     'milliseconds',
     pg_catalog.clock_timestamp()
   );
+  if v_job.created_at +
+      v_policy.max_queue_age_ms * interval '1 millisecond' <= v_now
+  then
+    return pg_catalog.jsonb_build_object('status', 'IDLE', 'claim', null);
+  end if;
+
   if v_payload.id is null
     or v_payload.state <> 'AVAILABLE'
     or v_payload.expires_at - v_now <
@@ -3916,6 +3925,1025 @@ select pg_catalog.set_config(
 );
 
 -- -------------------------------------------------------------------------
+-- Fresh post-lock terminal time for the shared five-note worker RPCs
+-- -------------------------------------------------------------------------
+
+set role careslink_v1_generation_executor;
+
+create or replace function careslink_v1_generation._settle_denied_authority(
+  p_job_id uuid,
+  p_attempt_id uuid,
+  p_payload_id uuid,
+  p_registration_digest text,
+  p_reason text,
+  p_at timestamptz
+)
+returns jsonb
+language plpgsql
+volatile
+security invoker
+set search_path = ''
+as $careslink_v1_settle_denied_fresh_clock$
+declare
+  v_job record;
+  v_attempt record;
+  v_payload record;
+  v_outbox record;
+  v_now timestamptz;
+  v_transaction_id uuid;
+  v_event_hash text;
+begin
+  if p_at is null
+    or p_reason is null
+    or p_reason not in (
+      'PAYLOAD_UNAVAILABLE', 'SESSION_REVOKED', 'PRIVACY_REVIEW_STALE'
+    )
+  then
+    raise exception using errcode = 'P0001', message = 'INTERNAL_FAILURE';
+  end if;
+
+  select job.* into v_job
+  from careslink_v1_generation.jobs as job
+  where job.id = p_job_id
+    and job.payload_id = p_payload_id
+  for update;
+
+  if v_job.id is null then
+    raise exception using errcode = 'P0001', message = 'PAYLOAD_UNAVAILABLE';
+  end if;
+
+  select attempt.* into v_attempt
+  from careslink_v1_generation.attempts as attempt
+  where attempt.id = p_attempt_id
+    and attempt.job_id = p_job_id
+    and attempt.owner_user_id = v_job.owner_user_id
+    and attempt.registration_digest = p_registration_digest
+  for update;
+
+  if v_attempt.id is null then
+    raise exception using errcode = 'P0001', message = 'INTERNAL_FAILURE';
+  end if;
+
+  -- A terminal denial replay is validation-only. It returns the one stored
+  -- acknowledgement without acquiring active-write locks or observing a new
+  -- terminal time.
+  if v_job.status = 'FAILED' and v_attempt.status = 'FAILED' then
+    if v_job.failure_reason is distinct from p_reason
+      or v_attempt.failure_reason is distinct from p_reason
+      or v_attempt.terminal_transaction_id is null
+      or v_attempt.finished_at is null
+      or v_job.finished_at is distinct from v_attempt.finished_at
+    then
+      raise exception using errcode = 'P0001', message = 'INTERNAL_FAILURE';
+    end if;
+
+    select payload.* into v_payload
+    from careslink_v1_generation.payloads as payload
+    where payload.id = p_payload_id
+      and payload.job_id = p_job_id
+      and payload.owner_user_id = v_job.owner_user_id;
+
+    select outbox.* into v_outbox
+    from careslink_v1_generation.payload_purge_outbox as outbox
+    where outbox.payload_id = p_payload_id
+      and outbox.job_id = p_job_id
+      and outbox.owner_user_id = v_job.owner_user_id
+      and outbox.transaction_id = v_attempt.terminal_transaction_id
+      and outbox.reason = 'FAILED';
+
+    if v_payload.id is null
+      or v_payload.revoke_reason is distinct from 'FAILED'
+      or v_payload.revoked_at is distinct from v_attempt.finished_at
+      or v_outbox.id is null
+      or v_outbox.requested_at is distinct from v_attempt.finished_at
+    then
+      raise exception using errcode = 'P0001', message = 'INTERNAL_FAILURE';
+    end if;
+
+    return jsonb_build_object(
+      'status', 'DENIED_SETTLED',
+      'transactionId', v_attempt.terminal_transaction_id,
+      'transactionStatus', 'COMMITTED',
+      'atomic', true,
+      'committedAt',
+        careslink_v1_generation._server_time(v_attempt.finished_at),
+      'registrationDigest', p_registration_digest,
+      'reason', p_reason,
+      'jobReferenceHash',
+        careslink_v1_generation._sha256_text(p_job_id::text),
+      'attemptReferenceHash',
+        careslink_v1_generation._sha256_text(p_attempt_id::text),
+      'payloadReferenceHash',
+        careslink_v1_generation._sha256_text(p_payload_id::text),
+      'jobStatus', 'FAILED',
+      'attemptStatus', 'FAILED',
+      'payloadState', 'REVOKED',
+      'payloadDisposition', 'REVOKED_PURGE_ENQUEUED',
+      'purgeEventReferenceHash', v_outbox.event_reference_hash
+    );
+  end if;
+
+  if v_job.status <> 'RUNNING' or v_attempt.status <> 'RUNNING' then
+    raise exception using errcode = 'P0001', message = 'INTERNAL_FAILURE';
+  end if;
+
+  -- Keep the worker's established order. The job lock serializes this job;
+  -- payload and issued-grant locks close every row that the purge helper can
+  -- update. The paid helper adds the shared owner advisory lane and exact
+  -- reservation lock before the terminal clock is sampled.
+  select payload.* into v_payload
+  from careslink_v1_generation.payloads as payload
+  where payload.id = p_payload_id
+    and payload.job_id = p_job_id
+    and payload.owner_user_id = v_job.owner_user_id
+  for update;
+
+  if v_payload.id is null then
+    raise exception using errcode = 'P0001', message = 'PAYLOAD_UNAVAILABLE';
+  end if;
+
+  perform grant_record.id
+  from careslink_v1_generation.payload_grants as grant_record
+  where grant_record.payload_id = p_payload_id
+    and grant_record.job_id = p_job_id
+    and grant_record.owner_user_id = v_job.owner_user_id
+    and grant_record.status = 'ISSUED'
+  order by grant_record.id
+  for update;
+
+  if v_job.communication_note_point_admission_id is not null then
+    perform
+      careslink_v1_generation._lock_v1_shadow_communication_note_point_reservation(
+        v_job.id,
+        v_job.owner_user_id
+      );
+  end if;
+
+  -- A valid active job cannot already have a purge outbox row, and the job
+  -- lock serializes every supported producer. Reject impossible residue now;
+  -- the executor deliberately retains no UPDATE privilege on this table.
+  select outbox.* into v_outbox
+  from careslink_v1_generation.payload_purge_outbox as outbox
+  where outbox.payload_id = p_payload_id
+    and outbox.job_id = p_job_id
+    and outbox.owner_user_id = v_job.owner_user_id;
+
+  if v_outbox.id is not null then
+    raise exception using errcode = 'P0001', message = 'INTERNAL_FAILURE';
+  end if;
+
+  v_now := pg_catalog.date_trunc(
+    'milliseconds',
+    pg_catalog.clock_timestamp()
+  );
+  v_transaction_id := extensions.gen_random_uuid();
+
+  update careslink_v1_generation.attempts as attempt
+  set status = 'FAILED',
+      failure_reason = p_reason,
+      provider_evidence_hash = null,
+      canonical_content_hash = null,
+      terminal_transaction_id = v_transaction_id,
+      settlement_base_delay_ms = null,
+      settlement_jitter_ms = null,
+      settlement_retry_delay_ms = null,
+      finished_at = v_now
+  where attempt.id = p_attempt_id
+    and attempt.job_id = p_job_id
+    and attempt.owner_user_id = v_job.owner_user_id
+    and attempt.registration_digest = p_registration_digest
+    and attempt.status = 'RUNNING';
+
+  if not found then
+    raise exception using errcode = 'P0001', message = 'INTERNAL_FAILURE';
+  end if;
+
+  update careslink_v1_generation.jobs as job
+  set status = 'FAILED',
+      next_eligible_at = null,
+      failure_reason = p_reason,
+      finished_at = v_now,
+      updated_at = v_now
+  where job.id = p_job_id
+    and job.owner_user_id = v_job.owner_user_id
+    and job.status = 'RUNNING';
+
+  if not found then
+    raise exception using errcode = 'P0001', message = 'INTERNAL_FAILURE';
+  end if;
+
+  v_event_hash := careslink_v1_generation._enqueue_payload_purge(
+    v_transaction_id,
+    p_payload_id,
+    p_job_id,
+    v_job.owner_user_id,
+    'FAILED',
+    v_now
+  );
+
+  return jsonb_build_object(
+    'status', 'DENIED_SETTLED',
+    'transactionId', v_transaction_id,
+    'transactionStatus', 'COMMITTED',
+    'atomic', true,
+    'committedAt', careslink_v1_generation._server_time(v_now),
+    'registrationDigest', p_registration_digest,
+    'reason', p_reason,
+    'jobReferenceHash',
+      careslink_v1_generation._sha256_text(p_job_id::text),
+    'attemptReferenceHash',
+      careslink_v1_generation._sha256_text(p_attempt_id::text),
+    'payloadReferenceHash',
+      careslink_v1_generation._sha256_text(p_payload_id::text),
+    'jobStatus', 'FAILED',
+    'attemptStatus', 'FAILED',
+    'payloadState', 'REVOKED',
+    'payloadDisposition', 'REVOKED_PURGE_ENQUEUED',
+    'purgeEventReferenceHash', v_event_hash
+  );
+end;
+$careslink_v1_settle_denied_fresh_clock$;
+
+create or replace function careslink_v1_generation.commit_v1_shadow_note_generation_success(
+  p_job_id uuid,
+  p_attempt_id uuid,
+  p_lease_token text,
+  p_registration_digest text,
+  p_worker_policy_version text,
+  p_worker_policy_digest text,
+  p_fence_id uuid,
+  p_fence_digest text,
+  p_canonical_content jsonb,
+  p_canonical_content_hash text,
+  p_provider_evidence jsonb
+)
+returns jsonb
+language plpgsql
+volatile
+security definer
+set search_path = ''
+as $$
+declare
+  v_observed_at timestamptz;
+  v_now timestamptz;
+  v_job record;
+  v_attempt record;
+  v_payload record;
+  v_privacy_expires_at timestamptz;
+  v_candidate_digest text;
+  v_evidence_hash text;
+  v_transaction_id uuid;
+  v_document_id uuid;
+  v_revision_id uuid;
+  v_change_id bigint;
+  v_receipt_id uuid;
+  v_mutation_id text;
+  v_mutation_reference_hash text;
+  v_event_hash text;
+  v_request_fingerprint jsonb;
+  v_acknowledgement jsonb;
+begin
+  perform careslink_v1_generation._assert_capability();
+
+  select job.* into v_job
+  from careslink_v1_generation.jobs as job
+  where job.id = p_job_id
+  for update;
+
+  if v_job.id is null then
+    raise exception using errcode = 'P0001', message = 'INTERNAL_FAILURE';
+  end if;
+  perform careslink_v1_generation._set_owner(v_job.owner_user_id);
+
+  select attempt.* into v_attempt
+  from careslink_v1_generation.attempts as attempt
+  where attempt.id = p_attempt_id
+    and attempt.job_id = p_job_id
+    and attempt.owner_user_id = v_job.owner_user_id
+  for update;
+
+  if v_attempt.id is null
+    or v_attempt.registration_digest <> p_registration_digest
+    or v_attempt.lease_token_hash is distinct from
+      careslink_v1_generation._sha256_text(p_lease_token)
+    or v_job.worker_policy_version <> p_worker_policy_version
+    or v_job.worker_policy_digest <> p_worker_policy_digest
+    or not careslink_v1_generation._job_registration_binding_is_valid(
+      p_registration_digest,
+      v_job.worker_policy_version,
+      v_job.worker_policy_digest,
+      v_job.payload_policy_version,
+      v_job.payload_policy_snapshot_hash,
+      v_job.note_type,
+      v_job.provider_policy_version,
+      v_job.provider_policy_digest
+    )
+    or not careslink_v1_generation._registration_is_valid(
+      p_registration_digest,
+      p_worker_policy_version,
+      p_worker_policy_digest,
+      v_attempt.worker_identity_hash,
+      v_job.contract_version,
+      v_job.schema_version
+    )
+  then
+    raise exception using errcode = 'P0001', message = 'POLICY_MISMATCH';
+  end if;
+
+  -- Keep the established job -> attempt -> session -> privacy -> payload lock
+  -- order. This provisional observation supports exact replay and the
+  -- pre-payload authority checks; active writes use the later post-lock clock.
+  v_observed_at := pg_catalog.date_trunc(
+    'milliseconds',
+    pg_catalog.clock_timestamp()
+  );
+
+  v_candidate_digest := careslink_v1_generation._validate_note_content(
+    v_job.note_type,
+    v_job.schema_version,
+    v_job.cleaned_facts_hash,
+    p_canonical_content,
+    p_canonical_content_hash
+  );
+  v_evidence_hash := careslink_v1_generation._validate_provider_evidence(
+    v_job.note_type,
+    v_job.service_code,
+    v_job.rate_catalog_version,
+    v_job.worker_policy_version,
+    v_job.worker_policy_digest,
+    v_job.provider_policy_version,
+    v_job.provider_policy_digest,
+    v_attempt.acquired_at,
+    v_observed_at,
+    p_provider_evidence,
+    v_candidate_digest
+  );
+
+  if p_provider_evidence->>'finishReason' <> 'COMPLETED' then
+    raise exception using
+      errcode = 'P0001',
+      message = 'PROVIDER_OUTPUT_INVALID';
+  end if;
+
+  if v_job.status = 'SUCCEEDED' and v_attempt.status = 'SUCCEEDED' then
+    if v_job.result_content_hash is distinct from p_canonical_content_hash
+      or v_attempt.canonical_content_hash
+        is distinct from p_canonical_content_hash
+      or v_attempt.provider_evidence_hash is distinct from v_evidence_hash
+      or v_attempt.fence_id is distinct from p_fence_id
+      or v_attempt.fence_digest is distinct from p_fence_digest
+    then
+      raise exception using errcode = 'P0001', message = 'INTERNAL_FAILURE';
+    end if;
+    return careslink_v1_generation._success_envelope(
+      p_job_id,
+      p_attempt_id,
+      p_registration_digest
+    );
+  end if;
+
+  if v_job.status <> 'RUNNING'
+    or v_attempt.status <> 'RUNNING'
+    or v_attempt.lease_expires_at <= v_observed_at
+    or v_attempt.fence_id is distinct from p_fence_id
+    or v_attempt.fence_digest is distinct from p_fence_digest
+    or v_attempt.fence_expires_at is null
+    or v_attempt.fence_expires_at <= v_observed_at
+  then
+    raise exception using errcode = 'P0001', message = 'LEASE_EXPIRED';
+  end if;
+
+  if not careslink_v1_generation.fresh_session_is_active(
+    v_job.owner_user_id,
+    v_job.initiating_session_id,
+    v_observed_at
+  ) then
+    raise exception using errcode = 'P0001', message = 'SESSION_REVOKED';
+  end if;
+
+  v_privacy_expires_at :=
+    careslink_v1_generation.fresh_privacy_proof_expires_at(
+      v_job.privacy_review_id,
+      v_job.owner_user_id,
+      v_job.note_type,
+      v_job.cleaned_facts_hash,
+      v_job.schema_version,
+      v_job.contract_version,
+      v_observed_at
+    );
+  if v_privacy_expires_at is null then
+    raise exception using
+      errcode = 'P0001',
+      message = 'PRIVACY_REVIEW_STALE';
+  end if;
+
+  select payload.* into v_payload
+  from careslink_v1_generation.payloads as payload
+  where payload.id = v_job.payload_id
+    and payload.job_id = v_job.id
+    and payload.owner_user_id = v_job.owner_user_id
+  for update;
+
+  -- Sample the one persisted terminal time only after every established
+  -- pre-write worker row lock has been acquired.
+  v_now := pg_catalog.date_trunc(
+    'milliseconds',
+    pg_catalog.clock_timestamp()
+  );
+  if not careslink_v1_generation.fresh_session_is_active(
+    v_job.owner_user_id,
+    v_job.initiating_session_id,
+    v_now
+  ) then
+    raise exception using errcode = 'P0001', message = 'SESSION_REVOKED';
+  end if;
+  v_evidence_hash := careslink_v1_generation._validate_provider_evidence(
+    v_job.note_type,
+    v_job.service_code,
+    v_job.rate_catalog_version,
+    v_job.worker_policy_version,
+    v_job.worker_policy_digest,
+    v_job.provider_policy_version,
+    v_job.provider_policy_digest,
+    v_attempt.acquired_at,
+    v_now,
+    p_provider_evidence,
+    v_candidate_digest
+  );
+  if p_provider_evidence->>'finishReason' <> 'COMPLETED' then
+    raise exception using
+      errcode = 'P0001',
+      message = 'PROVIDER_OUTPUT_INVALID';
+  end if;
+  if v_attempt.lease_expires_at <= v_now
+    or v_attempt.fence_expires_at <= v_now
+  then
+    raise exception using errcode = 'P0001', message = 'LEASE_EXPIRED';
+  end if;
+
+  if v_payload.id is null
+    or v_payload.state <> 'AVAILABLE'
+    or v_payload.expires_at <= v_now
+    or v_payload.privacy_proof_expires_at is distinct from v_privacy_expires_at
+    or v_payload.expires_at > v_privacy_expires_at
+    or v_payload.note_type <> v_job.note_type
+    or v_payload.source_locale <> v_job.source_locale
+    or v_payload.contract_version <> v_job.contract_version
+    or v_payload.schema_version <> v_job.schema_version
+    or v_payload.privacy_review_id <> v_job.privacy_review_id
+    or v_payload.cleaned_facts_hash <> v_job.cleaned_facts_hash
+    or v_payload.request_hash <> v_job.request_hash
+    or v_payload.policy_version <> v_job.payload_policy_version
+    or v_payload.policy_snapshot_hash <> v_job.payload_policy_snapshot_hash
+    or not careslink_v1_generation._payload_snapshot_is_valid(
+      v_payload.policy_version,
+      v_payload.policy_snapshot_hash,
+      v_payload.encryption_profile_version,
+      v_payload.backup_disposition_version
+    )
+    or v_attempt.payload_authorized_at is null
+    or not exists (
+      select 1
+      from careslink_v1_generation.payload_grants as grant_record
+      where grant_record.payload_id = v_payload.id
+        and grant_record.job_id = v_job.id
+        and grant_record.owner_user_id = v_job.owner_user_id
+        and grant_record.attempt_id = v_attempt.id
+        and grant_record.registration_digest = p_registration_digest
+        and grant_record.lease_token_hash = v_attempt.lease_token_hash
+        and grant_record.request_hash = v_job.request_hash
+        and grant_record.status = 'CONSUMED'
+        and grant_record.consumed_at is not null
+        and grant_record.consumed_at <= v_now
+        and grant_record.expires_at > grant_record.consumed_at
+    )
+  then
+    raise exception using errcode = 'P0001', message = 'PAYLOAD_UNAVAILABLE';
+  end if;
+
+  v_transaction_id := extensions.gen_random_uuid();
+  v_document_id := extensions.gen_random_uuid();
+  v_revision_id := extensions.gen_random_uuid();
+  v_receipt_id := extensions.gen_random_uuid();
+  v_mutation_id :=
+    'note-generation:' || careslink_v1_generation._sha256_text(v_job.id::text);
+  v_mutation_reference_hash := public.v1_shadow_content_sha256(
+    jsonb_build_object(
+      'kind', 'careslink.v1.note-generation-mutation',
+      'jobId', v_job.id::text,
+      'attemptId', v_attempt.id::text,
+      'registrationDigest', p_registration_digest
+    )
+  );
+  v_request_fingerprint := jsonb_build_object(
+    'kind', 'careslink.v1.note-generation-create',
+    'jobReferenceHash',
+      careslink_v1_generation._sha256_text(v_job.id::text),
+    'attemptReferenceHash',
+      careslink_v1_generation._sha256_text(v_attempt.id::text),
+    'registrationDigest', p_registration_digest,
+    'contentHash', p_canonical_content_hash,
+    'providerEvidenceHash', v_evidence_hash
+  );
+
+  insert into public.ai_documents (
+    id,
+    owner_user_id,
+    note_type,
+    source_locale,
+    lifecycle_status,
+    current_revision_id,
+    current_revision_number,
+    schema_version,
+    contract_version,
+    shadow_only,
+    created_at,
+    updated_at
+  ) values (
+    v_document_id,
+    v_job.owner_user_id,
+    v_job.note_type,
+    v_job.source_locale,
+    'IN_PROGRESS',
+    null,
+    0,
+    v_job.schema_version,
+    v_job.contract_version,
+    true,
+    v_now,
+    v_now
+  );
+
+  insert into public.ai_document_revisions (
+    id,
+    document_id,
+    owner_user_id,
+    revision_number,
+    base_revision_id,
+    privacy_review_id,
+    content,
+    content_hash,
+    mutation_id,
+    schema_version,
+    contract_version,
+    shadow_only,
+    created_at
+  ) values (
+    v_revision_id,
+    v_document_id,
+    v_job.owner_user_id,
+    1,
+    null,
+    v_job.privacy_review_id,
+    p_canonical_content,
+    p_canonical_content_hash,
+    v_mutation_id,
+    v_job.schema_version,
+    v_job.contract_version,
+    true,
+    v_now
+  );
+
+  update public.ai_documents as document
+  set current_revision_id = v_revision_id,
+      current_revision_number = 1,
+      updated_at = v_now
+  where document.id = v_document_id
+    and document.owner_user_id = v_job.owner_user_id;
+
+  insert into public.ai_document_sync_changes (
+    owner_user_id,
+    change_kind,
+    document_id,
+    revision_id,
+    last_mutation_id,
+    server_time,
+    deleted_at,
+    shadow_only
+  ) values (
+    v_job.owner_user_id,
+    'DOCUMENT_UPSERTED',
+    v_document_id,
+    v_revision_id,
+    v_mutation_id,
+    v_now,
+    null,
+    true
+  ) returning change_id into v_change_id;
+
+  v_acknowledgement := jsonb_build_object(
+    'status', 'SERVER_ACKNOWLEDGED',
+    'mutationReferenceHash', v_mutation_reference_hash,
+    'mutationKind', 'CREATE_DOCUMENT',
+    'canonicalId', v_document_id,
+    'revisionId', v_revision_id,
+    'contentHash', p_canonical_content_hash,
+    'serverTime', careslink_v1_generation._server_time(v_now)
+  );
+
+  insert into public.ai_document_mutation_receipts (
+    id,
+    owner_user_id,
+    mutation_id,
+    mutation_kind,
+    request_fingerprint,
+    document_id,
+    revision_id,
+    change_id,
+    acknowledgement,
+    server_time,
+    shadow_only,
+    created_at
+  ) values (
+    v_receipt_id,
+    v_job.owner_user_id,
+    v_mutation_id,
+    'CREATE_DOCUMENT',
+    v_request_fingerprint,
+    v_document_id,
+    v_revision_id,
+    v_change_id,
+    v_acknowledgement,
+    v_now,
+    true,
+    v_now
+  );
+
+  insert into careslink_v1_generation.provider_evidence (
+    attempt_id,
+    job_id,
+    owner_user_id,
+    evidence_hash,
+    evidence,
+    created_at,
+    shadow_only
+  ) values (
+    v_attempt.id,
+    v_job.id,
+    v_job.owner_user_id,
+    v_evidence_hash,
+    p_provider_evidence,
+    v_now,
+    true
+  );
+
+  v_event_hash := careslink_v1_generation._enqueue_payload_purge(
+    v_transaction_id,
+    v_job.payload_id,
+    v_job.id,
+    v_job.owner_user_id,
+    'SUCCEEDED',
+    v_now
+  );
+
+  update careslink_v1_generation.attempts as attempt
+  set status = 'SUCCEEDED',
+      provider_evidence_hash = v_evidence_hash,
+      canonical_content_hash = p_canonical_content_hash,
+      failure_reason = null,
+      terminal_transaction_id = v_transaction_id,
+      settlement_base_delay_ms = null,
+      settlement_jitter_ms = null,
+      settlement_retry_delay_ms = null,
+      finished_at = v_now
+  where attempt.id = v_attempt.id
+    and attempt.status = 'RUNNING';
+
+  update careslink_v1_generation.jobs as job
+  set status = 'SUCCEEDED',
+      next_eligible_at = null,
+      failure_reason = null,
+      result_document_id = v_document_id,
+      result_revision_id = v_revision_id,
+      result_content_hash = p_canonical_content_hash,
+      finished_at = v_now,
+      updated_at = v_now
+  where job.id = v_job.id
+    and job.status = 'RUNNING';
+
+  return careslink_v1_generation._success_envelope(
+    p_job_id,
+    p_attempt_id,
+    p_registration_digest
+  );
+end;
+$$;
+
+create or replace function careslink_v1_generation.settle_v1_shadow_note_generation_failure(
+  p_job_id uuid,
+  p_attempt_id uuid,
+  p_lease_token text,
+  p_registration_digest text,
+  p_worker_policy_version text,
+  p_worker_policy_digest text,
+  p_reason text,
+  p_provider_evidence jsonb
+)
+returns jsonb
+language plpgsql
+volatile
+security definer
+set search_path = ''
+as $$
+declare
+  v_observed_at timestamptz;
+  v_now timestamptz;
+  v_job record;
+  v_attempt record;
+  v_policy record;
+  v_payload record;
+  v_evidence_hash text;
+  v_transaction_id uuid;
+  v_retry_allowed boolean;
+  v_base_delay_ms bigint;
+  v_jitter_ms bigint;
+  v_retry_delay_ms bigint;
+  v_next_eligible_at timestamptz;
+  v_attempt_status text;
+  v_job_status text;
+  v_purge_reason text;
+  v_event_hash text;
+begin
+  perform careslink_v1_generation._assert_capability();
+
+  if p_reason is null or p_reason not in (
+    'LEASE_EXPIRED', 'PROVIDER_TIMEOUT', 'PROVIDER_TRANSIENT',
+    'PROVIDER_PERMANENT', 'PROVIDER_OUTPUT_INVALID', 'PAYLOAD_UNAVAILABLE',
+    'SESSION_REVOKED', 'PRIVACY_REVIEW_STALE', 'CANCELLED',
+    'POLICY_MISMATCH', 'INTERNAL_FAILURE'
+  ) then
+    raise exception using errcode = 'P0001', message = 'INTERNAL_FAILURE';
+  end if;
+
+  select job.* into v_job
+  from careslink_v1_generation.jobs as job
+  where job.id = p_job_id
+  for update;
+  if v_job.id is null then
+    raise exception using errcode = 'P0001', message = 'INTERNAL_FAILURE';
+  end if;
+  perform careslink_v1_generation._set_owner(v_job.owner_user_id);
+
+  select attempt.* into v_attempt
+  from careslink_v1_generation.attempts as attempt
+  where attempt.id = p_attempt_id
+    and attempt.job_id = p_job_id
+    and attempt.owner_user_id = v_job.owner_user_id
+  for update;
+
+  if v_attempt.id is null
+    or v_attempt.registration_digest <> p_registration_digest
+    or v_attempt.lease_token_hash is distinct from
+      careslink_v1_generation._sha256_text(p_lease_token)
+    or v_job.worker_policy_version <> p_worker_policy_version
+    or v_job.worker_policy_digest <> p_worker_policy_digest
+    or not careslink_v1_generation._job_registration_binding_is_valid(
+      p_registration_digest,
+      v_job.worker_policy_version,
+      v_job.worker_policy_digest,
+      v_job.payload_policy_version,
+      v_job.payload_policy_snapshot_hash,
+      v_job.note_type,
+      v_job.provider_policy_version,
+      v_job.provider_policy_digest
+    )
+    or not careslink_v1_generation._registration_is_valid(
+      p_registration_digest,
+      p_worker_policy_version,
+      p_worker_policy_digest,
+      v_attempt.worker_identity_hash,
+      v_job.contract_version,
+      v_job.schema_version
+    )
+  then
+    raise exception using errcode = 'P0001', message = 'POLICY_MISMATCH';
+  end if;
+
+  -- Exact replay validates against a fresh post-job/attempt-lock observation.
+  -- Active settlement refreshes after its payload lock before any write.
+  v_observed_at := pg_catalog.date_trunc(
+    'milliseconds',
+    pg_catalog.clock_timestamp()
+  );
+
+  if p_provider_evidence is not null then
+    v_evidence_hash := careslink_v1_generation._validate_provider_evidence(
+      v_job.note_type,
+      v_job.service_code,
+      v_job.rate_catalog_version,
+      v_job.worker_policy_version,
+      v_job.worker_policy_digest,
+      v_job.provider_policy_version,
+      v_job.provider_policy_digest,
+      v_attempt.acquired_at,
+      v_observed_at,
+      p_provider_evidence,
+      null
+    );
+  else
+    v_evidence_hash := null;
+  end if;
+
+  if v_attempt.status <> 'RUNNING' then
+    if v_attempt.failure_reason is distinct from p_reason
+      or v_attempt.provider_evidence_hash is distinct from v_evidence_hash
+    then
+      raise exception using errcode = 'P0001', message = 'INTERNAL_FAILURE';
+    end if;
+    return careslink_v1_generation._failure_envelope(
+      p_job_id,
+      p_attempt_id,
+      p_registration_digest
+    );
+  end if;
+
+  if v_job.status <> 'RUNNING'
+    or (
+      v_attempt.lease_expires_at <= v_observed_at
+      and p_reason <> 'LEASE_EXPIRED'
+    )
+  then
+    raise exception using errcode = 'P0001', message = 'LEASE_EXPIRED';
+  end if;
+
+  select policy.* into v_policy
+  from careslink_v1_generation.worker_policies as policy
+  where policy.version = p_worker_policy_version
+    and policy.policy_digest = p_worker_policy_digest
+    and policy.status = 'APPROVED'
+    and policy.shadow_only is true;
+
+  v_retry_allowed := p_reason = any(v_policy.retryable_outcomes)
+    and v_attempt.attempt_number < v_policy.max_attempts;
+
+  select payload.* into v_payload
+  from careslink_v1_generation.payloads as payload
+  where payload.id = v_job.payload_id
+    and payload.job_id = v_job.id
+    and payload.owner_user_id = v_job.owner_user_id
+  for update;
+
+  -- Sample the one persisted terminal time after the active path's final
+  -- pre-write worker row lock. Retry and terminal timestamps reuse this value.
+  v_now := pg_catalog.date_trunc(
+    'milliseconds',
+    pg_catalog.clock_timestamp()
+  );
+  if p_provider_evidence is not null then
+    v_evidence_hash := careslink_v1_generation._validate_provider_evidence(
+      v_job.note_type,
+      v_job.service_code,
+      v_job.rate_catalog_version,
+      v_job.worker_policy_version,
+      v_job.worker_policy_digest,
+      v_job.provider_policy_version,
+      v_job.provider_policy_digest,
+      v_attempt.acquired_at,
+      v_now,
+      p_provider_evidence,
+      null
+    );
+  else
+    v_evidence_hash := null;
+  end if;
+  if v_job.status <> 'RUNNING'
+    or (v_attempt.lease_expires_at <= v_now and p_reason <> 'LEASE_EXPIRED')
+  then
+    raise exception using errcode = 'P0001', message = 'LEASE_EXPIRED';
+  end if;
+
+  if v_payload.id is null then
+    raise exception using errcode = 'P0001', message = 'PAYLOAD_UNAVAILABLE';
+  end if;
+
+  if v_retry_allowed and (
+    v_payload.state <> 'AVAILABLE'
+    or v_payload.expires_at <= v_now
+    or v_payload.privacy_proof_expires_at <= v_now
+  ) then
+    raise exception using errcode = 'P0001', message = 'PAYLOAD_UNAVAILABLE';
+  end if;
+
+  v_transaction_id := extensions.gen_random_uuid();
+
+  if p_provider_evidence is not null then
+    insert into careslink_v1_generation.provider_evidence (
+      attempt_id,
+      job_id,
+      owner_user_id,
+      evidence_hash,
+      evidence,
+      created_at,
+      shadow_only
+    ) values (
+      v_attempt.id,
+      v_job.id,
+      v_job.owner_user_id,
+      v_evidence_hash,
+      p_provider_evidence,
+      v_now,
+      true
+    );
+  end if;
+
+  if v_retry_allowed then
+    v_base_delay_ms :=
+      v_policy.retry_delay_ms_after_attempt[v_attempt.attempt_number];
+    v_jitter_ms := case
+      when v_policy.jitter_mode = 'NONE' then 0
+      else floor(
+        pg_catalog.random()::numeric * (v_policy.jitter_max_ms + 1)
+      )::bigint
+    end;
+    v_retry_delay_ms := v_base_delay_ms + v_jitter_ms;
+    v_next_eligible_at :=
+      v_now + v_retry_delay_ms * interval '1 millisecond';
+    v_attempt_status := case
+      when p_reason = 'LEASE_EXPIRED' then 'LEASE_EXPIRED'
+      else 'FAILED'
+    end;
+
+    update careslink_v1_generation.attempts as attempt
+    set status = v_attempt_status,
+        provider_evidence_hash = v_evidence_hash,
+        canonical_content_hash = null,
+        failure_reason = p_reason,
+        terminal_transaction_id = v_transaction_id,
+        settlement_base_delay_ms = v_base_delay_ms,
+        settlement_jitter_ms = v_jitter_ms,
+        settlement_retry_delay_ms = v_retry_delay_ms,
+        finished_at = v_now
+    where attempt.id = v_attempt.id
+      and attempt.status = 'RUNNING';
+
+    update careslink_v1_generation.jobs as job
+    set status = 'QUEUED',
+        next_eligible_at = v_next_eligible_at,
+        failure_reason = null,
+        finished_at = null,
+        updated_at = v_now
+    where job.id = v_job.id
+      and job.status = 'RUNNING';
+  else
+    v_attempt_status := case
+      when p_reason = 'CANCELLED' then 'CANCELLED'
+      when p_reason = 'LEASE_EXPIRED' then 'LEASE_EXPIRED'
+      else 'FAILED'
+    end;
+    v_job_status := case
+      when p_reason = 'CANCELLED' then 'CANCELLED'
+      else 'FAILED'
+    end;
+    v_purge_reason := v_job_status;
+    v_event_hash := careslink_v1_generation._enqueue_payload_purge(
+      v_transaction_id,
+      v_job.payload_id,
+      v_job.id,
+      v_job.owner_user_id,
+      v_purge_reason,
+      v_now
+    );
+
+    update careslink_v1_generation.attempts as attempt
+    set status = v_attempt_status,
+        provider_evidence_hash = v_evidence_hash,
+        canonical_content_hash = null,
+        failure_reason = p_reason,
+        terminal_transaction_id = v_transaction_id,
+        settlement_base_delay_ms = null,
+        settlement_jitter_ms = null,
+        settlement_retry_delay_ms = null,
+        finished_at = v_now
+    where attempt.id = v_attempt.id
+      and attempt.status = 'RUNNING';
+
+    update careslink_v1_generation.jobs as job
+    set status = v_job_status,
+        next_eligible_at = null,
+        failure_reason = p_reason,
+        finished_at = v_now,
+        updated_at = v_now
+    where job.id = v_job.id
+      and job.status = 'RUNNING';
+  end if;
+
+  return careslink_v1_generation._failure_envelope(
+    p_job_id,
+    p_attempt_id,
+    p_registration_digest
+  );
+end;
+$$;
+
+
+select pg_catalog.set_config(
+  'role',
+  pg_catalog.current_setting('careslink.migration_entry_role'),
+  false
+);
+
+
+-- -------------------------------------------------------------------------
 -- Exact ACL closure; purpose ownership is not a caller grant
 -- -------------------------------------------------------------------------
 
@@ -4076,6 +5104,15 @@ revoke all on function
     pg_catalog.uuid, pg_catalog.uuid, pg_catalog.uuid, pg_catalog.text,
     pg_catalog.text
   ),
+  careslink_v1_generation.commit_v1_shadow_note_generation_success(
+    pg_catalog.uuid, pg_catalog.uuid, pg_catalog.text, pg_catalog.text,
+    pg_catalog.text, pg_catalog.text, pg_catalog.uuid, pg_catalog.text,
+    pg_catalog.jsonb, pg_catalog.text, pg_catalog.jsonb
+  ),
+  careslink_v1_generation.settle_v1_shadow_note_generation_failure(
+    pg_catalog.uuid, pg_catalog.uuid, pg_catalog.text, pg_catalog.text,
+    pg_catalog.text, pg_catalog.text, pg_catalog.text, pg_catalog.jsonb
+  ),
   careslink_v1_generation.fence_v1_shadow_note_generation_attempt(
     pg_catalog.uuid, pg_catalog.uuid, pg_catalog.text, pg_catalog.text,
     pg_catalog.text, pg_catalog.text
@@ -4085,6 +5122,10 @@ revoke all on function
   ),
   careslink_v1_generation._failure_envelope(
     pg_catalog.uuid, pg_catalog.uuid, pg_catalog.text
+  ),
+  careslink_v1_generation._settle_denied_authority(
+    pg_catalog.uuid, pg_catalog.uuid, pg_catalog.uuid, pg_catalog.text,
+    pg_catalog.text, pg_catalog.timestamptz
   ) from public, anon, authenticated, service_role, authenticator,
     careslink_v1_generation_owner,
     careslink_v1_generation_owner_api_executor,

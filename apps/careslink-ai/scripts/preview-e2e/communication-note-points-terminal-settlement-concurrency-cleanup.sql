@@ -229,6 +229,10 @@ revoke execute on function
     pg_catalog.uuid, pg_catalog.uuid, pg_catalog.uuid, pg_catalog.text,
     pg_catalog.text
   ),
+  careslink_v1_generation.consume_v1_shadow_note_generation_payload_grant(
+    pg_catalog.uuid, pg_catalog.uuid, pg_catalog.uuid, pg_catalog.text,
+    pg_catalog.text, pg_catalog.uuid
+  ),
   careslink_v1_generation.settle_v1_shadow_note_generation_failure(
     pg_catalog.uuid, pg_catalog.uuid, pg_catalog.text, pg_catalog.text,
     pg_catalog.text, pg_catalog.text, pg_catalog.text, pg_catalog.jsonb

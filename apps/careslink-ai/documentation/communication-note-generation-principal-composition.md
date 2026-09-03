@@ -130,7 +130,7 @@ starvation. This is still source/local evidence only: it does not set `READY`,
 install the principal composition, create a credential or authorize a model.
 
 The final isolated PostgreSQL 16.15 run passed the exact 20-migration dependency
-chain and all five terminal/concurrency groups, then passed permanent ACL,
+chain and all six terminal/concurrency groups, then passed permanent ACL,
 zero-fixture, graceful-stop and exact-delete checks. See
 `documentation/tests.md` for the pinned source and scenario evidence.
 

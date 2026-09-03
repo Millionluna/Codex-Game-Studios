@@ -64,11 +64,11 @@ const MANAGEMENT_APPLICATION_NAME =
   "careslink-communication-terminal-management";
 const MAX_COMMAND_OUTPUT_BYTES = 1024 * 1024;
 const SETUP_SQL_SHA256 =
-  "b68d43aa72daf498d02c38c588152f78d6855a1e1a1241c04816d5454755fac1";
+  "a2dd25412d376d88892cfcc074ea4fcfe4cdb8a45e0992242006e36282437466";
 const CLEANUP_SQL_SHA256 =
-  "3632f078f7354ce574eeacc2dd0bd82f400ac78d1ccdcd108071fea66ef3be17";
+  "8da5bdca78c46c38d5654459669fd030cbbf9b82a6c126bec01e96e284665c88";
 const SOURCE_REVISION_SHA256 =
-  "2a272627e57db69efce212e1c74d02f4158e9abf2df52fb8e91df0e00b6628b6";
+  "0d67bccd29b384a0aab23c8291f9f40c5134d07e3e82bfada2947cf100058bc2";
 
 const REQUIRED_PG16_BINARIES = Object.freeze([
   "initdb",
@@ -135,7 +135,32 @@ export const COMMUNICATION_NOTE_POINTS_TERMINAL_SETTLEMENT_SCENARIOS =
     "queued-expiry-recovery",
     "short-grant-denial",
     "authority-bounds-cancel",
+    "timing-boundaries",
   ]);
+
+const TERMINAL_CLOCK_FIXTURE = Object.freeze({
+  ownerId: "da100000-0000-4000-8000-000000000001",
+  sessionId: "db351000-0000-4000-8000-000000000001",
+  privacyId: "db352000-0000-4000-8000-000000000001",
+  jobId: "db350000-0000-4000-8000-000000000001",
+  payloadId: "db360000-0000-4000-8000-000000000001",
+});
+
+const TERMINAL_DENIED_CLOCK_FIXTURE = Object.freeze({
+  ownerId: "da100000-0000-4000-8000-000000000001",
+  sessionId: "dd351000-0000-4000-8000-000000000001",
+  privacyId: "dd352000-0000-4000-8000-000000000001",
+  jobId: "dd350000-0000-4000-8000-000000000001",
+  payloadId: "dd360000-0000-4000-8000-000000000001",
+});
+
+const TERMINAL_SUCCESS_CLOCK_FIXTURE = Object.freeze({
+  ownerId: "da100000-0000-4000-8000-000000000001",
+  sessionId: "dc351000-0000-4000-8000-000000000001",
+  privacyId: "dc352000-0000-4000-8000-000000000001",
+  jobId: "dc350000-0000-4000-8000-000000000001",
+  payloadId: "dc360000-0000-4000-8000-000000000001",
+});
 
 export const COMMUNICATION_NOTE_POINTS_TERMINAL_SETTLEMENT_TEST_ONLY =
   Object.freeze({
@@ -168,6 +193,7 @@ const FIXED_ERROR_CODES = new Set([
   "COMMUNICATION_NOTE_POINTS_TERMINAL_SETTLEMENT_CONCURRENCY_RECOVERY_RACE_FAILED",
   "COMMUNICATION_NOTE_POINTS_TERMINAL_SETTLEMENT_CONCURRENCY_SHORT_GRANT_FAILED",
   "COMMUNICATION_NOTE_POINTS_TERMINAL_SETTLEMENT_CONCURRENCY_AUTHORITY_CANCEL_FAILED",
+  "COMMUNICATION_NOTE_POINTS_TERMINAL_SETTLEMENT_CONCURRENCY_TIMING_BOUNDARIES_FAILED",
   "COMMUNICATION_NOTE_POINTS_TERMINAL_SETTLEMENT_CONCURRENCY_CLOSE_FAILED",
   "COMMUNICATION_NOTE_POINTS_TERMINAL_SETTLEMENT_CONCURRENCY_INTERNAL_FAILED",
   "COMMUNICATION_NOTE_POINTS_TERMINAL_SETTLEMENT_LOCAL_PG16_ABORTED",
@@ -1091,7 +1117,7 @@ select case when not exists (
       or activity.datname <> 'postgres'
       or activity.client_addr is not null
       or activity.application_name !~
-        '^careslink-cn-terminal-(terminal-failure|retry-success-replay|queued-expiry-recovery|short-grant-denial|authority-bounds-cancel)-(a|b|observer)$'
+        '^careslink-cn-terminal-(terminal-failure|retry-success-replay|queued-expiry-recovery|short-grant-denial|authority-bounds-cancel|timing-boundaries)-(a|b|observer)$'
     )
 ) then 'safe' else 'unsafe' end;
 `;
@@ -1107,7 +1133,7 @@ from (
     and activity.datname = 'postgres'
     and activity.client_addr is null
     and activity.application_name ~
-      '^careslink-cn-terminal-(terminal-failure|retry-success-replay|queued-expiry-recovery|short-grant-denial|authority-bounds-cancel)-(a|b|observer)$'
+      '^careslink-cn-terminal-(terminal-failure|retry-success-replay|queued-expiry-recovery|short-grant-denial|authority-bounds-cancel|timing-boundaries)-(a|b|observer)$'
 ) as terminated_runner
 where terminated_runner.terminated;
 `;
@@ -1253,6 +1279,34 @@ select case when
       'careslink_v1_generation._communication_note_point_settlement_content_sha256(pg_catalog.jsonb)'::pg_catalog.regprocedure,
       'careslink_v1_generation._communication_note_job_has_point_admission(pg_catalog.uuid,pg_catalog.uuid)'::pg_catalog.regprocedure
     ])
+  )
+  and exists (
+    select 1
+    from pg_catalog.pg_proc as denied_helper
+    where denied_helper.oid =
+        'careslink_v1_generation._settle_denied_authority(pg_catalog.uuid,pg_catalog.uuid,pg_catalog.uuid,pg_catalog.text,pg_catalog.text,pg_catalog.timestamptz)'::pg_catalog.regprocedure
+      and denied_helper.proowner = pg_catalog.to_regrole(
+        'careslink_v1_generation_executor'
+      )
+      and denied_helper.prosecdef is false
+      and denied_helper.provolatile = 'v'
+      and pg_catalog.cardinality(denied_helper.proconfig) = 1
+      and denied_helper.proconfig[1] in ('search_path=', 'search_path=""')
+  )
+  and not exists (
+    select 1
+    from pg_catalog.unnest(array[
+      'public', 'anon', 'authenticated', 'service_role', 'authenticator',
+      'careslink_v1_generation_owner',
+      'careslink_v1_generation_owner_api_executor',
+      'careslink_v1_generation_points_admission_executor',
+      'careslink_v1_generation_points_settlement_executor'
+    ]::pg_catalog.text[]) as denied_role(role_name)
+    where pg_catalog.has_function_privilege(
+      denied_role.role_name,
+      'careslink_v1_generation._settle_denied_authority(pg_catalog.uuid,pg_catalog.uuid,pg_catalog.uuid,pg_catalog.text,pg_catalog.text,pg_catalog.timestamptz)',
+      'EXECUTE'
+    )
   )
   and not exists (
     select 1
@@ -2280,6 +2334,27 @@ async function authorize(client, fixture, claimed, catalog) {
   );
 }
 
+async function consume(client, fixture, claimed, authorized, catalog) {
+  return expectSingleJson(
+    await query(
+      client,
+      `select careslink_v1_generation.consume_v1_shadow_note_generation_payload_grant(
+        $1::pg_catalog.uuid, $2::pg_catalog.uuid, $3::pg_catalog.uuid,
+        $4::pg_catalog.text, $5::pg_catalog.text, $6::pg_catalog.uuid
+      ) as result`,
+      [
+        fixture.jobId,
+        fixture.payloadId,
+        claimed.attempt.attemptId,
+        claimed.leaseToken,
+        catalog.registrationDigest,
+        authorized.grantId,
+      ],
+    ),
+    "COMMUNICATION_NOTE_POINTS_TERMINAL_SETTLEMENT_CONCURRENCY_ENVELOPE_FAILED",
+  );
+}
+
 async function fence(client, fixture, claimed, catalog) {
   return expectSingleJson(
     await query(
@@ -2521,6 +2596,7 @@ const FIXTURE_STATE_KEYS = Object.freeze([
   "jobStatus",
   "attemptCount",
   "jobFailureReason",
+  "jobFinishedAt",
   "resultDocumentId",
   "resultRevisionId",
   "resultContentHash",
@@ -2530,12 +2606,14 @@ const FIXTURE_STATE_KEYS = Object.freeze([
   "attempts",
   "reservationStatus",
   "reservationExpiresAt",
+  "reservationTerminalAt",
   "settlementCount",
   "settlementJobStatus",
   "settlementReservationStatus",
   "settlementAttemptId",
   "settlementAttemptNumber",
   "settlementReason",
+  "settlementSettledAt",
   "settlementPoints",
   "settlementAllocationPoints",
   "settlementRestoredPoints",
@@ -2543,6 +2621,7 @@ const FIXTURE_STATE_KEYS = Object.freeze([
   "reserveLedgerCount",
   "terminalLedgerCount",
   "terminalLedgerEvent",
+  "terminalLedgerCreatedAt",
   "lotRemaining",
   "grantCount",
   "issuedGrantCount",
@@ -2551,7 +2630,9 @@ const FIXTURE_STATE_KEYS = Object.freeze([
   "authorityBoundsValid",
   "payloadState",
   "payloadRevokeReason",
+  "payloadRevokedAt",
   "outboxCount",
+  "outboxRequestedAt",
   "documentCount",
   "revisionCount",
   "syncChangeCount",
@@ -2750,9 +2831,11 @@ function assertFailureAcknowledgement(value, reason, disposition) {
   return value;
 }
 
-function assertDeniedSettlement(value) {
-  const code =
-    "COMMUNICATION_NOTE_POINTS_TERMINAL_SETTLEMENT_CONCURRENCY_SHORT_GRANT_FAILED";
+function assertDeniedSettlement(
+  value,
+  code =
+    "COMMUNICATION_NOTE_POINTS_TERMINAL_SETTLEMENT_CONCURRENCY_SHORT_GRANT_FAILED",
+) {
   assert(
     exactKeys(value, [
       "status",
@@ -3806,6 +3889,695 @@ async function runShortGrantDenialScenario(
   }
 }
 
+function assertIdleClaim(value, code) {
+  assert(
+    exactKeys(value, ["status", "claim"]) &&
+      value.status === "IDLE" &&
+      value.claim === null,
+    code,
+  );
+  assertNoPrivatePointsIdentifiers(value, code);
+  return value;
+}
+
+function assertQueueAgeBlockedState(state, scenario, fixture) {
+  const code =
+    "COMMUNICATION_NOTE_POINTS_TERMINAL_SETTLEMENT_CONCURRENCY_TIMING_BOUNDARIES_FAILED";
+  assertFixtureStateShape(state, scenario, fixture);
+  assert(
+    state.jobStatus === "QUEUED" &&
+      state.attemptCount === 0 &&
+      state.jobFailureReason === null &&
+      state.attempts.length === 0 &&
+      state.reservationStatus === "RESERVED" &&
+      state.settlementCount === 0 &&
+      state.settlementJobStatus === null &&
+      state.settlementReservationStatus === null &&
+      state.settlementAttemptId === null &&
+      state.settlementAttemptNumber === null &&
+      state.settlementReason === null &&
+      state.settlementPoints === null &&
+      state.settlementAllocationPoints === null &&
+      state.settlementRestoredPoints === null &&
+      state.settlementResultRef === null &&
+      state.terminalLedgerCount === 0 &&
+      state.terminalLedgerEvent === null &&
+      state.lotRemaining === 10 &&
+      state.grantCount === 0 &&
+      state.payloadState === "AVAILABLE" &&
+      state.payloadRevokeReason === null &&
+      state.outboxCount === 0 &&
+      state.documentCount === 0 &&
+      state.revisionCount === 0 &&
+      state.syncChangeCount === 0 &&
+      state.mutationReceiptCount === 0 &&
+      state.providerEvidenceCount === 0,
+    code,
+  );
+  return state;
+}
+
+function assertSuccessBoundaryZeroWriteState(state, fixture) {
+  const code =
+    "COMMUNICATION_NOTE_POINTS_TERMINAL_SETTLEMENT_CONCURRENCY_TIMING_BOUNDARIES_FAILED";
+  assertFixtureStateShape(state, "success-clock", fixture);
+  assert(
+    state.jobStatus === "RUNNING" &&
+      state.attemptCount === 1 &&
+      state.jobFailureReason === null &&
+      state.resultDocumentId === null &&
+      state.resultRevisionId === null &&
+      state.resultContentHash === null &&
+      state.documentCurrentRevisionId === null &&
+      state.documentCurrentRevisionNumber === null &&
+      state.documentLifecycleStatus === null &&
+      state.attempts.length === 1 &&
+      state.attempts[0].attemptNumber === 1 &&
+      state.attempts[0].status === "RUNNING" &&
+      state.attempts[0].failureReason === null &&
+      state.attempts[0].terminalTransactionId === null &&
+      state.attempts[0].finishedAt === null &&
+      state.reservationStatus === "RESERVED" &&
+      state.settlementCount === 0 &&
+      state.settlementJobStatus === null &&
+      state.settlementReservationStatus === null &&
+      state.settlementAttemptId === null &&
+      state.settlementAttemptNumber === null &&
+      state.settlementReason === null &&
+      state.settlementPoints === null &&
+      state.settlementAllocationPoints === null &&
+      state.settlementRestoredPoints === null &&
+      state.settlementResultRef === null &&
+      state.terminalLedgerCount === 0 &&
+      state.terminalLedgerEvent === null &&
+      state.lotRemaining === 10 &&
+      state.grantCount === 1 &&
+      state.issuedGrantCount === 0 &&
+      state.consumedGrantCount === 1 &&
+      state.revokedGrantCount === 0 &&
+      state.payloadState === "AVAILABLE" &&
+      state.payloadRevokeReason === null &&
+      state.outboxCount === 0 &&
+      state.documentCount === 0 &&
+      state.revisionCount === 0 &&
+      state.syncChangeCount === 0 &&
+      state.mutationReceiptCount === 0 &&
+      state.providerEvidenceCount === 0,
+    code,
+  );
+  return state;
+}
+
+async function runTimingBoundariesScenario(
+  Client,
+  databaseUrl,
+  target,
+  sleep,
+  clock,
+) {
+  const scenario = "timing-boundaries";
+  const code =
+    "COMMUNICATION_NOTE_POINTS_TERMINAL_SETTLEMENT_CONCURRENCY_TIMING_BOUNDARIES_FAILED";
+  const connections = await openScenario(
+    Client,
+    databaseUrl,
+    target,
+    scenario,
+    ["a", "b", "observer"],
+  );
+  let primaryError = null;
+  let payloadBlockerTransaction = false;
+  let jobBlockerTransaction = false;
+  let terminalTransaction = false;
+  let deniedPointsBlockerTransaction = false;
+  let deniedTransaction = false;
+  let successPayloadBlockerTransaction = false;
+  let successTransaction = false;
+  try {
+    const catalog = assertFixtureCatalog(
+      await fixtureCatalog(connections.observer.client),
+    );
+    const fixture = catalog.cases[scenario];
+    assertAdmission(
+      await admitCase(connections.a.client, scenario, 120_000),
+      fixture,
+    );
+    const queueExpiresAt = await support(
+      connections.observer.client,
+      "age_queue_deadline",
+      ["text", "int4"],
+      [scenario, 750],
+    );
+    assert(validIsoMilliseconds(queueExpiresAt), code);
+
+    await query(connections.a.client, "begin");
+    payloadBlockerTransaction = true;
+    assert(
+      (await support(
+        connections.a.client,
+        "hold_payload_lock",
+        ["text"],
+        [scenario],
+      )) === true,
+      code,
+    );
+    const pendingClaim = capture(claim(connections.b.client, catalog));
+    const claimBarrier = await waitForBlocker(
+      connections.observer.client,
+      connections.b.pid,
+      connections.a.pid,
+      sleep,
+    );
+    await waitUntilExpired(queueExpiresAt, sleep, clock, code);
+    await query(connections.a.client, "commit");
+    payloadBlockerTransaction = false;
+    const claimOutcome = await pendingClaim;
+    assert(claimOutcome.ok === true, code);
+    assertIdleClaim(claimOutcome.value, code);
+    assertQueueAgeBlockedState(
+      await fixtureState(connections.observer.client, scenario),
+      scenario,
+      fixture,
+    );
+    const recovered = assertRecoveryEnvelope(
+      await recover(connections.observer.client, catalog),
+    );
+    assert(
+      recovered.recovered === 1 &&
+        recovered.requeued === 0 &&
+        recovered.failed === 1,
+      code,
+    );
+    const queueReleased = assertReleasedState(
+      await fixtureState(connections.observer.client, scenario),
+      {
+        scenario,
+        fixture,
+        jobStatus: "FAILED",
+        jobFailureReason: "PAYLOAD_UNAVAILABLE",
+        attemptStatus: "FAILED",
+        attemptFailureReason: "PAYLOAD_UNAVAILABLE",
+        settlementReason: "PAYLOAD_UNAVAILABLE",
+        grantCount: 0,
+        revokedGrantCount: 0,
+      },
+    );
+
+    assertAdmission(
+      await admitCase(connections.a.client, "terminal-clock", 120_000),
+      TERMINAL_CLOCK_FIXTURE,
+    );
+    await query(connections.b.client, "begin");
+    terminalTransaction = true;
+    const transactionClock = await query(
+      connections.b.client,
+      [
+        "select pg_catalog.to_char(",
+        "  pg_catalog.date_trunc(",
+        "    'milliseconds',",
+        "    pg_catalog.transaction_timestamp()",
+        "  ) at time zone 'UTC',",
+        "  'YYYY-MM-DD\"T\"HH24:MI:SS.MS\"Z\"'",
+        ") as observed_at",
+      ].join("\n"),
+    );
+    const transactionStartedAt = transactionClock.rows[0]?.observed_at;
+    assert(validIsoMilliseconds(transactionStartedAt), code);
+    const claimed = assertClaim(
+      await claim(connections.a.client, catalog),
+      TERMINAL_CLOCK_FIXTURE,
+      1,
+    );
+    assertAuthorized(
+      await authorize(
+        connections.a.client,
+        TERMINAL_CLOCK_FIXTURE,
+        claimed,
+        catalog,
+      ),
+      claimed,
+      catalog,
+    );
+
+    await query(connections.observer.client, "begin");
+    jobBlockerTransaction = true;
+    assert(
+      (await support(
+        connections.observer.client,
+        "hold_job_lock",
+        ["text"],
+        ["terminal-clock"],
+      )) === true,
+      code,
+    );
+    const pendingSettlement = capture(
+      settleFailure(
+        connections.b.client,
+        TERMINAL_CLOCK_FIXTURE,
+        claimed,
+        catalog,
+        "PROVIDER_PERMANENT",
+      ),
+    );
+    const terminalBarrier = await waitForBlocker(
+      connections.a.client,
+      connections.b.pid,
+      connections.observer.pid,
+      sleep,
+    );
+    await sleep(50);
+    const releaseClock = await query(
+      connections.observer.client,
+      [
+        "select pg_catalog.to_char(",
+        "  pg_catalog.date_trunc(",
+        "    'milliseconds',",
+        "    pg_catalog.clock_timestamp()",
+        "  ) at time zone 'UTC',",
+        "  'YYYY-MM-DD\"T\"HH24:MI:SS.MS\"Z\"'",
+        ") as observed_at",
+      ].join("\n"),
+    );
+    const releasedAt = releaseClock.rows[0]?.observed_at;
+    assert(validIsoMilliseconds(releasedAt), code);
+    await query(connections.observer.client, "commit");
+    jobBlockerTransaction = false;
+    const settlementOutcome = await pendingSettlement;
+    assert(settlementOutcome.ok === true, code);
+    assertFailureAcknowledgement(
+      settlementOutcome.value,
+      "PROVIDER_PERMANENT",
+      "FAILED",
+    );
+    await query(connections.b.client, "commit");
+    terminalTransaction = false;
+
+    const terminalState = assertReleasedState(
+      await fixtureState(connections.a.client, "terminal-clock"),
+      {
+        scenario: "terminal-clock",
+        fixture: TERMINAL_CLOCK_FIXTURE,
+        jobStatus: "FAILED",
+        jobFailureReason: "PROVIDER_PERMANENT",
+        attemptStatus: "FAILED",
+        attemptFailureReason: "PROVIDER_PERMANENT",
+        settlementReason: "PROVIDER_PERMANENT",
+        grantCount: 1,
+        revokedGrantCount: 1,
+      },
+    );
+    const terminalAttempt = terminalState.attempts[0];
+    assert(
+      validIsoMilliseconds(terminalAttempt.acquiredAt) &&
+        validIsoMilliseconds(terminalAttempt.finishedAt) &&
+        Date.parse(terminalAttempt.finishedAt) >=
+          Date.parse(terminalAttempt.acquiredAt) &&
+        Date.parse(terminalAttempt.finishedAt) >= Date.parse(releasedAt) &&
+        Date.parse(terminalAttempt.finishedAt) >
+          Date.parse(transactionStartedAt),
+      code,
+    );
+
+    assertAdmission(
+      await admitCase(connections.a.client, "denied-clock", 120_000),
+      TERMINAL_DENIED_CLOCK_FIXTURE,
+    );
+    await query(connections.b.client, "begin");
+    deniedTransaction = true;
+    const deniedTransactionClock = await query(
+      connections.b.client,
+      [
+        "select pg_catalog.to_char(",
+        "  pg_catalog.date_trunc(",
+        "    'milliseconds',",
+        "    pg_catalog.transaction_timestamp()",
+        "  ) at time zone 'UTC',",
+        "  'YYYY-MM-DD\"T\"HH24:MI:SS.MS\"Z\"'",
+        ") as observed_at",
+      ].join("\n"),
+    );
+    const deniedTransactionStartedAt =
+      deniedTransactionClock.rows[0]?.observed_at;
+    assert(validIsoMilliseconds(deniedTransactionStartedAt), code);
+    await sleep(50);
+
+    const deniedClaim = assertClaim(
+      await claim(connections.a.client, catalog),
+      TERMINAL_DENIED_CLOCK_FIXTURE,
+      1,
+    );
+    const deniedGrant = assertAuthorized(
+      await authorize(
+        connections.a.client,
+        TERMINAL_DENIED_CLOCK_FIXTURE,
+        deniedClaim,
+        catalog,
+      ),
+      deniedClaim,
+      catalog,
+    );
+    const deniedRunningState = assertFixtureStateShape(
+      await fixtureState(connections.a.client, "denied-clock"),
+      "denied-clock",
+      TERMINAL_DENIED_CLOCK_FIXTURE,
+    );
+    const deniedAcquiredAt = deniedRunningState.attempts[0]?.acquiredAt;
+    assert(
+      deniedRunningState.jobStatus === "RUNNING" &&
+        deniedRunningState.attempts.length === 1 &&
+        validIsoMilliseconds(deniedAcquiredAt) &&
+        Date.parse(deniedAcquiredAt) >
+          Date.parse(deniedTransactionStartedAt),
+      code,
+    );
+
+    await query(connections.observer.client, "begin");
+    deniedPointsBlockerTransaction = true;
+    assert(
+      (await support(
+        connections.observer.client,
+        "hold_point_reservation_lock",
+        ["text"],
+        ["denied-clock"],
+      )) === true,
+      code,
+    );
+    const pendingDenied = capture(
+      consume(
+        connections.b.client,
+        TERMINAL_DENIED_CLOCK_FIXTURE,
+        deniedClaim,
+        deniedGrant,
+        catalog,
+      ),
+    );
+    const deniedBarrier = await waitForBlocker(
+      connections.a.client,
+      connections.b.pid,
+      connections.observer.pid,
+      sleep,
+    );
+    await sleep(50);
+    const deniedReleaseClock = await query(
+      connections.observer.client,
+      [
+        "select pg_catalog.to_char(",
+        "  pg_catalog.date_trunc(",
+        "    'milliseconds',",
+        "    pg_catalog.clock_timestamp()",
+        "  ) at time zone 'UTC',",
+        "  'YYYY-MM-DD\"T\"HH24:MI:SS.MS\"Z\"'",
+        ") as observed_at",
+      ].join("\n"),
+    );
+    const deniedReleasedAt = deniedReleaseClock.rows[0]?.observed_at;
+    assert(
+      validIsoMilliseconds(deniedReleasedAt) &&
+        Date.parse(deniedReleasedAt) > Date.parse(deniedAcquiredAt) &&
+        Date.parse(deniedReleasedAt) >
+          Date.parse(deniedTransactionStartedAt),
+      code,
+    );
+    await query(connections.observer.client, "commit");
+    deniedPointsBlockerTransaction = false;
+    const deniedOutcome = await pendingDenied;
+    assert(deniedOutcome.ok === true, code);
+    const denied = assertDeniedSettlement(deniedOutcome.value, code);
+    await query(connections.b.client, "commit");
+    deniedTransaction = false;
+
+    const deniedState = assertReleasedState(
+      await fixtureState(connections.a.client, "denied-clock"),
+      {
+        scenario: "denied-clock",
+        fixture: TERMINAL_DENIED_CLOCK_FIXTURE,
+        jobStatus: "FAILED",
+        jobFailureReason: "PAYLOAD_UNAVAILABLE",
+        attemptStatus: "FAILED",
+        attemptFailureReason: "PAYLOAD_UNAVAILABLE",
+        settlementReason: "PAYLOAD_UNAVAILABLE",
+        grantCount: 1,
+        revokedGrantCount: 1,
+      },
+    );
+    const deniedAttempt = deniedState.attempts[0];
+    const deniedTerminalTimes = [
+      denied.committedAt,
+      deniedAttempt.finishedAt,
+      deniedState.jobFinishedAt,
+      deniedState.reservationTerminalAt,
+      deniedState.settlementSettledAt,
+      deniedState.terminalLedgerCreatedAt,
+      deniedState.payloadRevokedAt,
+      deniedState.outboxRequestedAt,
+    ];
+    assert(
+      deniedAttempt.terminalTransactionId === denied.transactionId &&
+        deniedTerminalTimes.every(validIsoMilliseconds) &&
+        deniedTerminalTimes.every(
+          (terminalAt) => terminalAt === deniedAttempt.finishedAt,
+        ) &&
+        Date.parse(deniedAttempt.finishedAt) >=
+          Date.parse(deniedReleasedAt) &&
+        Date.parse(deniedAttempt.finishedAt) >
+          Date.parse(deniedTransactionStartedAt),
+      code,
+    );
+    const deniedReplay = assertDeniedSettlement(
+      await consume(
+        connections.b.client,
+        TERMINAL_DENIED_CLOCK_FIXTURE,
+        deniedClaim,
+        deniedGrant,
+        catalog,
+      ),
+      code,
+    );
+    assert(sameJson(deniedReplay, denied), code);
+    const deniedAfterReplay = assertReleasedState(
+      await fixtureState(connections.a.client, "denied-clock"),
+      {
+        scenario: "denied-clock",
+        fixture: TERMINAL_DENIED_CLOCK_FIXTURE,
+        jobStatus: "FAILED",
+        jobFailureReason: "PAYLOAD_UNAVAILABLE",
+        attemptStatus: "FAILED",
+        attemptFailureReason: "PAYLOAD_UNAVAILABLE",
+        settlementReason: "PAYLOAD_UNAVAILABLE",
+        grantCount: 1,
+        revokedGrantCount: 1,
+      },
+    );
+    assert(sameJson(deniedAfterReplay, deniedState), code);
+
+    assertAdmission(
+      await admitCase(connections.a.client, "success-clock", 120_000),
+      TERMINAL_SUCCESS_CLOCK_FIXTURE,
+    );
+    await query(connections.b.client, "begin");
+    successTransaction = true;
+    const successTransactionClock = await query(
+      connections.b.client,
+      [
+        "select pg_catalog.to_char(",
+        "  pg_catalog.date_trunc(",
+        "    'milliseconds',",
+        "    pg_catalog.transaction_timestamp()",
+        "  ) at time zone 'UTC',",
+        "  'YYYY-MM-DD\"T\"HH24:MI:SS.MS\"Z\"'",
+        ") as observed_at",
+      ].join("\n"),
+    );
+    const successTransactionStartedAt =
+      successTransactionClock.rows[0]?.observed_at;
+    assert(validIsoMilliseconds(successTransactionStartedAt), code);
+    const successClaim = assertClaim(
+      await claim(connections.a.client, catalog),
+      TERMINAL_SUCCESS_CLOCK_FIXTURE,
+      1,
+    );
+    const successGrant = assertAuthorized(
+      await authorize(
+        connections.a.client,
+        TERMINAL_SUCCESS_CLOCK_FIXTURE,
+        successClaim,
+        catalog,
+      ),
+      successClaim,
+      catalog,
+    );
+    const successConsumed = await support(
+      connections.a.client,
+      "consume_grant_test_only",
+      ["uuid", "uuid"],
+      [TERMINAL_SUCCESS_CLOCK_FIXTURE.jobId, successGrant.grantId],
+    );
+    assert(
+      exactKeys(successConsumed, ["status", "grantId", "consumedAt"]) &&
+        successConsumed.status === "CONSUMED" &&
+        successConsumed.grantId === successGrant.grantId &&
+        validIsoMilliseconds(successConsumed.consumedAt),
+      code,
+    );
+    const successFence = assertFence(
+      await fence(
+        connections.a.client,
+        TERMINAL_SUCCESS_CLOCK_FIXTURE,
+        successClaim,
+        catalog,
+      ),
+      catalog,
+    );
+    const successBefore = assertSuccessBoundaryZeroWriteState(
+      await fixtureState(connections.a.client, "success-clock"),
+      TERMINAL_SUCCESS_CLOCK_FIXTURE,
+    );
+    const successAttemptBefore = successBefore.attempts[0];
+    assert(
+      validIsoMilliseconds(successAttemptBefore.leaseExpiresAt) &&
+        validIsoMilliseconds(successAttemptBefore.fenceExpiresAt),
+      code,
+    );
+    const successTerminalBoundaryExpiresAt =
+      Date.parse(successAttemptBefore.leaseExpiresAt) >=
+      Date.parse(successAttemptBefore.fenceExpiresAt)
+        ? successAttemptBefore.leaseExpiresAt
+        : successAttemptBefore.fenceExpiresAt;
+
+    await query(connections.observer.client, "begin");
+    successPayloadBlockerTransaction = true;
+    assert(
+      (await support(
+        connections.observer.client,
+        "hold_payload_lock",
+        ["text"],
+        ["success-clock"],
+      )) === true,
+      code,
+    );
+    const pendingSuccess = capture(
+      support(
+        connections.b.client,
+        "commit_success_test_only",
+        ["uuid", "uuid", "text", "uuid", "text"],
+        [
+          TERMINAL_SUCCESS_CLOCK_FIXTURE.jobId,
+          successClaim.attempt.attemptId,
+          successClaim.leaseToken,
+          successFence.fenceId,
+          successFence.fenceDigest,
+        ],
+      ),
+    );
+    const successBarrier = await waitForBlocker(
+      connections.a.client,
+      connections.b.pid,
+      connections.observer.pid,
+      sleep,
+    );
+    await waitUntilExpired(
+      successTerminalBoundaryExpiresAt,
+      sleep,
+      clock,
+      code,
+    );
+    const successReleaseClock = await query(
+      connections.observer.client,
+      [
+        "select pg_catalog.to_char(",
+        "  pg_catalog.date_trunc(",
+        "    'milliseconds',",
+        "    pg_catalog.clock_timestamp()",
+        "  ) at time zone 'UTC',",
+        "  'YYYY-MM-DD\"T\"HH24:MI:SS.MS\"Z\"'",
+        ") as observed_at",
+      ].join("\n"),
+    );
+    const successReleasedAt = successReleaseClock.rows[0]?.observed_at;
+    assert(
+      validIsoMilliseconds(successReleasedAt) &&
+        Date.parse(successReleasedAt) >
+          Date.parse(successTransactionStartedAt) &&
+        Date.parse(successReleasedAt) >=
+          Date.parse(successAttemptBefore.leaseExpiresAt) &&
+        Date.parse(successReleasedAt) >=
+          Date.parse(successAttemptBefore.fenceExpiresAt),
+      code,
+    );
+    await query(connections.observer.client, "commit");
+    successPayloadBlockerTransaction = false;
+    const successOutcome = await pendingSuccess;
+    assertDatabaseError(successOutcome, "LEASE_EXPIRED", code);
+    await query(connections.b.client, "rollback");
+    successTransaction = false;
+    const successZeroWrite = assertSuccessBoundaryZeroWriteState(
+      await fixtureState(connections.a.client, "success-clock"),
+      TERMINAL_SUCCESS_CLOCK_FIXTURE,
+    );
+    assert(sameJson(successZeroWrite, successBefore), code);
+
+    return Object.freeze({
+      scenario,
+      queueAgeBlockerObserved: claimBarrier.observed,
+      queueAgeCrossingReturnedIdle: true,
+      queueAgeRecoveryCount: recovered.recovered,
+      queueAgePointsReleased: queueReleased.settlementPoints,
+      terminalBlockerObserved: terminalBarrier.observed,
+      terminalClockAfterTransactionStart: true,
+      terminalClockAfterBlockerRelease: true,
+      terminalGrantRevoked: terminalState.revokedGrantCount === 1,
+      terminalPointsReleased: terminalState.settlementPoints,
+      deniedAuthorityBlockerObserved: deniedBarrier.observed,
+      deniedAuthorityCallerTransactionBeforeClaim: true,
+      deniedAuthorityClockAfterBlockerRelease: true,
+      deniedAuthorityReplayStable: true,
+      deniedAuthoritySettlementCount: deniedState.settlementCount,
+      deniedAuthorityPointsReleased: deniedState.settlementPoints,
+      deniedAuthorityTerminalWritesUnique:
+        deniedState.terminalLedgerCount === 1 &&
+        deniedState.outboxCount === 1,
+      successBlockerObserved: successBarrier.observed,
+      successLeaseExpiredAtDatabaseRelease: true,
+      successExpiredFenceRejected: true,
+      successStateSnapshotUnchanged: true,
+      successTerminalWritesAbsent:
+        successZeroWrite.settlementCount === 0 &&
+        successZeroWrite.documentCount === 0 &&
+        successZeroWrite.providerEvidenceCount === 0 &&
+        successZeroWrite.outboxCount === 0,
+    });
+  } catch (error) {
+    primaryError = error;
+    if (payloadBlockerTransaction) {
+      await rollbackClient(connections.a.client);
+    }
+    if (jobBlockerTransaction) {
+      await rollbackClient(connections.observer.client);
+    }
+    if (terminalTransaction) {
+      await rollbackClient(connections.b.client);
+    }
+    if (deniedPointsBlockerTransaction) {
+      await rollbackClient(connections.observer.client);
+    }
+    if (deniedTransaction) {
+      await rollbackClient(connections.b.client);
+    }
+    if (successPayloadBlockerTransaction) {
+      await rollbackClient(connections.observer.client);
+    }
+    if (successTransaction) {
+      await rollbackClient(connections.b.client);
+    }
+    throw error;
+  } finally {
+    await closeClients(
+      Object.values(connections).map((entry) => entry.client),
+      primaryError,
+    );
+  }
+}
+
 function assertOwnerCancelEnvelope(value, fixture) {
   const code =
     "COMMUNICATION_NOTE_POINTS_TERMINAL_SETTLEMENT_CONCURRENCY_AUTHORITY_CANCEL_FAILED";
@@ -4046,6 +4818,13 @@ export async function runCommunicationNotePointsTerminalSettlementConcurrencyHar
     sleep,
     clock,
   );
+  const timingBoundaries = await runTimingBoundariesScenario(
+    Driver,
+    databaseUrl,
+    target,
+    sleep,
+    clock,
+  );
 
   return Object.freeze({
     ok: true,
@@ -4062,6 +4841,7 @@ export async function runCommunicationNotePointsTerminalSettlementConcurrencyHar
       queuedExpiryRecovery,
       shortGrantDenial,
       authorityBoundsCancel,
+      timingBoundaries,
     }),
   });
 }

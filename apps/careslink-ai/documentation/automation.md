@@ -1306,7 +1306,7 @@ unchanged. The migration remains default-off, unwired and Production-unapplied,
 with no deployment, provider request, model call or real care data.
 
 The final isolated PostgreSQL 16.15 gate applied the exact 20-migration
-dependency chain and passed all five terminal/concurrency groups, including
+dependency chain and passed all six terminal/concurrency groups, including
 unmarked `QUEUED`/`RUNNING`/`FAILED` cross-surface denial, deterministic
 recovery fairness and permanent ACL checks. Exact cleanup, graceful stop and
 temporary-root deletion all passed; `documentation/tests.md` records the pinned

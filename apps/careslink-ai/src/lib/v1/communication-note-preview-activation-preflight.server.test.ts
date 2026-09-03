@@ -75,7 +75,7 @@ describe("Communication Note M1l activation preflight", () => {
     expect(
       CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_ACTIVATION_PREFLIGHT_POLICY_DIGEST,
     ).toBe(
-      "0cbe311475728efa6c1d38ebbb7ffb71a465e754352b599d5564de51a896fa1f",
+      "5eed52f738170b7cd8817c6ca8b713a992d18e071aee94518fdc870eb6004d41",
     );
     expect(
       CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_ACTIVATION_PREFLIGHT_POLICY,

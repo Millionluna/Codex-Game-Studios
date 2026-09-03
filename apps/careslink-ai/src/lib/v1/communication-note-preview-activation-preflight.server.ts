@@ -55,7 +55,7 @@ export const CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_DATABASE_EVIDENCE_PINS =
     orderedMigrationBasenamesSha256:
       "80743dc1d26c9ec055adbf2aefd7485df486f05110cc56a4294d1022751e6efc",
     orderedMigrationEntriesSha256:
-      "9cf7c024a2f574ba97db130bbd9f8944150b5a6726d40c05131a314725315c66",
+      "3e76160b37330897fadbcfe05740eb3e005b6d7286958065396761c14326c012",
     authorityMigrationSha256:
       "94f83498ea04053e7238a95bb9be0bb8a38ad0a76fa0e751390419800da51f7f",
     custodyMigrationSha256:
@@ -73,7 +73,7 @@ export const CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_DATABASE_EVIDENCE_PINS =
     runtimeCredentialBrokerMigrationSha256:
       "64dcb8c57f2c73d3fbd5adc99e3261f8e2e0ddd8e8efcf5cca52c12ca34ba5aa",
     pointsTerminalSettlementMigrationSha256:
-      "e10c67d24336fec97137b804534c0c6f867f88656980e577ffb8ea57d0b5eeea",
+      "6e5148f3e080ab767f586c27c86490ac1c05b80deed864f48783c331bbf41afd",
     runnerTerminalAssertionSha256:
       "0f8192bccf46101103c301fcfd2b00cb818dd6725425a952777f697db8ea8172",
   } as const);
@@ -165,7 +165,7 @@ export type CaresLinkV1CommunicationNotePreviewActivationPreflightPolicy =
     Readonly<{ policyDigest: string }>;
 
 export const CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_ACTIVATION_PREFLIGHT_POLICY_DIGEST =
-  "0cbe311475728efa6c1d38ebbb7ffb71a465e754352b599d5564de51a896fa1f" as const;
+  "5eed52f738170b7cd8817c6ca8b713a992d18e071aee94518fdc870eb6004d41" as const;
 
 if (
   createCanonicalSha256(ACTIVATION_PREFLIGHT_POLICY_CORE) !==

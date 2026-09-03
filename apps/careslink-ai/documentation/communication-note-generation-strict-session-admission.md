@@ -119,7 +119,7 @@ recovery turns prevent paid/unpaid and paid queued/running starvation. It adds a
 non-login purpose role but no runtime membership, route, pool or credential.
 
 The final isolated PostgreSQL 16.15 gate passed the exact 20-migration chain,
-all five terminal/concurrency groups, permanent ACL postcheck and complete
+all six terminal/concurrency groups, permanent ACL postcheck and complete
 cleanup. `documentation/tests.md` records the exact hashes and non-production
 evidence boundary.
 

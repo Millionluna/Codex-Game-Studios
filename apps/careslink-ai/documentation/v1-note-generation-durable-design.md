@@ -2036,7 +2036,7 @@ creates no runtime credential, route, deployment, provider request, model call,
 welcome grant, legacy-credit mutation or real care data.
 
 The final isolated PostgreSQL 16.15 gate applied the exact 20-migration
-dependency chain and passed all five terminal/concurrency groups. It also proved
+dependency chain and passed all six terminal/concurrency groups. It also proved
 unmarked cross-surface denial, deterministic recovery fairness, permanent ACL
 closure, zero scoped residue, graceful shutdown and exact temporary-root
 deletion. The pinned migration, setup, cleanup and normalized source hashes are

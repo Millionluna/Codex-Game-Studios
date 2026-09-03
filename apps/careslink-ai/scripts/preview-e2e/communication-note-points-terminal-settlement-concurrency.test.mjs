@@ -357,6 +357,7 @@ describe("Communication Note Points terminal settlement launcher contract", () =
       "queued-expiry-recovery",
       "short-grant-denial",
       "authority-bounds-cancel",
+      "timing-boundaries",
     ]);
     const applicationNames =
       COMMUNICATION_NOTE_POINTS_TERMINAL_SETTLEMENT_SCENARIOS.flatMap(
@@ -390,6 +391,20 @@ describe("Communication Note Points terminal settlement launcher contract", () =
       "commit_success_test_only",
       "advance_success_document_test_only",
       "hold_paid_recovery_lock",
+      "age_queue_deadline",
+      "hold_payload_lock",
+      "denied-clock",
+      "hold_point_reservation_lock",
+      "consume_v1_shadow_note_generation_payload_grant",
+      "deniedAuthorityCallerTransactionBeforeClaim",
+      "deniedAuthorityClockAfterBlockerRelease",
+      "deniedAuthorityReplayStable",
+      "deniedAuthorityTerminalWritesUnique",
+      "success-clock",
+      "successLeaseExpiredAtDatabaseRelease",
+      "successExpiredFenceRejected",
+      "successStateSnapshotUnchanged",
+      "successTerminalWritesAbsent",
       "assert_incomplete_fence_denied",
     ]) {
       expect(HARNESS_SOURCE).toContain(marker);

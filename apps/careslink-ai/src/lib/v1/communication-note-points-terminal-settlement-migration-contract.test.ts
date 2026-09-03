@@ -761,13 +761,13 @@ describe("Communication Note atomic Points terminal settlement migration contrac
     );
     expect(claim).toContain("for update of job skip locked");
     expect(claim).toMatch(
-      /v_now := pg_catalog\.date_trunc\([\s\S]{0,160}pg_catalog\.clock_timestamp\(\)[\s\S]{0,120}if v_payload\.id is null/,
+      /v_now := pg_catalog\.date_trunc\([\s\S]{0,160}pg_catalog\.clock_timestamp\(\)[\s\S]{0,500}if v_payload\.id is null/,
     );
     expect(claim).toMatch(
       /or \(\s*v_job\.communication_note_point_admission_id is not null\s*and \(\s*v_reservation_expires_at is null\s*or v_reservation_expires_at - v_now <[\s\S]{0,180}minimum_payload_remaining_at_claim_ms/,
     );
     expect(claim).toMatch(
-      /else\s*v_reservation_expires_at := 'infinity'::pg_catalog\.timestamptz;\s*end if;[\s\S]{0,500}v_job\.communication_note_point_admission_id is not null[\s\S]{0,180}v_reservation_expires_at - v_now/,
+      /else\s*v_reservation_expires_at := 'infinity'::pg_catalog\.timestamptz;\s*end if;[\s\S]{0,900}v_job\.communication_note_point_admission_id is not null[\s\S]{0,180}v_reservation_expires_at - v_now/,
     );
     expect(claim).toMatch(
       /v_lease_expires_at := least\([\s\S]{0,500}v_reservation_expires_at/,
@@ -788,6 +788,213 @@ describe("Communication Note atomic Points terminal settlement migration contrac
     );
     expect(lock).toContain("for update of reservation");
     expect(claim).not.toMatch(/'pointsAdmission'|'pointsSettlement'/);
+  });
+
+  it("rechecks queue age and samples direct terminal writes after worker row locks", () => {
+    const claim = functionSection(
+      "careslink_v1_generation.claim_v1_shadow_note_generation_job(",
+    );
+    const finalClaimClock = claim.lastIndexOf(
+      "v_now := pg_catalog.date_trunc(",
+    );
+    const queueAgeRecheck = claim.indexOf(
+      "v_job.created_at +\n" +
+        "      v_policy.max_queue_age_ms * interval '1 millisecond' <= v_now",
+      finalClaimClock,
+    );
+    const idleAfterCrossing = claim.indexOf(
+      "return pg_catalog.jsonb_build_object('status', 'IDLE', 'claim', null);",
+      queueAgeRecheck,
+    );
+    const attemptInsert = claim.indexOf(
+      "insert into careslink_v1_generation.attempts",
+    );
+    expect(claim).toContain(
+      "v_policy.max_queue_age_ms * interval '1 millisecond' > v_now",
+    );
+    expect(finalClaimClock).toBeGreaterThan(
+      claim.indexOf(
+        "_lock_v1_shadow_communication_note_point_reservation(",
+      ),
+    );
+    expect(queueAgeRecheck).toBeGreaterThan(finalClaimClock);
+    expect(idleAfterCrossing).toBeGreaterThan(queueAgeRecheck);
+    expect(attemptInsert).toBeGreaterThan(idleAfterCrossing);
+
+    for (const terminal of [
+      {
+        name: "careslink_v1_generation.commit_v1_shadow_note_generation_success(",
+        replay:
+          "if v_job.status = 'SUCCEEDED' and v_attempt.status = 'SUCCEEDED' then",
+      },
+      {
+        name: "careslink_v1_generation.settle_v1_shadow_note_generation_failure(",
+        replay: "if v_attempt.status <> 'RUNNING' then",
+      },
+    ]) {
+      const body = functionSection(terminal.name);
+      const jobLock = body.indexOf(
+        "from careslink_v1_generation.jobs as job",
+      );
+      const attemptLock = body.indexOf(
+        "from careslink_v1_generation.attempts as attempt",
+      );
+      const replay = body.indexOf(terminal.replay);
+      const payloadLock = body.indexOf(
+        "from careslink_v1_generation.payloads as payload",
+        replay,
+      );
+      const persistedClock = body.indexOf(
+        "v_now := pg_catalog.date_trunc(",
+        payloadLock,
+      );
+      const firstUuid = body.indexOf(
+        "v_transaction_id := extensions.gen_random_uuid()",
+      );
+      expect(body).toMatch(/^create or replace function/);
+      expect(body).toContain("volatile");
+      expect(body).toContain("security definer");
+      expect(body).toContain("set search_path = ''");
+      expect(body).toContain("v_observed_at timestamptz;");
+      expect(body).toContain("v_now timestamptz;");
+      expect(body).not.toContain("_server_now()");
+      expect(body.match(/\bv_now :=/g)).toHaveLength(1);
+      expect(jobLock).toBeGreaterThan(0);
+      expect(attemptLock).toBeGreaterThan(jobLock);
+      expect(replay).toBeGreaterThan(attemptLock);
+      expect(payloadLock).toBeGreaterThan(replay);
+      expect(persistedClock).toBeGreaterThan(payloadLock);
+      expect(firstUuid).toBeGreaterThan(persistedClock);
+    }
+
+    const success = functionSection(
+      "careslink_v1_generation.commit_v1_shadow_note_generation_success(",
+    );
+    const successPayloadLock = success.indexOf(
+      "from careslink_v1_generation.payloads as payload",
+    );
+    const successFinalClock = success.indexOf(
+      "v_now := pg_catalog.date_trunc(",
+      successPayloadLock,
+    );
+    const successFinalSessionCheck = success.indexOf(
+      "if not careslink_v1_generation.fresh_session_is_active(",
+      successFinalClock,
+    );
+    const successFirstUuid = success.indexOf(
+      "v_transaction_id := extensions.gen_random_uuid()",
+    );
+    expect(successFinalSessionCheck).toBeGreaterThan(successFinalClock);
+    expect(successFirstUuid).toBeGreaterThan(successFinalSessionCheck);
+
+    for (const terminalName of [
+      "commit_v1_shadow_note_generation_success",
+      "settle_v1_shadow_note_generation_failure",
+    ]) {
+      expect(migration).toMatch(
+        new RegExp(
+          "revoke all on function[\\s\\S]{0,1800}" +
+            "careslink_v1_generation\\." +
+            terminalName +
+            "\\([\\s\\S]{0,1200}from public, anon, authenticated, " +
+            "service_role, authenticator,[\\s\\S]{0,400}" +
+            "careslink_v1_generation_points_settlement_executor",
+        ),
+      );
+    }
+  });
+
+  it("settles denied authority from one fresh clock after its complete active lock set", () => {
+    expect(migration).toContain(
+      "careslink_v1_generation._settle_denied_authority(uuid,uuid,uuid,text,text,timestamp with time zone)'\n" +
+        "    ) is null",
+    );
+    const denied = functionSection(
+      "careslink_v1_generation._settle_denied_authority(",
+    );
+    const jobLock = denied.indexOf(
+      "from careslink_v1_generation.jobs as job",
+    );
+    const attemptLock = denied.indexOf(
+      "from careslink_v1_generation.attempts as attempt",
+    );
+    const replay = denied.indexOf(
+      "if v_job.status = 'FAILED' and v_attempt.status = 'FAILED' then",
+    );
+    const activeGate = denied.indexOf(
+      "if v_job.status <> 'RUNNING' or v_attempt.status <> 'RUNNING' then",
+    );
+    const payloadLock = denied.indexOf(
+      "from careslink_v1_generation.payloads as payload",
+      activeGate,
+    );
+    const grantLock = denied.indexOf(
+      "from careslink_v1_generation.payload_grants as grant_record",
+      payloadLock,
+    );
+    const reservationLock = denied.indexOf(
+      "_lock_v1_shadow_communication_note_point_reservation(",
+      grantLock,
+    );
+    const outboxLock = denied.indexOf(
+      "from careslink_v1_generation.payload_purge_outbox as outbox",
+      reservationLock,
+    );
+    const finalClock = denied.indexOf(
+      "v_now := pg_catalog.date_trunc(",
+      outboxLock,
+    );
+    const firstUuid = denied.indexOf(
+      "v_transaction_id := extensions.gen_random_uuid()",
+    );
+
+    expect(denied).toMatch(/^create or replace function/);
+    expect(denied).toContain("returns jsonb");
+    expect(denied).toContain("volatile");
+    expect(denied).toContain("security invoker");
+    expect(denied).toContain("set search_path = ''");
+    expect(denied.match(/\bv_now :=/g)).toHaveLength(1);
+    expect(jobLock).toBeGreaterThan(0);
+    expect(attemptLock).toBeGreaterThan(jobLock);
+    expect(replay).toBeGreaterThan(attemptLock);
+    expect(activeGate).toBeGreaterThan(replay);
+    const replayBlock = denied.slice(replay, activeGate);
+    expect(replayBlock).not.toContain("clock_timestamp()");
+    expect(replayBlock).not.toContain("gen_random_uuid()");
+    expect(replayBlock).toContain(
+      "_server_time(v_attempt.finished_at)",
+    );
+    expect(payloadLock).toBeGreaterThan(activeGate);
+    expect(grantLock).toBeGreaterThan(payloadLock);
+    expect(denied.slice(grantLock, reservationLock)).toMatch(
+      /grant_record\.status = 'ISSUED'[\s\S]{0,100}order by grant_record\.id[\s\S]{0,80}for update;/,
+    );
+    expect(reservationLock).toBeGreaterThan(grantLock);
+    expect(outboxLock).toBeGreaterThan(reservationLock);
+    expect(denied.slice(outboxLock, finalClock)).toContain(
+      "if v_outbox.id is not null then",
+    );
+    expect(denied.slice(outboxLock, finalClock)).not.toContain("for update;");
+    expect(finalClock).toBeGreaterThan(outboxLock);
+    expect(firstUuid).toBeGreaterThan(finalClock);
+
+    const activeWrites = denied.slice(finalClock);
+    expect(activeWrites).not.toMatch(/\bp_at\b/);
+    expect(activeWrites).toContain("finished_at = v_now");
+    expect(activeWrites).toContain("updated_at = v_now");
+    expect(activeWrites).toMatch(
+      /_enqueue_payload_purge\([\s\S]{0,300}'FAILED',[\s\S]{0,80}v_now/,
+    );
+    expect(activeWrites).toContain("_server_time(v_now)");
+    expect(migration).toMatch(
+      /revoke all on function[\s\S]{0,1800}_settle_denied_authority\([\s\S]{0,400}from public, anon, authenticated, service_role, authenticator,[\s\S]{0,500}careslink_v1_generation_points_settlement_executor/,
+    );
+    expect(
+      section(
+        "set role careslink_v1_generation_executor;\n\ncreate or replace function careslink_v1_generation._settle_denied_authority(",
+        "create or replace function careslink_v1_generation.commit_v1_shadow_note_generation_success(",
+      ),
+    ).toContain("security invoker");
   });
 
   it("bounds paid attempts, fences, and payload grants by the same reservation expiry", () => {

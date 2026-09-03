@@ -3439,19 +3439,19 @@ Migration
 adds the default-off terminal coordinator, a separate non-login settlement
 purpose role, an immutable settlement table and a per-registration recovery-turn
 table. Its SHA-256 is
-`e10c67d24336fec97137b804534c0c6f867f88656980e577ffb8ea57d0b5eeea`.
+`6e5148f3e080ab767f586c27c86490ac1c05b80deed864f48783c331bbf41afd`.
 The current 44-entry transactional manifest digest is
-`b8096489e0a525a37a1cb1bbc4af55a5a25fdea062dff0062d6d158baf9d1495`.
+`033aaf2aa8eafe98f6d9cfd6888c247ffc0a43289b95aca319447a380da2d3f0`.
 
 A fresh passwordless PostgreSQL 16.15 Homebrew cluster with no TCP listener and
 an owned `0700` Unix socket applied the exact 20-migration dependency chain from
 that pinned manifest. The local runner used setup SHA
-`b68d43aa72daf498d02c38c588152f78d6855a1e1a1241c04816d5454755fac1`,
+`a2dd25412d376d88892cfcc074ea4fcfe4cdb8a45e0992242006e36282437466`,
 cleanup SHA
-`3632f078f7354ce574eeacc2dd0bd82f400ac78d1ccdcd108071fea66ef3be17`
+`8da5bdca78c46c38d5654459669fd030cbbf9b82a6c126bec01e96e284665c88`
 and normalized source revision
-`2a272627e57db69efce212e1c74d02f4158e9abf2df52fb8e91df0e00b6628b6`.
-All five exact dynamic scenario groups passed:
+`0d67bccd29b384a0aab23c8291f9f40c5134d07e3e82bfada2947cf100058bc2`.
+All six exact dynamic scenario groups passed:
 
 - permanent worker failure released 20 Points, denied generic commit/release,
   kept the terminal job immutable, and made response-loss replay write-free;
@@ -3468,29 +3468,46 @@ All five exact dynamic scenario groups passed:
   original 20-Point allocation;
 - incomplete fence, stale heartbeat and stale fence replay were denied; owner
   cancellation and its replay released exactly 20 Points once.
+- the timing-boundary group held the payload lock across `max_queue_age`,
+  returned exact `IDLE` with zero attempt writes, and then recovered the queued
+  job while releasing 20 Points; it also proved direct permanent failure uses a
+  post-blocker terminal time; the denied-authority path began its caller
+  transaction before claim, blocked on the Points reservation, then persisted
+  one shared terminal time no earlier than blocker release across its ACK,
+  attempt, job, reservation, settlement, ledger, payload and purge outbox while
+  exact replay remained write-free; direct success starting before claim but
+  crossing the fence/lease boundary returned `LEASE_EXPIRED` with zero
+  document, settlement, evidence or outbox writes.
 
-The run completed in about 9.4 seconds. Runner quiescence, exact SQL cleanup,
+The run completed in about 12.5 seconds. Runner quiescence, exact SQL cleanup,
 the independent role/RLS/ACL/zero-fixture postcheck, graceful PostgreSQL stop and
 exact temporary-root deletion were all true; forced stop was false. Static
 coverage also pins the absence of `-infinity` timestamp subtraction, the
 settlement helpers' exact owner/search-path/execute ACLs, schema `CREATE`
 closure and the settlement role's lack of direct extension access.
 
-Two predecessor timing refinements remain explicit pre-activation follow-ups.
-The older five-note terminal RPCs can retain a transaction-start timestamp while
-waiting on a lock, so a long wait can fail an existing timestamp constraint even
-though the new Points settlement authority uses a fresh post-lock clock.
-Likewise, claim rechecks payload and reservation margins after its locks but does
-not recheck the narrow `max_queue_age` crossing window. Neither issue can debit,
-double-settle or expose Points, and neither is a reason to activate this source;
-both must be closed before runtime principal installation.
+The reviewed claim and direct-terminal timing refinements are now closed.
+Claim rechecks `max_queue_age` after its payload and reservation locks. Direct
+success/failure sample the persisted terminal clock after the payload lock;
+success also revalidates the initiating session at that final time, and the
+dynamic gate proves the expired fence/lease branch is write-free.
 
-The current source gate passed 11 focused files / 294 tests and the full Vitest
-suite passed 213 files / 3,002 tests. TypeScript, full ESLint, Node syntax,
-the Next.js 16.2.9 Webpack production build with 64/64 generated pages, the
-100-static-chunk client boundary, the 73-file adapter sync and
-`git diff --check` all passed. Independent final SQL/security review reported
-zero P0 and zero P1 findings; the two P2 timing refinements are recorded above.
+The adjacent denied-authority terminal-time P2 is now closed. Migration 44
+redefines the exact `_settle_denied_authority(..., p_at)` identity without
+changing its wire contract: active settlement acquires the job, attempt,
+payload, ordered issued-grant and Points reservation locks before sampling one
+wall clock, while exact replay remains validation-only and returns the stored
+terminal time. This conclusion is limited to terminal persistence after denial;
+it does not broaden the predecessor authorize/consume authority model. The
+entire slice remains default-off and creates no runtime principal or activation
+authority.
+
+The current focused timing/pin gate passed 6 files / 93 tests and the full
+Vitest suite passed 213 files / 3,004 tests. TypeScript, full ESLint, Node
+syntax, the Next.js 16.2.9 Turbopack production build with 64/64 generated
+pages, the 26-static-chunk client boundary, the 73-file adapter sync and
+`git diff --check` all passed. Independent SQL/security review reported zero P0,
+zero P1 and zero remaining P2 findings for this source-only batch.
 
 ### Current live/read-only evidence
 
