@@ -1278,6 +1278,15 @@ describe("V1 shadow runtime boundary", () => {
       );
     }
   });
+
+  it("keeps the M2c GCS authorized-operation adapter outside product runtime composition", () => {
+    const importers = walkSourceFiles("src").filter((file) =>
+      readFileSync(file, "utf8").includes(
+        "note-generation-encrypted-payload-gcs-private-object-store.server",
+      ),
+    );
+    expect(importers).toEqual([]);
+  });
 });
 
 function walkSourceFiles(relativeDirectory: string): string[] {

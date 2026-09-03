@@ -159,10 +159,36 @@ This is not an active trust root. The formal preparation path fails closed,
 formal singletons are `undefined`, readiness is `false`, and only an explicit
 `TEST_ONLY` capability can run the source seam. Tests mock provider/HTTPS work;
 there is no live evidence, cloud call/resource, route/worker composition,
-Preview deployment, Production change, real care data or model call. The GCS
-raw-token DTO and independent WIF/IAM/KMS IAM control-plane attestation remain
-future gates. See
+Preview deployment, Production change, real care data or model call. M2c later
+removed the GCS raw-token DTO from the object-store source boundary, but a
+private GCS authority/owned transport and independent WIF/IAM/KMS and bucket
+control-plane attestation remain future gates. See
 `documentation/communication-note-secure-submission-provider-trust-m2b.md`.
+
+### Google Cloud Storage authority handoff M2c — source only
+
+M2c replaces the GCS adapter's raw-token DTO and caller-owned authenticated
+transport with one tokenless authorized-operation handoff per complete
+top-level `read`, `createIfAbsent` or `deleteIfBindingMatches`. The authority
+must call the consumer once synchronously with an exact frozen `{ request }`
+session and directly return the exact opaque operation without reading,
+awaiting, wrapping or Promise-assimilating it. One session may perform all
+metadata, media, upload and recovery requests inside that logical operation;
+concurrent top-level operations receive isolated sessions. Operation and
+request child signals close on settlement, while the existing digest locator,
+generation-pinned read, create-only write, CAS tombstone, integrity and late
+byte-cleanup rules remain intact.
+
+This closes only the tokenless source handoff. The formal singleton remains
+`undefined`, readiness remains `false`, and there is no product importer. The
+bucket posture and permission hashes are still injected claims, not Google
+Cloud provenance. No private credential authority, owned GCS HTTPS transport,
+live WIF/IAM, exact-bucket policy/history/backup proof, Preview, deployment,
+Production change, real care data or model call belongs to M2c. See
+`documentation/communication-note-secure-submission-gcs-authority-handoff-m2c.md`.
+The local gate passed 50/50 focused tests across 2 files and 3240/3240 complete
+tests across 224 files, plus TypeScript, zero-warning ESLint, the 64/64-page
+production build, 27-chunk client-boundary scan, adapter sync and diff checks.
 
 ### PostgreSQL 16.15 local isolated gate — 2026-08-24
 
@@ -468,8 +494,9 @@ The contract/domain/schema portion and a feature-flagged NDIS dual-write/shadow-
   private-store and purpose-session protocol adapters. M2b now narrows the KMS
   source path to owned HTTPS, pinned WIF/service-account exchange and
   authenticated exact parent/version reads, but remains TestOnly with mocked
-  provider evidence. Live IAM/resource attestation, the GCS raw-token boundary,
-  bucket propagation and historical-copy purge evidence, independently
+  provider evidence. M2c removes the GCS raw-token DTO/header from the adapter
+  source boundary, but private credential authority, owned GCS transport, live
+  IAM/resource attestation, bucket propagation and historical-copy purge evidence, independently
   observed database quiescence, no-data Hosted proof, worker vault grant and
   separate activation approvals remain absent.
 - On deleted `r9`, the security advisor returned 26 global findings (23 INFO, 3 WARN for pre-existing public authenticated-executable `get`/`list`/`pull` security-definer functions) and zero generation findings; see the [security-definer executable remediation](https://supabase.com/docs/guides/database/database-linter?lint=0029_authenticated_security_definer_function_executable). The performance advisor returned 155 global findings (144 INFO, 11 WARN); generation scope contained 20 INFO only—14 [unindexed composite foreign keys](https://supabase.com/docs/guides/database/database-linter?lint=0001_unindexed_foreign_keys) and 6 [unused fresh indexes](https://supabase.com/docs/guides/database/database-linter?lint=0005_unused_index)—with zero generation WARN/ERROR. This is not an all-project green result; no mechanical bulk index addition was made, and zero-row unused-index findings are not runtime-usage evidence.
@@ -491,6 +518,7 @@ There is no app-owned email delivery service, push service, deployed queue worke
 - `documentation/communication-note-preview-runtime-credential-broker-m1l.md` - formal migration source, local PG16 plus deleted Hosted PG17 evidence, terminal fence and remaining product/Production gates.
 - `documentation/communication-note-secure-submission-runtime-m1z.md` - current source-only encrypted staging, policy-bound admission and maintenance boundary.
 - `documentation/communication-note-secure-submission-provider-trust-m2b.md` - default-off WIF, owned HTTPS and authenticated exact-version KMS source boundary.
+- `documentation/communication-note-secure-submission-gcs-authority-handoff-m2c.md` - tokenless, one-logical-operation GCS source handoff and remaining provider/bucket trust gates.
 - `documentation/seo.md` - public Companion indexing boundary.
 - `documentation/v1-implementation-readiness-audit.zh.md` - requirement map, implementation delta and approval gates.
 - `documentation/prd.md` - historical NDIS pilot decision with V1 baseline precedence.

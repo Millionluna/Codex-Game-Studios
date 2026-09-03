@@ -163,9 +163,10 @@ References:
 2. run the same reviewed revision once on an explicitly authorized disposable,
    no-data Preview and retain content-free evidence for the exact identity,
    resource and teardown posture;
-3. replace or encapsulate the M2a GCS credential boundary so its raw-token DTO
-   is not exposed, and independently authenticate exact-bucket IAM, propagation,
-   historical-version absence and retained/backup-copy expiry or purge;
+3. retain M2c's completed tokenless GCS source handoff, implement its private
+   credential authority and owned transport, and independently authenticate
+   exact-bucket IAM, propagation, historical-version absence and
+   retained/backup-copy expiry or purge;
 4. implement the Supabase purpose credential issuer/revoker and exclusive
    Direct/Session Pooler connector with independently observed quiescence;
 5. implement persistent maintenance adapters and a separately approved

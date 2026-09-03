@@ -26,8 +26,7 @@ const GCS_SCOPE =
   "https://www.googleapis.com/auth/devstorage.read_write" as const;
 const GCS_AUDIENCE = "https://storage.googleapis.com/" as const;
 const REQUEST_TIMEOUT_MS = 5_000 as const;
-const CREDENTIAL_TIMEOUT_MS = 5_000;
-const OPERATION_TIMEOUT_MS = 30_000;
+const OPERATION_TIMEOUT_MS = 30_000 as const;
 const METADATA_RESPONSE_MAXIMUM_BYTES = 32 * 1_024;
 const PRIVATE_OBJECT_MAXIMUM_BYTES = 256 * 1_024;
 const TOMBSTONE_MAXIMUM_BYTES = 4 * 1_024;
@@ -35,9 +34,6 @@ const MULTIPART_OVERHEAD_MAXIMUM_BYTES = 8 * 1_024;
 const BUCKET_POSTURE_MAXIMUM_AGE_MS = 5 * 60 * 1_000;
 const BUCKET_POSTURE_MAXIMUM_REMAINING_MS = 5 * 60 * 1_000;
 const BUCKET_PROTECTION_SETTINGS_PROPAGATION_MS = 30 * 1_000;
-const CREDENTIAL_MAXIMUM_AGE_MS = 5 * 60 * 1_000;
-const CREDENTIAL_MAXIMUM_REMAINING_MS = 60 * 60 * 1_000;
-const MAXIMUM_CONSUMED_CREDENTIAL_REFERENCES = 1_024;
 const EMPTY_BODY = new Uint8Array(0);
 const MULTIPART_BOUNDARY =
   "===============careslink_m2a_gcs_private_object==" as const;
@@ -72,7 +68,6 @@ const DECIMAL_PATTERN = /^[1-9][0-9]{0,19}$/;
 const BASE64URL_PATTERN = /^[A-Za-z0-9_-]+$/;
 const NUMERIC_KMS_KEY_VERSION_RESOURCE_PATTERN =
   /^projects\/(?:[a-z][a-z0-9-]{4,28}[a-z0-9]|[1-9][0-9]{5,20})\/locations\/[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\/keyRings\/[A-Za-z0-9_-]{1,63}\/cryptoKeys\/[A-Za-z0-9_-]{1,63}\/cryptoKeyVersions\/[1-9][0-9]{0,18}$/;
-const ACCESS_TOKEN_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._~-]{15,8191}$/;
 
 const REQUIRED_PERMISSIONS = Object.freeze([
   "storage.objects.create",
@@ -81,7 +76,7 @@ const REQUIRED_PERMISSIONS = Object.freeze([
 ] as const);
 
 export const CARESLINK_V1_NOTE_GENERATION_GCS_PRIVATE_OBJECT_STORE_VERSION =
-  "gcs-private-object-store.communication.2026-09-03.m2a.v1" as const;
+  "gcs-private-object-store.communication.2026-09-03.m2c.v1" as const;
 export const CARESLINK_V1_NOTE_GENERATION_GCS_PRIVATE_OBJECT_STORE_READY =
   false as const;
 
@@ -102,11 +97,18 @@ export const CARESLINK_V1_NOTE_GENERATION_GCS_PRIVATE_OBJECT_STORE_SOURCE_POLICY
     officialHttpsOrigin: GCS_ORIGIN,
     redirectsAllowed: false,
     automaticRetries: 0,
-    credentialDeadlineMs: CREDENTIAL_TIMEOUT_MS,
+    authorityHandoffSynchronous: true,
+    authorityAcquisitionOutsideAdapter: true,
+    authorizedOperationDelivery:
+      "SYNCHRONOUS_CALLBACK_DIRECT_RETURN_ONE_LOGICAL_OPERATION",
+    rawCredentialDtoReturned: false,
+    rawAuthorizationHeaderAccepted: false,
+    authorizedSessionRequestCapabilityOnly: true,
+    perAdapterAuthorizedSessionIdentityReplayRejected: true,
+    perAdapterAuthorizedRequestFunctionIdentityReplayRejected: true,
+    callbackResultOpaque: true,
+    callbackPromiseAssimilationAllowed: false,
     operationDeadlineMs: OPERATION_TIMEOUT_MS,
-    credentialMinimumRemainingMs: OPERATION_TIMEOUT_MS,
-    consumedCredentialReferenceMaximum:
-      MAXIMUM_CONSUMED_CREDENTIAL_REFERENCES,
     conditionalCreateIfGenerationMatch: "0",
     deleteDisposition: "SAME_OBJECT_CAS_TOMBSTONE",
     deleteGenerationAndMetagenerationRequired: true,
@@ -153,23 +155,35 @@ export type CaresLinkV1NoteGenerationGcsBucketPostureAttestation = Readonly<{
   postureEvidenceHash: string;
 }>;
 
-export type CaresLinkV1NoteGenerationGcsCredentialPort = Readonly<{
-  getAccessToken(input: Readonly<{
+export type CaresLinkV1NoteGenerationGcsAuthorizedOperationRequest =
+  Readonly<{
     purpose: typeof CREDENTIAL_OPERATION_PURPOSE;
     projectId: typeof PROJECT_ID;
+    bucketLocation: typeof BUCKET_LOCATION;
     runtimePrincipal: typeof RUNTIME_PRINCIPAL;
     audience: typeof GCS_AUDIENCE;
     scope: typeof GCS_SCOPE;
     bucket: string;
     requiredPermissionSetHash: string;
+    operationTimeoutMs: typeof OPERATION_TIMEOUT_MS;
+    requestTimeoutMs: typeof REQUEST_TIMEOUT_MS;
     signal: AbortSignal;
-  }>): Promise<unknown>;
-}>;
+  }>;
 
-export type CaresLinkV1NoteGenerationGcsHttpsRequest = Readonly<{
+declare const CARESLINK_V1_GCS_AUTHORIZED_OPERATION: unique symbol;
+
+export type CaresLinkV1NoteGenerationGcsAuthorizedOperation =
+  PromiseLike<void> &
+    Readonly<{
+      [CARESLINK_V1_GCS_AUTHORIZED_OPERATION]: true;
+    }>;
+
+export type CaresLinkV1NoteGenerationGcsAuthorizedHttpsRequest = Readonly<{
   method: "GET" | "POST";
   url: string;
-  headers: Readonly<Record<string, string>>;
+  accept: "application/json";
+  contentType?: string;
+  contentLength?: string;
   body: Uint8Array;
   redirect: "ERROR";
   automaticRetries: 0;
@@ -178,10 +192,29 @@ export type CaresLinkV1NoteGenerationGcsHttpsRequest = Readonly<{
   signal: AbortSignal;
 }>;
 
-export type CaresLinkV1NoteGenerationGcsHttpsTransport = Readonly<{
+export type CaresLinkV1NoteGenerationGcsAuthorizedHttpsPort = Readonly<{
   request(
-    input: CaresLinkV1NoteGenerationGcsHttpsRequest,
-  ): Promise<unknown>;
+    input: CaresLinkV1NoteGenerationGcsAuthorizedHttpsRequest,
+  ): PromiseLike<unknown>;
+}>;
+
+export type CaresLinkV1NoteGenerationGcsAuthorizedOperationConsumer = (
+  authorizedSession: unknown,
+) => CaresLinkV1NoteGenerationGcsAuthorizedOperation;
+
+export type CaresLinkV1NoteGenerationGcsAuthorizedOperationPort = Readonly<{
+  /**
+   * Calls `consumer` exactly once and synchronously with a tokenless,
+   * operation-scoped HTTPS request capability, then directly returns the exact
+   * opaque operation produced by that call. The port must not inspect `.then`,
+   * await, wrap, assimilate or retain that operation. Credential DTOs and
+   * Authorization headers never cross this public boundary. Any credential
+   * acquisition occurs privately before this synchronous handoff.
+   */
+  consumeAuthorizedOperation(
+    input: CaresLinkV1NoteGenerationGcsAuthorizedOperationRequest,
+    consumer: CaresLinkV1NoteGenerationGcsAuthorizedOperationConsumer,
+  ): CaresLinkV1NoteGenerationGcsAuthorizedOperation;
 }>;
 
 export type CaresLinkV1NoteGenerationGcsPrivateObjectStoreOptions =
@@ -197,8 +230,7 @@ export type CaresLinkV1NoteGenerationGcsPrivateObjectStoreOptions =
     }>;
     bucketPostureAttestation: CaresLinkV1NoteGenerationGcsBucketPostureAttestation;
     clock: () => string;
-    credentialPort: CaresLinkV1NoteGenerationGcsCredentialPort;
-    httpsTransport: CaresLinkV1NoteGenerationGcsHttpsTransport;
+    authorizedOperationPort: CaresLinkV1NoteGenerationGcsAuthorizedOperationPort;
     signal: AbortSignal;
   }>;
 
@@ -207,9 +239,10 @@ export const CARESLINK_V1_NOTE_GENERATION_FORMAL_GCS_PRIVATE_OBJECT_STORE =
   undefined as CaresLinkV1NoteGenerationPrivateObjectStorePort | undefined;
 
 /**
- * Production-safe protocol core with no environment, SDK, network or cloud
- * discovery. Every credential, transport, bucket locator and posture proof is
- * supplied explicitly; the formal singleton above remains absent.
+ * Production-oriented protocol core with no environment, SDK, network or
+ * cloud discovery. A private authority supplies one tokenless request
+ * capability per complete logical operation; the formal singleton above
+ * remains absent.
  */
 export function createCaresLinkV1NoteGenerationGcsPrivateObjectStore(
   value: unknown,
@@ -221,12 +254,12 @@ export function createCaresLinkV1NoteGenerationGcsPrivateObjectStore(
       try {
         const namespace = parseNamespace(input);
         return await withAuthorizedOperation(options, async (
-          accessToken,
+          authorizedRequest,
           operationOptions,
         ) => {
           const result = await readCurrent(
             operationOptions,
-            accessToken,
+            authorizedRequest,
             namespace,
           );
           if (result.status === "NOT_FOUND") {
@@ -266,13 +299,13 @@ export function createCaresLinkV1NoteGenerationGcsPrivateObjectStore(
 
         try {
           return await withAuthorizedOperation(options, async (
-            accessToken,
+            authorizedRequest,
             operationOptions,
           ) => {
             try {
               const outcome = await uploadMultipart(
                 operationOptions,
-                accessToken,
+                authorizedRequest,
                 {
                   locator,
                   body,
@@ -284,7 +317,7 @@ export function createCaresLinkV1NoteGenerationGcsPrivateObjectStore(
                 return existingCreateOutcome(
                   await readCurrent(
                     operationOptions,
-                    accessToken,
+                    authorizedRequest,
                     namespace,
                   ),
                 );
@@ -294,7 +327,7 @@ export function createCaresLinkV1NoteGenerationGcsPrivateObjectStore(
               return existingCreateOutcome(
                 await readCurrent(
                   operationOptions,
-                  accessToken,
+                  authorizedRequest,
                   namespace,
                 ),
               );
@@ -318,12 +351,12 @@ export function createCaresLinkV1NoteGenerationGcsPrivateObjectStore(
         const deleteBindingHash = requireSha256(request.deleteBindingHash);
 
         return await withAuthorizedOperation(options, async (
-          accessToken,
+          authorizedRequest,
           operationOptions,
         ) => {
           const current = await readCurrent(
             operationOptions,
-            accessToken,
+            authorizedRequest,
             namespace,
           );
           if (current.status === "NOT_FOUND") {
@@ -370,7 +403,7 @@ export function createCaresLinkV1NoteGenerationGcsPrivateObjectStore(
             try {
               const outcome = await uploadMultipart(
                 operationOptions,
-                accessToken,
+                authorizedRequest,
                 {
                   locator: current.locator,
                   body,
@@ -383,7 +416,7 @@ export function createCaresLinkV1NoteGenerationGcsPrivateObjectStore(
                 return recoveredDeleteOutcome(
                   await readCurrent(
                     operationOptions,
-                    accessToken,
+                    authorizedRequest,
                     namespace,
                   ),
                   deleteBindingHash,
@@ -392,11 +425,11 @@ export function createCaresLinkV1NoteGenerationGcsPrivateObjectStore(
               return Object.freeze({ status: "DELETED" as const });
             } catch {
               return recoveredDeleteOutcome(
-              await readCurrent(
-                operationOptions,
-                accessToken,
-                namespace,
-              ),
+                await readCurrent(
+                  operationOptions,
+                  authorizedRequest,
+                  namespace,
+                ),
                 deleteBindingHash,
               );
             }
@@ -421,15 +454,21 @@ type ParsedPolicy = Readonly<{
   backupDispositionVersion: string;
 }>;
 
+type ConsumeAuthorizedOperation =
+  CaresLinkV1NoteGenerationGcsAuthorizedOperationPort["consumeAuthorizedOperation"];
+type AuthorizedRequest =
+  CaresLinkV1NoteGenerationGcsAuthorizedHttpsPort["request"];
+
 type ParsedOptions = Readonly<{
   policy: ParsedPolicy;
   bucketPostureAttestation: CaresLinkV1NoteGenerationGcsBucketPostureAttestation;
   clock: () => string;
-  credentialPort: CaresLinkV1NoteGenerationGcsCredentialPort;
-  httpsTransport: CaresLinkV1NoteGenerationGcsHttpsTransport;
+  consumeAuthorizedOperation: ConsumeAuthorizedOperation;
+  authorizedOperationFunctionIdentity: object;
   signal: AbortSignal;
   requiredPermissionSetHash: string;
-  consumedCredentialReferences: Map<string, number>;
+  consumedAuthorizedSessions: WeakSet<object>;
+  consumedAuthorizedRequestFunctions: WeakSet<object>;
 }>;
 
 type Namespace = Readonly<{
@@ -475,8 +514,7 @@ function parseOptions(value: unknown): ParsedOptions {
       "policy",
       "bucketPostureAttestation",
       "clock",
-      "credentialPort",
-      "httpsTransport",
+      "authorizedOperationPort",
       "signal",
     ]);
     const policyValue = exactDataRecord(options.policy, [
@@ -513,14 +551,11 @@ function parseOptions(value: unknown): ParsedOptions {
     });
     const clock = requireCallable<() => string>(options.clock);
     const signal = requireAbortSignal(options.signal);
-    const credentialPort = requireFrozenPort<CaresLinkV1NoteGenerationGcsCredentialPort>(
-      options.credentialPort,
-      ["getAccessToken"],
-    );
-    const httpsTransport = requireFrozenPort<CaresLinkV1NoteGenerationGcsHttpsTransport>(
-      options.httpsTransport,
-      ["request"],
-    );
+    const authorizedOperationPort =
+      requireFrozenPort<CaresLinkV1NoteGenerationGcsAuthorizedOperationPort>(
+        options.authorizedOperationPort,
+        ["consumeAuthorizedOperation"],
+      );
     const bucketPostureAttestation = parseBucketPostureAttestation(
       options.bucketPostureAttestation,
       policy,
@@ -530,13 +565,18 @@ function parseOptions(value: unknown): ParsedOptions {
       policy,
       bucketPostureAttestation,
       clock,
-      credentialPort,
-      httpsTransport,
+      consumeAuthorizedOperation:
+        authorizedOperationPort.consumeAuthorizedOperation.bind(
+          authorizedOperationPort,
+        ),
+      authorizedOperationFunctionIdentity:
+        authorizedOperationPort.consumeAuthorizedOperation,
       signal,
       requiredPermissionSetHash: createRequiredPermissionSetHash(
         policy.bucket,
       ),
-      consumedCredentialReferences: new Map<string, number>(),
+      consumedAuthorizedSessions: new WeakSet<object>(),
+      consumedAuthorizedRequestFunctions: new WeakSet<object>(),
     });
   } catch {
     throw unavailable();
@@ -546,7 +586,7 @@ function parseOptions(value: unknown): ParsedOptions {
 async function withAuthorizedOperation<T>(
   options: ParsedOptions,
   operation: (
-    accessToken: string,
+    authorizedRequest: AuthorizedRequest,
     operationOptions: ParsedOptions,
   ) => Promise<T>,
 ): Promise<T> {
@@ -560,88 +600,206 @@ async function withAuthorizedOperation<T>(
         options.policy,
         now,
       );
-      const credentialValue = await runWithDeadline(
+      return consumeAuthorizedOperation(
+        options,
+        operation,
         operationSignal,
-        CREDENTIAL_TIMEOUT_MS,
-        (credentialSignal) =>
-          options.credentialPort.getAccessToken(
-            Object.freeze({
-              purpose: CREDENTIAL_OPERATION_PURPOSE,
-              projectId: PROJECT_ID,
-              runtimePrincipal: RUNTIME_PRINCIPAL,
-              audience: GCS_AUDIENCE,
-              scope: GCS_SCOPE,
-              bucket: options.policy.bucket,
-              requiredPermissionSetHash:
-                options.requiredPermissionSetHash,
-              signal: credentialSignal,
-            }),
-          ),
       );
-      const credential = exactDataRecord(credentialValue, [
-        "purpose",
-        "projectId",
-        "runtimePrincipal",
-        "accessToken",
-        "issuedAt",
-        "expiresAt",
-        "bucket",
-        "requiredPermissionSetHash",
-        "credentialReferenceHash",
-      ]);
-      if (
-        credential.purpose !== CREDENTIAL_OPERATION_PURPOSE ||
-        credential.projectId !== PROJECT_ID ||
-        credential.runtimePrincipal !== RUNTIME_PRINCIPAL ||
-        credential.bucket !== options.policy.bucket ||
-        credential.requiredPermissionSetHash !==
-          options.requiredPermissionSetHash ||
-        typeof credential.accessToken !== "string" ||
-        !ACCESS_TOKEN_PATTERN.test(credential.accessToken)
-      ) {
-        throw unavailable();
-      }
-      const issuedAt = requireTimestamp(credential.issuedAt);
-      const expiresAt = requireTimestamp(credential.expiresAt);
-      const nowMs = Date.parse(now);
-      const issuedAtMs = Date.parse(issuedAt);
-      const expiresAtMs = Date.parse(expiresAt);
-      if (
-        issuedAtMs > nowMs ||
-        nowMs - issuedAtMs > CREDENTIAL_MAXIMUM_AGE_MS ||
-        expiresAtMs - nowMs < OPERATION_TIMEOUT_MS ||
-        expiresAtMs > nowMs + CREDENTIAL_MAXIMUM_REMAINING_MS
-      ) {
-        throw unavailable();
-      }
-      const credentialReferenceHash = requireSha256(
-        credential.credentialReferenceHash,
-      );
-      for (const [referenceHash, referenceExpiresAt] of
-        options.consumedCredentialReferences) {
-        if (referenceExpiresAt <= nowMs) {
-          options.consumedCredentialReferences.delete(referenceHash);
-        }
-      }
-      if (
-        options.consumedCredentialReferences.has(credentialReferenceHash) ||
-        options.consumedCredentialReferences.size >=
-          MAXIMUM_CONSUMED_CREDENTIAL_REFERENCES
-      ) {
-        throw unavailable();
-      }
-      options.consumedCredentialReferences.set(
-        credentialReferenceHash,
-        expiresAtMs,
-      );
-      const operationOptions = Object.freeze({
-        ...options,
-        signal: operationSignal,
-      });
-      requireNotAborted(operationSignal);
-      return operation(credential.accessToken, operationOptions);
     },
   );
+}
+
+async function consumeAuthorizedOperation<T>(
+  options: ParsedOptions,
+  operation: (
+    authorizedRequest: AuthorizedRequest,
+    operationOptions: ParsedOptions,
+  ) => Promise<T>,
+  signal: AbortSignal,
+): Promise<T> {
+  let callbackOpen = true;
+  let callbackArmed = false;
+  let callbackCount = 0;
+  let callbackViolation = false;
+  let thenClaimCount = 0;
+  let callbackStarted = false;
+  let callbackSettled = false;
+  let callbackFailure = false;
+  let result: T | undefined;
+  let resultPresent = false;
+  let issuedOperation:
+    | CaresLinkV1NoteGenerationGcsAuthorizedOperation
+    | undefined;
+
+  const inertThen = <TResult1 = void, TResult2 = never>(
+    onfulfilled?: ((value: void) => TResult1 | PromiseLike<TResult1>) | null,
+    onrejected?:
+      | ((reason: unknown) => TResult2 | PromiseLike<TResult2>)
+      | null,
+  ): PromiseLike<TResult1 | TResult2> => {
+    const settlement = Promise.resolve().then(onfulfilled, onrejected);
+    void settlement.catch(() => undefined);
+    return settlement;
+  };
+
+  const consumer: CaresLinkV1NoteGenerationGcsAuthorizedOperationConsumer = (
+    sessionValue: unknown,
+  ): CaresLinkV1NoteGenerationGcsAuthorizedOperation => {
+    if (!callbackOpen || callbackCount !== 0) {
+      callbackViolation = true;
+      return Object.freeze({
+        then: inertThen,
+      }) as CaresLinkV1NoteGenerationGcsAuthorizedOperation;
+    }
+    callbackCount += 1;
+    let callbackOperation: Promise<void> | undefined;
+    const authorizedThen = <TResult1 = void, TResult2 = never>(
+      onfulfilled?: ((value: void) => TResult1 | PromiseLike<TResult1>) | null,
+      onrejected?:
+        | ((reason: unknown) => TResult2 | PromiseLike<TResult2>)
+        | null,
+    ): PromiseLike<TResult1 | TResult2> => {
+      if (
+        !callbackOpen ||
+        !callbackArmed ||
+        callbackViolation ||
+        signal.aborted
+      ) {
+        return inertThen(onfulfilled, onrejected);
+      }
+      if (callbackOperation === undefined) {
+        if (callbackStarted) {
+          callbackViolation = true;
+          return inertThen(onfulfilled, onrejected);
+        }
+        callbackStarted = true;
+        callbackOperation = (async () => {
+          try {
+            requireNotAborted(signal);
+            const session =
+              requireFrozenPort<CaresLinkV1NoteGenerationGcsAuthorizedHttpsPort>(
+                sessionValue,
+                ["request"],
+              );
+            const requestFunction = session.request as unknown as object;
+            if (
+              options.consumedAuthorizedSessions.has(session) ||
+              options.consumedAuthorizedRequestFunctions.has(
+                requestFunction,
+              ) ||
+              (session.request as unknown) ===
+                options.authorizedOperationFunctionIdentity
+            ) {
+              throw unavailable();
+            }
+            options.consumedAuthorizedSessions.add(session);
+            options.consumedAuthorizedRequestFunctions.add(
+              requestFunction,
+            );
+            const operationOptions = Object.freeze({
+              ...options,
+              signal,
+            });
+            const candidate = await operation(
+              session.request.bind(session),
+              operationOptions,
+            );
+            requireNotAborted(signal);
+            if (!callbackOpen || callbackViolation) throw unavailable();
+            result = candidate;
+            resultPresent = true;
+          } catch {
+            callbackFailure = true;
+          } finally {
+            callbackSettled = true;
+          }
+        })();
+        void callbackOperation.catch(() => undefined);
+      }
+      const settlement = callbackOperation.then(onfulfilled, onrejected);
+      void settlement.catch(() => undefined);
+      return settlement;
+    };
+    const opaqueOperation = Object.defineProperty({}, "then", {
+      configurable: false,
+      enumerable: false,
+      get() {
+        if (!callbackOpen) return inertThen;
+        if (!callbackArmed) {
+          callbackViolation = true;
+          return inertThen;
+        }
+        thenClaimCount += 1;
+        if (thenClaimCount !== 1) {
+          callbackViolation = true;
+          return inertThen;
+        }
+        return authorizedThen;
+      },
+    }) as CaresLinkV1NoteGenerationGcsAuthorizedOperation;
+    issuedOperation = Object.freeze(opaqueOperation);
+    return issuedOperation;
+  };
+
+  let authorityReturn:
+    | CaresLinkV1NoteGenerationGcsAuthorizedOperation
+    | undefined;
+  try {
+    authorityReturn = options.consumeAuthorizedOperation(
+      Object.freeze({
+        purpose: CREDENTIAL_OPERATION_PURPOSE,
+        projectId: PROJECT_ID,
+        bucketLocation: BUCKET_LOCATION,
+        runtimePrincipal: RUNTIME_PRINCIPAL,
+        audience: GCS_AUDIENCE,
+        scope: GCS_SCOPE,
+        bucket: options.policy.bucket,
+        requiredPermissionSetHash: options.requiredPermissionSetHash,
+        operationTimeoutMs: OPERATION_TIMEOUT_MS,
+        requestTimeoutMs: REQUEST_TIMEOUT_MS,
+        signal,
+      }),
+      consumer,
+    );
+  } catch {
+    callbackOpen = false;
+    throw unavailable();
+  }
+  if (
+    issuedOperation === undefined ||
+    authorityReturn !== issuedOperation ||
+    callbackCount !== 1 ||
+    callbackViolation
+  ) {
+    callbackOpen = false;
+    observeRejectedAuthorityReturnBestEffort(
+      authorityReturn,
+      issuedOperation,
+    );
+    throw unavailable();
+  }
+
+  callbackArmed = true;
+  try {
+    await settleBeforeAbort(issuedOperation, signal);
+  } catch {
+    throw unavailable();
+  } finally {
+    callbackOpen = false;
+  }
+  if (
+    callbackViolation ||
+    callbackFailure ||
+    callbackCount !== 1 ||
+    thenClaimCount !== 1 ||
+    !callbackStarted ||
+    !callbackSettled ||
+    signal.aborted ||
+    !resultPresent
+  ) {
+    throw unavailable();
+  }
+  return result as T;
 }
 
 function parseBucketPostureAttestation(
@@ -791,23 +949,23 @@ function createLocator(policy: ParsedPolicy, namespace: Namespace): Locator {
 
 async function readCurrent(
   options: ParsedOptions,
-  accessToken: string,
+  authorizedRequest: AuthorizedRequest,
   namespace: Namespace,
 ): Promise<CurrentObject> {
   const locator = createLocator(options.policy, namespace);
-  const first = await readCurrentOnce(options, accessToken, locator);
+  const first = await readCurrentOnce(options, authorizedRequest, locator);
   if (first.status !== "STALE") return first;
-  const second = await readCurrentOnce(options, accessToken, locator);
+  const second = await readCurrentOnce(options, authorizedRequest, locator);
   if (second.status === "STALE") throw unavailable();
   return second;
 }
 
 async function readCurrentOnce(
   options: ParsedOptions,
-  accessToken: string,
+  authorizedRequest: AuthorizedRequest,
   locator: Locator,
 ): Promise<CurrentObject | Readonly<{ status: "STALE" }>> {
-  const metadataResponse = await requestHttps(options, accessToken, {
+  const metadataResponse = await requestHttps(options, authorizedRequest, {
     method: "GET",
     url: metadataUrl(locator),
     body: EMPTY_BODY,
@@ -833,7 +991,7 @@ async function readCurrentOnce(
       ? TOMBSTONE_MAXIMUM_BYTES
       : PRIVATE_OBJECT_MAXIMUM_BYTES;
   if (metadata.size > maximumBodyBytes) throw unavailable();
-  const bodyResponse = await requestHttps(options, accessToken, {
+  const bodyResponse = await requestHttps(options, authorizedRequest, {
     method: "GET",
     url: mediaUrl(locator, metadata.generation, metadata.metageneration),
     body: EMPTY_BODY,
@@ -894,7 +1052,7 @@ async function readCurrentOnce(
 
 async function uploadMultipart(
   options: ParsedOptions,
-  accessToken: string,
+  authorizedRequest: AuthorizedRequest,
   input: Readonly<{
     locator: Locator;
     body: Uint8Array;
@@ -919,7 +1077,7 @@ async function uploadMultipart(
     input.customMetadata,
   );
   try {
-    const response = await requestHttps(options, accessToken, {
+    const response = await requestHttps(options, authorizedRequest, {
       method: "POST",
       url: uploadUrl(
         input.locator,
@@ -959,7 +1117,7 @@ async function uploadMultipart(
 
 async function requestHttps(
   options: ParsedOptions,
-  accessToken: string,
+  authorizedRequest: AuthorizedRequest,
   input: Readonly<{
     method: "GET" | "POST";
     url: string;
@@ -1000,16 +1158,13 @@ async function requestHttps(
   const request = Object.freeze({
     method: input.method,
     url: input.url,
-    headers: Object.freeze({
-      accept: "application/json",
-      authorization: `Bearer ${accessToken}`,
-      ...(input.contentType === undefined
-        ? {}
-        : {
-            "content-type": input.contentType,
-            "content-length": String(input.body.byteLength),
-          }),
-    }),
+    accept: "application/json" as const,
+    ...(input.contentType === undefined
+      ? {}
+      : {
+          contentType: input.contentType,
+          contentLength: String(input.body.byteLength),
+        }),
     body: requestBody,
     redirect: "ERROR" as const,
     automaticRetries: 0 as const,
@@ -1019,7 +1174,7 @@ async function requestHttps(
   });
   const transportPromise = Promise.resolve().then(() => {
     requireNotAborted(requestController.signal);
-    return options.httpsTransport.request(request);
+    return authorizedRequest(request);
   });
   let responseValue: unknown;
   try {
@@ -1033,6 +1188,7 @@ async function requestHttps(
   } finally {
     clearTimeout(deadline);
     options.signal.removeEventListener("abort", abortForRoot);
+    requestController.abort();
     requestBody.fill(0);
   }
   try {
@@ -1719,6 +1875,62 @@ function requireNotAborted(signal: AbortSignal) {
   if (signal.aborted) throw unavailable();
 }
 
+async function settleBeforeAbort<T>(
+  operation: PromiseLike<T>,
+  signal: AbortSignal,
+): Promise<T> {
+  requireNotAborted(signal);
+  return new Promise<T>((resolve, reject) => {
+    let settled = false;
+    const finish = (error: unknown, result?: T) => {
+      if (settled) return;
+      settled = true;
+      signal.removeEventListener("abort", onAbort);
+      if (error !== undefined) reject(error);
+      else resolve(result as T);
+    };
+    const onAbort = () => finish(unavailable());
+    signal.addEventListener("abort", onAbort, { once: true });
+    Promise.resolve(operation).then(
+      (result) => finish(undefined, result),
+      () => finish(unavailable()),
+    );
+    if (signal.aborted) onAbort();
+  });
+}
+
+function observeRejectedAuthorityReturnBestEffort(
+  value: unknown,
+  issuedOperation:
+    | CaresLinkV1NoteGenerationGcsAuthorizedOperation
+    | undefined,
+) {
+  if (value === issuedOperation) return;
+  try {
+    if (!nodeTypes.isProxy(value) && nodeTypes.isPromise(value)) {
+      observeNativePromiseRejectionBestEffort(value);
+    }
+  } catch {
+    // The authority handshake is already closed. Never inspect a non-native
+    // thenable merely to observe its possible rejection.
+  }
+}
+
+function observeNativePromiseRejectionBestEffort(value: Promise<unknown>) {
+  try {
+    const settlement = Reflect.apply(Promise.prototype.then, value, [
+      undefined,
+      () => undefined,
+    ]) as Promise<unknown>;
+    Reflect.apply(Promise.prototype.then, settlement, [
+      undefined,
+      () => undefined,
+    ]);
+  } catch {
+    // Invalid authority output remains unavailable. Cleanup is best effort.
+  }
+}
+
 async function runWithDeadline<T>(
   rootSignal: AbortSignal,
   timeoutMs: number,
@@ -1748,6 +1960,7 @@ async function runWithDeadline<T>(
   } finally {
     clearTimeout(deadline);
     rootSignal.removeEventListener("abort", abortForRoot);
+    controller.abort();
   }
 }
 

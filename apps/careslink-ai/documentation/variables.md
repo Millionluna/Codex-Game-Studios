@@ -466,8 +466,32 @@ are immutable JavaScript strings, so reference release is not a reliable
 zeroization guarantee and must not be documented as one. Formal trust and
 transport singletons stay `undefined`, both readiness latches stay `false`, and
 the formal preparation factory fails closed. Do not add deployment variables
-until live WIF/IAM/KMS IAM evidence, the GCS raw-token redesign, an authorized
-no-data Preview gate and separate activation approval are complete.
+until live WIF/IAM/KMS IAM evidence, a private GCS authority and owned
+transport, authenticated exact-bucket evidence, an authorized no-data Preview
+gate and separate activation approval are complete.
+
+## Secure-submission M2c GCS authority handoff
+
+M2c adds no environment variables and no `.env.example` entry. The GCS
+private-object-store adapter receives one constructor-injected, tokenless
+authorized-operation port and an injected bucket-posture claim. Neither is an
+ambient deployment setting or an approved provider trust root.
+
+A future private authority must own credential acquisition and the exact GCS
+HTTPS transport. It must not accept provider credentials, service-account JSON,
+Application Default Credentials, a generic endpoint, proxy configuration or a
+caller-supplied authenticated transport through application environment
+variables. Any future raw token must remain inside that private authority and
+owned transport; it must never enter the GCS adapter request DTO, generic
+headers, logs, evidence or client configuration. Immutable JavaScript token
+strings still have no reliable zeroization guarantee.
+
+The fixed project, region, runtime principal, audience, scope, bucket and
+permission-set hash in the source request bind an intended operation only.
+They do not authenticate WIF, IAM, the bucket or its history. Do not add
+deployment variables until the owned authority/transport, live exact-bucket
+evidence, same-revision no-data Preview teardown and separate activation
+approval are complete.
 
 ## Platform-provided variables
 

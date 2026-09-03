@@ -3591,7 +3591,7 @@ private-object-store, purpose-caller query credential and persistent maintenance
 adapters remain absent. See
 `documentation/communication-note-secure-submission-runtime-m1z.md`.
 
-### Communication Note secure submission provider adapters M2a — source/build evidence
+### Communication Note secure submission provider adapters M2a — historical source/build evidence
 
 M2a adds three server-only, constructor-injected protocol adapters without
 installing any formal runtime singleton. KMS wrapping is pinned to the M1u
@@ -3658,10 +3658,52 @@ version markers as forbidden static-chunk content.
 
 All provider and Node HTTPS effects in these focused tests are mocked. The
 suites make no live WIF, IAM, KMS, network, Hosted Preview, billing, deployment,
-Production, real-care-data or model-call claim. They also do not cover the M2a
-GCS raw-token DTO or independently attest WIF/IAM/KMS IAM policy. Formal
-activation remains closed. See
+Production, real-care-data or model-call claim. M2c later removes and tests the
+GCS raw-token DTO source boundary, but neither suite independently attests a
+private GCS authority, owned GCS transport, WIF/IAM/KMS IAM policy or bucket
+provenance. Formal activation remains closed. See
 `documentation/communication-note-secure-submission-provider-trust-m2b.md`.
+
+### Communication Note GCS authority handoff M2c — source/build evidence
+
+M2c replaces the GCS adapter's raw credential/Authorization and caller-owned
+authenticated transport DTOs with a tokenless, one-logical-operation authority
+callback. Focused tests prove the exact frozen authority request and tokenless
+request descriptor; no/duplicate/deferred callback; different, rejected,
+awaited, wrapped and pre-assimilated return values; untouched hostile thenables
+and proxies; unfrozen, expanded, accessor, proxy and non-callable sessions plus
+a session request that aliases the authority callable; competing, retained and
+late callback adoption; and sequential
+plus concurrent rejection of reused session or request-function identities.
+
+The preserved object-protocol tests cover create/read/replay, direct
+generation/metageneration-pinned media reads, CRC32C/SHA-256/canonical-body
+checks, same-name CAS tombstones, binding mismatch, bare `404`, and upload
+response-loss recovery. They additionally prove that one authority session
+covers every metadata/media/upload/recovery request in a complete logical
+operation, while concurrent top-level operations use isolated sessions.
+Root/request abort, the 30-second whole-operation bound across a seven-request
+recovery chain, non-empty multipart timeout cleanup, transport-error redaction,
+late fulfilled/rejected response observation and mutable byte clearing are
+exercised. Runtime-boundary tests prove there is no non-test
+source importer, and the post-build scanner retains the historical M2a marker
+while adding the M2c version marker.
+
+The focused gate passed **50/50 tests across 2 files**. The complete local
+Vitest suite passed **3240/3240 tests across 224 files**. TypeScript, full
+zero-warning ESLint, the optimized Next.js 16.2.9 Turbopack build with 64/64
+generated pages, the 27-static-chunk M1r–M2c client-boundary scan, 73-file
+adapter sync and diff checks also passed.
+
+This evidence does not implement or test a live private credential authority,
+credential acquisition, owned GCS DNS/TLS transport, WIF/service-account or
+bucket IAM, authenticated bucket settings/propagation/history/backup state,
+cloud resource, Preview, deployment, Production, real care data or model call.
+The per-adapter WeakSet identity checks reject exact session/callable reuse at
+that adapter boundary; they cannot detect a fresh wrapper around an underlying
+credential/capability or reuse across separate adapter instances. The future
+private authority must enforce that lifecycle. Formal readiness and activation remain closed. See
+`documentation/communication-note-secure-submission-gcs-authority-handoff-m2c.md`.
 
 ### Current live/read-only evidence
 
