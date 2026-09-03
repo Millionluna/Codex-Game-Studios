@@ -15,6 +15,7 @@ import {
   CARESLINK_COMMUNICATION_NOTE_SUBMITTER_COMPOSITION_READY,
   CARESLINK_COMMUNICATION_NOTE_SUBMITTER_COMPOSITION_TEST_CAPABILITY,
   COMMUNICATION_NOTE_GENERATION_FORMAL_SUBMITTER_COMPOSITION,
+  createCommunicationNoteGenerationSubmitterComposition,
   createTestOnlyCommunicationNoteGenerationSubmitterComposition,
   type CommunicationNoteGenerationPayloadStager,
   type CommunicationNoteGenerationPrivacyReviewIssuer,
@@ -35,6 +36,11 @@ const CONFIRMED_AT = "2026-09-03T02:00:00.000Z";
 const PAYLOAD_EXPIRES_AT = "2026-09-03T02:20:00.000Z";
 const PROOF_EXPIRES_AT = "2026-09-03T02:30:00.000Z";
 const CREATED_AT = "2026-09-03T02:00:01.000Z";
+const PAYLOAD_POLICY_VERSION = "2026-09-03.communication-preview.1";
+const ENCRYPTION_PROFILE_VERSION = "aes-256-gcm-envelope.1";
+const BACKUP_DISPOSITION_VERSION = "gcs-no-soft-delete.1";
+const PAYLOAD_POLICY_SNAPSHOT_HASH = "b".repeat(64);
+const KMS_KEY_VERSION_RESOURCE_HASH = "c".repeat(64);
 
 const CLEANED_FACTS = Object.freeze({
   occurred_at: "2026-09-03T12:00:00+10:00",
@@ -126,6 +132,11 @@ describe("Communication Note product submitter composition", () => {
       requestHash,
       payloadHandleHash: "a".repeat(64),
       payloadExpiresAt: PAYLOAD_EXPIRES_AT,
+      payloadPolicyVersion: PAYLOAD_POLICY_VERSION,
+      payloadPolicySnapshotHash: PAYLOAD_POLICY_SNAPSHOT_HASH,
+      encryptionProfileVersion: ENCRYPTION_PROFILE_VERSION,
+      kmsKeyVersionResourceHash: KMS_KEY_VERSION_RESOURCE_HASH,
+      backupDispositionVersion: BACKUP_DISPOSITION_VERSION,
     });
     expect(harness.payloadStager.abortUnaccepted).not.toHaveBeenCalled();
   });
@@ -146,6 +157,7 @@ describe("Communication Note product submitter composition", () => {
     });
     expect(harness.payloadStager.abortUnaccepted).toHaveBeenCalledExactlyOnceWith({
       ownerUserId: OWNER_ID,
+      idempotencyHash: sha256(IDEMPOTENCY_KEY),
       requestHash: expect.stringMatching(/^[a-f0-9]{64}$/),
       staged: stagedPayload(),
       reason: "PAYLOAD_NOT_ACCEPTED",
@@ -320,6 +332,23 @@ describe("Communication Note product submitter composition", () => {
     expect(harness.enqueue).not.toHaveBeenCalled();
   });
 
+  it.each([
+    ["payloadPolicyVersion", "latest/alias"],
+    ["payloadPolicySnapshotHash", "b".repeat(63)],
+    ["encryptionProfileVersion", "aes 256"],
+    ["kmsKeyVersionResourceHash", "c".repeat(63)],
+    ["backupDispositionVersion", ""],
+  ])("rejects an invalid staged %s binding before Points admission", async (field, value) => {
+    const harness = createHarness({
+      staged: stagedPayload({ [field]: value }),
+    });
+
+    await expect(harness.submitter.submit(command())).rejects.toMatchObject({
+      code: "PRODUCT_API_DISABLED",
+    });
+    expect(harness.enqueue).not.toHaveBeenCalled();
+  });
+
   it("normalizes the Supabase timestamptz privacy expiry before staging and admission", async () => {
     const harness = createHarness({
       proof: privacyProof({
@@ -352,6 +381,59 @@ describe("Communication Note product submitter composition", () => {
         options as never,
       ),
     ).toThrowError(expect.objectContaining({ code: "PRODUCT_API_DISABLED" }));
+  });
+
+  it("exposes a provider-neutral composition core without installing the formal runtime", async () => {
+    const harness = createHarness();
+    const submitter = createCommunicationNoteGenerationSubmitterComposition({
+      privacyReviewIssuer: harness.privacyReviewIssuer,
+      payloadStager: harness.payloadStager,
+      createPointsAdmissionRepository: harness.createRepository,
+    });
+
+    await expect(submitter.submit(command())).resolves.toEqual({
+      created: true,
+      job: ownerJob(),
+    });
+    expect(COMMUNICATION_NOTE_GENERATION_FORMAL_SUBMITTER_COMPOSITION).toBeUndefined();
+  });
+
+  it("captures production-safe ports so retained options cannot replace them", async () => {
+    const harness = createHarness();
+    const replacementConfirm = vi.fn(() => {
+      throw new Error("replacement privacy issuer reached");
+    });
+    const replacementStage = vi.fn(() => {
+      throw new Error("replacement payload stager reached");
+    });
+    const replacementRepositoryFactory = vi.fn(() => {
+      throw new Error("replacement repository factory reached");
+    });
+    const options = {
+      privacyReviewIssuer: harness.privacyReviewIssuer,
+      payloadStager: harness.payloadStager,
+      createPointsAdmissionRepository: harness.createRepository,
+    };
+    const submitter =
+      createCommunicationNoteGenerationSubmitterComposition(options);
+
+    const retained = options as unknown as Record<string, unknown>;
+    retained.privacyReviewIssuer = { confirm: replacementConfirm };
+    retained.createPointsAdmissionRepository = replacementRepositoryFactory;
+    (
+      harness.payloadStager as unknown as Record<string, unknown>
+    ).stageCanonicalFacts = replacementStage;
+
+    await expect(submitter.submit(command())).resolves.toEqual({
+      created: true,
+      job: ownerJob(),
+    });
+    expect(harness.confirm).toHaveBeenCalledOnce();
+    expect(harness.stageCanonicalFacts).toHaveBeenCalledOnce();
+    expect(harness.createRepository).toHaveBeenCalledOnce();
+    expect(replacementConfirm).not.toHaveBeenCalled();
+    expect(replacementStage).not.toHaveBeenCalled();
+    expect(replacementRepositoryFactory).not.toHaveBeenCalled();
   });
 });
 
@@ -484,6 +566,11 @@ function stagedPayload(overrides: Record<string, unknown> = {}) {
     payloadId: PAYLOAD_ID,
     payloadHandleHash: "a".repeat(64),
     payloadExpiresAt: PAYLOAD_EXPIRES_AT,
+    payloadPolicyVersion: PAYLOAD_POLICY_VERSION,
+    payloadPolicySnapshotHash: PAYLOAD_POLICY_SNAPSHOT_HASH,
+    encryptionProfileVersion: ENCRYPTION_PROFILE_VERSION,
+    kmsKeyVersionResourceHash: KMS_KEY_VERSION_RESOURCE_HASH,
+    backupDispositionVersion: BACKUP_DISPOSITION_VERSION,
     ...overrides,
   };
 }

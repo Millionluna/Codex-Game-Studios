@@ -50,6 +50,8 @@ export type CaresLinkV1NoteGenerationPayloadPolicy = Readonly<{
   policyVersion: string;
   /** Provider-neutral encryption profile identifier; no algorithm is guessed. */
   encryptionProfileVersion: string;
+  /** Digest of one exact numeric KMS key-version resource, never an alias. */
+  kmsKeyVersionResourceHash: string;
   /** Provider-neutral backup/deletion disposition; no backend is selected. */
   backupDispositionVersion: string;
 }>;
@@ -104,6 +106,7 @@ export type CaresLinkV1NoteGenerationPayloadMetadata = Readonly<{
   requestHash: string;
   policyVersion: string;
   encryptionProfileVersion: string;
+  kmsKeyVersionResourceHash: string;
   backupDispositionVersion: string;
   /**
    * Digest of the immutable policy identifiers. Absolute payload/proof expiry
@@ -421,6 +424,7 @@ function createMemoryRepository({
         requestHash: input.requestHash,
         policyVersion: input.policy.policyVersion,
         encryptionProfileVersion: input.policy.encryptionProfileVersion,
+        kmsKeyVersionResourceHash: input.policy.kmsKeyVersionResourceHash,
         backupDispositionVersion: input.policy.backupDispositionVersion,
         policySnapshotHash: prepared.policySnapshotHash,
         payloadHandleHash: sha256(handle),
@@ -876,6 +880,7 @@ function prepareStage(input: CaresLinkV1NoteGenerationPayloadStageInput) {
       requestHash: input.requestHash,
       policyVersion: input.policy.policyVersion,
       encryptionProfileVersion: input.policy.encryptionProfileVersion,
+      kmsKeyVersionResourceHash: input.policy.kmsKeyVersionResourceHash,
       backupDispositionVersion: input.policy.backupDispositionVersion,
       expiresAt: input.expiresAt,
     }),
@@ -1074,6 +1079,7 @@ function assertPolicy(policy: CaresLinkV1NoteGenerationPayloadPolicy) {
   const expectedKeys = [
     "policyVersion",
     "encryptionProfileVersion",
+    "kmsKeyVersionResourceHash",
     "backupDispositionVersion",
   ] as const;
   const actualKeys = Object.keys(policy);
@@ -1088,6 +1094,7 @@ function assertPolicy(policy: CaresLinkV1NoteGenerationPayloadPolicy) {
   }
   assertSafeVersion(policy.policyVersion, "Policy version");
   assertSafeVersion(policy.encryptionProfileVersion, "Encryption profile");
+  assertSha256(policy.kmsKeyVersionResourceHash, "KMS key-version resource hash");
   assertSafeVersion(policy.backupDispositionVersion, "Backup disposition");
 }
 

@@ -75,7 +75,7 @@ describe("Communication Note M1l activation preflight", () => {
     expect(
       CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_ACTIVATION_PREFLIGHT_POLICY_DIGEST,
     ).toBe(
-      "5eed52f738170b7cd8817c6ca8b713a992d18e071aee94518fdc870eb6004d41",
+      "2ca9c1530b17bcd2725afab1205554c04f2e966bd2105cb174f262c0e8772a1a",
     );
     expect(
       CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_ACTIVATION_PREFLIGHT_POLICY,
@@ -180,13 +180,16 @@ describe("Communication Note M1l activation preflight", () => {
       ),
     );
     expect(result.candidate.database).toMatchObject({
-      migrationCount: 44,
+      migrationCount: 45,
       runtimeCredentialBrokerMigrationSha256:
         CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_DATABASE_EVIDENCE_PINS
           .runtimeCredentialBrokerMigrationSha256,
       pointsTerminalSettlementMigrationSha256:
         CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_DATABASE_EVIDENCE_PINS
           .pointsTerminalSettlementMigrationSha256,
+      encryptedPayloadAdmissionMigrationSha256:
+        CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_DATABASE_EVIDENCE_PINS
+          .encryptedPayloadAdmissionMigrationSha256,
       runnerTerminalRuntimeIdentityPresent: false,
       runnerTerminalRuntimeMembershipPresent: false,
       runnerTerminalCredentialResolverPresent: false,
@@ -241,7 +244,7 @@ describe("Communication Note M1l activation preflight", () => {
     }
   });
 
-  it("pins the exact 44-migration manifest and ten database artifacts through Points terminal settlement", () => {
+  it("pins the exact 45-migration manifest and eleven database artifacts through encrypted payload admission", () => {
     const migrationsDirectory = join(process.cwd(), "supabase/migrations");
     const migrationNames = readdirSync(migrationsDirectory)
       .filter((name) => name.endsWith(".sql"))
@@ -312,6 +315,11 @@ describe("Communication Note M1l activation preflight", () => {
         "supabase/migrations/20260902121601_add_v1_communication_note_points_terminal_settlement.sql",
         CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_DATABASE_EVIDENCE_PINS
           .pointsTerminalSettlementMigrationSha256,
+      ],
+      [
+        "supabase/migrations/20260903041819_bind_v1_communication_note_encrypted_payload_admission.sql",
+        CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_DATABASE_EVIDENCE_PINS
+          .encryptedPayloadAdmissionMigrationSha256,
       ],
       [
         "supabase/assertions/communication_note_preview_runner_terminal_shadow_assertions.sql",
@@ -568,6 +576,13 @@ describe("Communication Note M1l activation preflight", () => {
             runtimeCredentialBrokerMigrationSha256: string;
           }
         ).runtimeCredentialBrokerMigrationSha256 = hex("f");
+      },
+      (candidate) => {
+        (
+          candidate.database as {
+            encryptedPayloadAdmissionMigrationSha256: string;
+          }
+        ).encryptedPayloadAdmissionMigrationSha256 = hex("f");
       },
       (candidate) => {
         (

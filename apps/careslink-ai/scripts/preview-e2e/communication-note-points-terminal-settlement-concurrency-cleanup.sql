@@ -326,6 +326,14 @@ where owner_user_id in (
 )
   and communication_note_point_admission_id is not null;
 
+-- Flush the new paid-payload constraint events while the synthetic jobs are
+-- intentionally unmarked. PostgreSQL will otherwise reject the following
+-- exact trigger re-enable because pending deferred events still reference it.
+set constraints
+  careslink_v1_generation.jobs_paid_communication_payload_policy_binding,
+  careslink_v1_generation.payloads_paid_communication_policy_binding
+  immediate;
+
 alter table careslink_v1_generation.jobs
 enable trigger jobs_communication_note_point_terminal_coordinator;
 

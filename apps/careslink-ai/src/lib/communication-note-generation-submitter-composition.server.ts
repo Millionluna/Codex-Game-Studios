@@ -74,6 +74,16 @@ export type CommunicationNoteGenerationStagedPayload = Readonly<{
   /** Digest only. A vault locator must never cross this boundary. */
   payloadHandleHash: string;
   payloadExpiresAt: string;
+  /** Exact immutable policy selected before ciphertext is written. */
+  payloadPolicyVersion: string;
+  /** Legacy catalog digest of policy, encryption and backup identifiers. */
+  payloadPolicySnapshotHash: string;
+  /** Exact envelope-encryption profile used for this ciphertext. */
+  encryptionProfileVersion: string;
+  /** Digest of the exact numeric KMS key-version resource, never an alias. */
+  kmsKeyVersionResourceHash: string;
+  /** Exact backup/deletion disposition applied to the stored ciphertext. */
+  backupDispositionVersion: string;
 }>;
 
 export type CommunicationNoteGenerationPayloadStager = Readonly<{
@@ -100,6 +110,8 @@ export type CommunicationNoteGenerationPayloadStager = Readonly<{
   /** Idempotent purge request for a payload the database explicitly rejected. */
   abortUnaccepted(input: Readonly<{
     ownerUserId: string;
+    /** Required to address the private owner/idempotency vault namespace. */
+    idempotencyHash: string;
     requestHash: string;
     staged: CommunicationNoteGenerationStagedPayload;
     reason: "PAYLOAD_NOT_ACCEPTED";
@@ -113,10 +125,55 @@ export type CommunicationNoteGenerationPointsAdmissionRepositoryFactory = (
 export type TestOnlyCommunicationNoteGenerationSubmitterCompositionOptions =
   Readonly<{
     capability: typeof CARESLINK_COMMUNICATION_NOTE_SUBMITTER_COMPOSITION_TEST_CAPABILITY;
+  }> &
+  CommunicationNoteGenerationSubmitterCompositionOptions;
+
+export type CommunicationNoteGenerationSubmitterCompositionOptions =
+  Readonly<{
     privacyReviewIssuer: CommunicationNoteGenerationPrivacyReviewIssuer;
     payloadStager: CommunicationNoteGenerationPayloadStager;
     createPointsAdmissionRepository: CommunicationNoteGenerationPointsAdmissionRepositoryFactory;
   }>;
+
+/**
+ * Provider-neutral composition core. It performs no environment lookup,
+ * credential creation, network call or model dispatch at construction time.
+ * A formal runtime may use it only after every injected port is independently
+ * target-guarded and approved.
+ */
+export function createCommunicationNoteGenerationSubmitterComposition(
+  options: CommunicationNoteGenerationSubmitterCompositionOptions,
+): CommunicationNoteGenerationSubmitter {
+  const privacyReviewIssuer = options?.privacyReviewIssuer;
+  const payloadStager = options?.payloadStager;
+  const createPointsAdmissionRepository =
+    options?.createPointsAdmissionRepository;
+  if (
+    typeof privacyReviewIssuer?.confirm !== "function" ||
+    typeof payloadStager?.stageCanonicalFacts !== "function" ||
+    typeof payloadStager?.abortUnaccepted !== "function" ||
+    typeof createPointsAdmissionRepository !== "function"
+  ) {
+    throw unavailable();
+  }
+
+  const confirm = privacyReviewIssuer.confirm.bind(privacyReviewIssuer);
+  const stageCanonicalFacts =
+    payloadStager.stageCanonicalFacts.bind(payloadStager);
+  const abortUnaccepted = payloadStager.abortUnaccepted.bind(payloadStager);
+  const createRepository = createPointsAdmissionRepository.bind(undefined);
+
+  return createSubmitter(
+    Object.freeze({
+      privacyReviewIssuer: Object.freeze({ confirm }),
+      payloadStager: Object.freeze({
+        stageCanonicalFacts,
+        abortUnaccepted,
+      }),
+      createPointsAdmissionRepository: createRepository,
+    }),
+  );
+}
 
 /**
  * Source-test seam only. It performs no provider/model call: a successful
@@ -128,15 +185,17 @@ export function createTestOnlyCommunicationNoteGenerationSubmitterComposition(
 ): CommunicationNoteGenerationSubmitter {
   if (
     options.capability !==
-      CARESLINK_COMMUNICATION_NOTE_SUBMITTER_COMPOSITION_TEST_CAPABILITY ||
-    typeof options.privacyReviewIssuer?.confirm !== "function" ||
-    typeof options.payloadStager?.stageCanonicalFacts !== "function" ||
-    typeof options.payloadStager?.abortUnaccepted !== "function" ||
-    typeof options.createPointsAdmissionRepository !== "function"
+    CARESLINK_COMMUNICATION_NOTE_SUBMITTER_COMPOSITION_TEST_CAPABILITY
   ) {
     throw unavailable();
   }
 
+  return createCommunicationNoteGenerationSubmitterComposition(options);
+}
+
+function createSubmitter(
+  options: CommunicationNoteGenerationSubmitterCompositionOptions,
+): CommunicationNoteGenerationSubmitter {
   return Object.freeze({
     async submit(command) {
       const prepared = prepareCommand(command);
@@ -208,6 +267,11 @@ export function createTestOnlyCommunicationNoteGenerationSubmitterComposition(
           requestHash,
           payloadHandleHash: staged.payloadHandleHash,
           payloadExpiresAt: staged.payloadExpiresAt,
+          payloadPolicyVersion: staged.payloadPolicyVersion,
+          payloadPolicySnapshotHash: staged.payloadPolicySnapshotHash,
+          encryptionProfileVersion: staged.encryptionProfileVersion,
+          kmsKeyVersionResourceHash: staged.kmsKeyVersionResourceHash,
+          backupDispositionVersion: staged.backupDispositionVersion,
         });
       } catch (error) {
         // An exception is not proof that the transaction did not commit. A
@@ -221,6 +285,7 @@ export function createTestOnlyCommunicationNoteGenerationSubmitterComposition(
       if (!projection.payloadAccepted) {
         await abortUnacceptedOrDisable(options.payloadStager, {
           ownerUserId: prepared.principal.userId,
+          idempotencyHash,
           requestHash,
           staged,
           reason: "PAYLOAD_NOT_ACCEPTED",
@@ -334,10 +399,15 @@ function parseStagedPayload(
   privacyProofExpiresAt: string,
 ): CommunicationNoteGenerationStagedPayload {
   const staged = exactRecord(value, [
+    "backupDispositionVersion",
+    "encryptionProfileVersion",
     "jobId",
+    "kmsKeyVersionResourceHash",
     "payloadExpiresAt",
     "payloadHandleHash",
     "payloadId",
+    "payloadPolicySnapshotHash",
+    "payloadPolicyVersion",
   ] as const);
   const payloadExpiresAt = parseCanonicalServerTime(staged.payloadExpiresAt);
   if (
@@ -345,6 +415,13 @@ function parseStagedPayload(
     parseUuid(staged.payloadId) === undefined ||
     typeof staged.payloadHandleHash !== "string" ||
     !SHA256_PATTERN.test(staged.payloadHandleHash) ||
+    typeof staged.payloadPolicySnapshotHash !== "string" ||
+    !SHA256_PATTERN.test(staged.payloadPolicySnapshotHash) ||
+    typeof staged.kmsKeyVersionResourceHash !== "string" ||
+    !SHA256_PATTERN.test(staged.kmsKeyVersionResourceHash) ||
+    !isPolicyIdentifier(staged.payloadPolicyVersion) ||
+    !isPolicyIdentifier(staged.encryptionProfileVersion) ||
+    !isPolicyIdentifier(staged.backupDispositionVersion) ||
     payloadExpiresAt === undefined ||
     payloadExpiresAt > Date.parse(privacyProofExpiresAt)
   ) {
@@ -355,6 +432,11 @@ function parseStagedPayload(
     payloadId: (staged.payloadId as string).toLowerCase(),
     payloadHandleHash: staged.payloadHandleHash,
     payloadExpiresAt: staged.payloadExpiresAt as string,
+    payloadPolicyVersion: staged.payloadPolicyVersion,
+    payloadPolicySnapshotHash: staged.payloadPolicySnapshotHash,
+    encryptionProfileVersion: staged.encryptionProfileVersion,
+    kmsKeyVersionResourceHash: staged.kmsKeyVersionResourceHash,
+    backupDispositionVersion: staged.backupDispositionVersion,
   });
 }
 
@@ -643,6 +725,7 @@ function cloneCleanedFacts(
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const SHA256_PATTERN = /^[a-f0-9]{64}$/;
+const POLICY_IDENTIFIER_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 const SERVER_TIME_PATTERN =
   /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
 const PRIVACY_PROOF_TIME_PATTERN =
@@ -662,6 +745,10 @@ function parseCanonicalServerTime(value: unknown) {
   return Number.isFinite(parsed) && new Date(parsed).toISOString() === value
     ? parsed
     : undefined;
+}
+
+function isPolicyIdentifier(value: unknown): value is string {
+  return typeof value === "string" && POLICY_IDENTIFIER_PATTERN.test(value);
 }
 
 function parsePrivacyProofTime(value: unknown) {

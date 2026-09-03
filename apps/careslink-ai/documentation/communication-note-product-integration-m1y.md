@@ -2,6 +2,13 @@
 
 ## Status
 
+> Historical M1y snapshot: the bullets below describe the M1y closeout and are
+> not rewritten as later capabilities arrive. The current M1z successor has
+> conditionally installed the formal Cookie principal behind the complete exact
+> Preview binding, while UI/API readiness remain `false` and the formal
+> submitter/maintenance remain absent. See
+> `documentation/communication-note-secure-submission-runtime-m1z.md`.
+
 M1y connects the existing Communication Note page to the M1x generation API
 in source, and connects that API to an explicit product-submission composition.
 It does not activate generation.

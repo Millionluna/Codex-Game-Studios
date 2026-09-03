@@ -1208,6 +1208,10 @@ describe("V1 shadow runtime boundary", () => {
         applicationBoundaryTestPath,
         handlerPath,
         handlerTestPath,
+        join(
+          process.cwd(),
+          "src/lib/v1/note-generation-encrypted-payload-stager.server.test.ts",
+        ),
         submitterCompositionTestPath,
       ].sort(),
     );
@@ -1232,7 +1236,7 @@ describe("V1 shadow runtime boundary", () => {
     );
     expect(principalCompositionSource).toMatch(/^import "server-only";/);
     expect(principalCompositionSource).toContain(
-      "COMMUNICATION_NOTE_GENERATION_FORMAL_PRINCIPAL_COMPOSITION =\n  undefined",
+      "COMMUNICATION_NOTE_GENERATION_FORMAL_PRINCIPAL_COMPOSITION =\n  createCommunicationNoteGenerationPrincipalComposition()",
     );
     expect(principalCompositionSource).not.toContain(
       "createCaresLinkV1SessionStatusResolverFromEnv",

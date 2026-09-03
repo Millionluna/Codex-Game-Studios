@@ -345,11 +345,14 @@ describe("Communication Note Points terminal settlement launcher contract", () =
       },
     );
     expect(
+      COMMUNICATION_NOTE_POINTS_TERMINAL_SETTLEMENT_TEST_ONLY.migrationFiles,
+    ).toHaveLength(21);
+    expect(
       COMMUNICATION_NOTE_POINTS_TERMINAL_SETTLEMENT_TEST_ONLY.migrationFiles.at(
         -1,
       ),
     ).toBe(
-      "20260902121601_add_v1_communication_note_points_terminal_settlement.sql",
+      "20260903041819_bind_v1_communication_note_encrypted_payload_admission.sql",
     );
     expect(COMMUNICATION_NOTE_POINTS_TERMINAL_SETTLEMENT_SCENARIOS).toEqual([
       "terminal-failure",

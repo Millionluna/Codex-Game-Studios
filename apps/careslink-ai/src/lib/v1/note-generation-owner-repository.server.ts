@@ -44,7 +44,7 @@ export const CARESLINK_V1_NOTE_GENERATION_OWNER_REPOSITORY_RPC_NAMES = {
 } as const;
 
 export const CARESLINK_V1_COMMUNICATION_NOTE_POINTS_ADMISSION_RPC_NAME =
-  "admit_and_reserve_v1_shadow_communication_note_generation_job" as const;
+  "admit_and_reserve_v1_bound_communication_note_generation_job" as const;
 
 export type CaresLinkV1NoteGenerationOwnerRepositoryQuery = (
   sql: string,
@@ -81,7 +81,13 @@ export type CaresLinkV1NoteGenerationOwnerAdmissionResult = Readonly<{
 }>;
 
 export type CaresLinkV1CommunicationNotePointsAdmissionInput = Readonly<
-  Omit<CaresLinkV1NoteGenerationOwnerAdmissionInput, "noteType">
+  Omit<CaresLinkV1NoteGenerationOwnerAdmissionInput, "noteType"> & {
+    payloadPolicyVersion: string;
+    payloadPolicySnapshotHash: string;
+    encryptionProfileVersion: string;
+    kmsKeyVersionResourceHash: string;
+    backupDispositionVersion: string;
+  }
 >;
 
 export type CaresLinkV1CommunicationNotePointsAdmissionResult = Readonly<{
@@ -154,7 +160,7 @@ const RPC_CALLS = Object.freeze({
 });
 
 const COMMUNICATION_POINTS_ADMISSION_RPC_CALL = Object.freeze({
-  sql: `select careslink_v1_generation.admit_and_reserve_v1_shadow_communication_note_generation_job(
+  sql: `select careslink_v1_generation.admit_and_reserve_v1_bound_communication_note_generation_job(
   $1::pg_catalog.uuid,
   $2::pg_catalog.uuid,
   $3::pg_catalog.text,
@@ -168,7 +174,12 @@ const COMMUNICATION_POINTS_ADMISSION_RPC_CALL = Object.freeze({
   $11::pg_catalog.text,
   $12::pg_catalog.text,
   $13::pg_catalog.text,
-  $14::pg_catalog.timestamptz
+  $14::pg_catalog.timestamptz,
+  $15::pg_catalog.text,
+  $16::pg_catalog.text,
+  $17::pg_catalog.text,
+  $18::pg_catalog.text,
+  $19::pg_catalog.text
 ) as data`,
 } satisfies RpcCall);
 
@@ -177,6 +188,7 @@ const UUID_PATTERN =
 const INPUT_UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const SHA256_PATTERN = /^[a-f0-9]{64}$/;
+const POLICY_IDENTIFIER_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 const SERVER_TIME_PATTERN =
   /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
 
@@ -229,6 +241,7 @@ const FIXED_ERROR_MESSAGES: Readonly<Record<string, string>> = Object.freeze({
 });
 
 const FACTORY_KEYS = ["capability", "principal", "query"] as const;
+const INJECTED_QUERY_FACTORY_KEYS = ["principal", "query"] as const;
 const PRINCIPAL_KEYS = ["sessionId", "transport", "userId"] as const;
 const ENQUEUE_KEYS = [
   "cleanedFactsHash",
@@ -243,12 +256,17 @@ const ENQUEUE_KEYS = [
   "sourceLocale",
 ] as const;
 const COMMUNICATION_POINTS_ADMISSION_KEYS = [
+  "backupDispositionVersion",
   "cleanedFactsHash",
+  "encryptionProfileVersion",
   "idempotencyHash",
   "jobId",
+  "kmsKeyVersionResourceHash",
   "payloadExpiresAt",
   "payloadHandleHash",
   "payloadId",
+  "payloadPolicySnapshotHash",
+  "payloadPolicyVersion",
   "privacyReviewId",
   "requestHash",
   "sourceLocale",
@@ -372,16 +390,42 @@ export function createTestOnlyCaresLinkV1CommunicationNotePointsAdmissionReposit
   }>,
 ): CaresLinkV1CommunicationNotePointsAdmissionRepository {
   let factory: Record<(typeof FACTORY_KEYS)[number], unknown>;
-  let principal: Record<(typeof PRINCIPAL_KEYS)[number], unknown>;
   try {
     factory = exactDataRecord(options, FACTORY_KEYS);
-    principal = exactDataRecord(factory.principal, PRINCIPAL_KEYS);
   } catch {
     throw unavailable();
   }
   if (factory.capability !== "TEST_ONLY" || typeof factory.query !== "function") {
     throw unavailable();
   }
+
+  return createCaresLinkV1CommunicationNotePointsAdmissionRepository({
+    principal: factory.principal as CaresLinkV1AuthenticatedPrincipal,
+    query: factory.query as CaresLinkV1NoteGenerationOwnerRepositoryQuery,
+  });
+}
+
+/**
+ * Adapts a direct, purpose-role query capability supplied by server
+ * composition. This factory never resolves a credential, opens a pool or
+ * makes the repository live; the runtime boundary must inject the reviewed
+ * policy-admission caller capability explicitly.
+ */
+export function createCaresLinkV1CommunicationNotePointsAdmissionRepository(
+  options: Readonly<{
+    query: CaresLinkV1NoteGenerationOwnerRepositoryQuery;
+    principal: CaresLinkV1AuthenticatedPrincipal;
+  }>,
+): CaresLinkV1CommunicationNotePointsAdmissionRepository {
+  let factory: Record<(typeof INJECTED_QUERY_FACTORY_KEYS)[number], unknown>;
+  let principal: Record<(typeof PRINCIPAL_KEYS)[number], unknown>;
+  try {
+    factory = exactDataRecord(options, INJECTED_QUERY_FACTORY_KEYS);
+    principal = exactDataRecord(factory.principal, PRINCIPAL_KEYS);
+  } catch {
+    throw unavailable();
+  }
+  if (typeof factory.query !== "function") throw unavailable();
 
   const safePrincipal = Object.freeze({
     userId: parseInputUuid(principal.userId),
@@ -411,6 +455,11 @@ export function createTestOnlyCaresLinkV1CommunicationNotePointsAdmissionReposit
           prepared.requestHash,
           prepared.payloadHandleHash,
           prepared.payloadExpiresAt,
+          prepared.payloadPolicyVersion,
+          prepared.payloadPolicySnapshotHash,
+          prepared.encryptionProfileVersion,
+          prepared.kmsKeyVersionResourceHash,
+          prepared.backupDispositionVersion,
         ]),
         COMMUNICATION_POINTS_SAFE_DATABASE_MESSAGES,
       );
@@ -472,6 +521,21 @@ function prepareCommunicationPointsAdmission(
       requestHash: expectInputSha256(input.requestHash),
       payloadHandleHash: expectInputSha256(input.payloadHandleHash),
       payloadExpiresAt: expectInputServerTime(input.payloadExpiresAt),
+      payloadPolicyVersion: expectInputPolicyIdentifier(
+        input.payloadPolicyVersion,
+      ),
+      payloadPolicySnapshotHash: expectInputSha256(
+        input.payloadPolicySnapshotHash,
+      ),
+      encryptionProfileVersion: expectInputPolicyIdentifier(
+        input.encryptionProfileVersion,
+      ),
+      kmsKeyVersionResourceHash: expectInputSha256(
+        input.kmsKeyVersionResourceHash,
+      ),
+      backupDispositionVersion: expectInputPolicyIdentifier(
+        input.backupDispositionVersion,
+      ),
     });
   } catch {
     throw validationError();
@@ -845,6 +909,13 @@ function expectUuid(value: unknown) {
 
 function expectInputSha256(value: unknown) {
   if (typeof value !== "string" || !SHA256_PATTERN.test(value)) {
+    throw validationError();
+  }
+  return value;
+}
+
+function expectInputPolicyIdentifier(value: unknown) {
+  if (typeof value !== "string" || !POLICY_IDENTIFIER_PATTERN.test(value)) {
     throw validationError();
   }
   return value;

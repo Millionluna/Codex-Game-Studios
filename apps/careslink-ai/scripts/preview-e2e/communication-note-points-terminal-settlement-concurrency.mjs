@@ -64,11 +64,11 @@ const MANAGEMENT_APPLICATION_NAME =
   "careslink-communication-terminal-management";
 const MAX_COMMAND_OUTPUT_BYTES = 1024 * 1024;
 const SETUP_SQL_SHA256 =
-  "a2dd25412d376d88892cfcc074ea4fcfe4cdb8a45e0992242006e36282437466";
+  "009e5ae77a71aced2df0a28667fcd2b185b5bbce6a164d66a84449ababfa15ee";
 const CLEANUP_SQL_SHA256 =
-  "8da5bdca78c46c38d5654459669fd030cbbf9b82a6c126bec01e96e284665c88";
+  "276461b165a37ab131bbf9bab64e001f9eaf00e75302536137dd5bc9ef25da7d";
 const SOURCE_REVISION_SHA256 =
-  "0d67bccd29b384a0aab23c8291f9f40c5134d07e3e82bfada2947cf100058bc2";
+  "c1ade589beec5c4554de1b7dc02407efef48f4625d8139428fccca7f1192438f";
 
 const REQUIRED_PG16_BINARIES = Object.freeze([
   "initdb",
@@ -105,6 +105,7 @@ const REQUIRED_MIGRATIONS = Object.freeze([
   "20260902052755_add_v1_communication_note_points_preview.sql",
   "20260902063211_add_v1_communication_note_points_admission.sql",
   "20260902121601_add_v1_communication_note_points_terminal_settlement.sql",
+  "20260903041819_bind_v1_communication_note_encrypted_payload_admission.sql",
 ]);
 
 export const COMMUNICATION_NOTE_POINTS_TERMINAL_SETTLEMENT_DEADLINES =
@@ -1000,7 +1001,7 @@ async function readAndValidateFiles() {
   if (
     pinned.migrations.length !==
       COMMUNICATION_NOTE_PREVIEW_TRANSACTIONAL_MIGRATION_POLICY.migrationCount ||
-    pinned.migrations.length !== 44 ||
+    pinned.migrations.length !== 45 ||
     migrations.some((migration) => !migration) ||
     migrations.some(
       (migration, index) =>
