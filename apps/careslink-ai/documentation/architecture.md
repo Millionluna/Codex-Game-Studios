@@ -137,6 +137,33 @@ The first implementation-readiness batch is present in source but is deliberatel
 | Server repository/orchestrator | `ndis-shadow-repository.server.ts` and `ndis-shadow-integration.server.ts` project only after the legacy draft save succeeds | legacy response/content and monthly credits remain authoritative; shadow failure preserves that response and emits content-free evidence |
 | Activation guard | master, dual-write, read and exact branch-ref checks in `ndis-shadow-guard.ts` | requires `VERCEL_ENV=preview`; known Production ref and every `VERCEL_ENV=production` execution fail closed |
 
+### Google Cloud provider trust M2b — source only
+
+M2b adds an owned, exact-allowlist `node:https` transport and a source seam for
+Vercel custom-audience OIDC -> Google STS -> pinned service-account
+impersonation. One access token reads the exact parent KMS key and numeric key
+version; the result of a second independent token request is retained only
+behind a private WeakMap one-use handle for the M2a `rawEncrypt` adapter. Parent purpose/template and
+version algorithm/protection/state are all cross-checked before that handle is
+issued. The M2a direct import remains quarantined to the M2b trust module, so a
+caller-supplied M2a posture claim cannot enter this composition path.
+
+The transport preflights every DNS answer as public, pins that result set into
+the HTTPS request, rechecks the connected peer and preserves certificate and
+server-name verification. It permits only the exact Vercel, STS, pinned IAM
+Credentials, parent-key, numeric-version and numeric-version `rawEncrypt`
+method/resource profiles, with five-second request bounds, one 30-second chain
+deadline, no redirect/retry, fixed byte caps and content-free failures.
+
+This is not an active trust root. The formal preparation path fails closed,
+formal singletons are `undefined`, readiness is `false`, and only an explicit
+`TEST_ONLY` capability can run the source seam. Tests mock provider/HTTPS work;
+there is no live evidence, cloud call/resource, route/worker composition,
+Preview deployment, Production change, real care data or model call. The GCS
+raw-token DTO and independent WIF/IAM/KMS IAM control-plane attestation remain
+future gates. See
+`documentation/communication-note-secure-submission-provider-trust-m2b.md`.
+
 ### PostgreSQL 16.15 local isolated gate — 2026-08-24
 
 On a worktree based on HEAD
@@ -438,11 +465,13 @@ The contract/domain/schema portion and a feature-flagged NDIS dual-write/shadow-
   20-Point admission to the existing atomic terminal commit/release boundary.
   Its formal Cookie principal is exact-Preview-conditional, but the formal
   submitter/maintenance remain absent. M2a supplies default-off KMS,
-  private-store and purpose-session protocol adapters, but their real
-  credentials/transports, authenticated exact-resource posture, bucket
-  propagation and historical-copy purge evidence, independently observed
-  database quiescence, no-data Hosted proof, worker vault grant and separate
-  activation approvals remain absent.
+  private-store and purpose-session protocol adapters. M2b now narrows the KMS
+  source path to owned HTTPS, pinned WIF/service-account exchange and
+  authenticated exact parent/version reads, but remains TestOnly with mocked
+  provider evidence. Live IAM/resource attestation, the GCS raw-token boundary,
+  bucket propagation and historical-copy purge evidence, independently
+  observed database quiescence, no-data Hosted proof, worker vault grant and
+  separate activation approvals remain absent.
 - On deleted `r9`, the security advisor returned 26 global findings (23 INFO, 3 WARN for pre-existing public authenticated-executable `get`/`list`/`pull` security-definer functions) and zero generation findings; see the [security-definer executable remediation](https://supabase.com/docs/guides/database/database-linter?lint=0029_authenticated_security_definer_function_executable). The performance advisor returned 155 global findings (144 INFO, 11 WARN); generation scope contained 20 INFO only—14 [unindexed composite foreign keys](https://supabase.com/docs/guides/database/database-linter?lint=0001_unindexed_foreign_keys) and 6 [unused fresh indexes](https://supabase.com/docs/guides/database/database-linter?lint=0005_unused_index)—with zero generation WARN/ERROR. This is not an all-project green result; no mechanical bulk index addition was made, and zero-row unused-index findings are not runtime-usage evidence.
 - On deleted exact-current Assignment `r2`, security advisors returned 21 INFO / 14 WARN and performance advisors returned 105 INFO / 24 WARN, with no ERROR. On the deleted exact-current M1b re-gate ref `nhupgyxczlvtddycrgyw`, final advisors returned 21 INFO / 17 WARN and 106 INFO / 24 WARN respectively, with zero ERROR; the live inbox query exercised its dedicated index, so the final performance result had one fewer unused-index INFO than the pre-matrix 107 INFO snapshot. The three additional M1b WARN are the intentionally narrow authenticated-executable Provider Response `SECURITY DEFINER` RPCs rather than table grants or unrestricted bypasses: every Portal operation remains behind the master and operation-specific database gates, an exact non-Production application target, fresh Auth user/session validation and exact membership/tenant authorization, with `search_path=''` and direct Portal table privileges withheld. These warnings remain explicit review items, not an all-project security-green claim.
 - Follow-up M1c source/local validation first passed 11 focused files / 336 tests, the full 147-file / 2,011-test suite, TypeScript, lint and the 64/64-page production build. Independent state-machine review found no remaining P0/P1 after resource/authorization-epoch fencing, per-resource write registration and authoritative stale-completion reconciliation. Its post-review concurrency lifecycle now passes 2 focused files / 28 tests, the current 149-file / 2,039-test suite, TypeScript and lint, then clean-applies the exact eight-file chain on two fresh PostgreSQL 16.15 clusters and passes 8/8 true multi-backend replay/competition/session/provider/flag/ownership scenarios each time. PostgreSQL has no TCP listener, host auth is `reject`, management and runner traffic use only an owned `0700` Unix socket, and the complete live harness is SHA-pinned before execution. Receipt replay is lock-aligned with fresh writes and a revoke-held replay is proven blocked before failing after commit. The runner is made `NOLOGIN`; SQL cleanup and independent postcheck retain six disabled Preview-only flags, zero Auth/Portal fixtures and all three append-only triggers; PostgreSQL stops normally and the exact temporary root is deleted. This remains local engine/schema/transaction evidence only: Hosted Auth/Data API, Vercel deployment, activation, merge and Production application are still absent.
@@ -461,6 +490,7 @@ There is no app-owned email delivery service, push service, deployed queue worke
 - `documentation/automation.md` - LLM/RPC automation and activation gates.
 - `documentation/communication-note-preview-runtime-credential-broker-m1l.md` - formal migration source, local PG16 plus deleted Hosted PG17 evidence, terminal fence and remaining product/Production gates.
 - `documentation/communication-note-secure-submission-runtime-m1z.md` - current source-only encrypted staging, policy-bound admission and maintenance boundary.
+- `documentation/communication-note-secure-submission-provider-trust-m2b.md` - default-off WIF, owned HTTPS and authenticated exact-version KMS source boundary.
 - `documentation/seo.md` - public Companion indexing boundary.
 - `documentation/v1-implementation-readiness-audit.zh.md` - requirement map, implementation delta and approval gates.
 - `documentation/prd.md` - historical NDIS pilot decision with V1 baseline precedence.

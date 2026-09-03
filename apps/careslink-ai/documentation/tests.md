@@ -3635,6 +3635,34 @@ migration apply, Supabase/Hosted write, deployment, real care data or model call
 was used. See
 `documentation/communication-note-secure-submission-provider-adapters-m2a.md`.
 
+### Communication Note Google Cloud provider trust M2b — source evidence
+
+Two focused source suites exercise the new trust and transport boundary. The
+transport suite covers import-time inactivity, its six exact endpoint/method
+profiles, URL/header ambiguity and SSRF rejection, all-address DNS preflight,
+request-pinned resolution, private connected-peer denial, certificate and
+server-name verification, redirect/retry rejection, body/response caps,
+deadline/abort destruction, late-response handling and mutable-buffer
+scrubbing.
+
+The trust suite covers the fixed-failure formal factory, `undefined` singleton
+and `READY=false`; exact Vercel Preview claims and custom-exchange `jti`; Google
+STS and two independent pinned service-account credential requests; exact
+parent-key and numeric-version posture; and one one-use M2a `rawEncrypt`. It
+also covers malformed/unsafe provider responses, upstream-expiry widening,
+clone/spread/proxy/accessor attacks, caller-supplied M2a posture, exact root
+abort binding, replay and explicit discard. Static importer checks quarantine
+the M2a KMS adapter to M2b and prove there is no M2b product runtime importer.
+The post-build client-boundary scanner also treats the M2a/M2b policy and
+version markers as forbidden static-chunk content.
+
+All provider and Node HTTPS effects in these focused tests are mocked. The
+suites make no live WIF, IAM, KMS, network, Hosted Preview, billing, deployment,
+Production, real-care-data or model-call claim. They also do not cover the M2a
+GCS raw-token DTO or independently attest WIF/IAM/KMS IAM policy. Formal
+activation remains closed. See
+`documentation/communication-note-secure-submission-provider-trust-m2b.md`.
+
 ### Current live/read-only evidence
 
 - Supabase migrations, tables, RLS flags, policies, grants, function grants and aggregate row counts were checked read-only.
