@@ -7,6 +7,7 @@ import {
 } from "../../../lib/communication-note-composer";
 import { isCommunicationNoteComposerEnabled } from "../../../lib/communication-note-composer-feature";
 import { isCommunicationNoteGenerationUiEnabled } from "../../../lib/communication-note-generation-feature";
+import { isCaresLinkV1PointsUiEnabled } from "../../../lib/points-ui-feature.server";
 import { resolveCommunicationNotePointsPreview } from "../../../lib/communication-note-points-preview.server";
 import { resolveWorkspaceAccountFromSupabaseSession } from "../../../lib/referral-workspace-session";
 import { CARESLINK_AI_NOINDEX_ROBOTS } from "../../../lib/seo-policy";
@@ -39,7 +40,10 @@ export default async function CommunicationNotePage({
 }: {
   searchParams?: Promise<SearchParams>;
 }) {
-  if (!isCommunicationNoteComposerEnabled()) {
+  if (
+    !isCaresLinkV1PointsUiEnabled() ||
+    !isCommunicationNoteComposerEnabled()
+  ) {
     notFound();
   }
 

@@ -26,10 +26,10 @@ import {
   type ReferralWorkspaceCopy,
 } from "@/lib/referral-workspace-i18n";
 import {
-  isCaresLinkV1PointsUiEnabled,
   resolveCaresLinkV1PointsPageData,
   type CaresLinkV1PointsPageData,
 } from "@/lib/v1/points-page-data.server";
+import { isCaresLinkV1PointsUiEnabled } from "@/lib/points-ui-feature.server";
 
 type SearchParams = Record<string, string | string[] | undefined>;
 
@@ -90,6 +90,7 @@ export default async function PlanAndUsagePage({
 
     return (
       <AppShell
+        balanceNavigation="points"
         locale={locale}
         languageSwitcherHref="/plan-and-usage"
         workspaceAccountId={accountParam}

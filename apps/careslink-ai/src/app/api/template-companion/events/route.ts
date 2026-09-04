@@ -10,6 +10,7 @@ import {
   getNdisCaseNoteRequestIdentity,
   NDIS_CASE_NOTE_COMPANION_SESSION_COOKIE,
 } from "@/lib/ndis-case-note-companion-request";
+import { isCaresLinkV1PointsUiEnabled } from "@/lib/points-ui-feature.server";
 import { resolveWorkspaceAccountFromSupabaseSession } from "@/lib/referral-workspace-session";
 import { createCareslinkServerSupabaseClient } from "@/lib/supabase-server";
 
@@ -45,6 +46,20 @@ export async function POST(request: Request) {
       },
       { status: 403 },
     );
+  }
+
+  if (isCaresLinkV1PointsUiEnabled()) {
+    const response = NextResponse.json(
+      {
+        ok: false,
+        code: "ndis_companion_unavailable",
+        error:
+          "NDIS Case Note Companion activity is unavailable during the Points preview.",
+      },
+      { status: 503 },
+    );
+    response.headers.set("Cache-Control", "private, no-store");
+    return response;
   }
 
   let body: CompanionEventPostBody;

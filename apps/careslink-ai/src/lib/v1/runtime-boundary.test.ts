@@ -117,12 +117,61 @@ describe("V1 shadow runtime boundary", () => {
       "src/lib/v1/product-api-session-status.server.ts",
       "src/lib/v1/product-api-supabase.server.ts",
       "src/lib/v1/points-page-data.server.ts",
+      "src/lib/points-ui-feature.server.ts",
       "src/lib/communication-note-generation-current-session.server.ts",
       "src/lib/communication-note-generation-principal.server.ts",
       "src/lib/communication-note-generation-principal-composition.server.ts",
     ]) {
       expect(readFileSync(join(process.cwd(), relativePath), "utf8")).toMatch(
         /^import "server-only";/,
+      );
+    }
+  });
+
+  it("keeps the Points UI cutover in a small audited server-only graph", () => {
+    const featureModule = join(
+      process.cwd(),
+      "src/lib/points-ui-feature.server.ts",
+    );
+    const pointsPageDataModule = join(
+      process.cwd(),
+      "src/lib/v1/points-page-data.server.ts",
+    );
+    const sourceFiles = walkSourceFiles("src");
+    const featureImporters = sourceFiles.filter(
+      (file) =>
+        file !== featureModule &&
+        readFileSync(file, "utf8").includes("points-ui-feature.server"),
+    );
+    const pointsPageDataImporters = sourceFiles.filter(
+      (file) =>
+        file !== pointsPageDataModule &&
+        readFileSync(file, "utf8").includes("points-page-data.server"),
+    );
+
+    expect(readFileSync(featureModule, "utf8")).toMatch(
+      /^import "server-only";/,
+    );
+    expect(featureImporters).toEqual(
+      [
+        "src/app/ai-documents/communication-note/page.tsx",
+        "src/app/ai-documents/page.tsx",
+        "src/app/api/template-companion/events/route.ts",
+        "src/app/api/template-companion/ndis-case-note/route.ts",
+        "src/app/plan-and-usage/page.tsx",
+        "src/app/privacy/page.tsx",
+        "src/app/template-companion/ndis-case-note/page.tsx",
+        "src/lib/v1/points-page-data.server.ts",
+      ]
+        .map((relativePath) => join(process.cwd(), relativePath))
+        .sort(),
+    );
+    expect(pointsPageDataImporters).toEqual([
+      join(process.cwd(), "src/app/plan-and-usage/page.tsx"),
+    ]);
+    for (const importer of featureImporters) {
+      expect(readFileSync(importer, "utf8"), importer).not.toMatch(
+        /^"use client";/,
       );
     }
   });

@@ -1,5 +1,10 @@
 import "server-only";
 
+import {
+  CARESLINK_V1_POINTS_UI_FEATURE_FLAG,
+  isCaresLinkV1PointsUiEnabled,
+  type CaresLinkV1PointsUiEnv,
+} from "../points-ui-feature.server";
 import { CARESLINK_V1_CONTRACT_VERSION } from "./shared-contracts";
 import {
   CARESLINK_V1_DEFAULT_PRODUCT_API_RUNTIME,
@@ -10,12 +15,10 @@ import {
   type CaresLinkV1AuthenticatedPrincipal,
 } from "./transport-contract";
 
-export const CARESLINK_V1_POINTS_UI_FEATURE_FLAG =
-  "CARESLINK_V1_POINTS_UI_ENABLED" as const;
-
-type CaresLinkV1PointsUiEnv = Readonly<{
-  CARESLINK_V1_POINTS_UI_ENABLED?: string;
-}>;
+export {
+  CARESLINK_V1_POINTS_UI_FEATURE_FLAG,
+  isCaresLinkV1PointsUiEnabled,
+};
 
 export type CaresLinkV1PointsPageData =
   | Readonly<{
@@ -60,12 +63,6 @@ const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const SERVER_TIME_PATTERN =
   /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
-
-export function isCaresLinkV1PointsUiEnabled(
-  env: CaresLinkV1PointsUiEnv = process.env as CaresLinkV1PointsUiEnv,
-) {
-  return env[CARESLINK_V1_POINTS_UI_FEATURE_FLAG] === "true";
-}
 
 /**
  * Resolves the owner-free Points summary for a Server Component without an

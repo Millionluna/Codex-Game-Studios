@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   checkRateLimit: vi.fn(),
 }));
 
+vi.mock("server-only", () => ({}));
 vi.mock("@/lib/supabase-server", () => ({
   createCareslinkServerSupabaseClient: mocks.createServerClient,
 }));
@@ -30,6 +31,9 @@ vi.mock("@/lib/ndis-case-note-companion-store", async () => {
 });
 vi.mock("@/lib/ndis-case-note-companion-request", async () => {
   return vi.importActual("../../../../lib/ndis-case-note-companion-request");
+});
+vi.mock("@/lib/points-ui-feature.server", async () => {
+  return vi.importActual("../../../../lib/points-ui-feature.server");
 });
 
 const provider = {
@@ -59,6 +63,7 @@ describe("provider-only companion telemetry", () => {
   beforeEach(() => {
     vi.resetModules();
     vi.stubEnv("NDIS_CASE_NOTE_FINGERPRINT_PEPPER", "test-pepper");
+    vi.stubEnv("CARESLINK_V1_POINTS_UI_ENABLED", "false");
     vi.clearAllMocks();
     mocks.createServerClient.mockResolvedValue({ auth: {} });
     mocks.resolveAccount.mockResolvedValue(provider);
@@ -77,6 +82,7 @@ describe("provider-only companion telemetry", () => {
   });
 
   it("rejects an unauthenticated event before parsing or rate limiting", async () => {
+    vi.stubEnv("CARESLINK_V1_POINTS_UI_ENABLED", "true");
     mocks.resolveAccount.mockResolvedValueOnce(undefined);
     const json = vi.fn();
     const request = {
@@ -92,6 +98,46 @@ describe("provider-only companion telemetry", () => {
     expect(json).not.toHaveBeenCalled();
     expect(mocks.checkRateLimit).not.toHaveBeenCalled();
     expect(mocks.getStore).not.toHaveBeenCalled();
+  });
+
+  it("blocks stale companion telemetry before parsing or persistence in Points mode", async () => {
+    vi.stubEnv("CARESLINK_V1_POINTS_UI_ENABLED", "true");
+    const json = vi.fn();
+    const request = {
+      url: "http://localhost/api/template-companion/events",
+      headers: new Headers(),
+      json,
+    } as unknown as Request;
+
+    const { POST } = await import("./route");
+    const response = await POST(request);
+    const payload = await response.json();
+
+    expect(response.status).toBe(503);
+    expect(response.headers.get("cache-control")).toBe("private, no-store");
+    expect(payload).toEqual({
+      ok: false,
+      code: "ndis_companion_unavailable",
+      error:
+        "NDIS Case Note Companion activity is unavailable during the Points preview.",
+    });
+    expect(JSON.stringify(payload)).not.toMatch(
+      /credit|userId|sessionId|visitor|error detail/i,
+    );
+    expect(json).not.toHaveBeenCalled();
+    expect(mocks.checkRateLimit).not.toHaveBeenCalled();
+    expect(mocks.getStore).not.toHaveBeenCalled();
+    expect(mocks.recordEvent).not.toHaveBeenCalled();
+  });
+
+  it("keeps the legacy event path unchanged for a non-exact UI flag", async () => {
+    vi.stubEnv("CARESLINK_V1_POINTS_UI_ENABLED", "TRUE");
+
+    const { POST } = await import("./route");
+    const response = await POST(createRequest());
+
+    expect(response.status).toBe(200);
+    expect(mocks.recordEvent).toHaveBeenCalledTimes(1);
   });
 
   it("records provider metadata without case-note content", async () => {
@@ -161,6 +207,7 @@ describe("provider-only companion telemetry", () => {
   });
 
   it("rejects an admin before reading event data", async () => {
+    vi.stubEnv("CARESLINK_V1_POINTS_UI_ENABLED", "true");
     mocks.resolveAccount.mockResolvedValueOnce({ ...provider, role: "admin" });
     const json = vi.fn();
     const request = {

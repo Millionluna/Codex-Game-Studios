@@ -1,5 +1,5 @@
 import { renderToStaticMarkup } from "react-dom/server";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { getGeneratedMaterialDraftStore } from "../../lib/generated-material-draft-store";
 import { NDIS_CASE_NOTE_DISCLAIMER } from "../../lib/ndis-case-note-companion";
 import AiDocumentsPage from "./page";
@@ -16,6 +16,10 @@ const creditMocks = vi.hoisted(() => ({
     reservedCredits: 0,
     recentUsage: [],
   }),
+}));
+
+const pointsUiMocks = vi.hoisted(() => ({
+  isEnabled: vi.fn(),
 }));
 
 vi.mock("@/components/app-shell", async () =>
@@ -39,6 +43,9 @@ vi.mock("@/lib/communication-note-composer-feature", async () =>
 );
 vi.mock("@/lib/account-credit-store", () => ({
   getAccountCreditStore: () => ({ getUsage: creditMocks.getUsage }),
+}));
+vi.mock("@/lib/points-ui-feature.server", () => ({
+  isCaresLinkV1PointsUiEnabled: pointsUiMocks.isEnabled,
 }));
 vi.mock("@/lib/ndis-case-note-companion", async () =>
   import("../../lib/ndis-case-note-companion"),
@@ -67,6 +74,11 @@ vi.mock("@/lib/referral-workspace-i18n", async () =>
 );
 
 describe("AI Documents page", () => {
+  beforeEach(() => {
+    pointsUiMocks.isEnabled.mockReturnValue(false);
+    creditMocks.getUsage.mockClear();
+  });
+
   afterEach(() => {
     vi.unstubAllEnvs();
   });
@@ -130,11 +142,8 @@ describe("AI Documents page", () => {
     expect(markup).toContain("AI Documents");
     expect(markup).toContain("Referrals");
     expect(markup).toContain("Create case note draft");
-    expect(markup).toContain("Communication Note intake &amp; privacy review");
-    expect(markup).toContain("Local preparation · generation offline");
-    expect(markup).toContain(
-      "/ai-documents/communication-note?lang=en",
-    );
+    expect(markup).not.toContain("Communication Note intake");
+    expect(markup).not.toContain("/ai-documents/communication-note");
     expect(markup).toContain("2 of 3 available");
     expect(markup).toContain("2 credits remaining");
     expect(markup).toContain("/plan-and-usage?lang=en");
@@ -162,5 +171,28 @@ describe("AI Documents page", () => {
 
     expect(markup).not.toContain("Communication Note intake");
     expect(markup).not.toContain("/ai-documents/communication-note");
+  });
+
+  it("isolates legacy Credits and NDIS generation in Points mode", async () => {
+    vi.stubEnv("CARESLINK_COMMUNICATION_NOTE_COMPOSER_ENABLED", "true");
+    pointsUiMocks.isEnabled.mockReturnValue(true);
+
+    const element = await AiDocumentsPage({
+      searchParams: Promise.resolve({
+        account: "user-approved",
+        lang: "en",
+      }),
+    });
+    const markup = renderToStaticMarkup(element);
+
+    expect(markup).toContain("View Points preview");
+    expect(markup).toContain("Generation unavailable in Points preview");
+    expect(markup).toContain("This generator is not yet connected to Points");
+    expect(markup).toContain("Communication Note intake &amp; privacy review");
+    expect(markup).toContain("Saved Documents");
+    expect(markup).not.toContain("Create case note draft");
+    expect(markup).not.toContain('href="/template-companion/ndis-case-note');
+    expect(markup).not.toMatch(/\bcredits?\b/i);
+    expect(creditMocks.getUsage).not.toHaveBeenCalled();
   });
 });

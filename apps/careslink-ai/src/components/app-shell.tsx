@@ -4,6 +4,7 @@ import {
   Archive,
   Building2,
   ClipboardList,
+  Coins,
   FileText,
   KeyRound,
   LayoutDashboard,
@@ -29,6 +30,7 @@ import type {
 } from "@/lib/referral-workspace-auth";
 
 type AppShellProps = {
+  balanceNavigation?: "plan-usage" | "points";
   children: ReactNode;
   locale?: Locale;
   languageSwitcherHref?: string;
@@ -47,6 +49,7 @@ type ShellCopy = {
   savedDocuments: string;
   profileReadiness: string;
   planUsage: string;
+  points: string;
   accessRequests: string;
   materialUsage: string;
   language: string;
@@ -89,6 +92,7 @@ const legacyNavItems = [
 ] as const;
 
 export function AppShell({
+  balanceNavigation = "plan-usage",
   children,
   locale = DEFAULT_LOCALE,
   languageSwitcherHref = "/ai-documents",
@@ -104,7 +108,7 @@ export function AppShell({
   const showLegacyDemoNav =
     isDemoSession &&
     process.env.NEXT_PUBLIC_CARESLINK_SHOW_LEGACY_DEMO_NAV === "true";
-  const navigation = getNavigation(workspaceRole, copy);
+  const navigation = getNavigation(workspaceRole, copy, balanceNavigation);
   const showSignOut =
     workspaceSessionSource === "supabase" && Boolean(workspaceRole);
   const currentPath = getPathname(languageSwitcherHref);
@@ -335,6 +339,7 @@ function ShellNavSection({
 function getNavigation(
   role: WorkspaceAccountRole | undefined,
   copy: ShellCopy,
+  balanceNavigation: NonNullable<AppShellProps["balanceNavigation"]>,
 ) {
   if (role === "provider") {
     return {
@@ -373,8 +378,9 @@ function getNavigation(
         },
         {
           href: "/plan-and-usage",
-          label: copy.planUsage,
-          icon: KeyRound,
+          label:
+            balanceNavigation === "points" ? copy.points : copy.planUsage,
+          icon: balanceNavigation === "points" ? Coins : KeyRound,
           activePaths: ["/plan-and-usage"],
         },
       ],
@@ -419,6 +425,7 @@ function getShellCopy(locale: Locale): ShellCopy {
       savedDocuments: "已保存文档",
       profileReadiness: "资料与转介准备",
       planUsage: "访问与使用量",
+      points: "Points",
       accessRequests: "访问申请",
       materialUsage: "材料使用情况",
       language: "语言",
@@ -447,6 +454,7 @@ function getShellCopy(locale: Locale): ShellCopy {
     savedDocuments: "Saved Documents",
     profileReadiness: "Profile & Readiness",
     planUsage: "Plan & Usage",
+    points: "Points",
     accessRequests: "Access requests",
     materialUsage: "Material usage",
     language: "Language",

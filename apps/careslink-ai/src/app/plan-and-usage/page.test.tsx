@@ -20,8 +20,10 @@ vi.mock("@/lib/referral-workspace-session", () => ({
   getWorkspaceAccessGateWithServerSession: mocks.getGate,
 }));
 vi.mock("@/lib/v1/points-page-data.server", () => ({
-  isCaresLinkV1PointsUiEnabled: mocks.isPointsUiEnabled,
   resolveCaresLinkV1PointsPageData: mocks.resolvePoints,
+}));
+vi.mock("@/lib/points-ui-feature.server", () => ({
+  isCaresLinkV1PointsUiEnabled: mocks.isPointsUiEnabled,
 }));
 vi.mock("@/lib/referral-workspace-auth", async () =>
   import("../../lib/referral-workspace-auth"),

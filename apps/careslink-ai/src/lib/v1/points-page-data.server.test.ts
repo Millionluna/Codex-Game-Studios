@@ -3,6 +3,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   CARESLINK_V1_POINTS_UI_FEATURE_FLAG,
   isCaresLinkV1PointsUiEnabled,
+} from "../points-ui-feature.server";
+import {
   resolveCaresLinkV1PointsPageData,
 } from "./points-page-data.server";
 import type { CaresLinkV1ProductApiRuntime } from "./product-api-runtime.server";

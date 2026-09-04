@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   createServerClient: vi.fn(),
   resolveAccount: vi.fn(),
   resolvePointsPreview: vi.fn(),
+  isPointsUiEnabled: vi.fn(),
 }));
 
 vi.mock("next/navigation", () => ({
@@ -26,6 +27,9 @@ vi.mock("../../../lib/referral-workspace-session", () => ({
 }));
 vi.mock("../../../lib/communication-note-points-preview.server", () => ({
   resolveCommunicationNotePointsPreview: mocks.resolvePointsPreview,
+}));
+vi.mock("../../../lib/points-ui-feature.server", () => ({
+  isCaresLinkV1PointsUiEnabled: mocks.isPointsUiEnabled,
 }));
 
 import CommunicationNotePage, { dynamic, generateMetadata } from "./page";
@@ -52,6 +56,7 @@ describe("Communication Note page boundary", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.stubEnv("CARESLINK_COMMUNICATION_NOTE_COMPOSER_ENABLED", "true");
+    mocks.isPointsUiEnabled.mockReturnValue(true);
     mocks.createServerClient.mockResolvedValue(serverClient);
     mocks.resolveAccount.mockResolvedValue(provider);
     mocks.resolvePointsPreview.mockResolvedValue(availablePointsPreview);
@@ -63,6 +68,20 @@ describe("Communication Note page boundary", () => {
 
   it("stays fail-closed unless the composer is explicitly enabled", async () => {
     vi.stubEnv("CARESLINK_COMMUNICATION_NOTE_COMPOSER_ENABLED", "false");
+
+    await expect(
+      CommunicationNotePage({
+        searchParams: Promise.resolve({ lang: "en" }),
+      }),
+    ).rejects.toThrow("not-found");
+
+    expect(mocks.notFound).toHaveBeenCalledTimes(1);
+    expect(mocks.createServerClient).not.toHaveBeenCalled();
+    expect(mocks.resolvePointsPreview).not.toHaveBeenCalled();
+  });
+
+  it("stays unreachable until the mutually exclusive Points surface is enabled", async () => {
+    mocks.isPointsUiEnabled.mockReturnValue(false);
 
     await expect(
       CommunicationNotePage({

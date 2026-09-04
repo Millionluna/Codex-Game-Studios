@@ -25,6 +25,10 @@ const supabaseMock = vi.hoisted(() => ({
   createCareslinkServerSupabaseClient: vi.fn(),
 }));
 
+vi.mock("server-only", () => ({}));
+vi.mock("@/lib/points-ui-feature.server", async () => {
+  return vi.importActual("../../../../lib/points-ui-feature.server");
+});
 vi.mock("@/lib/ndis-case-note-companion-store", async () => {
   const actual = await vi.importActual<
     typeof import("../../../../lib/ndis-case-note-companion-store")
@@ -163,6 +167,7 @@ function createRequest(
 describe("provider-only NDIS case note generation route", () => {
   beforeEach(() => {
     vi.resetModules();
+    vi.stubEnv("CARESLINK_V1_POINTS_UI_ENABLED", "false");
     vi.stubEnv("OPENAI_API_KEY", "test-openai-key");
     vi.stubEnv("NDIS_CASE_NOTE_FINGERPRINT_PEPPER", "test-pepper");
     Object.values(store).forEach((value) => {
@@ -239,65 +244,74 @@ describe("provider-only NDIS case note generation route", () => {
     vi.unstubAllEnvs();
   });
 
-  it("generates an owner-bound provider draft and records metadata only", async () => {
-    const { POST } = await import("./route");
-    const response = await POST(createRequest());
-    const payload = await response.json();
+  it.each([
+    ["false", "false"],
+    ["unset", undefined],
+    ["non-exact", "TRUE"],
+  ] as const)(
+    "generates an owner-bound provider draft and records metadata only when the flag is %s",
+    async (_flagCase, flagValue) => {
+      vi.stubEnv("CARESLINK_V1_POINTS_UI_ENABLED", flagValue);
+      const { POST } = await import("./route");
+      const response = await POST(createRequest());
+      const payload = await response.json();
 
-    expect(response.status).toBe(200);
-    expect(payload).toMatchObject({
-      ok: true,
-      feature: "ndis_case_note",
-      material,
-      signedIn: true,
-      credits: creditSummary,
-    });
-    expect(payload.claimToken).toMatch(/^[A-Za-z0-9_-]{32,100}$/);
-    expect(store.consumeQuota).toHaveBeenCalledTimes(2);
-    expect(creditStore.reserveCredit).toHaveBeenCalledWith({
-      userId: provider.id,
-      feature: "ndis_case_note",
-      action: "generate",
-      idempotencyKey: "case-note-request-0001",
-    });
-    expect(creditStore.commitCredit).toHaveBeenCalledOnce();
-    expect(store.consumeQuota.mock.calls.map(([input]) => input.scope)).toEqual([
-      "authenticated_user",
-      "authenticated_ip",
-    ]);
-    expect(store.saveClaim).toHaveBeenCalledWith(
-      expect.objectContaining({
-        claimedByUserId: provider.id,
-        claimedAt: expect.any(String),
-      }),
-    );
-    expect(openAiMock.generateNdisCaseNoteDraft).toHaveBeenCalledWith(
-      expect.objectContaining({ input: validInput }),
-    );
+      expect(response.status).toBe(200);
+      expect(payload).toMatchObject({
+        ok: true,
+        feature: "ndis_case_note",
+        material,
+        signedIn: true,
+        credits: creditSummary,
+      });
+      expect(payload.claimToken).toMatch(/^[A-Za-z0-9_-]{32,100}$/);
+      expect(store.consumeQuota).toHaveBeenCalledTimes(2);
+      expect(creditStore.reserveCredit).toHaveBeenCalledWith({
+        userId: provider.id,
+        feature: "ndis_case_note",
+        action: "generate",
+        idempotencyKey: "case-note-request-0001",
+      });
+      expect(creditStore.commitCredit).toHaveBeenCalledOnce();
+      expect(store.consumeQuota.mock.calls.map(([input]) => input.scope)).toEqual([
+        "authenticated_user",
+        "authenticated_ip",
+      ]);
+      expect(store.saveClaim).toHaveBeenCalledWith(
+        expect.objectContaining({
+          claimedByUserId: provider.id,
+          claimedAt: expect.any(String),
+        }),
+      );
+      expect(openAiMock.generateNdisCaseNoteDraft).toHaveBeenCalledWith(
+        expect.objectContaining({ input: validInput }),
+      );
 
-    const event = store.recordEvent.mock.calls[0][0];
-    expect(event).toMatchObject({
-      eventName: "companion_generated",
-      attribution: {
-        source: "ndis-case-note-download",
-        resourceSlug: "ndis-case-note-template",
-      },
-    });
-    expect(JSON.stringify(event)).not.toContain(
-      validInput.observableFacts,
-    );
-    expect(JSON.stringify(event)).not.toContain(material.englishCaseNoteDraft);
-    expect(JSON.stringify(event)).not.toContain(material.chineseReviewVersion);
-    const creditCalls = JSON.stringify({
-      reserve: creditStore.reserveCredit.mock.calls,
-      commit: creditStore.commitCredit.mock.calls,
-    });
-    expect(creditCalls).not.toContain(validInput.observableFacts);
-    expect(creditCalls).not.toContain(material.englishCaseNoteDraft);
-    expect(creditCalls).not.toContain(material.chineseReviewVersion);
-  });
+      const event = store.recordEvent.mock.calls[0][0];
+      expect(event).toMatchObject({
+        eventName: "companion_generated",
+        attribution: {
+          source: "ndis-case-note-download",
+          resourceSlug: "ndis-case-note-template",
+        },
+      });
+      expect(JSON.stringify(event)).not.toContain(validInput.observableFacts);
+      expect(JSON.stringify(event)).not.toContain(
+        material.englishCaseNoteDraft,
+      );
+      expect(JSON.stringify(event)).not.toContain(material.chineseReviewVersion);
+      const creditCalls = JSON.stringify({
+        reserve: creditStore.reserveCredit.mock.calls,
+        commit: creditStore.commitCredit.mock.calls,
+      });
+      expect(creditCalls).not.toContain(validInput.observableFacts);
+      expect(creditCalls).not.toContain(material.englishCaseNoteDraft);
+      expect(creditCalls).not.toContain(material.chineseReviewVersion);
+    },
+  );
 
   it("requires a provider session before parsing JSON, quota, claims or OpenAI", async () => {
+    vi.stubEnv("CARESLINK_V1_POINTS_UI_ENABLED", "true");
     sessionMock.resolveWorkspaceAccountFromSupabaseSession.mockResolvedValueOnce(
       undefined,
     );
@@ -322,6 +336,51 @@ describe("provider-only NDIS case note generation route", () => {
     expect(creditStore.reserveCredit).not.toHaveBeenCalled();
     expect(store.saveClaim).not.toHaveBeenCalled();
     expect(openAiMock.generateNdisCaseNoteDraft).not.toHaveBeenCalled();
+  });
+
+  it("blocks the legacy generation route after provider auth and before body or store work in Points mode", async () => {
+    vi.stubEnv("CARESLINK_V1_POINTS_UI_ENABLED", "true");
+    const json = vi.fn(() => {
+      throw new Error("sensitive request body must not be parsed");
+    });
+    const request = {
+      url: "http://localhost/api/template-companion/ndis-case-note",
+      headers: new Headers(),
+      json,
+    } as unknown as Request;
+
+    const { POST } = await import("./route");
+    const response = await POST(request);
+    const payload = await response.json();
+
+    expect(response.status).toBe(503);
+    expect(response.headers.get("cache-control")).toBe("private, no-store");
+    expect(payload).toEqual({
+      ok: false,
+      code: "service_unavailable",
+      error: "The case note companion is temporarily unavailable.",
+    });
+    expect(JSON.stringify(payload)).not.toMatch(
+      /credits?|owner|userId|sessionId|reservationId|claimToken|details?/i,
+    );
+    expect(supabaseMock.createCareslinkServerSupabaseClient).toHaveBeenCalledOnce();
+    expect(sessionMock.resolveWorkspaceAccountFromSupabaseSession).toHaveBeenCalledOnce();
+    expect(json).not.toHaveBeenCalled();
+    expect(companionStoreMock.getNdisCaseNoteCompanionStore).not.toHaveBeenCalled();
+    expect(creditStoreMock.getAccountCreditStore).not.toHaveBeenCalled();
+    expect(rateLimitMock.getGuidedAiRateLimiter).not.toHaveBeenCalled();
+    expect(rateLimitMock.check).not.toHaveBeenCalled();
+    expect(openAiMock.generateNdisCaseNoteDraft).not.toHaveBeenCalled();
+    for (const method of Object.values(store)) {
+      if (typeof method === "function") {
+        expect(method).not.toHaveBeenCalled();
+      }
+    }
+    for (const method of Object.values(creditStore)) {
+      if (typeof method === "function") {
+        expect(method).not.toHaveBeenCalled();
+      }
+    }
   });
 
   it("requires an idempotency key after safety validation and before credit or OpenAI work", async () => {
@@ -557,6 +616,7 @@ describe("provider-only NDIS case note generation route", () => {
   });
 
   it("rejects an admin before parsing or quota work", async () => {
+    vi.stubEnv("CARESLINK_V1_POINTS_UI_ENABLED", "true");
     sessionMock.resolveWorkspaceAccountFromSupabaseSession.mockResolvedValueOnce(
       {
         ...provider,
