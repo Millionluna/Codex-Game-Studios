@@ -19,6 +19,7 @@ import {
   type CaresLinkV1CreateDocumentRequest,
   type CaresLinkV1DocumentResource,
   type CaresLinkV1MobileAuthContext,
+  type CaresLinkV1PointsResponse,
 } from "./transport-contract";
 import {
   CARESLINK_V1_CONTRACT_VERSION,
@@ -54,6 +55,7 @@ describe("CaresLink V1 transport contract", () => {
   it("freezes Product API paths and the four document mutation kinds", () => {
     expect(CARESLINK_V1_PRODUCT_API_PATHS).toEqual({
       me: "/v1/me",
+      points: "/v1/points",
       documents: "/v1/documents",
       document: "/v1/documents/{documentId}",
       checkpoint: "/v1/documents/{documentId}/checkpoint",
@@ -63,6 +65,7 @@ describe("CaresLink V1 transport contract", () => {
     });
     expect(CARESLINK_V1_PRODUCT_API_METHODS).toEqual({
       getMe: "GET",
+      getPoints: "GET",
       confirmPrivacyReview: "POST",
       listDocuments: "GET",
       createDocument: "POST",
@@ -82,6 +85,39 @@ describe("CaresLink V1 transport contract", () => {
       "DOCUMENT_UPSERTED",
       "DOCUMENT_TOMBSTONED",
     ]);
+  });
+
+  it("keeps the Points read DTO owner-free and limited to the approved summary", () => {
+    const notReady = {
+      status: "NOT_READY",
+      unit: "POINTS",
+      serverTime: "2026-09-04T05:45:00.000Z",
+      contractVersion: CARESLINK_V1_CONTRACT_VERSION,
+    } satisfies CaresLinkV1PointsResponse;
+    const available = {
+      ...notReady,
+      status: "AVAILABLE",
+      availablePoints: 250,
+      reservedPoints: 50,
+    } satisfies CaresLinkV1PointsResponse;
+
+    expect(notReady).toEqual({
+      status: "NOT_READY",
+      unit: "POINTS",
+      serverTime: "2026-09-04T05:45:00.000Z",
+      contractVersion: CARESLINK_V1_CONTRACT_VERSION,
+    });
+    expect(available).toEqual({
+      status: "AVAILABLE",
+      unit: "POINTS",
+      serverTime: "2026-09-04T05:45:00.000Z",
+      contractVersion: CARESLINK_V1_CONTRACT_VERSION,
+      availablePoints: 250,
+      reservedPoints: 50,
+    });
+    expect(JSON.stringify([notReady, available])).not.toMatch(
+      /(?:owner|user|session|wallet|lot|reservation|ledger|source|reference|receipt|idempotency)/i,
+    );
   });
 
   it("freezes sync push as an unserved PRD boundary without inventing a body", () => {

@@ -3,6 +3,7 @@ import {
   handleCaresLinkV1AppendRevision,
   handleCaresLinkV1CreateDocument,
   handleCaresLinkV1GetMe,
+  handleCaresLinkV1GetPoints,
   handleCaresLinkV1ListDocuments,
   handleCaresLinkV1PullChanges,
   handleCaresLinkV1SaveCheckpoint,
@@ -556,6 +557,30 @@ describe("CaresLink V1 Product API HTTP route boundary", () => {
     ).toBe(CARESLINK_V1_MINIMUM_CLIENT_VERSION);
   });
 
+  it("returns the owner-free Points summary through the authenticated GET boundary", async () => {
+    const store = deterministicStore([]);
+    const response = await handleCaresLinkV1GetPoints(
+      versionedRequest("/v1/points", {
+        headers: { authorization: `Bearer ${ACCESS_TOKEN}` },
+      }),
+      authenticatedDependencies(store, "bearer"),
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    const text = await response.text();
+    expect(JSON.parse(text)).toEqual({
+      status: "NOT_READY",
+      unit: "POINTS",
+      serverTime: CREATED_AT,
+      contractVersion: CARESLINK_V1_CONTRACT_VERSION,
+    });
+    expect(text).not.toContain(ACCESS_TOKEN);
+    expect(text).not.toMatch(
+      /(?:owner|user|session|wallet|lot|reservation|ledger|source|reference|receipt|idempotency)/i,
+    );
+  });
+
   it("returns an explicit revoked-session error without constructing an API", async () => {
     const getProductApi = vi.fn();
     const response = await handleCaresLinkV1GetMe(
@@ -755,6 +780,42 @@ describe("CaresLink V1 Product API HTTP route boundary", () => {
     );
     const response = await handleCaresLinkV1GetMe(
       versionedRequest("/v1/me", {
+        headers: { authorization: `Bearer ${ACCESS_TOKEN}` },
+      }),
+      {
+        resolveAuth: async () => ({
+          ok: true,
+          identity: { userId: USER_ID, sessionId: SESSION_ID, source: "bearer" },
+        }),
+        getProductApi: () => api,
+        createCorrelationId: () => CORRELATION_ID,
+      },
+    );
+
+    expect(response.status).toBe(503);
+    const text = await response.text();
+    expect(JSON.parse(text)).toEqual({
+      error: {
+        code: "PRODUCT_API_DISABLED",
+        message: "The Product API request could not be completed",
+        correlationId: CORRELATION_ID,
+      },
+    });
+    expect(text).not.toContain(ACCESS_TOKEN);
+  });
+
+  it("maps Points infrastructure failures to the existing opaque 503 envelope", async () => {
+    const store = deterministicStore([]);
+    const api = store.forPrincipal({
+      userId: USER_ID,
+      sessionId: SESSION_ID,
+      transport: "BEARER",
+    });
+    vi.spyOn(api, "getPoints").mockRejectedValue(
+      new Error(`points backend included ${ACCESS_TOKEN}`),
+    );
+    const response = await handleCaresLinkV1GetPoints(
+      versionedRequest("/v1/points", {
         headers: { authorization: `Bearer ${ACCESS_TOKEN}` },
       }),
       {

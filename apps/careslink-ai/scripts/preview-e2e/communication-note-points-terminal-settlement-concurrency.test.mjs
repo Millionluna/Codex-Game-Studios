@@ -342,6 +342,8 @@ describe("Communication Note Points terminal settlement launcher contract", () =
         hosted: false,
         realCareData: false,
         modelCalls: false,
+        migrationEvidenceScope:
+          "HISTORICAL_21_MIGRATION_DEPENDENCY_CHAIN",
       },
     );
     expect(
@@ -379,6 +381,26 @@ describe("Communication Note Points terminal settlement launcher contract", () =
     expect(
       COMMUNICATION_NOTE_POINTS_TERMINAL_SETTLEMENT_DEADLINES.totalMs,
     ).toBeLessThanOrEqual(240_000);
+  });
+
+  it("keeps the retained 21-migration evidence ordered inside the newer pinned superset", () => {
+    const migrationFiles =
+      COMMUNICATION_NOTE_POINTS_TERMINAL_SETTLEMENT_TEST_ONLY.migrationFiles;
+
+    expect(migrationFiles).toHaveLength(21);
+    expect(migrationFiles).not.toContain(
+      "20260904054437_add_v1_points_wallet_read.sql",
+    );
+    expect(HARNESS_SOURCE).toContain(
+      "migration.manifestIndex <= migrations[index - 1].manifestIndex",
+    );
+    expect(HARNESS_SOURCE).toContain(
+      "COMMUNICATION_NOTE_PREVIEW_TRANSACTIONAL_MIGRATION_POLICY.migrationCount",
+    );
+    expect(HARNESS_SOURCE).not.toContain("pinned.migrations.length !== 45");
+    expect(HARNESS_SOURCE).not.toContain(
+      "migrations.at(-1)?.manifestIndex !== pinned.migrations.length - 1",
+    );
   });
 
   it("wires every terminal, replay, fairness, and boundary helper", () => {

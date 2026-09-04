@@ -382,6 +382,7 @@ compile-time latches or the absent formal submitter.
 | `CARESLINK_V1_PRODUCT_API_DURABLE_ADAPTER_ENABLED` | Server configuration | independent gate for request-scoped Supabase persistence and active-session validation | only exact `true`; also requires the master gate, verified Preview target, server configuration, the unapplied database migration and its separate default-off database flag |
 | `CARESLINK_V1_PRODUCT_API_EXPECTED_SUPABASE_REF` | Server configuration | binds the Product API runtime to one reviewed Preview branch | must exactly match the ref parsed from the server Supabase URL; missing/mismatch, non-Preview Vercel environment and the known Production ref all fail closed before any client is created |
 | `CARESLINK_V1_PRODUCT_API_M0_READ_ENABLED` | Server configuration | operation gate for only `GET /v1/me`, `GET /v1/documents` and `GET /v1/sync/pull` | exact `true` is insufficient alone and remains `false` in the example; it never enables detail or writes |
+| `CARESLINK_V1_PRODUCT_API_POINTS_READ_ENABLED` | Server configuration | independent M3a application gate for only `GET /v1/points` | exact `true` is insufficient alone: the master/durable gates, exact reviewed non-Production Preview binding and exact `public.v1_points_wallet_read_flags` row `points_wallet_read_v1` with `enabled=true`, `preview_only=true`, `shadow_only=true` must all pass; missing, disabled or non-exact database state returns `503 PRODUCT_API_DISABLED`; this owner-scoped aggregate read never enables Point grants, rates, mutations, payment or Production |
 | `CARESLINK_V1_PRODUCT_API_DOCUMENT_DETAIL_ENABLED` | Server configuration | future independent gate for `GET /v1/documents/{id}` | default/unset is off; not part of the Mobile M0 read slice |
 | `CARESLINK_V1_PRODUCT_API_PRIVACY_REVIEW_ENABLED` | Server configuration | future independent gate for atomic privacy review | default/unset is off; also requires the dedicated Preview service role and DB evidence |
 | `CARESLINK_V1_PRODUCT_API_DOCUMENT_WRITE_ENABLED` | Server configuration | future independent gate for create/PATCH/checkpoint/tombstone | default/unset is off; current database write RPC grants remain withheld |
@@ -401,6 +402,17 @@ compile-time latches or the absent formal submitter.
 | `CARESLINK_V1_NDIS_SHADOW_READ_ENABLED` | Server configuration | permits metadata-only hash/status comparison | exact `true`; cannot enable independently of dual-write |
 | `CARESLINK_V1_SHADOW_EXPECTED_SUPABASE_REF` | Server configuration | binds the runtime to the one approved development branch | non-secret project ref; must equal the ref parsed from server Supabase URL and must not be Production |
 | `CARESLINK_V1_NDIS_SHADOW_TIMEOUT_MS` | Server configuration | bounds shadow latency after legacy success | optional, clamped 250-5000 ms; default 1500 ms |
+
+M3a exposes only a read-only Points wallet summary. `NOT_READY` contains only
+`status`, `unit`, `serverTime` and `contractVersion`; `AVAILABLE` adds the
+non-negative safe integers `availablePoints` and `reservedPoints`. Neither
+response exposes an owner identifier, Point grant, rate, lot, ledger entry,
+mutation or payment field, and this slice is not a Production activation path.
+The database capability is migration-owned rather than an environment variable:
+its exact row defaults to `enabled=false`, while `preview_only` and `shadow_only`
+must remain `true`. The application flag and database row are independent
+fail-closed gates. This source state is not evidence of successful Hosted or
+Production verification.
 
 The two reserved native-auth names are intentionally absent from `.env.example` because the capability is not activatable. Adding placeholders would incorrectly imply that configuration is an approved next step. Their guard tests use synthetic in-memory objects only; no deployment environment or secret is read.
 

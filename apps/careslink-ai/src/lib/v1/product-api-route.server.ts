@@ -85,6 +85,15 @@ export async function handleCaresLinkV1GetMe(
   return withProductApi(request, dependencies, async ({ api }) => api.getMe());
 }
 
+export async function handleCaresLinkV1GetPoints(
+  request: Request,
+  dependencies?: CaresLinkV1ProductApiRouteDependencies,
+) {
+  return withProductApi(request, dependencies, async ({ api }) =>
+    api.getPoints(),
+  );
+}
+
 export async function handleCaresLinkV1ConfirmPrivacyReview(
   request: Request,
   dependencies?: CaresLinkV1ProductApiRouteDependencies,

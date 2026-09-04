@@ -5,6 +5,7 @@ import {
   CARESLINK_V1_PRODUCT_API_DOCUMENT_WRITE_FLAG,
   CARESLINK_V1_PRODUCT_API_EXPECTED_SUPABASE_REF_FLAG,
   CARESLINK_V1_PRODUCT_API_M0_READ_FLAG,
+  CARESLINK_V1_PRODUCT_API_POINTS_READ_FLAG,
   CARESLINK_V1_PRODUCT_API_PRIVACY_REVIEW_FLAG,
   createCaresLinkV1ProductApiRuntime,
   getCaresLinkV1ProductApiOperationCapability,
@@ -32,6 +33,7 @@ describe("CaresLink V1 Product API runtime", () => {
   it("gates the M0 read slice independently before any auth or RPC client", async () => {
     const env = {
       ...enabledEnv(),
+      [CARESLINK_V1_PRODUCT_API_POINTS_READ_FLAG]: undefined,
       [CARESLINK_V1_PRODUCT_API_DOCUMENT_DETAIL_FLAG]: undefined,
       [CARESLINK_V1_PRODUCT_API_PRIVACY_REVIEW_FLAG]: undefined,
       [CARESLINK_V1_PRODUCT_API_DOCUMENT_WRITE_FLAG]: undefined,
@@ -74,6 +76,59 @@ describe("CaresLink V1 Product API runtime", () => {
     }
     expect(createSessionStatusResolver).not.toHaveBeenCalled();
     expect(createBearerRpcClient).toHaveBeenCalledTimes(3);
+  });
+
+  it("gates the Points read slice behind its own exact-true flag", async () => {
+    expect(CARESLINK_V1_PRODUCT_API_POINTS_READ_FLAG).toBe(
+      "CARESLINK_V1_PRODUCT_API_POINTS_READ_ENABLED",
+    );
+    const request = requestWithBearer("/v1/points");
+    const createSessionStatusResolver = vi.fn();
+    const createBearerRpcClient = vi.fn(() => rpcClient());
+    const disabledEnv = {
+      ...enabledEnv(),
+      [CARESLINK_V1_PRODUCT_API_POINTS_READ_FLAG]: "TRUE",
+    };
+    const disabledRuntime = createCaresLinkV1ProductApiRuntime({
+      env: disabledEnv,
+      createSessionStatusResolver,
+      createBearerRpcClient,
+    });
+
+    expect(getCaresLinkV1ProductApiOperationCapability(request)).toBe(
+      "POINTS_READ",
+    );
+    expect(isCaresLinkV1ProductApiOperationEnabled(request, disabledEnv)).toBe(
+      false,
+    );
+    await expect(disabledRuntime.resolveAuth(request)).resolves.toEqual({
+      ok: false,
+      reason: "feature_disabled",
+      status: 503,
+    });
+    await expect(
+      disabledRuntime.getProductApi(principal, request),
+    ).resolves.toBeUndefined();
+    expect(createSessionStatusResolver).not.toHaveBeenCalled();
+    expect(createBearerRpcClient).not.toHaveBeenCalled();
+
+    const enabledRuntime = createCaresLinkV1ProductApiRuntime({
+      env: enabledEnv(),
+      createBearerRpcClient,
+    });
+    expect(isCaresLinkV1ProductApiOperationEnabled(request, enabledEnv())).toBe(
+      true,
+    );
+    await expect(
+      enabledRuntime.getProductApi(principal, request),
+    ).resolves.toBeDefined();
+    expect(createBearerRpcClient).toHaveBeenCalledOnce();
+
+    const wrongMethod = requestWithBearer("/v1/points", "POST");
+    expect(getCaresLinkV1ProductApiOperationCapability(wrongMethod)).toBeUndefined();
+    expect(isCaresLinkV1ProductApiOperationEnabled(wrongMethod, enabledEnv())).toBe(
+      false,
+    );
   });
 
   it("keeps the durable adapter behind an independent exact-true flag", async () => {
@@ -350,6 +405,7 @@ function enabledEnv() {
     CARESLINK_V1_PRODUCT_API_DURABLE_ADAPTER_ENABLED: "true",
     CARESLINK_V1_PRODUCT_API_EXPECTED_SUPABASE_REF: "previewproject",
     [CARESLINK_V1_PRODUCT_API_M0_READ_FLAG]: "true",
+    [CARESLINK_V1_PRODUCT_API_POINTS_READ_FLAG]: "true",
     CARESLINK_V1_PRODUCT_API_DOCUMENT_DETAIL_ENABLED: "true",
     CARESLINK_V1_PRODUCT_API_PRIVACY_REVIEW_ENABLED: "true",
     CARESLINK_V1_PRODUCT_API_DOCUMENT_WRITE_ENABLED: "true",

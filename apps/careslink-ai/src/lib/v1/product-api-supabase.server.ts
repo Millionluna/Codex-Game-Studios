@@ -44,6 +44,7 @@ import {
   type CaresLinkV1DocumentRevisionResource,
   type CaresLinkV1GetDocumentResponse,
   type CaresLinkV1ListDocumentsResponse,
+  type CaresLinkV1PointsResponse,
   type CaresLinkV1ProductApi,
   type CaresLinkV1PullChangesResponse,
   type CaresLinkV1SaveCheckpointResponse,
@@ -51,6 +52,7 @@ import {
 } from "./transport-contract";
 
 export const CARESLINK_V1_SUPABASE_RPC_NAMES = {
+  getPoints: "get_v1_points_wallet",
   confirmPrivacyReview: "confirm_v1_shadow_privacy_review",
   listDocuments: "list_v1_shadow_documents",
   getDocument: "get_v1_shadow_document",
@@ -152,6 +154,14 @@ export function createSupabaseCaresLinkV1ProductApi({
           sessionRevocation: false,
         },
       };
+    },
+
+    async getPoints() {
+      const data = await callRpc(
+        client,
+        CARESLINK_V1_SUPABASE_RPC_NAMES.getPoints,
+      );
+      return parseRpcResponse(data, parsePointsResponse);
     },
 
     async confirmPrivacyReview(request, mutation) {
@@ -407,11 +417,14 @@ export function createSupabaseCaresLinkV1ProductApi({
 async function callRpc(
   client: CaresLinkV1SessionScopedSupabaseRpcClient,
   functionName: string,
-  args: Readonly<Record<string, unknown>>,
+  args?: Readonly<Record<string, unknown>>,
 ) {
   let result: CaresLinkV1SupabaseRpcResult;
   try {
-    result = await client.rpc(functionName, args);
+    result =
+      args === undefined
+        ? await client.rpc(functionName)
+        : await client.rpc(functionName, args);
   } catch {
     throw unavailable();
   }
@@ -746,6 +759,53 @@ function parseListDocumentsResponse(value: unknown): CaresLinkV1ListDocumentsRes
     nextCursor,
     hasMore,
   };
+}
+
+function parsePointsResponse(value: unknown): CaresLinkV1PointsResponse {
+  const record = expectRecord(value, "response");
+  const commonKeys = ["status", "unit", "serverTime", "contractVersion"];
+
+  if (record.status === "NOT_READY") {
+    exactKeys(record, commonKeys);
+    return {
+      status: "NOT_READY",
+      unit: expectLiteral(record.unit, "POINTS", "unit"),
+      serverTime: expectTimestamp(record.serverTime, "serverTime"),
+      contractVersion: expectLiteral(
+        record.contractVersion,
+        CARESLINK_V1_CONTRACT_VERSION,
+        "contractVersion",
+      ),
+    };
+  }
+
+  if (record.status === "AVAILABLE") {
+    exactKeys(record, [
+      ...commonKeys,
+      "availablePoints",
+      "reservedPoints",
+    ]);
+    return {
+      status: "AVAILABLE",
+      unit: expectLiteral(record.unit, "POINTS", "unit"),
+      serverTime: expectTimestamp(record.serverTime, "serverTime"),
+      contractVersion: expectLiteral(
+        record.contractVersion,
+        CARESLINK_V1_CONTRACT_VERSION,
+        "contractVersion",
+      ),
+      availablePoints: expectNonnegativeInteger(
+        record.availablePoints,
+        "availablePoints",
+      ),
+      reservedPoints: expectNonnegativeInteger(
+        record.reservedPoints,
+        "reservedPoints",
+      ),
+    };
+  }
+
+  throw unavailable();
 }
 
 function parseGetDocumentResponse(value: unknown): CaresLinkV1GetDocumentResponse {

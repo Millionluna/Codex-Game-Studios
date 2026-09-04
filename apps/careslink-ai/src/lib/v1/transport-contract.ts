@@ -31,6 +31,7 @@ export const CARESLINK_V1_HEADER_NAMES = {
 
 export const CARESLINK_V1_PRODUCT_API_PATHS = {
   me: "/v1/me",
+  points: "/v1/points",
   documents: "/v1/documents",
   document: "/v1/documents/{documentId}",
   checkpoint: "/v1/documents/{documentId}/checkpoint",
@@ -41,6 +42,7 @@ export const CARESLINK_V1_PRODUCT_API_PATHS = {
 
 export const CARESLINK_V1_PRODUCT_API_METHODS = {
   getMe: "GET",
+  getPoints: "GET",
   confirmPrivacyReview: "POST",
   listDocuments: "GET",
   createDocument: "POST",
@@ -167,6 +169,22 @@ export type CaresLinkV1MeResponse = {
     sessionRevocation: false;
   };
 };
+
+export type CaresLinkV1PointsResponse =
+  | {
+      status: "NOT_READY";
+      unit: "POINTS";
+      serverTime: string;
+      contractVersion: typeof CARESLINK_V1_CONTRACT_VERSION;
+    }
+  | {
+      status: "AVAILABLE";
+      unit: "POINTS";
+      serverTime: string;
+      contractVersion: typeof CARESLINK_V1_CONTRACT_VERSION;
+      availablePoints: number;
+      reservedPoints: number;
+    };
 
 /**
  * Public HTTP request. `cleanedFacts` is the user's confirmed structured facts,
@@ -387,6 +405,7 @@ export const CARESLINK_V1_HTTP_STATUS_BY_ERROR_CODE = {
 
 export type CaresLinkV1ProductApi = {
   getMe(): Promise<CaresLinkV1MeResponse>;
+  getPoints(): Promise<CaresLinkV1PointsResponse>;
   confirmPrivacyReview(
     request: CaresLinkV1ConfirmPrivacyReviewCommand,
     mutation: CaresLinkV1MutationHeaders,

@@ -38,6 +38,7 @@ import {
   type CaresLinkV1ListDocumentsResponse,
   type CaresLinkV1MeResponse,
   type CaresLinkV1MutationHeaders,
+  type CaresLinkV1PointsResponse,
   type CaresLinkV1ProductApi,
   type CaresLinkV1PullChangesRequest,
   type CaresLinkV1PullChangesResponse,
@@ -150,6 +151,15 @@ export function createMemoryCaresLinkV1ProductApiStore({
               deviceManagement: false,
               sessionRevocation: false,
             },
+          };
+        },
+
+        async getPoints(): Promise<CaresLinkV1PointsResponse> {
+          return {
+            status: "NOT_READY",
+            unit: "POINTS",
+            serverTime: now(),
+            contractVersion: CARESLINK_V1_CONTRACT_VERSION,
           };
         },
 

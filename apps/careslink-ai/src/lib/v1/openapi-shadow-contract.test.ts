@@ -23,6 +23,11 @@ const contract = readFileSync(
   join(process.cwd(), "contracts/careslink-v1-shadow.openapi.yaml"),
   "utf8",
 );
+const envExample = readFileSync(join(process.cwd(), ".env.example"), "utf8");
+const variablesDocumentation = readFileSync(
+  join(process.cwd(), "documentation/variables.md"),
+  "utf8",
+);
 
 describe("V1 shadow OpenAPI contract", () => {
   it("is explicitly local-durable, default-disabled and has no Production server", () => {
@@ -141,11 +146,165 @@ describe("V1 shadow OpenAPI contract", () => {
       "tombstoneDocument",
       "confirmPrivacyReview",
       "pushChangesBoundary",
+      "getPoints",
     ]) {
       expect(getOperationIdBlock(operationId)).toContain(
         "x-careslink-sdk-target: disabled-boundary",
       );
     }
+  });
+
+  it("freezes the independently gated read-only Points wallet response", () => {
+    const points = getPathBlock("/v1/points");
+    expect(points).toMatch(/^  \/v1\/points:\n    get:/);
+    expect(points).not.toMatch(/^    (?:delete|patch|post|put):/m);
+    expect(points).not.toContain("requestBody:");
+    expect(points).toContain("operationId: getPoints");
+    expect(points).toContain(
+      "x-careslink-capability-id: points.wallet.read.disabled",
+    );
+    expect(points).toContain("x-careslink-sdk-target: disabled-boundary");
+    expect(points).toContain("x-careslink-default-enabled: false");
+    expect(points).toContain(
+      "x-careslink-runtime-flag: CARESLINK_V1_PRODUCT_API_POINTS_READ_ENABLED",
+    );
+    expect(points).toContain(
+      "x-careslink-database-capability-table: public.v1_points_wallet_read_flags",
+    );
+    expect(points).toContain(
+      "x-careslink-database-capability-key: points_wallet_read_v1",
+    );
+    expect(points).toMatch(
+      /x-careslink-database-capability-required:\n        enabled: true\n        preview_only: true\n        shadow_only: true/,
+    );
+    expect(points).toContain(
+      "x-careslink-database-capability-default: disabled",
+    );
+    expect(points).toContain("x-careslink-hosted-verification: not-run");
+    expect(points).toContain("x-careslink-production-verification: not-run");
+    expect(points).toContain(
+      "x-careslink-availability: feature-disabled-shadow",
+    );
+    expect(points).toContain("approved disposable\n        Preview");
+    expect(points).toContain("does not expose or enable Point grants, rates");
+    expect(points).toContain("mutations, payment or Production");
+    expect(points).toContain("flag is necessary but insufficient");
+    expect(points).toContain("non-exact row returns 503 PRODUCT_API_DISABLED");
+    expect(points).toContain("not been Hosted or Production verified");
+    for (const parameter of [
+      "ContractVersion",
+      "ClientVersion",
+      "CorrelationId",
+    ]) {
+      expect(points).toContain(`#/components/parameters/${parameter}`);
+    }
+    expect(points).toContain('$ref: "#/components/schemas/PointsResponse"');
+    for (const [status, response] of [
+      ["400", "ValidationError"],
+      ["401", "AuthenticationFailure"],
+      ["403", "Forbidden"],
+      ["426", "MinimumClientVersion"],
+      ["503", "ProductApiDisabled"],
+    ] as const) {
+      expect(points).toContain(`"${status}":`);
+      expect(points).toContain(`#/components/responses/${response}`);
+    }
+
+    const response = getSchemaBlock("PointsResponse");
+    expect(response).toContain("oneOf:");
+    expect(response).toContain(
+      '$ref: "#/components/schemas/PointsNotReadyResponse"',
+    );
+    expect(response).toContain(
+      '$ref: "#/components/schemas/PointsAvailableResponse"',
+    );
+    expect(response).toContain("propertyName: status");
+    expect(response).toContain(
+      'NOT_READY: "#/components/schemas/PointsNotReadyResponse"',
+    );
+    expect(response).toContain(
+      'AVAILABLE: "#/components/schemas/PointsAvailableResponse"',
+    );
+
+    const notReady = getSchemaBlock("PointsNotReadyResponse");
+    expect(notReady).toContain("additionalProperties: false");
+    expect(notReady).toContain(
+      "required: [status, unit, serverTime, contractVersion]",
+    );
+    expect(notReady).toContain("status: { const: NOT_READY }");
+    expect(notReady).toContain("unit: { const: POINTS }");
+    expect(notReady).toContain("serverTime: { type: string, format: date-time }");
+    expect(notReady).toContain(
+      "contractVersion: { const: 1.0.0-shadow.1 }",
+    );
+    expect(notReady).not.toMatch(/(?:available|reserved)Points/);
+
+    const available = getSchemaBlock("PointsAvailableResponse");
+    expect(available).toContain("additionalProperties: false");
+    for (const field of [
+      "status",
+      "unit",
+      "serverTime",
+      "contractVersion",
+      "availablePoints",
+      "reservedPoints",
+    ]) {
+      expect(available).toContain(`- ${field}`);
+    }
+    expect(available).toContain("status: { const: AVAILABLE }");
+    expect(available).toContain("unit: { const: POINTS }");
+    expect(available.match(/type: integer/g)).toHaveLength(2);
+    expect(available.match(/minimum: 0/g)).toHaveLength(2);
+    expect(available.match(/maximum: 9007199254740991/g)).toHaveLength(2);
+    expect(available).not.toMatch(
+      /^\s+(?:owner|user|session|grant|rate|lot|ledger|payment)[A-Za-z]*:/im,
+    );
+  });
+
+  it("documents the Points read flag as Preview-only and default-off", () => {
+    expect(
+      envExample.match(
+        /^CARESLINK_V1_PRODUCT_API_POINTS_READ_ENABLED=false$/gm,
+      ),
+    ).toHaveLength(1);
+    expect(envExample).toContain(
+      "Points wallet summary is an independent Preview-only read gate",
+    );
+    expect(envExample).toMatch(
+      /cannot enable Point grants, rates, mutations, payment or\s+# Production/,
+    );
+    expect(envExample).toContain(
+      "public.v1_points_wallet_read_flags / points_wallet_read_v1 database row",
+    );
+    expect(envExample).toContain(
+      "enabled=true, preview_only=true and shadow_only=true",
+    );
+    expect(envExample).toContain("That row defaults false");
+    expect(envExample).toContain("non-exact state returns 503");
+    expect(envExample).toContain(
+      "Hosted and Production have\n# not been verified",
+    );
+    expect(variablesDocumentation).toContain(
+      "`CARESLINK_V1_PRODUCT_API_POINTS_READ_ENABLED` | Server configuration | independent M3a application gate for only `GET /v1/points`",
+    );
+    expect(variablesDocumentation).toContain(
+      "exact `public.v1_points_wallet_read_flags` row `points_wallet_read_v1` with `enabled=true`, `preview_only=true`, `shadow_only=true`",
+    );
+    expect(variablesDocumentation).toContain(
+      "missing, disabled or non-exact database state returns `503 PRODUCT_API_DISABLED`",
+    );
+    expect(variablesDocumentation).toContain(
+      "never enables Point grants, rates, mutations, payment or Production",
+    );
+    expect(variablesDocumentation).toMatch(
+      /`NOT_READY` contains only\s+`status`, `unit`, `serverTime` and `contractVersion`/,
+    );
+    expect(variablesDocumentation).toContain(
+      "exact row defaults to `enabled=false`",
+    );
+    expect(variablesDocumentation).toContain(
+      "not evidence of successful Hosted or\nProduction verification",
+    );
   });
 
   it("keeps native session, device and revoke boundaries Bearer-only", () => {
@@ -380,7 +539,7 @@ describe("V1 shadow OpenAPI contract", () => {
       contract.match(
         /#\/components\/responses\/AuthenticationFailure/g,
       ),
-    ).toHaveLength(9);
+    ).toHaveLength(10);
     expect(contract).not.toContain("#/components/responses/AuthRequired");
     expect(contract).not.toMatch(/^    SessionRevoked:/m);
     const authenticationFailure = getComponentBlock("AuthenticationFailure");
