@@ -3,7 +3,7 @@ import { extname, join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 describe("V1 shadow runtime boundary", () => {
-  it("is imported only by audited NDIS routes and the default-off Product API", () => {
+  it("is imported only by audited server surfaces and the default-off Product API", () => {
     const runtimeFiles = ["src/app", "src/components"].flatMap(walkSourceFiles);
     const allowedRuntimeImporters = new Map([
       [
@@ -11,14 +11,27 @@ describe("V1 shadow runtime boundary", () => {
           process.cwd(),
           "src/app/api/template-companion/ndis-case-note/save/route.ts",
         ),
-        "mirrorSavedNdisDraftToCanonicalShadow",
+        {
+          module: "@/lib/v1/ndis-shadow-integration.server",
+          symbol: "mirrorSavedNdisDraftToCanonicalShadow",
+        },
       ],
       [
         join(
           process.cwd(),
           "src/app/api/template-companion/ndis-case-note/drafts/[draftId]/route.ts",
         ),
-        "tombstoneDeletedNdisShadowFromCanonical",
+        {
+          module: "@/lib/v1/ndis-shadow-integration.server",
+          symbol: "tombstoneDeletedNdisShadowFromCanonical",
+        },
+      ],
+      [
+        join(process.cwd(), "src/app/plan-and-usage/page.tsx"),
+        {
+          module: "@/lib/v1/points-page-data.server",
+          symbol: "resolveCaresLinkV1PointsPageData",
+        },
       ],
     ]);
 
@@ -36,10 +49,9 @@ describe("V1 shadow runtime boundary", () => {
       );
 
       if (expectedIntegration) {
-        expect(source).toContain(
-          "@/lib/v1/ndis-shadow-integration.server",
-        );
-        expect(source).toContain(expectedIntegration);
+        expect(source).toContain(expectedIntegration.module);
+        expect(source).toContain(expectedIntegration.symbol);
+        expect(source).not.toMatch(/SUPABASE_SERVICE_ROLE_KEY|service_role/i);
       } else if (isNativeAuthBoundaryRoute) {
         expect(source).toContain("@/lib/v1/native-auth-boundary.server");
         expect(source).not.toMatch(/SUPABASE_SERVICE_ROLE_KEY|service_role/i);
@@ -104,6 +116,7 @@ describe("V1 shadow runtime boundary", () => {
       "src/lib/v1/product-api-runtime.server.ts",
       "src/lib/v1/product-api-session-status.server.ts",
       "src/lib/v1/product-api-supabase.server.ts",
+      "src/lib/v1/points-page-data.server.ts",
       "src/lib/communication-note-generation-current-session.server.ts",
       "src/lib/communication-note-generation-principal.server.ts",
       "src/lib/communication-note-generation-principal-composition.server.ts",
