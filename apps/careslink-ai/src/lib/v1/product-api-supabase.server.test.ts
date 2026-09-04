@@ -54,6 +54,99 @@ describe("CaresLink V1 session-scoped Supabase Product API", () => {
     expect(JSON.stringify(api)).not.toContain(ACCESS_TOKEN);
   });
 
+  it("reads exact owner-free Points summaries through a zero-argument RPC", async () => {
+    expect(CARESLINK_V1_SUPABASE_RPC_NAMES.getPoints).toBe(
+      "get_v1_points_wallet",
+    );
+    const { api, rpc } = createApi([
+      success({
+        status: "NOT_READY",
+        unit: "POINTS",
+        serverTime: CREATED_AT,
+        contractVersion: CARESLINK_V1_CONTRACT_VERSION,
+      }),
+      success({
+        status: "AVAILABLE",
+        unit: "POINTS",
+        serverTime: UPDATED_AT,
+        contractVersion: CARESLINK_V1_CONTRACT_VERSION,
+        availablePoints: 250,
+        reservedPoints: 50,
+      }),
+    ]);
+
+    await expect(api.getPoints()).resolves.toEqual({
+      status: "NOT_READY",
+      unit: "POINTS",
+      serverTime: CREATED_AT,
+      contractVersion: CARESLINK_V1_CONTRACT_VERSION,
+    });
+    await expect(api.getPoints()).resolves.toEqual({
+      status: "AVAILABLE",
+      unit: "POINTS",
+      serverTime: UPDATED_AT,
+      contractVersion: CARESLINK_V1_CONTRACT_VERSION,
+      availablePoints: 250,
+      reservedPoints: 50,
+    });
+    expect(rpc).toHaveBeenNthCalledWith(
+      1,
+      CARESLINK_V1_SUPABASE_RPC_NAMES.getPoints,
+    );
+    expect(rpc).toHaveBeenNthCalledWith(
+      2,
+      CARESLINK_V1_SUPABASE_RPC_NAMES.getPoints,
+    );
+  });
+
+  it("fails Points reads closed on response drift, identifiers, and unsafe balances", async () => {
+    const validAvailable = {
+      status: "AVAILABLE",
+      unit: "POINTS",
+      serverTime: CREATED_AT,
+      contractVersion: CARESLINK_V1_CONTRACT_VERSION,
+      availablePoints: 250,
+      reservedPoints: 50,
+    };
+    const invalidResponses = [
+      { ...validAvailable, ownerUserId: USER_ID },
+      { ...validAvailable, walletId: DOCUMENT_ID },
+      { ...validAvailable, unit: "CREDITS" },
+      { ...validAvailable, contractVersion: "future-contract" },
+      { ...validAvailable, serverTime: "not-a-time" },
+      { ...validAvailable, availablePoints: -1 },
+      { ...validAvailable, availablePoints: 1.5 },
+      { ...validAvailable, reservedPoints: Number.MAX_SAFE_INTEGER + 1 },
+      {
+        status: "AVAILABLE",
+        unit: "POINTS",
+        serverTime: CREATED_AT,
+        contractVersion: CARESLINK_V1_CONTRACT_VERSION,
+        availablePoints: 250,
+      },
+      {
+        status: "NOT_READY",
+        unit: "POINTS",
+        serverTime: CREATED_AT,
+        contractVersion: CARESLINK_V1_CONTRACT_VERSION,
+        availablePoints: 0,
+      },
+      {
+        status: "UNKNOWN",
+        unit: "POINTS",
+        serverTime: CREATED_AT,
+        contractVersion: CARESLINK_V1_CONTRACT_VERSION,
+      },
+    ];
+
+    for (const response of invalidResponses) {
+      const { api } = createApi([success(response)]);
+      await expect(api.getPoints()).rejects.toMatchObject({
+        code: "PRODUCT_API_DISABLED",
+      });
+    }
+  });
+
   it("uses the service-only client for privacy proof issuance without sending facts or tokens", async () => {
     const cleanedFacts = { support: "Observed assistance" };
     const cleanedFactsHash = createCaresLinkV1CleanedFactsHash(cleanedFacts);

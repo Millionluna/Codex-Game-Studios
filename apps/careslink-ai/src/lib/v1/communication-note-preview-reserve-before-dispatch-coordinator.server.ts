@@ -200,7 +200,7 @@ export type CaresLinkV1CommunicationNotePreviewCoordinatorPolicy =
   typeof COORDINATOR_POLICY_CORE & Readonly<{ policyDigest: string }>;
 
 export const CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_COORDINATOR_POLICY_DIGEST =
-  "ac1ded0882095bb0043290bfc44d620e0becfc72385dc42c1af0fd32525a0653" as const;
+  "259d5abf220aab544ec8a9552016b8b6f97b99c10734f87769f049f25f137b99" as const;
 
 if (
   createCanonicalSha256(COORDINATOR_POLICY_CORE) !==

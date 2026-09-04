@@ -37,6 +37,8 @@ export const CARESLINK_V1_PRODUCT_API_EXPECTED_SUPABASE_REF_FLAG =
   "CARESLINK_V1_PRODUCT_API_EXPECTED_SUPABASE_REF" as const;
 export const CARESLINK_V1_PRODUCT_API_M0_READ_FLAG =
   "CARESLINK_V1_PRODUCT_API_M0_READ_ENABLED" as const;
+export const CARESLINK_V1_PRODUCT_API_POINTS_READ_FLAG =
+  "CARESLINK_V1_PRODUCT_API_POINTS_READ_ENABLED" as const;
 export const CARESLINK_V1_PRODUCT_API_DOCUMENT_DETAIL_FLAG =
   "CARESLINK_V1_PRODUCT_API_DOCUMENT_DETAIL_ENABLED" as const;
 export const CARESLINK_V1_PRODUCT_API_PRIVACY_REVIEW_FLAG =
@@ -49,6 +51,7 @@ export type CaresLinkV1ProductApiRuntimeEnv = CaresLinkV1ProductApiEnv &
     CARESLINK_V1_PRODUCT_API_DURABLE_ADAPTER_ENABLED?: string;
     CARESLINK_V1_PRODUCT_API_EXPECTED_SUPABASE_REF?: string;
     CARESLINK_V1_PRODUCT_API_M0_READ_ENABLED?: string;
+    CARESLINK_V1_PRODUCT_API_POINTS_READ_ENABLED?: string;
     CARESLINK_V1_PRODUCT_API_DOCUMENT_DETAIL_ENABLED?: string;
     CARESLINK_V1_PRODUCT_API_PRIVACY_REVIEW_ENABLED?: string;
     CARESLINK_V1_PRODUCT_API_DOCUMENT_WRITE_ENABLED?: string;
@@ -119,6 +122,7 @@ export function isCaresLinkV1ProductApiPreviewTargetAllowed(
 
 export type CaresLinkV1ProductApiOperationCapability =
   | "M0_READ"
+  | "POINTS_READ"
   | "DOCUMENT_DETAIL"
   | "PRIVACY_REVIEW"
   | "DOCUMENT_WRITE";
@@ -133,6 +137,12 @@ export function getCaresLinkV1ProductApiOperationCapability(
     return undefined;
   }
   const method = request.method.toUpperCase();
+  if (
+    method === "GET" &&
+    pathname === CARESLINK_V1_PRODUCT_API_PATHS.points
+  ) {
+    return "POINTS_READ";
+  }
   if (
     method === "GET" &&
     (pathname === CARESLINK_V1_PRODUCT_API_PATHS.me ||
@@ -171,6 +181,8 @@ export function isCaresLinkV1ProductApiOperationEnabled(
   switch (getCaresLinkV1ProductApiOperationCapability(request)) {
     case "M0_READ":
       return env.CARESLINK_V1_PRODUCT_API_M0_READ_ENABLED === "true";
+    case "POINTS_READ":
+      return env.CARESLINK_V1_PRODUCT_API_POINTS_READ_ENABLED === "true";
     case "DOCUMENT_DETAIL":
       return env.CARESLINK_V1_PRODUCT_API_DOCUMENT_DETAIL_ENABLED === "true";
     case "PRIVACY_REVIEW":

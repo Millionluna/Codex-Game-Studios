@@ -187,7 +187,7 @@ export const CARESLINK_V1_NATIVE_M0_READ_SEQUENCE = [
  * never become callable merely because it is present in the contract.
  */
 export const CARESLINK_V1_NATIVE_M0_CAPABILITY_MANIFEST = {
-  openApiOperationCount: 20,
+  openApiOperationCount: 21,
   defaultEnabled: false,
   read: ["identity.me.read", "documents.list.read", "sync.pull.read"],
   disabled: [
@@ -204,6 +204,7 @@ export const CARESLINK_V1_NATIVE_M0_CAPABILITY_MANIFEST = {
     "documents.checkpoint.write.disabled",
     "sync.push.write.disabled",
     "privacy.review.write.disabled",
+    "points.wallet.read.disabled",
     "points.quote.disabled",
     "points.reserve.disabled",
     "points.commit.disabled",

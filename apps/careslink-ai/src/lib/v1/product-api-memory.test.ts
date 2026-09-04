@@ -6,6 +6,7 @@ import {
   createMemoryCaresLinkV1ProductApiStore,
 } from "./product-api-memory";
 import {
+  CARESLINK_V1_CONTRACT_VERSION,
   CARESLINK_V1_NOTE_SCHEMA_VERSION,
   CARESLINK_V1_PRIVACY_REVIEW_REVISION,
   CARESLINK_V1_PRIVACY_SCANNER_POLICY_VERSION,
@@ -33,6 +34,24 @@ const PRIVACY_REVIEW_ID = "30000000-0000-4000-8000-000000000001";
 const CREATED_AT = "2026-08-10T01:00:00.000Z";
 
 describe("CaresLink V1 memory Product API", () => {
+  it("returns an owner-free NOT_READY Points response without inventing a wallet", async () => {
+    const api = deterministicStore([]).forPrincipal(
+      principal(OWNER_A, SESSION_A),
+    );
+
+    const response = await api.getPoints();
+
+    expect(response).toEqual({
+      status: "NOT_READY",
+      unit: "POINTS",
+      serverTime: CREATED_AT,
+      contractVersion: CARESLINK_V1_CONTRACT_VERSION,
+    });
+    expect(JSON.stringify(response)).not.toMatch(
+      /(?:owner|user|session|wallet|lot|reservation|ledger|source|reference|receipt|idempotency)/i,
+    );
+  });
+
   it("atomically creates a canonical document and first acknowledged revision", async () => {
     const store = deterministicStore([DOCUMENT_ONE, REVISION_ONE]);
     const api = store.forPrincipal(principal(OWNER_A, SESSION_A));

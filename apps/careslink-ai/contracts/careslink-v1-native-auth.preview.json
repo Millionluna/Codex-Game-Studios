@@ -149,7 +149,7 @@
     "GET_V1_SYNC_PULL"
   ],
   "m0Capabilities": {
-    "openApiOperationCount": 20,
+    "openApiOperationCount": 21,
     "defaultEnabled": false,
     "read": ["identity.me.read", "documents.list.read", "sync.pull.read"],
     "disabled": [
@@ -166,6 +166,7 @@
       "documents.checkpoint.write.disabled",
       "sync.push.write.disabled",
       "privacy.review.write.disabled",
+      "points.wallet.read.disabled",
       "points.quote.disabled",
       "points.reserve.disabled",
       "points.commit.disabled",

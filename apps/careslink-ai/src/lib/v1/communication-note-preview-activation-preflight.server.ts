@@ -51,11 +51,11 @@ export type CaresLinkV1CommunicationNotePreviewActivationBlockedReason =
 
 export const CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_DATABASE_EVIDENCE_PINS =
   deepFreeze({
-    migrationCount: 45,
+    migrationCount: 46,
     orderedMigrationBasenamesSha256:
-      "9fb562c0a5434597d5287dc6868f721d238f6f6ff7eb397eb4bbadbcf66af55d",
+      "baa795a0b41117c5e9a891e1332312a080d0d3b9708a1e014169c1827a358d72",
     orderedMigrationEntriesSha256:
-      "bce464e4a300f611b4fe1f0134bfa4a0517a8c3bffc901d4bc89cee498e36fc2",
+      "6aacb1f8f0926cf412089a85420b67d8aaa981b00436d421a64f5dff965859ec",
     authorityMigrationSha256:
       "94f83498ea04053e7238a95bb9be0bb8a38ad0a76fa0e751390419800da51f7f",
     custodyMigrationSha256:
@@ -167,7 +167,7 @@ export type CaresLinkV1CommunicationNotePreviewActivationPreflightPolicy =
     Readonly<{ policyDigest: string }>;
 
 export const CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_ACTIVATION_PREFLIGHT_POLICY_DIGEST =
-  "2ca9c1530b17bcd2725afab1205554c04f2e966bd2105cb174f262c0e8772a1a" as const;
+  "4ca5243f264f3e202f629f8ec0b30d984b372325acc42125cebdca06ab4694cb" as const;
 
 if (
   createCanonicalSha256(ACTIVATION_PREFLIGHT_POLICY_CORE) !==
@@ -314,7 +314,7 @@ export type CaresLinkV1CommunicationNotePreviewActivationPreflightCandidate =
       persistent: false;
       withData: false;
       productionExcluded: true;
-      migrationCount: 45;
+      migrationCount: 46;
       orderedMigrationBasenamesSha256: string;
       orderedMigrationEntriesSha256: string;
       authorityMigrationSha256: string;
@@ -1082,7 +1082,7 @@ function validateDatabase(
     persistent: false as const,
     withData: false as const,
     productionExcluded: true as const,
-    migrationCount: 45 as const,
+    migrationCount: 46 as const,
     orderedMigrationBasenamesSha256: requireEvidencePin(
       object.orderedMigrationBasenamesSha256,
       "orderedMigrationBasenamesSha256",

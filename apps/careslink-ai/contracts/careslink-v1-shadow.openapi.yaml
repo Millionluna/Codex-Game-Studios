@@ -4,7 +4,7 @@ info:
   version: 1.0.0-shadow.1
   description: >-
     Versioned scaffold plus a local Route Handler and request-scoped Supabase
-    adapter for CaresLink Product Baseline V1.0. Both application feature gates
+    adapter for CaresLink Product Baseline V1.0. Application feature gates
     remain off by default, the database migration is unapplied, and write RPC
     grants remain withheld. No path in this document is served by Production
     and cross-device E2E has not passed.
@@ -579,6 +579,62 @@ paths:
           $ref: "#/components/responses/Conflict"
         "422":
           $ref: "#/components/responses/PrivacyReviewRequired"
+        "426":
+          $ref: "#/components/responses/MinimumClientVersion"
+        "503":
+          $ref: "#/components/responses/ProductApiDisabled"
+  /v1/points:
+    get:
+      operationId: getPoints
+      x-careslink-capability-id: points.wallet.read.disabled
+      x-careslink-sdk-target: disabled-boundary
+      x-careslink-default-enabled: false
+      x-careslink-runtime-flag: CARESLINK_V1_PRODUCT_API_POINTS_READ_ENABLED
+      x-careslink-database-capability-table: public.v1_points_wallet_read_flags
+      x-careslink-database-capability-key: points_wallet_read_v1
+      x-careslink-database-capability-required:
+        enabled: true
+        preview_only: true
+        shadow_only: true
+      x-careslink-database-capability-default: disabled
+      x-careslink-hosted-verification: not-run
+      x-careslink-production-verification: not-run
+      summary: Read the authenticated owner's Points wallet totals
+      description: >-
+        Independently default-off, read-only access for an approved disposable
+        Preview. The owner is derived only from the authenticated server
+        session. This operation does not expose or enable Point grants, rates,
+        lots, ledger entries, mutations, payment or Production. The application
+        flag is necessary but insufficient: the exact points_wallet_read_v1 row
+        in public.v1_points_wallet_read_flags must also have enabled=true,
+        preview_only=true and shadow_only=true. A missing, disabled or
+        non-exact row returns 503 PRODUCT_API_DISABLED. This source contract has
+        not been Hosted or Production verified.
+      x-careslink-availability: feature-disabled-shadow
+      parameters:
+        - $ref: "#/components/parameters/ContractVersion"
+        - $ref: "#/components/parameters/ClientVersion"
+        - $ref: "#/components/parameters/CorrelationId"
+      responses:
+        "200":
+          description: Owner-scoped Points wallet readiness or aggregate totals
+          headers:
+            x-careslink-contract-version:
+              $ref: "#/components/headers/ContractVersion"
+            x-careslink-min-client-version:
+              $ref: "#/components/headers/MinimumClientVersion"
+            x-correlation-id:
+              $ref: "#/components/headers/CorrelationId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PointsResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/AuthenticationFailure"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "426":
           $ref: "#/components/responses/MinimumClientVersion"
         "503":
@@ -1703,6 +1759,47 @@ components:
           description: >-
             Temporary 30-minute Preview expiry; not a Production product
             decision.
+    PointsResponse:
+      oneOf:
+        - $ref: "#/components/schemas/PointsNotReadyResponse"
+        - $ref: "#/components/schemas/PointsAvailableResponse"
+      discriminator:
+        propertyName: status
+        mapping:
+          NOT_READY: "#/components/schemas/PointsNotReadyResponse"
+          AVAILABLE: "#/components/schemas/PointsAvailableResponse"
+    PointsNotReadyResponse:
+      type: object
+      additionalProperties: false
+      required: [status, unit, serverTime, contractVersion]
+      properties:
+        status: { const: NOT_READY }
+        unit: { const: POINTS }
+        serverTime: { type: string, format: date-time }
+        contractVersion: { const: 1.0.0-shadow.1 }
+    PointsAvailableResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - status
+        - unit
+        - serverTime
+        - contractVersion
+        - availablePoints
+        - reservedPoints
+      properties:
+        status: { const: AVAILABLE }
+        unit: { const: POINTS }
+        serverTime: { type: string, format: date-time }
+        contractVersion: { const: 1.0.0-shadow.1 }
+        availablePoints:
+          type: integer
+          minimum: 0
+          maximum: 9007199254740991
+        reservedPoints:
+          type: integer
+          minimum: 0
+          maximum: 9007199254740991
     PointQuote:
       type: object
       additionalProperties: false

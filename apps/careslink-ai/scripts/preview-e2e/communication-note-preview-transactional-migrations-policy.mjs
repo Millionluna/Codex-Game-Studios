@@ -7,12 +7,12 @@ const NON_TRANSACTIONAL_SQL_PATTERN = /^(?:create\s+(?:unique\s+)?index\s+concur
 
 export const COMMUNICATION_NOTE_PREVIEW_TRANSACTIONAL_MIGRATION_POLICY =
   Object.freeze({
-    version: "2026-09-03.preview-transactional-migrations.13",
+    version: "2026-09-04.preview-transactional-migrations.14",
     productionProjectRef: "adocsnwnslxhxcjgbyee",
     expectedCliVersion: "2.115.0",
     manifestSha256:
-      "e7ca8a902904651070fc22adfa553c951c0703d9fa57337c268d4f8e77a661a3",
-    migrationCount: 45,
+      "3add3cad0232b89b206eb948eabe86045179ca7f978d0027e44121381919a7e8",
+    migrationCount: 46,
     disposablePreviewBaselineMigrationCount: 19,
     disposablePreviewBaselineHistorySha256:
       "b742d12dee926ccfe76158cf524e503bcdc576a08e928a7147741faf4a314424",
@@ -228,6 +228,7 @@ export const COMMUNICATION_NOTE_PREVIEW_TRANSACTIONAL_MIGRATION_MANIFEST =
     ["20260902063211_add_v1_communication_note_points_admission.sql", "7029f48142dac3f2afa5e930930791c2cdbe6e82db283d4616656caae13746ec"],
     ["20260902121601_add_v1_communication_note_points_terminal_settlement.sql", "6e5148f3e080ab767f586c27c86490ac1c05b80deed864f48783c331bbf41afd"],
     ["20260903041819_bind_v1_communication_note_encrypted_payload_admission.sql", "f264ca0b7569c72273613e451b9742269d36fce290dcc0991f874d7426164f3f"],
+    ["20260904054437_add_v1_points_wallet_read.sql", "f936337a1ace09cf46434617ebe894fb0c5e26c980c529bddce797406412e566"],
   ].map(([basename, sha256]) => Object.freeze({ basename, sha256 })));
 
 const OUTER_TRANSACTION_MIGRATIONS = new Set([
@@ -256,6 +257,7 @@ const OUTER_TRANSACTION_MIGRATIONS = new Set([
   "20260902063211_add_v1_communication_note_points_admission.sql",
   "20260902121601_add_v1_communication_note_points_terminal_settlement.sql",
   "20260903041819_bind_v1_communication_note_encrypted_payload_admission.sql",
+  "20260904054437_add_v1_points_wallet_read.sql",
 ]);
 
 const FIXED_ERROR_CODES = new Set([

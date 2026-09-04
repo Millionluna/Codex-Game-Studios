@@ -24,20 +24,33 @@ const RUNNER_PATH = fileURLToPath(new URL(
 ));
 
 describe("Communication Note Preview transactional migration policy", () => {
-  it("pins all 45 repository migrations and removes only 25 known wrappers in memory", async () => {
+  it("pins all 46 repository migrations and removes only 26 known wrappers in memory", async () => {
     const bundle = await loadPinnedCommunicationNotePreviewMigrations();
     expect(bundle).toMatchObject({
       manifestSha256: POLICY.manifestSha256,
-      outerTransactionCount: 25,
+      outerTransactionCount: 26,
     });
-    expect(bundle.migrations).toHaveLength(45);
+    expect(bundle.migrations).toHaveLength(46);
     expect(bundle.migrations.at(-1)).toMatchObject({
+      basename: "20260904054437_add_v1_points_wallet_read.sql",
+      version: "20260904054437",
+      outerTransactionRemoved: true,
+    });
+    const pointsWalletRead = bundle.migrations.at(-1);
+    expect(pointsWalletRead.statements[0]).toMatch(/\bbegin$/i);
+    expect(pointsWalletRead.statements.at(-1)).toMatch(/^commit$/i);
+    expect(pointsWalletRead.executionSql.trim().toLowerCase()).not.toMatch(
+      /^begin\b|\bcommit;$/,
+    );
+    expect(pointsWalletRead.executionSql).toMatch(/get_v1_points_wallet/);
+
+    expect(bundle.migrations.at(-2)).toMatchObject({
       basename:
         "20260903041819_bind_v1_communication_note_encrypted_payload_admission.sql",
       version: "20260903041819",
       outerTransactionRemoved: true,
     });
-    const encryptedPayloadAdmission = bundle.migrations.at(-1);
+    const encryptedPayloadAdmission = bundle.migrations.at(-2);
     expect(encryptedPayloadAdmission.statements[0]).toMatch(/\bbegin$/i);
     expect(encryptedPayloadAdmission.statements.at(-1)).toMatch(/^commit$/i);
     expect(encryptedPayloadAdmission.executionSql.trim().toLowerCase()).not.toMatch(
@@ -47,13 +60,13 @@ describe("Communication Note Preview transactional migration policy", () => {
       /admit_and_reserve_v1_bound_communication_note_generation_job/,
     );
 
-    expect(bundle.migrations.at(-2)).toMatchObject({
+    expect(bundle.migrations.at(-3)).toMatchObject({
       basename:
         "20260902121601_add_v1_communication_note_points_terminal_settlement.sql",
       version: "20260902121601",
       outerTransactionRemoved: true,
     });
-    const pointsTerminalSettlement = bundle.migrations.at(-2);
+    const pointsTerminalSettlement = bundle.migrations.at(-3);
     expect(pointsTerminalSettlement.statements[0]).toMatch(/\bbegin$/i);
     expect(pointsTerminalSettlement.statements.at(-1)).toMatch(/^commit$/i);
     expect(pointsTerminalSettlement.executionSql.trim().toLowerCase()).not.toMatch(
@@ -63,13 +76,13 @@ describe("Communication Note Preview transactional migration policy", () => {
       /_settle_v1_shadow_communication_note_points/,
     );
 
-    expect(bundle.migrations.at(-3)).toMatchObject({
+    expect(bundle.migrations.at(-4)).toMatchObject({
       basename:
         "20260902063211_add_v1_communication_note_points_admission.sql",
       version: "20260902063211",
       outerTransactionRemoved: true,
     });
-    const pointsAdmission = bundle.migrations.at(-3);
+    const pointsAdmission = bundle.migrations.at(-4);
     expect(pointsAdmission.statements[0]).toMatch(/\bbegin$/i);
     expect(pointsAdmission.statements.at(-1)).toMatch(/^commit$/i);
     expect(pointsAdmission.executionSql.trim().toLowerCase()).not.toMatch(
@@ -79,13 +92,13 @@ describe("Communication Note Preview transactional migration policy", () => {
       /admit_and_reserve_v1_shadow_communication_note_generation_job/,
     );
 
-    expect(bundle.migrations.at(-4)).toMatchObject({
+    expect(bundle.migrations.at(-5)).toMatchObject({
       basename:
         "20260902052755_add_v1_communication_note_points_preview.sql",
       version: "20260902052755",
       outerTransactionRemoved: true,
     });
-    const pointsPreview = bundle.migrations.at(-4);
+    const pointsPreview = bundle.migrations.at(-5);
     expect(pointsPreview.statements[0]).toMatch(/\bbegin$/i);
     expect(pointsPreview.statements.at(-1)).toMatch(/^commit$/i);
     expect(pointsPreview.executionSql.trim().toLowerCase()).not.toMatch(
@@ -95,7 +108,7 @@ describe("Communication Note Preview transactional migration policy", () => {
       /get_v1_communication_note_points_preview/,
     );
 
-    const currentSessionResolver = bundle.migrations.at(-5);
+    const currentSessionResolver = bundle.migrations.at(-6);
     expect(currentSessionResolver.statements[0]).toMatch(/\bbegin$/i);
     expect(currentSessionResolver.statements.at(-1)).toMatch(/^commit$/i);
     expect(currentSessionResolver.executionSql.trim().toLowerCase()).not.toMatch(

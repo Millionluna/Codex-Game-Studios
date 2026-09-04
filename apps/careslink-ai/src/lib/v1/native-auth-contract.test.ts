@@ -198,7 +198,7 @@ describe("CaresLink V1 native-auth M0 contract", () => {
       "GET_V1_SYNC_PULL",
     ]);
     expect(CARESLINK_V1_NATIVE_M0_CAPABILITY_MANIFEST).toMatchObject({
-      openApiOperationCount: 20,
+      openApiOperationCount: 21,
       defaultEnabled: false,
       read: ["identity.me.read", "documents.list.read", "sync.pull.read"],
     });
@@ -212,11 +212,12 @@ describe("CaresLink V1 native-auth M0 contract", () => {
         "privacy.review.write.disabled",
         "sync.push.write.disabled",
         "notes.catalog.read.disabled",
+        "points.wallet.read.disabled",
       ]),
     );
   });
 
-  it("joins every M0 capability exactly to all 20 OpenAPI operations", () => {
+  it("joins every M0 capability exactly to all 21 OpenAPI operations", () => {
     const openApi = readFileSync(
       join(process.cwd(), "contracts/careslink-v1-shadow.openapi.yaml"),
       "utf8",

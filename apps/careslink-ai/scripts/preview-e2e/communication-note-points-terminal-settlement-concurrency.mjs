@@ -68,7 +68,7 @@ const SETUP_SQL_SHA256 =
 const CLEANUP_SQL_SHA256 =
   "276461b165a37ab131bbf9bab64e001f9eaf00e75302536137dd5bc9ef25da7d";
 const SOURCE_REVISION_SHA256 =
-  "c1ade589beec5c4554de1b7dc02407efef48f4625d8139428fccca7f1192438f";
+  "581734bdbca2af8a7687c86b9e85ba7d3fe787c433f54a840db93075431b3f5f";
 
 const REQUIRED_PG16_BINARIES = Object.freeze([
   "initdb",
@@ -84,6 +84,9 @@ const KNOWN_PG16_BIN_DIRECTORIES = Object.freeze([
   "/usr/pgsql-16/bin",
 ]);
 
+// Retained historical dependency chain for the terminal-settlement evidence.
+// Newer repository migrations may follow it in the globally pinned manifest,
+// but they must not silently expand the evidence exercised by this harness.
 const REQUIRED_MIGRATIONS = Object.freeze([
   "20260809120000_create_v1_shadow_foundation.sql",
   "20260810131648_add_v1_mobile_sync_shadow.sql",
@@ -174,6 +177,7 @@ export const COMMUNICATION_NOTE_POINTS_TERMINAL_SETTLEMENT_TEST_ONLY =
     modelCalls: false,
     bootstrapRole: BOOTSTRAP_ROLE,
     migrationRole: MIGRATION_ROLE,
+    migrationEvidenceScope: "HISTORICAL_21_MIGRATION_DEPENDENCY_CHAIN",
     migrationFiles: REQUIRED_MIGRATIONS,
     setupSqlSha256: SETUP_SQL_SHA256,
     cleanupSqlSha256: CLEANUP_SQL_SHA256,
@@ -1001,14 +1005,12 @@ async function readAndValidateFiles() {
   if (
     pinned.migrations.length !==
       COMMUNICATION_NOTE_PREVIEW_TRANSACTIONAL_MIGRATION_POLICY.migrationCount ||
-    pinned.migrations.length !== 45 ||
     migrations.some((migration) => !migration) ||
     migrations.some(
       (migration, index) =>
         index > 0 &&
         migration.manifestIndex <= migrations[index - 1].manifestIndex,
     ) ||
-    migrations.at(-1)?.manifestIndex !== pinned.migrations.length - 1 ||
     migrations.at(-1)?.basename !== REQUIRED_MIGRATIONS.at(-1)
   ) {
     fail(
