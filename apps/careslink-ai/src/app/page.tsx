@@ -19,6 +19,8 @@ import {
   NDIS_CASE_NOTE_RESOURCE_SLUG,
 } from "@/lib/ndis-case-note-companion-navigation";
 import type { NdisCaseNoteCompanionAttribution } from "@/lib/ndis-case-note-companion-store";
+import { POINTS_CUTOVER_AUTH_NEXT_HREF } from "@/lib/auth-page-context";
+import { isCaresLinkV1PointsUiEnabled } from "@/lib/points-ui-feature.server";
 import {
   getLocaleFromSearchParams,
   withLocale,
@@ -34,6 +36,20 @@ export async function generateMetadata({
 }: HomePageProps): Promise<Metadata> {
   const params = await searchParams;
   const locale = getLocaleFromSearchParams(params);
+
+  if (isCaresLinkV1PointsUiEnabled()) {
+    return locale === "zh-Hans"
+      ? {
+          title: "AI Documents 与 Points 预览 | CaresLink AI",
+          description:
+            "查看当前可用工具和仅限账户本人的 Points 预览；NDIS Case Note 在切换期间暂停。",
+        }
+      : {
+          title: "AI Documents and Points preview | CaresLink AI",
+          description:
+            "Review the tools currently available and an owner-scoped Points preview. NDIS Case Note is paused during the transition.",
+        };
+  }
 
   return locale === "zh-Hans"
     ? {
@@ -51,27 +67,11 @@ export async function generateMetadata({
 export default async function HomePage({ searchParams }: HomePageProps) {
   const params = await searchParams;
   const locale = getLocaleFromSearchParams(params);
-  const copy = getHomeCopy(locale);
-  const attribution = getHomeCompanionAttribution(locale);
-  const companionHref = buildNdisCaseNoteCompanionHref({ attribution });
-  const registerHref = buildNdisCaseNoteCompanionAuthHref(
-    "/auth/register",
-    attribution,
-  );
-  const loginHref = buildNdisCaseNoteCompanionAuthHref(
-    "/auth/login",
-    attribution,
-  );
-
-  const links = {
-    documents: withLocale("/ai-documents", locale),
-    companion: companionHref,
-    referrals: withLocale("/referral-workspace/referral-pack", locale),
-    profile: withLocale("/referral-workspace/profile", locale),
-    readiness: withLocale("/referral-workspace/health", locale),
-    register: registerHref,
-    login: loginHref,
-  };
+  const pointsUiEnabled = isCaresLinkV1PointsUiEnabled();
+  const copy = pointsUiEnabled
+    ? getPointsHomeCopy(locale)
+    : getHomeCopy(locale);
+  const links = getHomeLinks(locale, pointsUiEnabled);
 
   return (
     <main className="min-h-screen overflow-x-clip bg-background text-foreground">
@@ -155,7 +155,9 @@ export default async function HomePage({ searchParams }: HomePageProps) {
   );
 }
 
-type HomeCopy = ReturnType<typeof getHomeCopy>;
+type HomeCopy =
+  | ReturnType<typeof getHomeCopy>
+  | ReturnType<typeof getPointsHomeCopy>;
 
 type HomeLinks = {
   documents: string;
@@ -166,6 +168,45 @@ type HomeLinks = {
   register: string;
   login: string;
 };
+
+function getHomeLinks(
+  locale: Locale,
+  pointsUiEnabled: boolean,
+): HomeLinks {
+  const shared = {
+    documents: withLocale("/ai-documents", locale),
+    referrals: withLocale("/referral-workspace/referral-pack", locale),
+    profile: withLocale("/referral-workspace/profile", locale),
+    readiness: withLocale("/referral-workspace/health", locale),
+  };
+
+  if (pointsUiEnabled) {
+    return {
+      ...shared,
+      companion: withLocale("/plan-and-usage", locale),
+      register: withLocale(
+        `/auth/register?next=${encodeURIComponent(POINTS_CUTOVER_AUTH_NEXT_HREF)}`,
+        locale,
+      ),
+      login: withLocale(
+        `/auth/login?next=${encodeURIComponent(POINTS_CUTOVER_AUTH_NEXT_HREF)}`,
+        locale,
+      ),
+    };
+  }
+
+  const attribution = getHomeCompanionAttribution(locale);
+
+  return {
+    ...shared,
+    companion: buildNdisCaseNoteCompanionHref({ attribution }),
+    register: buildNdisCaseNoteCompanionAuthHref(
+      "/auth/register",
+      attribution,
+    ),
+    login: buildNdisCaseNoteCompanionAuthHref("/auth/login", attribution),
+  };
+}
 
 function PublicHeader({
   copy,
@@ -669,5 +710,138 @@ function getHomeCopy(locale: Locale) {
       "Drafts are not completed records or clinical, legal, compliance or care advice. CaresLink does not certify providers, assess service quality or guarantee referral outcomes.",
     footerBoundary:
       "CaresLink AI provides user-reviewed general documentation and operational support, not clinical, legal, compliance or care advice.",
+  } as const;
+}
+
+function getPointsHomeCopy(locale: Locale) {
+  const copy = getHomeCopy(locale);
+
+  if (locale === "zh-Hans") {
+    return {
+      ...copy,
+      navCaseNote: "Points",
+      heroKicker: "AI Documents 与 Points 预览",
+      heroTitle: "查看可用的 AI 文档工具与 Points。",
+      heroDescription:
+        "登录后查看当前可用的文档工具和仅限账户本人的 Points 余额预览。NDIS Case Note 生成功能在切换期间暂停。",
+      accountBoundary:
+        "注册或登录后进入 AI Documents。切换到 Points 期间，NDIS Case Note 的生成和保存功能不可用。",
+      previewAriaLabel: "AI Documents 与 Points 切换状态",
+      englishDraftLabel: "当前可用工作区",
+      caseNoteTitle: "AI Documents",
+      sampleDate: "Points 切换 · 当前状态",
+      englishSample:
+        "进入受保护的 AI Documents 工作区，查看当前可用的工具。NDIS Case Note 助手在 Points 切换期间保持暂停。",
+      chineseReviewLabel: "Points 余额",
+      reviewOnly: "仅限账户本人的预览",
+      chineseSample:
+        "登录后的账户可以查看自己的 Points 余额。此公开页面不会读取、预留或扣减 Points。",
+      privacyReview: "隐私边界",
+      privacyPrompt: "请勿在公开页面输入照护事实或任何可识别信息。",
+      guidedAction: "下一步",
+      guidedActionDetail: "登录后打开 AI Documents，并只使用明确显示为可用的工具。",
+      workflowKicker: "当前 Points 路径",
+      workflowTitle: "先登录，再查看可用工具。",
+      workflowDescription:
+        "Points 模式只开放明确启用的页面。NDIS Case Note 生成功能保持暂停，不会读取旧余额系统。",
+      workflowSteps: [
+        {
+          title: "注册或登录",
+          description: "AI Documents 和 Points 页面仅对已登录服务商账户开放。",
+        },
+        {
+          title: "打开 AI Documents",
+          description: "查看当前明确启用的文档工具和既有的账户内容。",
+        },
+        {
+          title: "确认工具状态",
+          description: "暂停的工具不会显示生成入口，也不会读取旧余额系统。",
+        },
+        {
+          title: "查看 Points",
+          description: "在仅限账户本人的页面查看余额和当前服务费用。",
+        },
+        {
+          title: "等待 NDIS 工具重新开放",
+          description: "NDIS Case Note 助手完成 Points 接入前不会提供生成或保存入口。",
+        },
+      ],
+      productKicker: "受保护的产品工作区",
+      productTitle: "AI Documents 为入口，Points 清晰可见。",
+      primaryLane: "当前产品路径",
+      documentsDescription:
+        "打开 AI Documents 查看 Points 预览中当前可用的工具。旧 NDIS 生成器保持暂停，不能预留或扣减 Points。",
+      openCaseNote: "查看 Points 预览",
+      ownerOnlyLabel: "仅限账户本人的 Points",
+      ownerOnlyDescription:
+        "余额只在认证后的账户页面读取，不会显示在公开资料或管理员内容视图中。",
+    } as const;
+  }
+
+  return {
+    ...copy,
+    navCaseNote: "Points",
+    heroKicker: "AI Documents with a Points preview",
+    heroTitle: "Review available AI Documents tools and your Points.",
+    heroDescription:
+      "Sign in to see the document tools currently available and an owner-scoped Points balance preview. NDIS Case Note generation is paused during this transition.",
+    accountBoundary:
+      "Register or sign in to open AI Documents. NDIS Case Note generation and saving are unavailable while the workspace moves to Points.",
+    previewAriaLabel: "AI Documents and Points transition status",
+    englishDraftLabel: "Available workspace",
+    caseNoteTitle: "AI Documents",
+    sampleDate: "Points transition · current status",
+    englishSample:
+      "Open the protected AI Documents workspace to see the tools currently available. The NDIS Case Note Companion remains paused during the Points transition.",
+    chineseReviewLabel: "Points balance",
+    reviewOnly: "Owner-scoped preview",
+    chineseSample:
+      "Your signed-in account can view its Points balance. This public page does not read, reserve or deduct Points.",
+    privacyReview: "Privacy boundary",
+    privacyPrompt:
+      "Do not enter care facts or identifying information on this public page.",
+    guidedAction: "Next action",
+    guidedActionDetail:
+      "Sign in, open AI Documents, and use only tools explicitly shown as available.",
+    workflowKicker: "Current Points path",
+    workflowTitle: "Sign in, then review the available tools.",
+    workflowDescription:
+      "Points mode exposes only explicitly enabled pages. NDIS Case Note generation stays paused and does not read the previous balance system.",
+    workflowSteps: [
+      {
+        title: "Register or sign in",
+        description:
+          "AI Documents and Points pages are available only to signed-in provider accounts.",
+      },
+      {
+        title: "Open AI Documents",
+        description:
+          "Review the document tools currently enabled and existing account content.",
+      },
+      {
+        title: "Confirm tool status",
+        description:
+          "Paused tools do not expose generation actions or read the previous balance system.",
+      },
+      {
+        title: "View Points",
+        description:
+          "See the balance and current service cost on an owner-scoped page.",
+      },
+      {
+        title: "Wait for the NDIS tool to reopen",
+        description:
+          "The NDIS Case Note Companion has no generation or saving entry point until its Points connection is ready.",
+      },
+    ],
+    productKicker: "Protected product workspace",
+    productTitle: "AI Documents is the entry point, with Points visible.",
+    primaryLane: "Current product path",
+    documentsDescription:
+      "Open AI Documents to see the tools available in the Points preview. The legacy NDIS generator remains paused and cannot reserve or deduct Points.",
+    openCaseNote: "View Points preview",
+    ownerOnlyLabel: "Owner-scoped Points",
+    ownerOnlyDescription:
+      "The balance is read only on an authenticated account page and stays out of public profiles and administrator content views.",
   } as const;
 }

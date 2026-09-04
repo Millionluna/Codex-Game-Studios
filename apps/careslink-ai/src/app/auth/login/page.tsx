@@ -13,10 +13,11 @@ import { AppShell } from "@/components/app-shell";
 import { GoogleOAuthForm } from "@/components/google-oauth-form";
 import { ButtonLink, FieldLabel, TextInput } from "@/components/ui";
 import {
-  getAuthPageContext,
+  getAuthPageDestination,
   type AuthPageContext,
 } from "@/lib/auth-page-context";
 import { isGoogleOAuthAvailable } from "@/lib/google-oauth";
+import { isCaresLinkV1PointsUiEnabled } from "@/lib/points-ui-feature.server";
 import {
   getProviderGeneratorHandoffContext,
   getSafeNextHrefWithHandoff,
@@ -46,11 +47,13 @@ export async function generateMetadata({
 }: LoginPageProps): Promise<Metadata> {
   const params = await searchParams;
   const locale = getLocaleFromSearchParams(params);
-  const nextHref = getSafeNextHrefWithHandoff(params);
-  const context = getAuthPageContext(nextHref);
+  const destination = getAuthPageDestination(
+    getSafeNextHrefWithHandoff(params),
+    isCaresLinkV1PointsUiEnabled(),
+  );
 
   return {
-    title: getLoginPageMetadataTitle(locale, context),
+    title: getLoginPageMetadataTitle(locale, destination.context),
     robots: CARESLINK_AI_NOINDEX_ROBOTS,
   };
 }
@@ -58,9 +61,17 @@ export async function generateMetadata({
 export default async function LoginPage({ searchParams }: LoginPageProps) {
   const params = await searchParams;
   const locale = getLocaleFromSearchParams(params);
-  const nextHref = getSafeNextHrefWithHandoff(params);
-  const copy = getAuthPageCopy(locale, getAuthPageContext(nextHref));
-  const registerHref = withAuthHandoffParams("/auth/register", params);
+  const requestedNextHref = getSafeNextHrefWithHandoff(params);
+  const destination = getAuthPageDestination(
+    requestedNextHref,
+    isCaresLinkV1PointsUiEnabled(),
+  );
+  const nextHref = destination.nextHref;
+  const copy = getAuthPageCopy(locale, destination.context);
+  const registerHref = withAuthHandoffParams(
+    "/auth/register",
+    nextHref === requestedNextHref ? params : { ...params, next: nextHref },
+  );
   const forgotPasswordHref = withLocale("/auth/forgot-password", locale);
   const handoff = getProviderGeneratorHandoffContext(params);
   const message = getAuthMessage(params, locale);
@@ -343,6 +354,41 @@ function getAuthPageCopy(
       },
     };
 
+    if (context === "points-cutover") {
+      return {
+        ...copy,
+        title: "登录后查看当前可用的 AI Documents 与 Points。",
+        description:
+          "NDIS Case Note 助手在 Points 切换期间暂停。登录后只进入明确显示为可用的工具，并查看仅限账户本人的 Points 余额。",
+        submit: "登录并查看可用工具",
+        boundary:
+          "NDIS Case Note 的生成和保存目前不可用。仅使用工作区中明确显示为可用的工具；一般文档与运营支持不构成临床、法律、照护、监管或合规建议。",
+        mockup: {
+          kicker: "AI Documents 与 Points",
+          title: "当前可用工具",
+          status: "NDIS 工具已暂停",
+          tabs: ["可用工具", "Points", "隐私", "状态"],
+          rows: [
+            {
+              label: "查看可用工具",
+              meta: "工作区",
+              detail: "只使用 AI Documents 中明确显示为可用的工具。",
+            },
+            {
+              label: "查看 Points",
+              meta: "仅限本人",
+              detail: "余额只在登录后的账户页面读取，不会显示在公开页面。",
+            },
+            {
+              label: "NDIS Case Note 已暂停",
+              meta: "切换中",
+              detail: "Points 接入完成前不会显示生成或保存入口。",
+            },
+          ],
+        },
+      };
+    }
+
     if (context === "ai-documents") {
       return {
         ...copy,
@@ -461,6 +507,43 @@ function getAuthPageCopy(
     },
   };
 
+  if (context === "points-cutover") {
+    return {
+      ...copy,
+      title: "Sign in to view available AI Documents tools and Points.",
+      description:
+        "The NDIS Case Note Companion is paused during the Points transition. Sign in to open only tools shown as available and view your owner-scoped Points balance.",
+      submit: "Sign in and view available tools",
+      boundary:
+        "NDIS Case Note generation and saving are unavailable. Use only tools explicitly shown as available; general documentation and operational support is not clinical, legal, care, regulatory or compliance advice.",
+      mockup: {
+        kicker: "AI Documents & Points",
+        title: "Currently available tools",
+        status: "NDIS tool paused",
+        tabs: ["Available", "Points", "Privacy", "Status"],
+        rows: [
+          {
+            label: "Review available tools",
+            meta: "Workspace",
+            detail: "Use only tools explicitly shown as available in AI Documents.",
+          },
+          {
+            label: "View Points",
+            meta: "Owner-only",
+            detail:
+              "The balance is read only on the signed-in account page and is not shown publicly.",
+          },
+          {
+            label: "NDIS Case Note paused",
+            meta: "Transition",
+            detail:
+              "No generation or saving entry point is shown until the Points connection is ready.",
+          },
+        ],
+      },
+    };
+  }
+
   if (context === "ai-documents") {
     return {
       ...copy,
@@ -545,14 +628,18 @@ function getLoginPageMetadataTitle(
   context: AuthPageContext,
 ) {
   if (locale === "zh-Hans") {
-    return context === "ndis-case-note"
+    return context === "points-cutover"
+      ? "NDIS Case Note 已暂停 · 登录 AI Documents 与 Points"
+      : context === "ndis-case-note"
       ? "登录 NDIS Case Note AI 助手"
       : context === "ai-documents"
         ? "登录 AI Documents"
         : "登录";
   }
 
-  return context === "ndis-case-note"
+  return context === "points-cutover"
+    ? "NDIS Case Note paused · AI Documents & Points sign-in"
+    : context === "ndis-case-note"
     ? "Sign in to NDIS Case Note Companion"
     : context === "ai-documents"
       ? "Sign in to AI Documents"

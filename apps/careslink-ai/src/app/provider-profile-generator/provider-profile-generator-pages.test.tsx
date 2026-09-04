@@ -64,6 +64,12 @@ vi.mock("@/lib/referral-workspace-i18n", async () =>
 vi.mock("@/lib/ndis-case-note-companion-navigation", async () =>
   import("../../lib/ndis-case-note-companion-navigation"),
 );
+vi.mock("@/lib/auth-page-context", async () =>
+  import("../../lib/auth-page-context"),
+);
+vi.mock("@/lib/points-ui-feature.server", () => ({
+  isCaresLinkV1PointsUiEnabled: () => false,
+}));
 vi.mock("@/lib/public-provider-profile-generator", async () =>
   import("../../lib/public-provider-profile-generator"),
 );

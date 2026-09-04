@@ -7,15 +7,13 @@ export default function PlanAndUsageLoading() {
       <div className="mx-auto max-w-[1180px]">
         <section
           className="document-paper min-h-72 overflow-hidden"
-          role="status"
-          aria-live="polite"
+          aria-hidden="true"
         >
           <div className="p-6 sm:p-8">
-            <p className="micro-label">Account summary</p>
-            <h1 className="document-title mt-3">Loading account balance…</h1>
-            <p className="mt-4 max-w-2xl text-sm leading-6 text-[#405b52] sm:text-base">
-              Checking the current session and read-only balance information.
-            </p>
+            <div className="h-3 w-28 animate-pulse rounded-sm bg-[#dfe7e2] motion-reduce:animate-none" />
+            <div className="mt-3 h-9 w-full max-w-sm animate-pulse rounded-sm bg-[#d3dfd9] motion-reduce:animate-none" />
+            <div className="mt-4 h-4 w-full max-w-2xl animate-pulse rounded-sm bg-[#dfe7e2] motion-reduce:animate-none" />
+            <div className="mt-2 h-4 w-full max-w-lg animate-pulse rounded-sm bg-[#dfe7e2] motion-reduce:animate-none" />
           </div>
 
           <div
