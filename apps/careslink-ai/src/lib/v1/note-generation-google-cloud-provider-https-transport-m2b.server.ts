@@ -33,6 +33,61 @@ const KMS_RAW_ENCRYPT_PATH =
 const BEARER_PATTERN = /^Bearer [A-Za-z0-9][A-Za-z0-9._~+\/-]{15,16383}={0,2}$/;
 const CONTENT_LENGTH_PATTERN = /^(0|[1-9][0-9]{0,15})$/;
 
+type Ipv6Prefix = Readonly<{
+  network: bigint;
+  prefixLength: number;
+}>;
+
+// Snapshot of the ALLOCATED rows in the IANA IPv6 Global Unicast Address
+// Space registry, reviewed 2026-09-04. The partially allocated 2001::/23 and
+// transition-only 2002::/16 rows are conservatively absent even though some
+// narrower special-purpose entries are globally reachable. Unlisted and newly
+// allocated space therefore fails closed until this auditable list is
+// deliberately reviewed and updated.
+// https://www.iana.org/assignments/ipv6-unicast-address-assignments/
+const IANA_ALLOCATED_IPV6_GLOBAL_UNICAST_PREFIXES = Object.freeze([
+  defineIpv6Prefix("2001:200::/23"),
+  defineIpv6Prefix("2001:400::/23"),
+  defineIpv6Prefix("2001:600::/23"),
+  defineIpv6Prefix("2001:800::/22"),
+  defineIpv6Prefix("2001:c00::/23"),
+  defineIpv6Prefix("2001:e00::/23"),
+  defineIpv6Prefix("2001:1200::/23"),
+  defineIpv6Prefix("2001:1400::/22"),
+  defineIpv6Prefix("2001:1800::/23"),
+  defineIpv6Prefix("2001:1a00::/23"),
+  defineIpv6Prefix("2001:1c00::/22"),
+  defineIpv6Prefix("2001:2000::/19"),
+  defineIpv6Prefix("2001:4000::/23"),
+  defineIpv6Prefix("2001:4200::/23"),
+  defineIpv6Prefix("2001:4400::/23"),
+  defineIpv6Prefix("2001:4600::/23"),
+  defineIpv6Prefix("2001:4800::/23"),
+  defineIpv6Prefix("2001:4a00::/23"),
+  defineIpv6Prefix("2001:4c00::/23"),
+  defineIpv6Prefix("2001:5000::/20"),
+  defineIpv6Prefix("2001:8000::/19"),
+  defineIpv6Prefix("2001:a000::/20"),
+  defineIpv6Prefix("2001:b000::/20"),
+  defineIpv6Prefix("2003::/18"),
+  defineIpv6Prefix("2400::/12"),
+  defineIpv6Prefix("2410::/12"),
+  defineIpv6Prefix("2600::/12"),
+  defineIpv6Prefix("2610::/23"),
+  defineIpv6Prefix("2620::/23"),
+  defineIpv6Prefix("2630::/12"),
+  defineIpv6Prefix("2800::/12"),
+  defineIpv6Prefix("2a00::/12"),
+  defineIpv6Prefix("2a10::/12"),
+  defineIpv6Prefix("2c00::/12"),
+]);
+
+// Documentation space sits inside the otherwise allocated 2001:c00::/23.
+// Keep that registry exception explicit instead of widening the allowlist.
+const IPV6_SPECIAL_PURPOSE_DENY_PREFIXES = Object.freeze([
+  defineIpv6Prefix("2001:db8::/32"),
+]);
+
 export const CARESLINK_V1_NOTE_GENERATION_GOOGLE_CLOUD_PROVIDER_HTTPS_TRANSPORT_M2B_VERSION =
   "provider-https-transport.communication-note.2026-09-03.m2b.v1" as const;
 export const CARESLINK_V1_NOTE_GENERATION_GOOGLE_CLOUD_PROVIDER_HTTPS_TRANSPORT_M2B_READY =
@@ -92,6 +147,7 @@ export const CARESLINK_V1_NOTE_GENERATION_GOOGLE_CLOUD_PROVIDER_HTTPS_TRANSPORT_
     dnsAllAddressesPreflightRequired: true,
     dnsResolutionPinnedToRequest: true,
     publicRemoteAddressRequired: true,
+    ipv6IanaAllocatedGlobalUnicastOnly: true,
     formalTransportEnabled: false,
     liveNetworkEvidencePresent: false,
     deploymentApproved: false,
@@ -694,26 +750,73 @@ function isPublicNetworkAddress(value: string): boolean {
         `${high >>> 8}.${high & 0xff}.${low >>> 8}.${low & 0xff}`,
       );
     }
-    if (
-      normalized === "::" ||
-      normalized === "::1" ||
-      normalized.startsWith("::") ||
-      normalized.startsWith("fc") ||
-      normalized.startsWith("fd") ||
-      /^fe[89ab]/.test(normalized) ||
-      /^fe[c-f]/.test(normalized) ||
-      normalized.startsWith("ff") ||
-      normalized.startsWith("64:ff9b:") ||
-      normalized.startsWith("100:") ||
-      normalized.startsWith("2001:db8:") ||
-      normalized.startsWith("2001:0:") ||
-      normalized.startsWith("2002:")
-    ) {
-      return false;
-    }
-    return true;
+    const address = parseCanonicalIpv6(normalized);
+    return (
+      address !== undefined &&
+      !IPV6_SPECIAL_PURPOSE_DENY_PREFIXES.some((prefix) =>
+        isIpv6PrefixMatch(address, prefix),
+      ) &&
+      IANA_ALLOCATED_IPV6_GLOBAL_UNICAST_PREFIXES.some((prefix) =>
+        isIpv6PrefixMatch(address, prefix),
+      )
+    );
   }
   return false;
+}
+
+function defineIpv6Prefix(value: string): Ipv6Prefix {
+  const match = /^([^/]+)\/([1-9][0-9]{0,2})$/.exec(value);
+  if (match === null) throw new Error("Invalid static IPv6 prefix");
+  const canonical = canonicalNetworkAddress(match[1]);
+  const prefixLength = Number(match[2]);
+  const network =
+    canonical?.startsWith("6:") === true
+      ? parseCanonicalIpv6(canonical.slice(2))
+      : undefined;
+  if (network === undefined || prefixLength > 128) {
+    throw new Error("Invalid static IPv6 prefix");
+  }
+  const hostBitCount = BigInt(128) - BigInt(prefixLength);
+  if ((network >> hostBitCount) << hostBitCount !== network) {
+    throw new Error("Non-canonical static IPv6 prefix");
+  }
+  return Object.freeze({ network, prefixLength });
+}
+
+function parseCanonicalIpv6(value: string): bigint | undefined {
+  const halves = value.split("::");
+  if (halves.length > 2) return undefined;
+  const left = halves[0] === "" ? [] : halves[0].split(":");
+  const right =
+    halves.length === 1 || halves[1] === "" ? [] : halves[1].split(":");
+  const omittedHextets = 8 - left.length - right.length;
+  if (
+    (halves.length === 1 && omittedHextets !== 0) ||
+    (halves.length === 2 && omittedHextets < 1)
+  ) {
+    return undefined;
+  }
+  const hextets = [
+    ...left,
+    ...Array.from({ length: omittedHextets }, () => "0"),
+    ...right,
+  ];
+  if (
+    hextets.length !== 8 ||
+    hextets.some((hextet) => !/^[0-9a-f]{1,4}$/.test(hextet))
+  ) {
+    return undefined;
+  }
+  return hextets.reduce(
+    (address, hextet) =>
+      (address << BigInt(16)) | BigInt(Number.parseInt(hextet, 16)),
+    BigInt(0),
+  );
+}
+
+function isIpv6PrefixMatch(address: bigint, prefix: Ipv6Prefix): boolean {
+  const hostBitCount = BigInt(128) - BigInt(prefix.prefixLength);
+  return address >> hostBitCount === prefix.network >> hostBitCount;
 }
 
 function discardLateResponse(

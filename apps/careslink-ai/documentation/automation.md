@@ -1342,7 +1342,12 @@ The exact-allowlist Node HTTPS transport performs public-address DNS preflight,
 pins resolution into each request, rechecks the connected peer, verifies TLS,
 rejects redirects and retries, bounds every request to five seconds and the
 whole preparation chain to 30 seconds, and applies endpoint-specific byte and
-header limits. Mutable body/chunk copies are scrubbed. Immutable JavaScript JWT
+header limits. IPv6 admission is now a static fail-closed allowlist of the
+`ALLOCATED` IANA Global Unicast rows reviewed 2026-09-04: reserved and
+unallocated space, `2001::/23`, `2002::/16` and `2001:db8::/32` are rejected
+for the Vercel, STS and IAM identity profiles before HTTPS, while future IANA
+allocations require manual snapshot review. Mutable body/chunk copies are
+scrubbed. Immutable JavaScript JWT
 and access-token strings cannot be reliably zeroized; M2b drops references but
 makes no string-zeroization claim.
 
@@ -1352,8 +1357,9 @@ capability can run the source seam, which has no route, worker or scheduler
 importer. The tests use mocked provider/HTTPS boundaries; no live cloud call,
 resource, deployment, Preview/Production change, real care data or model call
 belongs to this batch. M2c later removed the GCS raw-token DTO from the adapter
-source boundary; private GCS authority/transport and independent WIF/IAM/KMS
-and bucket control-plane attestation remain required before formal composition. See
+source boundary, and M2d later supplies its source-only private GCS
+authority/transport. Live composition and independent WIF/IAM/KMS and bucket
+control-plane attestation remain required before formal composition. See
 `documentation/communication-note-secure-submission-provider-trust-m2b.md`.
 
 ### Communication Note GCS authority handoff M2c — source only
@@ -1379,6 +1385,48 @@ this batch. See
 The local gate passed 50/50 focused tests, 3240/3240 complete tests, TypeScript,
 zero-warning ESLint, the 64/64-page production build, the 27-chunk M1r–M2c
 client-boundary scan, adapter sync and diff checks.
+
+### Communication Note GCS private authority M2d — source only
+
+M2d adds a private, one-use authority and a GCS-only owned Node HTTPS transport
+for the M2c authorized-operation contract. Its `TEST_ONLY` preparation path
+binds the exact Preview identity, custom audience, Google STS exchange, pinned
+runtime service account, GCS scope, bucket/prefix, permission set, upstream
+expiry and root signal before projecting a tokenless authorized-operation port.
+Each top-level GCS logical operation requires a separately prepared credential;
+the authority then performs the exact synchronous direct-return M2c handoff.
+
+The transport source limits metadata, direct media and multipart upload to
+exact endpoint/method/query/header/status profiles. It requires public-only
+pinned DNS with Google-published IPv6-prefix admission and a public connected
+peer, preserves TLS/server-name verification
+before private header/body commit, rejects redirects, retries, proxies and
+compression, and bounds request/operation time, bytes and late cleanup. Raw
+tokens and `Authorization` remain private to the authority/transport and do not
+enter the M2c DTO, logs, evidence or client configuration.
+
+The corrective review gate composes the M2d authority with the actual M2b
+provider-transport module while mocking DNS/HTTPS. Reserved or unallocated IPv6
+therefore fails during the first Vercel profile before `node:https` and before
+the GCS transport is created. Import quarantine now scans controlled scripts at
+repository root, `src`, `scripts` and `supabase/functions`, covers `.ts`,
+`.tsx`, `.mts`, `.cts`, `.js`, `.jsx`, `.mjs` and `.cjs`, excludes tests and
+retains the exact authority-only importer assertions.
+
+This adds no active automation. Both M2d readiness latches remain `false`, both
+formal exports remain `undefined`, the formal preparation path fails before
+OIDC/network work and no product runtime imports either module. Provider, DNS,
+TLS and HTTPS effects in source tests are mocked. The final same-revision local
+gate passed 27/27 M2d tests across 3 files (13 authority, 12 GCS transport and 2
+authority-to-M2b composition), 20/20 M2b provider-transport tests, 127/127
+focused regressions across 7 files and 3270/3270 complete tests across 227
+files, plus TypeScript,
+zero-warning ESLint, the 64/64-page Next.js 16.2.9 Turbopack build, 27-chunk
+client scan, 73-file adapter sync and diff check. The initially sandboxed build
+was denied only by temporary-local-port binding policy and passed on the
+permitted rerun. No live WIF, IAM, bucket, GCS, Preview, deployment, Production,
+real-care-data or model-call claim belongs to this batch. See
+`documentation/communication-note-secure-submission-gcs-private-authority-m2d.md`.
 
 ### Communication Note atomic 20-Point admission — source only
 
@@ -1464,8 +1512,8 @@ hashes and scenario evidence.
 
 ## Inactive shadow automation contracts
 
-- The contract and migrations define generation/export job states. Source-only memory contracts model leases, recovery, retry policy, provider evidence and single-use payload grants, and the registered-worker v2 facade composes those boundaries without a payload locator. All eight generation migrations remain Production-unapplied; deleted `r9` supplied isolated PostgreSQL 17.6 execution evidence for database-clock claim/heartbeat/fence/commit/settle/resolve/recover/authorize/consume logic and payload/grant/evidence/purge-outbox metadata, deleted `r20` supplied the three true two-session race results, and deleted `r21` supplied exact historical transient-retry/success replay through payload/outbox purge. The later local owner-repository gate covers the three private owner RPCs, migration #29 adds the non-login control-executor-owned graceful-retirement identity, admission adds the fifth purpose role/private binding table, terminal settlement adds the sixth purpose role plus settlement/recovery-turn tables, and M1z adds the source-only policy/KMS-bound admission caller—none has a runtime credential. There is still no installed caller. Normal consume deliberately settles `DENIED_SETTLED` / `PAYLOAD_UNAVAILABLE` and returns no vault grant, locator or facts; the historical rollback-only `TEST_ONLY` `CONSUMED` fixture proves only scripted canonical transaction atomicity. M1z supplies provider-neutral encrypted staging and maintenance cores; M2a adds default-off exact-version KMS, private GCS and one-shot Points-admission source adapters. M2c removes raw credentials from the GCS adapter handoff but installs no authority or transport. Their fresh posture brands and cleanup receipts remain injected validation claims, not live trust; they still have no installed WIF or database credential issuer, authenticated exact-resource/provenance proof, bucket propagation/history-purge evidence, independently observed database quiescence, formal composition, queue service, deployed worker, live retry loop or served cancellation endpoint.
-- No worker automation may be scheduled yet. Deleted `r20` closed the PostgreSQL 17.6 true two-session claim/session/privacy race gate, deleted `r21` closed the fixed Attempt-2 historical replay gate, deleted `r22` closed the hosted registration-retention gate, the earlier isolated local PostgreSQL 16.15 run closed its recorded engine/serial/true-two-session version gate, and deleted `r5` closed its historical Hosted 30/30 migration, then-current 11/11 assertion and independent posture gate. Owner admission/enqueue/status/cancel and graceful worker-registration retirement now have source, local SQL and deleted-Hosted schema/transaction boundaries; Communication has source/local fixed-20 admission and terminal-settlement boundaries plus M1z encrypted-staging, exact policy/KMS admission and maintenance source cores. M2a's provider protocol adapters remain uncomposed and unproved against live resources; M2c narrows only the GCS source handoff. Emergency revocation, attempt listing, account-delete/purge and orphan recovery, sequential JSON numeric parsing hardening, real credential issuers/transports, caller/route, hosted Auth/Data API, model/STT and runtime-activation blocks remain explicit governance gaps.
+- The contract and migrations define generation/export job states. Source-only memory contracts model leases, recovery, retry policy, provider evidence and single-use payload grants, and the registered-worker v2 facade composes those boundaries without a payload locator. All eight generation migrations remain Production-unapplied; deleted `r9` supplied isolated PostgreSQL 17.6 execution evidence for database-clock claim/heartbeat/fence/commit/settle/resolve/recover/authorize/consume logic and payload/grant/evidence/purge-outbox metadata, deleted `r20` supplied the three true two-session race results, and deleted `r21` supplied exact historical transient-retry/success replay through payload/outbox purge. The later local owner-repository gate covers the three private owner RPCs, migration #29 adds the non-login control-executor-owned graceful-retirement identity, admission adds the fifth purpose role/private binding table, terminal settlement adds the sixth purpose role plus settlement/recovery-turn tables, and M1z adds the source-only policy/KMS-bound admission caller—none has a runtime credential. There is still no installed caller. Normal consume deliberately settles `DENIED_SETTLED` / `PAYLOAD_UNAVAILABLE` and returns no vault grant, locator or facts; the historical rollback-only `TEST_ONLY` `CONSUMED` fixture proves only scripted canonical transaction atomicity. M1z supplies provider-neutral encrypted staging and maintenance cores; M2a adds default-off exact-version KMS, private GCS and one-shot Points-admission source adapters. M2c removes raw credentials from the GCS adapter handoff, and M2d adds a source-only private authority and GCS transport without installing either. Their posture brands, source identity checks and cleanup results are not live trust; they still have no installed WIF or database credential issuer, authenticated exact-resource/provenance proof, bucket propagation/history-purge evidence, independently observed database quiescence, formal composition, queue service, deployed worker, live retry loop or served cancellation endpoint.
+- No worker automation may be scheduled yet. Deleted `r20` closed the PostgreSQL 17.6 true two-session claim/session/privacy race gate, deleted `r21` closed the fixed Attempt-2 historical replay gate, deleted `r22` closed the hosted registration-retention gate, the earlier isolated local PostgreSQL 16.15 run closed its recorded engine/serial/true-two-session version gate, and deleted `r5` closed its historical Hosted 30/30 migration, then-current 11/11 assertion and independent posture gate. Owner admission/enqueue/status/cancel and graceful worker-registration retirement now have source, local SQL and deleted-Hosted schema/transaction boundaries; Communication has source/local fixed-20 admission and terminal-settlement boundaries plus M1z encrypted-staging, exact policy/KMS admission and maintenance source cores. M2a's provider protocol adapters remain uncomposed and unproved against live resources; M2c narrows the GCS source handoff and M2d supplies only its default-off source authority/transport. Emergency revocation, attempt listing, account-delete/purge and orphan recovery, sequential JSON numeric parsing hardening, live credential/IAM/network proof, caller/route, hosted Auth/Data API, model/STT and runtime-activation blocks remain explicit governance gaps.
 - The source follow-up for the two #26 readers and five #30 Portal functions is
   complete: their seven exact `pg_proc.proowner` signature checks now live in
   the maintained worker and Portal-intake rollback suites. The enhanced worker
@@ -1493,7 +1541,7 @@ hashes and scenario evidence.
 
 | Capability | Current status |
 |---|---|
-| generation worker/queue | absent at runtime; all eight generation migrations are Production-unapplied and exist on no retained Preview. M1z adds the source-level encrypted stager, exact policy/KMS-bound admission shell and reconciliation/sweep core; M2a adds default-off KMS/GCS/purpose-session protocol adapters and M2c removes raw credentials from the GCS source handoff, but neither installs a GCS authority/transport, credential issuer, authenticated exact resource, propagated/history-clean bucket proof, independently observed database quiescence, scheduler, formal composition or usable worker vault grant. Paid jobs remain default-off, settings/catalog/registration remain fail-closed, no API/service role has the new coordinator `EXECUTE`, and the formal submitter/maintenance plus worker runtime remain absent |
+| generation worker/queue | absent at runtime; all eight generation migrations are Production-unapplied and exist on no retained Preview. M1z adds the source-level encrypted stager, exact policy/KMS-bound admission shell and reconciliation/sweep core; M2a adds default-off KMS/GCS/purpose-session protocol adapters, M2c removes raw credentials from the GCS source handoff and M2d adds a quarantined source authority/transport. M2d installs no formal authority or transport and supplies no live credential, IAM/network proof, authenticated exact resource, propagated/history-clean bucket evidence, independently observed database quiescence, scheduler, formal composition or usable worker vault grant. Paid jobs remain default-off, settings/catalog/registration remain fail-closed, no API/service role has the new coordinator `EXECUTE`, and the formal submitter/maintenance plus worker runtime remain absent |
 | transcription worker | absent |
 | export worker/artifact cleanup | absent |
 | claim cleanup cron | absent; expired rows become unclaimable and are opportunistically cleaned |

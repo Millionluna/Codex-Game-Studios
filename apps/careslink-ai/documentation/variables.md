@@ -466,25 +466,27 @@ are immutable JavaScript strings, so reference release is not a reliable
 zeroization guarantee and must not be documented as one. Formal trust and
 transport singletons stay `undefined`, both readiness latches stay `false`, and
 the formal preparation factory fails closed. Do not add deployment variables
-until live WIF/IAM/KMS IAM evidence, a private GCS authority and owned
-transport, authenticated exact-bucket evidence, an authorized no-data Preview
-gate and separate activation approval are complete.
+until live WIF/IAM/KMS IAM evidence, independently reviewed live composition of
+the M2d private GCS authority and owned transport, authenticated exact-bucket
+evidence, an authorized no-data Preview gate and separate activation approval
+are complete.
 
-## Secure-submission M2c GCS authority handoff
+## Secure-submission M2c GCS authority handoff — historical source boundary
 
 M2c adds no environment variables and no `.env.example` entry. The GCS
 private-object-store adapter receives one constructor-injected, tokenless
 authorized-operation port and an injected bucket-posture claim. Neither is an
 ambient deployment setting or an approved provider trust root.
 
-A future private authority must own credential acquisition and the exact GCS
-HTTPS transport. It must not accept provider credentials, service-account JSON,
-Application Default Credentials, a generic endpoint, proxy configuration or a
-caller-supplied authenticated transport through application environment
-variables. Any future raw token must remain inside that private authority and
-owned transport; it must never enter the GCS adapter request DTO, generic
-headers, logs, evidence or client configuration. Immutable JavaScript token
-strings still have no reliable zeroization guarantee.
+M2c required a future private authority to own credential acquisition and the
+exact GCS HTTPS transport. M2d later supplies that source-only authority and
+transport without activating either. They must not accept provider credentials,
+service-account JSON, Application Default Credentials, a generic endpoint,
+proxy configuration or a caller-supplied authenticated transport through
+application environment variables. Any raw token must remain inside that
+private authority and owned transport; it must never enter the GCS adapter
+request DTO, generic headers, logs, evidence or client configuration. Immutable
+JavaScript token strings still have no reliable zeroization guarantee.
 
 The fixed project, region, runtime principal, audience, scope, bucket and
 permission-set hash in the source request bind an intended operation only.
@@ -492,6 +494,43 @@ They do not authenticate WIF, IAM, the bucket or its history. Do not add
 deployment variables until the owned authority/transport, live exact-bucket
 evidence, same-revision no-data Preview teardown and separate activation
 approval are complete.
+
+## Secure-submission M2d GCS private authority
+
+M2d adds no CaresLink environment variable and no `.env.example` entry. Its
+source versions are
+`google-cloud-gcs-private-authority.communication-note.2026-09-04.m2d.v1`
+and `google-cloud-gcs-https-transport.communication-note.2026-09-04.m2d.v1`.
+Readiness constants
+`CARESLINK_V1_NOTE_GENERATION_GOOGLE_CLOUD_GCS_PRIVATE_AUTHORITY_M2D_READY`
+and
+`CARESLINK_V1_NOTE_GENERATION_GOOGLE_CLOUD_GCS_HTTPS_TRANSPORT_M2D_READY`
+remain `false`. Source statuses remain
+`SOURCE_GCS_PRIVATE_AUTHORITY_NOT_COMPOSED` and
+`SOURCE_GCS_HTTPS_TRANSPORT_NOT_COMPOSED`; both formal exports remain
+`undefined`, and the formal preparation path fails before token or network
+work.
+
+The supported synchronous Vercel platform-token accessor may read its
+request-context token or Vercel's own injected `VERCEL_OIDC_TOKEN`; that is not
+a new CaresLink configuration variable. The `TEST_ONLY` M2d preparation seam
+accepts exact frozen non-secret bindings such as bucket, prefix and root signal.
+Those injected bindings and mocked provider results are source-test inputs, not
+environment fallbacks or authenticated control-plane evidence.
+
+Do not add a Google access token, service-account JSON, Application Default
+Credential setting, generic GCS endpoint, proxy, custom agent, arbitrary header
+map or caller-owned authenticated transport to application configuration. A raw
+access token and `Authorization` header may exist only inside the private M2d
+authority/transport implementation for the duration of one prepared operation;
+neither may enter an outward handle, M2c DTO, log, evidence artifact or client
+bundle. Reference release still does not prove zeroization of immutable
+JavaScript strings.
+
+No configuration may turn this source seam into live provider trust. Deployment
+variables remain prohibited until independently verified WIF/impersonation and
+bucket IAM, authenticated bucket posture/history, same-revision no-data Preview
+and separate formal-composition and activation approvals are complete.
 
 ## Platform-provided variables
 

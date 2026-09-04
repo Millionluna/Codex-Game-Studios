@@ -166,6 +166,7 @@ describe("Communication Note authenticated Google Cloud provider trust M2b", () 
       )
       .map((path) => relative(process.cwd(), path));
     expect(transportRuntimeImporters).toEqual([
+      "src/lib/v1/note-generation-google-cloud-gcs-private-authority-m2d.server.ts",
       "src/lib/v1/note-generation-google-cloud-provider-trust-m2b.server.ts",
     ]);
     const m2bRuntimeImporters = sourceFiles

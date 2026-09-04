@@ -34,6 +34,74 @@ const FIXED_FAILURE = Object.freeze({
   code: "GENERATION_FAILED",
   message: "Google Cloud provider HTTPS transport is unavailable",
 });
+const PROVIDER_IDENTITY_PROFILES = ["Vercel", "STS", "IAM"] as const;
+const REJECTED_IPV6_ADDRESSES = Object.freeze([
+  "0:0:0:0:0:0:0:1",
+  "0:0:0:0:0:ffff:7f00:1",
+  "64:ff9b::1",
+  "64:ff9b:1::1",
+  "100::1",
+  "100:0:0:1::1",
+  "2001::1",
+  "2001:2::1",
+  "2001:10::1",
+  "2001:20::1",
+  "2001:1ff:ffff:ffff:ffff:ffff:ffff:ffff",
+  "2001:db8::1",
+  "2001:db8:ffff:ffff:ffff:ffff:ffff:ffff",
+  "2001:1000::1",
+  "2001:11ff:ffff:ffff:ffff:ffff:ffff:ffff",
+  "2002::1",
+  "2003:4000::1",
+  "2420::1",
+  "2610:200::1",
+  "2620:200::1",
+  "2640::1",
+  "2c10::1",
+  "2d00::1",
+  "2e00::1",
+  "3000::1",
+  "3800::1",
+  "3c00::1",
+  "3e00::1",
+  "3f00::1",
+  "3f80::1",
+  "3fc0::1",
+  "3fe0::1",
+  "3ff0::1",
+  "3ff8::1",
+  "3ffc::1",
+  "3ffe::1",
+  "3fff::1",
+  "4000::1",
+  "5f00::1",
+  "fc00::1",
+  "fe80::1",
+  "ff00::1",
+]);
+const ALLOCATED_IPV6_BOUNDARIES = Object.freeze([
+  "2001:200::1",
+  "2001:3ff:ffff:ffff:ffff:ffff:ffff:ffff",
+  "2001:db7:ffff:ffff:ffff:ffff:ffff:ffff",
+  "2001:db9::1",
+  "2001:dff:ffff:ffff:ffff:ffff:ffff:ffff",
+  "2001:fff:ffff:ffff:ffff:ffff:ffff:ffff",
+  "2001:1200::1",
+  "2001:4860::1",
+  "2003:3fff:ffff:ffff:ffff:ffff:ffff:ffff",
+  "2400::1",
+  "2404:6800::1",
+  "241f:ffff:ffff:ffff:ffff:ffff:ffff:ffff",
+  "260f:ffff:ffff:ffff:ffff:ffff:ffff:ffff",
+  "2610::1",
+  "2610:1ff:ffff:ffff:ffff:ffff:ffff:ffff",
+  "2620::1",
+  "2620:1ff:ffff:ffff:ffff:ffff:ffff:ffff",
+  "2630::1",
+  "263f:ffff:ffff:ffff:ffff:ffff:ffff:ffff",
+  "2c00::1",
+  "2c0f:ffff:ffff:ffff:ffff:ffff:ffff:ffff",
+]);
 
 beforeEach(() => {
   networkMocks.dnsLookup.mockReset();
@@ -77,6 +145,7 @@ describe("Communication Note Google Cloud provider HTTPS transport M2b", () => {
       dnsAllAddressesPreflightRequired: true,
       dnsResolutionPinnedToRequest: true,
       publicRemoteAddressRequired: true,
+      ipv6IanaAllocatedGlobalUnicastOnly: true,
       liveNetworkEvidencePresent: false,
       deploymentApproved: false,
       activationApproved: false,
@@ -270,24 +339,53 @@ describe("Communication Note Google Cloud provider HTTPS transport M2b", () => {
     expect(networkMocks.httpsRequest).not.toHaveBeenCalled();
   });
 
-  it.each([
-    "0:0:0:0:0:0:0:1",
-    "0:0:0:0:0:ffff:7f00:1",
-    "2001:0db8:0:0:0:0:0:1",
-  ])("rejects non-canonical reserved DNS address %s", async (address) => {
-    networkMocks.dnsLookup.mockImplementationOnce(
-      (_hostname, _options, callback) =>
-        callback(null, [{ address, family: 6 }]),
-    );
+  it.each(PROVIDER_IDENTITY_PROFILES)(
+    "rejects IANA special, reserved and unallocated IPv6 for the %s profile before HTTPS",
+    async (profile) => {
+      const transport =
+        createCaresLinkV1NoteGenerationGoogleCloudProviderHttpsTransportM2b();
+      for (const address of REJECTED_IPV6_ADDRESSES) {
+        networkMocks.dnsLookup.mockImplementationOnce(
+          (_hostname, _options, callback) =>
+            callback(null, [{ address, family: 6 }]),
+        );
+        await expect(
+          transport.request(providerIdentityRequest(profile)),
+        ).rejects.toEqual(FIXED_FAILURE);
+      }
 
-    await expect(
-      createCaresLinkV1NoteGenerationGoogleCloudProviderHttpsTransportM2b().request(
-        bearerRequest(IAM_URL),
-      ),
-    ).rejects.toEqual(FIXED_FAILURE);
+      expect(networkMocks.dnsLookup).toHaveBeenCalledTimes(
+        REJECTED_IPV6_ADDRESSES.length,
+      );
+      expect(networkMocks.httpsRequest).not.toHaveBeenCalled();
+    },
+  );
 
-    expect(networkMocks.httpsRequest).not.toHaveBeenCalled();
-  });
+  it.each(PROVIDER_IDENTITY_PROFILES)(
+    "accepts only allocated global-unicast IPv6 boundaries for the %s profile",
+    async (profile) => {
+      const transport =
+        createCaresLinkV1NoteGenerationGoogleCloudProviderHttpsTransportM2b();
+      for (const address of ALLOCATED_IPV6_BOUNDARIES) {
+        networkMocks.dnsLookup.mockImplementationOnce(
+          (_hostname, _options, callback) =>
+            callback(null, [{ address, family: 6 }]),
+        );
+        const network = installNetworkResponse({ remoteAddress: address });
+        await expect(
+          transport.request(providerIdentityRequest(profile)),
+        ).resolves.toMatchObject({ status: 200 });
+        expect(network.writtenBodies).toHaveLength(1);
+      }
+
+      expect(networkMocks.dnsLookup).toHaveBeenCalledTimes(
+        ALLOCATED_IPV6_BOUNDARIES.length,
+      );
+      expect(networkMocks.httpsRequest).toHaveBeenCalledTimes(
+        ALLOCATED_IPV6_BOUNDARIES.length,
+      );
+    },
+  );
 
   it("pins every public DNS result into the request lookup and rejects lookup drift", async () => {
     const dnsAddresses = [
@@ -689,6 +787,29 @@ function bearerGetHeaders() {
     accept: "application/json",
     authorization: `Bearer ${ACCESS_TOKEN}`,
   };
+}
+
+function providerIdentityRequest(
+  profile: (typeof PROVIDER_IDENTITY_PROFILES)[number],
+): CaresLinkV1NoteGenerationGoogleCloudProviderHttpsRequestM2b {
+  if (profile === "Vercel") {
+    return requestFor("https://oidc.vercel.com/~token", {
+      headers: {
+        accept: "application/json",
+        "content-type": "application/json",
+        "user-agent": "careslink-ai-m2b-test",
+      },
+    });
+  }
+  if (profile === "STS") {
+    return requestFor("https://sts.googleapis.com/v1/token", {
+      headers: {
+        accept: "application/json",
+        "content-type": "application/x-www-form-urlencoded",
+      },
+    });
+  }
+  return bearerRequest(IAM_URL);
 }
 
 async function flushMicrotasks() {
