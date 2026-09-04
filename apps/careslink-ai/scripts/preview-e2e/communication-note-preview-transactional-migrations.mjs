@@ -61,6 +61,16 @@ const FIXED_PRECONDITION_CHECKPOINTS = new Set([
   "preserved_system_snapshot",
   "preserved_system_semantic_snapshot",
 ]);
+const FIXED_POSTCHECK_CHECKPOINTS = new Set([
+  "reset_namespace_and_globals",
+  "staged_history",
+  "rebuilt_state",
+  "application_roles",
+  "temporary_residue_or_connection",
+  "system_data_precommit",
+  "connection_postcommit",
+  "committed_history",
+]);
 
 const DISPOSABLE_PREVIEW_RESET_ARGUMENT =
   `--authorized-disposable-preview-reset=${POLICY.disposablePreviewBaselineHistorySha256}`;
@@ -1570,13 +1580,22 @@ class CommunicationNotePreviewTransactionalMigrationError extends Error {
     super(fixed);
     this.name = "CommunicationNotePreviewTransactionalMigrationError";
     this.code = fixed;
-    if (
-      fixed === "TRANSACTIONAL_MIGRATION_RESET_PRECONDITION_INVALID" &&
-      FIXED_PRECONDITION_CHECKPOINTS.has(checkpoint)
-    ) {
+    if (isFixedCheckpoint(fixed, checkpoint)) {
       this.checkpoint = checkpoint;
     }
   }
+}
+
+function isFixedCheckpoint(code, checkpoint) {
+  return typeof checkpoint === "string" && (
+    (
+      code === "TRANSACTIONAL_MIGRATION_RESET_PRECONDITION_INVALID" &&
+      FIXED_PRECONDITION_CHECKPOINTS.has(checkpoint)
+    ) || (
+      code === "TRANSACTIONAL_MIGRATION_POSTCHECK_FAILED" &&
+      FIXED_POSTCHECK_CHECKPOINTS.has(checkpoint)
+    )
+  );
 }
 
 function fail(code, checkpoint) {
@@ -1967,17 +1986,6 @@ async function assertDisposablePreviewResetPostconditions(
       preserved.preservedSemanticRecordCount ||
     currentSemantic.rows[0]?.semantic_sha256 !==
       preserved.preservedSemanticSha256 ||
-    applicationRoles.rowCount !== POLICY.applicationRoles.length ||
-    !sameStrings(
-      applicationRoles.rows.map((row) => row.rolname),
-      POLICY.applicationRoles,
-    ) ||
-    applicationRoles.rows.some((row) =>
-      row.attributes_safe !== true ||
-      row.one_membership !== true ||
-      row.no_member_edges !== true ||
-      row.bootstrap_edge_safe !== true
-    ) ||
     publications.rowCount !== 1 ||
     publicationsRow?.publication_count !==
       POLICY.disposablePreviewBaselinePublicationCount ||
@@ -2013,7 +2021,22 @@ async function assertDisposablePreviewResetPostconditions(
       expectedPublicApplicationAclCount ||
     publicSchemaRow?.public_comment !== preserved.publicComment
   ) {
-    fail("TRANSACTIONAL_MIGRATION_POSTCHECK_FAILED");
+    fail("TRANSACTIONAL_MIGRATION_POSTCHECK_FAILED", "rebuilt_state");
+  }
+  if (
+    applicationRoles.rowCount !== POLICY.applicationRoles.length ||
+    !sameStrings(
+      applicationRoles.rows.map((row) => row.rolname),
+      POLICY.applicationRoles,
+    ) ||
+    applicationRoles.rows.some((row) =>
+      row.attributes_safe !== true ||
+      row.one_membership !== true ||
+      row.no_member_edges !== true ||
+      row.bootstrap_edge_safe !== true
+    )
+  ) {
+    fail("TRANSACTIONAL_MIGRATION_POSTCHECK_FAILED", "application_roles");
   }
 }
 
@@ -2223,7 +2246,10 @@ export async function runTransactionalMigrationHarness({
       retainedEventTriggersRow?.event_triggers_sha256 !==
         POLICY.disposablePreviewBaselineEventTriggersSha256
     ) {
-      fail("TRANSACTIONAL_MIGRATION_POSTCHECK_FAILED");
+      fail(
+        "TRANSACTIONAL_MIGRATION_POSTCHECK_FAILED",
+        "reset_namespace_and_globals",
+      );
     }
     await client.query(
       "delete from supabase_migrations.schema_migrations",
@@ -2260,7 +2286,7 @@ export async function runTransactionalMigrationHarness({
       finalState.appliedCount !== migrations.length ||
       finalState.pending.length !== 0
     ) {
-      fail("TRANSACTIONAL_MIGRATION_POSTCHECK_FAILED");
+      fail("TRANSACTIONAL_MIGRATION_POSTCHECK_FAILED", "staged_history");
     }
     await assertDisposablePreviewResetPostconditions(
       client,
@@ -2300,7 +2326,10 @@ export async function runTransactionalMigrationHarness({
       Object.values(residueRow).some((value) => value !== true) ||
       backgroundState.failed
     ) {
-      fail("TRANSACTIONAL_MIGRATION_POSTCHECK_FAILED");
+      fail(
+        "TRANSACTIONAL_MIGRATION_POSTCHECK_FAILED",
+        "temporary_residue_or_connection",
+      );
     }
     const finalSystemData = await client.query(SYSTEM_DATA_EMPTY_SQL);
     const finalSystemDataRow = finalSystemData.rows[0];
@@ -2309,7 +2338,10 @@ export async function runTransactionalMigrationHarness({
       !finalSystemDataRow ||
       Object.values(finalSystemDataRow).some((value) => value !== true)
     ) {
-      fail("TRANSACTIONAL_MIGRATION_POSTCHECK_FAILED");
+      fail(
+        "TRANSACTIONAL_MIGRATION_POSTCHECK_FAILED",
+        "system_data_precommit",
+      );
     }
     await client.query("commit");
     transactionOpen = false;
@@ -2330,7 +2362,10 @@ export async function runTransactionalMigrationHarness({
     fail("TRANSACTIONAL_MIGRATION_TRANSACTION_FAILED");
   }
   if (backgroundState.failed) {
-    fail("TRANSACTIONAL_MIGRATION_POSTCHECK_FAILED");
+    fail(
+      "TRANSACTIONAL_MIGRATION_POSTCHECK_FAILED",
+      "connection_postcommit",
+    );
   }
   const committed = await client.query(`select version,
     coalesce(name, '') as name,
@@ -2344,7 +2379,7 @@ export async function runTransactionalMigrationHarness({
     committedState.appliedCount !== migrations.length ||
     committedState.pending.length !== 0
   ) {
-    fail("TRANSACTIONAL_MIGRATION_POSTCHECK_FAILED");
+    fail("TRANSACTIONAL_MIGRATION_POSTCHECK_FAILED", "committed_history");
   }
   return Object.freeze({
     postgres: expectedPostgresMajor,
@@ -2469,14 +2504,12 @@ function safeCode(error) {
 
 function safeCheckpoint(error) {
   if (!error || typeof error !== "object") return "";
+  const code = safeCode(error);
   const descriptor = Object.getOwnPropertyDescriptor(error, "checkpoint");
   const checkpoint = descriptor && "value" in descriptor
     ? descriptor.value
     : "";
-  return typeof checkpoint === "string" &&
-      FIXED_PRECONDITION_CHECKPOINTS.has(checkpoint)
-    ? checkpoint
-    : "";
+  return isFixedCheckpoint(code, checkpoint) ? checkpoint : "";
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

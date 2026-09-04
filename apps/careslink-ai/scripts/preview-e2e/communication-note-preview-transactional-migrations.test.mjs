@@ -12,6 +12,7 @@ import {
 import {
   COMMUNICATION_NOTE_PREVIEW_TRANSACTIONAL_MIGRATION_POLICY as POLICY,
   CommunicationNotePreviewTransactionalMigrationPolicyError,
+  extractDirectCareslinkRoleCreations,
   isTransactionControlStatement,
   loadPinnedCommunicationNotePreviewMigrations,
   splitSupabaseCliMigrationStatements,
@@ -161,6 +162,37 @@ describe("Communication Note Preview transactional migration policy", () => {
     expect(signedMigration.executionSql).toMatch(/lock\s+table/i);
   });
 
+  it("keeps the permanent application-role policy synchronized with migrations", async () => {
+    const bundle = await loadPinnedCommunicationNotePreviewMigrations();
+    const createdRoles = bundle.migrations.flatMap((entry) =>
+      extractDirectCareslinkRoleCreations(entry.statements)
+    ).sort();
+
+    expect(createdRoles).toEqual([...new Set(createdRoles)]);
+    expect(createdRoles).toEqual(POLICY.applicationRoles);
+    expect(createdRoles).toContain(
+      "careslink_v1_generation_points_admission_caller",
+    );
+  });
+
+  it("extracts only direct unquoted application role creations", () => {
+    expect(extractDirectCareslinkRoleCreations([
+      "-- create role careslink_comment\nselect 'create role careslink_string'",
+      "do $$ begin execute 'create role careslink_dynamic'; end $$",
+      "/* outer /* nested */ done */ CREATE /* gap */ ROLE careslink_direct nologin",
+      "create role unrelated_role nologin",
+    ])).toEqual(["careslink_direct"]);
+
+    for (const unsupported of [
+      'create role "careslink_quoted" nologin',
+      "create user careslink_user nologin",
+      "create group careslink_group",
+    ]) {
+      expect(() => extractDirectCareslinkRoleCreations([unsupported]))
+        .toThrowError("TRANSACTIONAL_MIGRATION_SQL_INVALID");
+    }
+  });
+
   it("matches the CLI statement boundary contract for quotes, comments, dollar bodies and parentheses", () => {
     const statements = splitSupabaseCliMigrationStatements(`
       -- header ; stays attached
@@ -267,6 +299,23 @@ describe("Communication Note Preview transactional migration policy", () => {
     expect(source).toMatch(
       /array_agg\(\s*relation\.relname::pg_catalog\.text/gu,
     );
+    const postcheckCalls = [...source.matchAll(
+      /fail\(\s*"TRANSACTIONAL_MIGRATION_POSTCHECK_FAILED",\s*"([a-z_]+)",?\s*\)/gu,
+    )].map((match) => match[1]).sort();
+    const allPostcheckFailCalls = source.match(
+      /fail\(\s*"TRANSACTIONAL_MIGRATION_POSTCHECK_FAILED"/gu,
+    ) ?? [];
+    expect(allPostcheckFailCalls).toHaveLength(postcheckCalls.length);
+    expect(postcheckCalls).toEqual([
+      "application_roles",
+      "committed_history",
+      "connection_postcommit",
+      "rebuilt_state",
+      "reset_namespace_and_globals",
+      "staged_history",
+      "system_data_precommit",
+      "temporary_residue_or_connection",
+    ]);
   });
 
   it("requires the exact disposable Preview reset authorization argument", () => {
@@ -555,6 +604,75 @@ describe("Communication Note Preview transactional migration runtime", () => {
     }
   });
 
+  it("attaches a fixed checkpoint at every postcheck transaction boundary", async () => {
+    const cases = [
+      {
+        options: { publicNamespaceClearedValid: false },
+        checkpoint: "reset_namespace_and_globals",
+        committed: false,
+      },
+      {
+        options: { stagedHistoryValid: false },
+        checkpoint: "staged_history",
+        committed: false,
+      },
+      {
+        options: { protectedObjectsDriftAfterReset: true },
+        checkpoint: "rebuilt_state",
+        committed: false,
+      },
+      {
+        options: { reverseAppRoleMembership: true },
+        checkpoint: "application_roles",
+        committed: false,
+      },
+      {
+        options: { residueValid: false },
+        checkpoint: "temporary_residue_or_connection",
+        committed: false,
+      },
+      {
+        options: { systemDataDriftsBeforeCommit: true },
+        checkpoint: "system_data_precommit",
+        committed: false,
+      },
+      {
+        options: {},
+        checkpoint: "connection_postcommit",
+        committed: true,
+        backgroundState: postcommitFailureState(),
+      },
+      {
+        options: { committedHistoryValid: false },
+        checkpoint: "committed_history",
+        committed: true,
+      },
+    ];
+
+    for (const entry of cases) {
+      const client = new FakeMigrationClient(entry.options);
+      const backgroundState = entry.backgroundState ?? { failed: false };
+      await expect(runTransactionalMigrationHarness({
+        client,
+        backgroundState,
+        expectedPostgresMajor: 17,
+        resetAuthorizationSha256:
+          POLICY.disposablePreviewBaselineHistorySha256,
+        migrations: [migration("20260101000000", "one")],
+        manifestSha256: "e".repeat(64),
+        outerTransactionCount: 0,
+      })).rejects.toMatchObject({
+        code: "TRANSACTIONAL_MIGRATION_POSTCHECK_FAILED",
+        checkpoint: entry.checkpoint,
+      });
+      expect(client.events).toContain(entry.committed ? "commit" : "rollback");
+      expect(client.events).not.toContain(
+        entry.committed ? "rollback" : "commit",
+      );
+      expect(client.schemaRebuilt).toBe(entry.committed);
+    }
+  });
+
   it("rejects a programmatic call without the exact reset authorization", async () => {
     const client = new FakeMigrationClient();
     await expect(runTransactionalMigrationHarness({
@@ -622,6 +740,16 @@ function migration(version, name) {
   });
 }
 
+function postcommitFailureState() {
+  let reads = 0;
+  return {
+    get failed() {
+      reads += 1;
+      return reads > 1;
+    },
+  };
+}
+
 class FakeMigrationClient {
   constructor({
     migrationFails = false,
@@ -656,6 +784,9 @@ class FakeMigrationClient {
     reverseAppRoleMembership = false,
     readOnlySystemLockCapabilityValid = true,
     systemDataDriftsBeforeCommit = false,
+    stagedHistoryValid = true,
+    committedHistoryValid = true,
+    residueValid = true,
   } = {}) {
     this.events = [];
     this.history = structuredClone(initialHistory);
@@ -700,9 +831,13 @@ class FakeMigrationClient {
     this.readOnlySystemLockCapabilityValid =
       readOnlySystemLockCapabilityValid;
     this.systemDataDriftsBeforeCommit = systemDataDriftsBeforeCommit;
+    this.stagedHistoryValid = stagedHistoryValid;
+    this.committedHistoryValid = committedHistoryValid;
+    this.residueValid = residueValid;
     this.systemDataCheckCount = 0;
     this.schemaRebuilt = false;
     this.pendingSchemaRebuilt = false;
+    this.transactionOpen = false;
   }
 
   async query(query) {
@@ -715,14 +850,17 @@ class FakeMigrationClient {
     if (normalized === "begin isolation level read committed") {
       this.pendingHistory = [...this.history];
       this.pendingSchemaRebuilt = this.schemaRebuilt;
+      this.transactionOpen = true;
     }
     if (normalized === "rollback") {
       this.pendingHistory = [...this.history];
       this.pendingSchemaRebuilt = this.schemaRebuilt;
+      this.transactionOpen = false;
     }
     if (normalized === "commit") {
       this.history = [...this.pendingHistory];
       this.schemaRebuilt = this.pendingSchemaRebuilt;
+      this.transactionOpen = false;
     }
     if (typeof query === "object" && normalized.startsWith("insert into")) {
       this.pendingHistory.push({
@@ -1079,7 +1217,16 @@ class FakeMigrationClient {
       return { rowCount: null, rows: [] };
     }
     if (normalized.startsWith("select version,")) {
-      return { rowCount: this.pendingHistory.length, rows: [...this.pendingHistory] };
+      const history = this.transactionOpen
+        ? this.pendingHistory
+        : this.history;
+      const valid = this.transactionOpen
+        ? this.stagedHistoryValid
+        : this.committedHistoryValid;
+      const rows = valid || history.length === 0
+        ? [...history]
+        : history.slice(0, -1);
+      return { rowCount: rows.length, rows };
     }
     if (
       normalized.startsWith("select (select pg_catalog.count(*) = 0 from auth.users)")
@@ -1142,7 +1289,7 @@ class FakeMigrationClient {
       return {
         rowCount: 1,
         rows: [{
-          temporary_roles_absent: true,
+          temporary_roles_absent: this.residueValid,
           authorizations_empty: true,
           revocations_empty: true,
           claims_empty: true,
