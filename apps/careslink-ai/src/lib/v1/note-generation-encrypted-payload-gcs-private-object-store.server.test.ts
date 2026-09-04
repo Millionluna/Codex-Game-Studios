@@ -10,7 +10,9 @@ import {
   CARESLINK_V1_NOTE_GENERATION_GCS_PRIVATE_OBJECT_STORE_READY,
   CARESLINK_V1_NOTE_GENERATION_GCS_PRIVATE_OBJECT_STORE_SOURCE_POLICY,
   createCaresLinkV1NoteGenerationGcsPrivateObjectStore,
-  type CaresLinkV1NoteGenerationGcsHttpsRequest,
+  type CaresLinkV1NoteGenerationGcsAuthorizedHttpsRequest,
+  type CaresLinkV1NoteGenerationGcsAuthorizedOperationConsumer,
+  type CaresLinkV1NoteGenerationGcsAuthorizedOperationRequest,
 } from "./note-generation-encrypted-payload-gcs-private-object-store.server";
 import type { CaresLinkV1NoteGenerationEncryptedPayloadPrivateObject } from "./note-generation-encrypted-payload-stager.server";
 
@@ -38,13 +40,34 @@ const DELETE_BINDING_HASH = sha256("delete-binding-1");
 const SECOND_DELETE_BINDING_HASH = sha256("delete-binding-2");
 const EXPECTED_OBJECT_NAME =
   `${PREFIX}/payloads/${OWNER_HASH}/${IDEMPOTENCY_HASH}.json`;
-const ACCESS_TOKEN = "ya29.test-only-access-token-never-log";
 
 afterEach(() => {
   vi.useRealTimers();
 });
 
 describe("Communication Note encrypted payload GCS private object store", () => {
+  it("performs no authority, network or timer work on cold import", async () => {
+    vi.resetModules();
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+    const timeoutSpy = vi.spyOn(globalThis, "setTimeout");
+    try {
+      const coldModule = await import(
+        "./note-generation-encrypted-payload-gcs-private-object-store.server"
+      );
+      expect(
+        coldModule.CARESLINK_V1_NOTE_GENERATION_GCS_PRIVATE_OBJECT_STORE_READY,
+      ).toBe(false);
+      expect(
+        coldModule.CARESLINK_V1_NOTE_GENERATION_FORMAL_GCS_PRIVATE_OBJECT_STORE,
+      ).toBeUndefined();
+      expect(fetchSpy).not.toHaveBeenCalled();
+      expect(timeoutSpy).not.toHaveBeenCalled();
+    } finally {
+      fetchSpy.mockRestore();
+      timeoutSpy.mockRestore();
+    }
+  });
+
   it("is server-only/default-off and rejects any unproved bucket posture", () => {
     expect(CARESLINK_V1_NOTE_GENERATION_GCS_PRIVATE_OBJECT_STORE_READY).toBe(
       false,
@@ -61,6 +84,15 @@ describe("Communication Note encrypted payload GCS private object store", () => 
       exactBucketLocation: LOCATION,
       exactRuntimePrincipal: RUNTIME_PRINCIPAL,
       exactBackupDispositionVersion: BACKUP_DISPOSITION_VERSION,
+      authorizedOperationDelivery:
+        "SYNCHRONOUS_CALLBACK_DIRECT_RETURN_ONE_LOGICAL_OPERATION",
+      rawCredentialDtoReturned: false,
+      rawAuthorizationHeaderAccepted: false,
+      authorizedSessionRequestCapabilityOnly: true,
+      perAdapterAuthorizedSessionIdentityReplayRejected: true,
+      perAdapterAuthorizedRequestFunctionIdentityReplayRejected: true,
+      callbackResultOpaque: true,
+      callbackPromiseAssimilationAllowed: false,
       conditionalCreateIfGenerationMatch: "0",
       deleteDisposition: "SAME_OBJECT_CAS_TOMBSTONE",
       softDeleteRetentionSecondsRequired: 0,
@@ -165,9 +197,12 @@ describe("Communication Note encrypted payload GCS private object store", () => 
     expect(source).not.toMatch(
       /process\.env|@google-cloud\/storage|node:https|\bfetch\s*\(|console\.|createBucket|model\.generate/i,
     );
+    expect(source).not.toMatch(
+      /\baccessToken\b|authorization\s*:|Bearer\s+\$\{|\bcredentialPort\b|\bhttpsTransport\b|\bgetAccessToken\b|\bcredentialReferenceHash\b/,
+    );
   });
 
-  it("conditionally creates only the derived allowlisted object with CRC32C and injected credentials", async () => {
+  it("conditionally creates only the derived allowlisted object through one tokenless authorized session", async () => {
     const harness = createHarness();
     const adapter = harness.adapter();
     const object = privateObject();
@@ -176,20 +211,50 @@ describe("Communication Note encrypted payload GCS private object store", () => 
       adapter.createIfAbsent({ namespace: namespace(), object }),
     ).resolves.toEqual({ status: "CREATED" });
 
-    expect(harness.credentialRequests).toHaveLength(1);
-    expect(harness.credentialRequests[0]).toMatchObject({
+    expect(harness.authorityRequests).toHaveLength(1);
+    expect(harness.authorityRequests[0]).toMatchObject({
       purpose: "CARESLINK_V1_COMMUNICATION_NOTE_GCS_PRIVATE_OBJECT_OPERATION",
       projectId: PROJECT_ID,
+      bucketLocation: LOCATION,
       runtimePrincipal: RUNTIME_PRINCIPAL,
       audience: "https://storage.googleapis.com/",
       scope: "https://www.googleapis.com/auth/devstorage.read_write",
       bucket: BUCKET,
       requiredPermissionSetHash: expect.stringMatching(/^[a-f0-9]{64}$/),
+      operationTimeoutMs: 30_000,
+      requestTimeoutMs: 5_000,
     });
-    expect(harness.credentialRequests[0].signal).toBeInstanceOf(AbortSignal);
-    expect(harness.credentialRequests[0].signal).not.toBe(
+    expect(Object.getOwnPropertyNames(harness.authorityRequests[0])).toEqual([
+      "purpose",
+      "projectId",
+      "bucketLocation",
+      "runtimePrincipal",
+      "audience",
+      "scope",
+      "bucket",
+      "requiredPermissionSetHash",
+      "operationTimeoutMs",
+      "requestTimeoutMs",
+      "signal",
+    ]);
+    expect(
+      Object.values(
+        Object.getOwnPropertyDescriptors(harness.authorityRequests[0]),
+      ).every(
+        (descriptor) => descriptor.enumerable && "value" in descriptor,
+      ),
+    ).toBe(true);
+    expect(Object.isFrozen(harness.authorityRequests[0])).toBe(true);
+    expect(harness.authorityRequests[0].signal).toBeInstanceOf(AbortSignal);
+    expect(harness.authorityRequests[0].signal).not.toBe(
       harness.controller.signal,
     );
+    expect(JSON.stringify(harness.authorityRequests[0])).not.toMatch(
+      /token|authorization|bearer|credentialReference/i,
+    );
+    expect(harness.sessions).toHaveLength(1);
+    expect(Object.keys(harness.sessions[0])).toEqual(["request"]);
+    expect(Object.isFrozen(harness.sessions[0])).toBe(true);
     const upload = harness.requests[0];
     expect(upload.method).toBe("POST");
     expect(upload.url).toBe(
@@ -197,10 +262,12 @@ describe("Communication Note encrypted payload GCS private object store", () => 
         "bucket,name,generation,metageneration,size,crc32c,contentType,cacheControl,metadata,temporaryHold,eventBasedHold",
       )}`,
     );
-    expect(upload.headers.authorization).toBe(`Bearer ${ACCESS_TOKEN}`);
-    expect(upload.headers["content-type"]).toBe(
+    expect(upload.accept).toBe("application/json");
+    expect(Object.hasOwn(upload, "headers")).toBe(false);
+    expect(upload.contentType).toBe(
       'multipart/related; boundary="===============careslink_m2a_gcs_private_object=="',
     );
+    expect(upload.contentLength).toBe(String(upload.body.byteLength));
     expect(upload.redirect).toBe("ERROR");
     expect(upload.automaticRetries).toBe(0);
     expect(upload.timeoutMs).toBe(5_000);
@@ -326,6 +393,12 @@ describe("Communication Note encrypted payload GCS private object store", () => 
         object: privateObject(),
       }),
     ).resolves.toEqual({ status: "EXISTS", object: privateObject() });
+    expect(harness.authorityRequests).toHaveLength(1);
+    expect(harness.requests).toHaveLength(3);
+    expect(new Set(harness.requestSessionIds).size).toBe(1);
+
+    harness.requests.length = 0;
+    harness.requestSessionIds.length = 0;
     harness.loseNextSuccessfulUploadResponse = true;
 
     await expect(
@@ -334,6 +407,9 @@ describe("Communication Note encrypted payload GCS private object store", () => 
         deleteBindingHash: DELETE_BINDING_HASH,
       }),
     ).resolves.toEqual({ status: "ALREADY_DELETED" });
+    expect(harness.authorityRequests).toHaveLength(2);
+    expect(harness.requests).toHaveLength(5);
+    expect(new Set(harness.requestSessionIds).size).toBe(1);
     await expect(
       adapter.deleteIfBindingMatches({
         namespace: namespace(),
@@ -374,7 +450,7 @@ describe("Communication Note encrypted payload GCS private object store", () => 
       .toHaveLength(0);
   });
 
-  it("fails closed on locator, canonical-body, size, credential and DTO drift without leaking payloads", async () => {
+  it("fails closed on locator, canonical-body, size, authority and DTO drift without leaking payloads", async () => {
     const harness = createHarness();
     const adapter = harness.adapter();
     const object = privateObject();
@@ -414,65 +490,282 @@ describe("Communication Note encrypted payload GCS private object store", () => 
 
     const secret = "participant plaintext must never escape";
     const failureHarness = createHarness();
-    failureHarness.throwEveryRequest = new Error(
-      `${secret}:${ACCESS_TOKEN}:${EXPECTED_OBJECT_NAME}`,
+    failureHarness.authorityFailure = new Error(
+      `${secret}:provider-secret:${EXPECTED_OBJECT_NAME}`,
     );
     const error = await failureHarness.adapter().read(namespace()).catch(
       (caught: unknown) => caught,
     );
     expect(error).toEqual(safeError());
     expect(JSON.stringify(error)).not.toMatch(
-      /participant plaintext|ya29|communication-note\/v1|careslink-m2a-private/,
+      /participant plaintext|provider-secret|communication-note\/v1|careslink-m2a-private/,
     );
+    expect(failureHarness.requests).toHaveLength(0);
 
-    const credentialHarness = createHarness();
-    credentialHarness.credentialOverrides = {
-      runtimePrincipal: "attacker@example.invalid",
-    };
-    await expect(credentialHarness.adapter().read(namespace())).rejects.toEqual(
-      safeError(),
+    const transportFailure = createHarness();
+    transportFailure.throwEveryRequest = new Error(
+      `${secret}:provider-secret:${privateObject().ciphertextBase64url}`,
     );
-    expect(credentialHarness.requests).toHaveLength(0);
-
-    const shortTokenHarness = createHarness();
-    shortTokenHarness.credentialOverrides = {
-      expiresAt: "2026-09-03T03:00:10.000Z",
-    };
-    await expect(shortTokenHarness.adapter().read(namespace())).rejects.toEqual(
-      safeError(),
+    const transportError = await transportFailure
+      .adapter()
+      .createIfAbsent({ namespace: namespace(), object: privateObject() })
+      .catch((caught: unknown) => caught);
+    expect(transportError).toEqual(safeError());
+    expect(JSON.stringify(transportError)).not.toMatch(
+      /participant plaintext|provider-secret|c2VhbGVkLXBheWxvYWQ/,
     );
-    expect(shortTokenHarness.requests).toHaveLength(0);
-
-    const reusedReferenceHarness = createHarness();
-    reusedReferenceHarness.credentialOverrides = {
-      credentialReferenceHash: sha256("fixed-single-use-reference"),
-    };
-    const reusedReferenceAdapter = reusedReferenceHarness.adapter();
-    await expect(reusedReferenceAdapter.read(namespace())).resolves.toEqual({
-      status: "NOT_FOUND",
-    });
-    await expect(reusedReferenceAdapter.read(namespace())).rejects.toEqual(
-      safeError(),
-    );
+    expect(transportFailure.requests[0]?.method).toBe("POST");
+    expect(
+      transportFailure.rawRequestBodies[0]?.every((byte) => byte === 0),
+    ).toBe(true);
   });
 
-  it("enforces credential and HTTPS deadlines even when injected ports hang", async () => {
+  it.each([
+    "NONE",
+    "TWICE",
+    "UNAWAITED",
+    "THEN_BEFORE_RETURN",
+    "PROMISE_RESOLVE_BEFORE_RETURN",
+    "ASYNC_AWAIT",
+    "ASYNC_RETURN",
+    "REJECTED_WRAPPER_WITH_POISONED_CATCH",
+    "DIFFERENT_THENABLE",
+    "DIFFERENT_PROXY",
+    "THROW_AFTER_CALLBACK",
+  ] as const)(
+    "fails before GCS I/O when the authority handshake is %s",
+    async (authorityMode) => {
+      const harness = createHarness();
+      harness.authorityMode = authorityMode;
+      await expect(harness.adapter().read(namespace())).rejects.toEqual(
+        safeError(),
+      );
+      expect(harness.requests).toHaveLength(0);
+      expect(harness.thenableGetterReads).toBe(0);
+      expect(harness.thenableCalls).toBe(0);
+      expect(harness.proxyTrapCount).toBe(0);
+    },
+  );
+
+  it.each([
+    "UNFROZEN",
+    "EXTRA_KEY",
+    "NONFUNCTION",
+    "ACCESSOR",
+    "PROXY",
+    "SAME_AS_AUTHORITY",
+  ] as const)(
+    "rejects an invalid %s authorized session before GCS I/O",
+    async (sessionMode) => {
+      const harness = createHarness();
+      harness.sessionMode = sessionMode;
+      await expect(harness.adapter().read(namespace())).rejects.toEqual(
+        safeError(),
+      );
+      expect(harness.requests).toHaveLength(0);
+      expect(harness.authorityRequests).toHaveLength(1);
+      expect(harness.sessionAccessorReads).toBe(0);
+      expect(harness.proxyTrapCount).toBe(0);
+    },
+  );
+
+  it("makes competing, completed and late authority callbacks inert", async () => {
+    const competing = createHarness();
+    competing.authorityMode = "RETAIN_AFTER_RETURN";
+    const pending = competing.adapter().read(namespace());
+    await Promise.resolve();
+    expect(competing.retainedOperations).toHaveLength(1);
+    const competingAdoption = Promise.resolve(competing.retainedOperations[0]);
+    await expect(pending).rejects.toEqual(safeError());
+    await expect(competingAdoption).resolves.toBeUndefined();
+    expect(competing.requests).toHaveLength(0);
+
+    const completed = createHarness();
+    completed.authorityMode = "RETAIN_AFTER_RETURN";
+    await expect(completed.adapter().read(namespace())).resolves.toEqual({
+      status: "NOT_FOUND",
+    });
+    expect(completed.requests).toHaveLength(1);
+    await expect(
+      Promise.resolve(completed.retainedOperations[0]),
+    ).resolves.toBeUndefined();
+    expect(completed.requests).toHaveLength(1);
+    await expect(
+      Promise.resolve(
+        completed.retainedConsumers[0]?.(completed.sessions[0]),
+      ),
+    ).resolves.toBeUndefined();
+    expect(completed.requests).toHaveLength(1);
+
+    const late = createHarness();
+    late.authorityMode = "LATE_AFTER_RETURN";
+    await expect(late.adapter().read(namespace())).rejects.toEqual(safeError());
+    expect(late.deferredConsumers).toHaveLength(1);
+    await expect(
+      Promise.resolve(late.deferredConsumers[0]?.(late.sessions[0])),
+    ).resolves.toBeUndefined();
+    expect(late.requests).toHaveLength(0);
+  });
+
+  it("uses one isolated authority session per complete logical operation", async () => {
+    const harness = createHarness();
+    const adapter = harness.adapter();
+    await adapter.createIfAbsent({
+      namespace: namespace(),
+      object: privateObject(),
+    });
+    harness.requests.length = 0;
+    harness.requestSessionIds.length = 0;
+    const authorityCount = harness.authorityRequests.length;
+
+    await expect(adapter.read(namespace())).resolves.toMatchObject({
+      status: "FOUND",
+    });
+    expect(harness.authorityRequests).toHaveLength(authorityCount + 1);
+    expect(harness.requests).toHaveLength(2);
+    expect(new Set(harness.requestSessionIds).size).toBe(1);
+    expect(harness.lastAuthoritySignal?.aborted).toBe(true);
+    expect(harness.requests.every((request) => request.signal.aborted)).toBe(
+      true,
+    );
+
+    harness.requests.length = 0;
+    harness.requestSessionIds.length = 0;
+    await Promise.all([adapter.read(namespace()), adapter.read(namespace())]);
+    expect(harness.requests).toHaveLength(4);
+    const concurrentSessionIds = new Set(harness.requestSessionIds);
+    expect(concurrentSessionIds.size).toBe(2);
+    for (const sessionId of concurrentSessionIds) {
+      expect(
+        harness.requestSessionIds.filter((value) => value === sessionId),
+      ).toHaveLength(2);
+    }
+  });
+
+  it("rejects sequential and concurrent session or request-function identity replay", async () => {
+    for (const replayKind of ["SESSION", "REQUEST"] as const) {
+      const sequential = createHarness();
+      if (replayKind === "SESSION") sequential.reuseFirstSession = true;
+      else sequential.reuseFirstRequestFunction = true;
+      const adapter = sequential.adapter();
+      await expect(adapter.read(namespace())).resolves.toEqual({
+        status: "NOT_FOUND",
+      });
+      await expect(adapter.read(namespace())).rejects.toEqual(safeError());
+      expect(sequential.requests).toHaveLength(1);
+
+      const concurrent = createHarness();
+      if (replayKind === "SESSION") concurrent.reuseFirstSession = true;
+      else concurrent.reuseFirstRequestFunction = true;
+      const concurrentAdapter = concurrent.adapter();
+      const results = await Promise.allSettled([
+        concurrentAdapter.read(namespace()),
+        concurrentAdapter.read(namespace()),
+      ]);
+      expect(results.filter((result) => result.status === "fulfilled"))
+        .toHaveLength(1);
+      expect(results.filter((result) => result.status === "rejected"))
+        .toHaveLength(1);
+      expect(concurrent.requests).toHaveLength(1);
+
+      const failed = createHarness();
+      if (replayKind === "SESSION") failed.reuseFirstSession = true;
+      else failed.reuseFirstRequestFunction = true;
+      failed.throwEveryRequest = new Error("transport failure");
+      const failedAdapter = failed.adapter();
+      await expect(failedAdapter.read(namespace())).rejects.toEqual(safeError());
+      expect(failed.requests).toHaveLength(1);
+      failed.throwEveryRequest = undefined;
+      await expect(failedAdapter.read(namespace())).rejects.toEqual(safeError());
+      expect(failed.requests).toHaveLength(1);
+    }
+  });
+
+  it("enforces one 30-second deadline across a multi-request recovery chain", async () => {
+    const harness = createHarness();
+    const adapter = harness.adapter();
+    await adapter.createIfAbsent({
+      namespace: namespace(),
+      object: privateObject(),
+    });
+    harness.resetAuthorityReplayBaseline();
+    harness.requests.length = 0;
+    harness.requestSessionIds.length = 0;
+    harness.rawRequestBodies.length = 0;
+    harness.rawResponseBodies.length = 0;
+    harness.reuseFirstSession = true;
+    harness.loseNextSuccessfulUploadResponse = true;
+    harness.staleNextMediaResponses = 1;
+    harness.delayEveryRequestMs = 4_900;
+
     vi.useFakeTimers();
-    const credentialHarness = createHarness();
-    credentialHarness.hangNextCredential = true;
-    const credentialOperation = credentialHarness.adapter().read(namespace());
-    const credentialRejection = expect(credentialOperation).rejects.toEqual(
+    const operation = adapter.deleteIfBindingMatches({
+      namespace: namespace(),
+      deleteBindingHash: DELETE_BINDING_HASH,
+    });
+    const rejection = expect(operation).rejects.toEqual(safeError());
+    await vi.advanceTimersByTimeAsync(29_999);
+    expect(harness.requests).toHaveLength(7);
+    expect(harness.lastAuthoritySignal?.aborted).toBe(false);
+
+    const timedAuthoritySignal = harness.lastAuthoritySignal;
+    const timedRequestSignal = harness.lastLiveTransportSignal;
+    await vi.advanceTimersByTimeAsync(1);
+    await rejection;
+    expect(timedAuthoritySignal?.aborted).toBe(true);
+    expect(timedRequestSignal?.aborted).toBe(true);
+    expect(
+      harness.rawRequestBodies.every((body) =>
+        body.every((byte) => byte === 0),
+      ),
+    ).toBe(true);
+
+    const requestCount = harness.requests.length;
+    harness.delayEveryRequestMs = 0;
+    await expect(adapter.read(namespace())).rejects.toEqual(safeError());
+    expect(harness.requests).toHaveLength(requestCount);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("propagates root abort before authority access and during a non-empty upload", async () => {
+    const beforeAuthority = createHarness();
+    beforeAuthority.controller.abort("secret abort reason");
+    await expect(beforeAuthority.adapter().read(namespace())).rejects.toEqual(
       safeError(),
     );
-    await vi.advanceTimersByTimeAsync(5_001);
-    await credentialRejection;
-    expect(credentialHarness.lastCredentialSignal?.aborted).toBe(true);
-    expect(credentialHarness.requests).toHaveLength(0);
+    expect(beforeAuthority.authorityRequests).toHaveLength(0);
 
+    const duringUpload = createHarness();
+    duringUpload.hangNextRequest = true;
+    const pending = duringUpload.adapter().createIfAbsent({
+      namespace: namespace(),
+      object: privateObject(),
+    });
+    await vi.waitFor(() => {
+      expect(duringUpload.rawRequestBodies).toHaveLength(1);
+    });
+    expect(duringUpload.rawRequestBodies[0]?.some((byte) => byte !== 0)).toBe(
+      true,
+    );
+    duringUpload.controller.abort("secret abort reason");
+    await expect(pending).rejects.toEqual(safeError());
+    expect(
+      duringUpload.rawRequestBodies[0]?.every((byte) => byte === 0),
+    ).toBe(true);
+    expect(duringUpload.lastLiveTransportSignal?.aborted).toBe(true);
+  });
+
+  it("enforces HTTPS deadlines and clears late request and response bytes", async () => {
+    vi.useFakeTimers();
     const harness = createHarness();
     harness.hangNextRequest = true;
-    const operation = harness.adapter().read(namespace());
+    const operation = harness.adapter().createIfAbsent({
+      namespace: namespace(),
+      object: privateObject(),
+    });
     const rejection = expect(operation).rejects.toEqual(safeError());
+    await vi.advanceTimersByTimeAsync(0);
+    expect(harness.rawRequestBodies[0]?.some((byte) => byte !== 0)).toBe(true);
     await vi.advanceTimersByTimeAsync(5_001);
 
     await rejection;
@@ -485,8 +778,15 @@ describe("Communication Note encrypted payload GCS private object store", () => 
 
     const lateHarness = createHarness();
     lateHarness.returnNextResponseAfterTimeout = true;
-    const lateOperation = lateHarness.adapter().read(namespace());
+    const lateOperation = lateHarness.adapter().createIfAbsent({
+      namespace: namespace(),
+      object: privateObject(),
+    });
     const lateRejection = expect(lateOperation).rejects.toEqual(safeError());
+    await vi.advanceTimersByTimeAsync(0);
+    expect(lateHarness.rawRequestBodies[0]?.some((byte) => byte !== 0)).toBe(
+      true,
+    );
     await vi.advanceTimersByTimeAsync(5_001);
     await lateRejection;
     expect(lateHarness.lateResponseBody).toBeDefined();
@@ -494,6 +794,24 @@ describe("Communication Note encrypted payload GCS private object store", () => 
     lateHarness.resolveLateResponse?.();
     await vi.advanceTimersByTimeAsync(0);
     expect(lateHarness.lateResponseBody?.every((byte) => byte === 0)).toBe(true);
+
+    const lateRejectionHarness = createHarness();
+    lateRejectionHarness.returnNextResponseAfterTimeout = true;
+    lateRejectionHarness.rejectLateResponse = true;
+    const lateRejectedOperation = lateRejectionHarness
+      .adapter()
+      .createIfAbsent({
+        namespace: namespace(),
+        object: privateObject(),
+      });
+    const expectedLateRejection = expect(
+      lateRejectedOperation,
+    ).rejects.toEqual(safeError());
+    await vi.advanceTimersByTimeAsync(5_001);
+    await expectedLateRejection;
+    lateRejectionHarness.resolveLateResponse?.();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(vi.getTimerCount()).toBe(0);
   });
 });
 
@@ -506,9 +824,41 @@ type StoredObject = {
   metadata: Record<string, string>;
 };
 
-type RequestSnapshot = Omit<CaresLinkV1NoteGenerationGcsHttpsRequest, "body"> & {
-  body: Uint8Array;
-};
+type RequestSnapshot = Omit<
+  CaresLinkV1NoteGenerationGcsAuthorizedHttpsRequest,
+  "body"
+> & { body: Uint8Array };
+
+type AuthorityMode =
+  | "ONCE"
+  | "NONE"
+  | "TWICE"
+  | "UNAWAITED"
+  | "THEN_BEFORE_RETURN"
+  | "PROMISE_RESOLVE_BEFORE_RETURN"
+  | "ASYNC_AWAIT"
+  | "ASYNC_RETURN"
+  | "REJECTED_WRAPPER_WITH_POISONED_CATCH"
+  | "DIFFERENT_THENABLE"
+  | "DIFFERENT_PROXY"
+  | "THROW_AFTER_CALLBACK"
+  | "RETAIN_AFTER_RETURN"
+  | "LATE_AFTER_RETURN";
+
+type SessionMode =
+  | "VALID"
+  | "UNFROZEN"
+  | "EXTRA_KEY"
+  | "NONFUNCTION"
+  | "ACCESSOR"
+  | "PROXY"
+  | "SAME_AS_AUTHORITY";
+
+type AuthorizedSession = Readonly<{
+  request(
+    input: CaresLinkV1NoteGenerationGcsAuthorizedHttpsRequest,
+  ): PromiseLike<unknown>;
+}>;
 
 type HarnessOptionsOverrides = Readonly<{
   policy?: Readonly<Record<string, unknown>>;
@@ -518,29 +868,51 @@ type HarnessOptionsOverrides = Readonly<{
 function createHarness() {
   const controller = new AbortController();
   const requests: RequestSnapshot[] = [];
+  const requestSessionIds: number[] = [];
   const rawRequestBodies: Uint8Array[] = [];
   const rawResponseBodies: Uint8Array[] = [];
-  const credentialRequests: Array<Record<string, unknown>> = [];
+  const authorityRequests: CaresLinkV1NoteGenerationGcsAuthorizedOperationRequest[] = [];
+  const sessions: AuthorizedSession[] = [];
+  const deferredConsumers: CaresLinkV1NoteGenerationGcsAuthorizedOperationConsumer[] = [];
+  const retainedConsumers: CaresLinkV1NoteGenerationGcsAuthorizedOperationConsumer[] = [];
+  const retainedOperations: ReturnType<CaresLinkV1NoteGenerationGcsAuthorizedOperationConsumer>[] = [];
   const objects = new Map<string, StoredObject>();
   let nextGeneration = 1;
-  let credentialOrdinal = 0;
+  let nextSessionId = 1;
+  let firstSession: AuthorizedSession | undefined;
+  let firstRequestFunction: AuthorizedSession["request"] | undefined;
 
   const harness = {
     controller,
     requests,
+    requestSessionIds,
     rawRequestBodies,
     rawResponseBodies,
-    credentialRequests,
+    authorityRequests,
+    sessions,
+    deferredConsumers,
+    retainedConsumers,
+    retainedOperations,
     objects,
+    authorityMode: "ONCE" as AuthorityMode,
+    sessionMode: "VALID" as SessionMode,
+    authorityFailure: undefined as Error | undefined,
+    thenableGetterReads: 0,
+    thenableCalls: 0,
+    sessionAccessorReads: 0,
+    proxyTrapCount: 0,
+    reuseFirstSession: false,
+    reuseFirstRequestFunction: false,
     loseNextSuccessfulUploadResponse: false,
+    staleNextMediaResponses: 0,
+    delayEveryRequestMs: 0,
     hangNextRequest: false,
     returnNextResponseAfterTimeout: false,
+    rejectLateResponse: false,
     lateResponseBody: undefined as Uint8Array | undefined,
     resolveLateResponse: undefined as (() => void) | undefined,
     throwEveryRequest: undefined as Error | undefined,
-    credentialOverrides: undefined as Record<string, unknown> | undefined,
-    hangNextCredential: false,
-    lastCredentialSignal: undefined as AbortSignal | undefined,
+    lastAuthoritySignal: undefined as AbortSignal | undefined,
     lastLiveTransportSignal: undefined as AbortSignal | undefined,
     options(overrides: HarnessOptionsOverrides = {}) {
       const policy = {
@@ -585,8 +957,7 @@ function createHarness() {
         policy,
         bucketPostureAttestation,
         clock: () => NOW,
-        credentialPort,
-        httpsTransport,
+        authorizedOperationPort,
         signal: controller.signal,
       };
     },
@@ -605,52 +976,26 @@ function createHarness() {
       stored.crc32c = crc32cBase64(stored.body);
       stored.metadata.careslinkBodySha256 = sha256(stored.body);
     },
+    resetAuthorityReplayBaseline() {
+      firstSession = undefined;
+      firstRequestFunction = undefined;
+    },
   };
 
-  const credentialPort = Object.freeze({
-    getAccessToken: vi.fn(async (input: unknown) => {
-      const signal = (input as { signal: AbortSignal }).signal;
-      harness.lastCredentialSignal = signal;
-      const request = structuredCloneWithoutSignal(
-        input as Record<string, unknown>,
-      );
-      credentialRequests.push(request);
-      if (harness.hangNextCredential) {
-        harness.hangNextCredential = false;
-        return new Promise((_resolve, reject) => {
-          signal.addEventListener(
-            "abort",
-            () => reject(new Error("credential port observed abort")),
-            { once: true },
-          );
-        });
-      }
-      credentialOrdinal += 1;
-      return Object.freeze({
-        purpose:
-          "CARESLINK_V1_COMMUNICATION_NOTE_GCS_PRIVATE_OBJECT_OPERATION",
-        projectId: PROJECT_ID,
-        runtimePrincipal: RUNTIME_PRINCIPAL,
-        accessToken: ACCESS_TOKEN,
-        issuedAt: "2026-09-03T02:59:30.000Z",
-        expiresAt: "2026-09-03T03:30:00.000Z",
-        bucket: BUCKET,
-        requiredPermissionSetHash: (
-          input as { requiredPermissionSetHash: string }
-        ).requiredPermissionSetHash,
-        credentialReferenceHash: sha256(
-          `credential-reference-${credentialOrdinal}`,
-        ),
-        ...harness.credentialOverrides,
-      });
-    }),
-  });
-
-  const httpsTransport = Object.freeze({
-    request: vi.fn(async (request: CaresLinkV1NoteGenerationGcsHttpsRequest) => {
+  const executeAuthorizedRequest = vi.fn(async (
+    request: CaresLinkV1NoteGenerationGcsAuthorizedHttpsRequest,
+    sessionId: number,
+  ) => {
       rawRequestBodies.push(request.body);
       harness.lastLiveTransportSignal = request.signal;
       requests.push({ ...request, body: Uint8Array.from(request.body) });
+      requestSessionIds.push(sessionId);
+      if (harness.delayEveryRequestMs > 0) {
+        await waitForRequestDelay(
+          harness.delayEveryRequestMs,
+          request.signal,
+        );
+      }
       if (harness.throwEveryRequest) throw harness.throwEveryRequest;
       if (harness.hangNextRequest) {
         harness.hangNextRequest = false;
@@ -667,8 +1012,12 @@ function createHarness() {
         const body = encoder.encode("late transport response must be cleared");
         harness.lateResponseBody = body;
         rawResponseBodies.push(body);
-        return new Promise((resolve) => {
-          harness.resolveLateResponse = () =>
+        return new Promise((resolve, reject) => {
+          harness.resolveLateResponse = () => {
+            if (harness.rejectLateResponse) {
+              reject(new Error("late transport rejection"));
+              return;
+            }
             resolve(
               Object.freeze({
                 status: 500,
@@ -678,6 +1027,7 @@ function createHarness() {
                 body,
               }),
             );
+          };
         });
       }
       const url = new URL(request.url);
@@ -724,6 +1074,10 @@ function createHarness() {
       const current = objects.get(objectName);
       if (!current) return trackResponse(response(request.url, 404, {}));
       if (url.searchParams.get("alt") === "media") {
+        if (harness.staleNextMediaResponses > 0) {
+          harness.staleNextMediaResponses -= 1;
+          return trackResponse(response(request.url, 412, {}));
+        }
         if (
           url.searchParams.get("generation") !== current.generation ||
           url.searchParams.get("ifGenerationMatch") !== current.generation ||
@@ -741,7 +1095,154 @@ function createHarness() {
         }));
       }
       return trackResponse(metadataResponse(request.url, current));
-    }),
+    });
+
+  const consumeAuthorizedOperation = (
+    input: CaresLinkV1NoteGenerationGcsAuthorizedOperationRequest,
+    consumer: CaresLinkV1NoteGenerationGcsAuthorizedOperationConsumer,
+  ) => {
+      authorityRequests.push(input);
+      harness.lastAuthoritySignal = input.signal;
+      if (harness.authorityFailure) throw harness.authorityFailure;
+
+      const sessionId = nextSessionId;
+      nextSessionId += 1;
+      const freshRequest = (
+          request: CaresLinkV1NoteGenerationGcsAuthorizedHttpsRequest,
+        ) => executeAuthorizedRequest(request, sessionId);
+      const request =
+        harness.reuseFirstRequestFunction && firstRequestFunction
+          ? firstRequestFunction
+          : freshRequest;
+      if (firstRequestFunction === undefined) firstRequestFunction = request;
+      const freshSession = Object.freeze({ request });
+      const reusableSession =
+        harness.reuseFirstSession && firstSession
+          ? firstSession
+          : freshSession;
+      if (firstSession === undefined) firstSession = reusableSession;
+      let session: unknown = reusableSession;
+      if (harness.sessionMode === "UNFROZEN") {
+        session = { request };
+      } else if (harness.sessionMode === "EXTRA_KEY") {
+        session = Object.freeze({ request, extra: true });
+      } else if (harness.sessionMode === "NONFUNCTION") {
+        session = Object.freeze({ request: "not-callable" });
+      } else if (harness.sessionMode === "ACCESSOR") {
+        const accessorSession = Object.defineProperty({}, "request", {
+          enumerable: true,
+          get() {
+            harness.sessionAccessorReads += 1;
+            return request;
+          },
+        });
+        session = Object.freeze(accessorSession);
+      } else if (harness.sessionMode === "PROXY") {
+        session = new Proxy(freshSession, {
+          get(target, property, receiver) {
+            harness.proxyTrapCount += 1;
+            return Reflect.get(target, property, receiver);
+          },
+          getPrototypeOf(target) {
+            harness.proxyTrapCount += 1;
+            return Reflect.getPrototypeOf(target);
+          },
+          ownKeys(target) {
+            harness.proxyTrapCount += 1;
+            return Reflect.ownKeys(target);
+          },
+        });
+      } else if (harness.sessionMode === "SAME_AS_AUTHORITY") {
+        session = Object.freeze({ request: consumeAuthorizedOperation });
+      }
+      if (harness.sessionMode === "VALID") sessions.push(reusableSession);
+
+      if (harness.authorityMode === "NONE") return Promise.resolve();
+      if (harness.authorityMode === "UNAWAITED") {
+        void consumer(session);
+        return Promise.resolve();
+      }
+      if (harness.authorityMode === "LATE_AFTER_RETURN") {
+        deferredConsumers.push(consumer);
+        return new Promise<never>(() => undefined);
+      }
+
+      const operation = consumer(session);
+      if (harness.authorityMode === "THEN_BEFORE_RETURN") {
+        void operation.then(
+          () => undefined,
+          () => undefined,
+        );
+        return operation;
+      }
+      if (harness.authorityMode === "PROMISE_RESOLVE_BEFORE_RETURN") {
+        const assimilation = Promise.resolve(operation);
+        void assimilation.catch(() => undefined);
+        return operation;
+      }
+      if (harness.authorityMode === "ASYNC_AWAIT") {
+        return (async () => {
+          await operation;
+        })();
+      }
+      if (harness.authorityMode === "ASYNC_RETURN") {
+        return (async () => operation)();
+      }
+      if (
+        harness.authorityMode ===
+        "REJECTED_WRAPPER_WITH_POISONED_CATCH"
+      ) {
+        const rejected = Promise.reject(
+          new Error("REJECTED_AUTHORITY_WRAPPER_TEST_ONLY"),
+        );
+        Object.defineProperty(rejected, "catch", {
+          configurable: false,
+          enumerable: false,
+          get() {
+            throw new Error("POISONED_CATCH_TEST_ONLY");
+          },
+        });
+        return rejected;
+      }
+      if (harness.authorityMode === "DIFFERENT_THENABLE") {
+        return Object.freeze(
+          Object.defineProperty({}, "then", {
+            enumerable: true,
+            get() {
+              harness.thenableGetterReads += 1;
+              return () => {
+                harness.thenableCalls += 1;
+              };
+            },
+          }),
+        );
+      }
+      if (harness.authorityMode === "DIFFERENT_PROXY") {
+        return new Proxy(Object.freeze({ then: () => undefined }), {
+          get(target, property, receiver) {
+            harness.proxyTrapCount += 1;
+            return Reflect.get(target, property, receiver);
+          },
+          getPrototypeOf(target) {
+            harness.proxyTrapCount += 1;
+            return Reflect.getPrototypeOf(target);
+          },
+        });
+      }
+      if (harness.authorityMode === "THROW_AFTER_CALLBACK") {
+        throw new Error("AUTHORITY_THROW_AFTER_CALLBACK_TEST_ONLY");
+      }
+      if (harness.authorityMode === "RETAIN_AFTER_RETURN") {
+        retainedConsumers.push(consumer);
+        retainedOperations.push(operation);
+      }
+      if (harness.authorityMode === "TWICE") {
+        void consumer(session);
+      }
+      return operation;
+    };
+  const authorizedOperationPort = Object.freeze({
+    consumeAuthorizedOperation,
   });
 
   function trackResponse<T extends Readonly<{ body: Uint8Array }>>(value: T) {
@@ -750,6 +1251,24 @@ function createHarness() {
   }
 
   return harness;
+}
+
+function waitForRequestDelay(milliseconds: number, signal: AbortSignal) {
+  return new Promise<void>((resolve, reject) => {
+    let settled = false;
+    const finish = (error?: Error) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      signal.removeEventListener("abort", onAbort);
+      if (error) reject(error);
+      else resolve();
+    };
+    const onAbort = () => finish(new Error("request delay observed abort"));
+    const timer = setTimeout(() => finish(), milliseconds);
+    signal.addEventListener("abort", onAbort, { once: true });
+    if (signal.aborted) onAbort();
+  });
 }
 
 function metadataResponse(url: string, stored: StoredObject) {
@@ -786,11 +1305,10 @@ function objectNameFromUrl(url: URL) {
 }
 
 function parseMultipart(request: Readonly<{
-  headers: Readonly<Record<string, string>>;
+  contentType?: string;
   body: Uint8Array;
 }>) {
-  const contentType = request.headers["content-type"];
-  const boundary = contentType?.match(
+  const boundary = request.contentType?.match(
     /^multipart\/related; boundary="([^"]+)"$/,
   )?.[1];
   if (!boundary) throw new Error("missing multipart boundary");
@@ -859,15 +1377,6 @@ function namespace(overrides: Partial<{
     idempotencyHash: IDEMPOTENCY_HASH,
     ...overrides,
   };
-}
-
-function structuredCloneWithoutSignal(value: Record<string, unknown>) {
-  return Object.fromEntries(
-    Object.entries(value).map(([key, child]) => [
-      key,
-      child instanceof AbortSignal ? child : structuredClone(child),
-    ]),
-  );
 }
 
 function canonicalSha256(value: unknown) {

@@ -18,6 +18,10 @@ adapters, but does not install them in the product runtime.
 
 This checkpoint is implementation evidence for local source contracts only.
 It is not cloud-posture, Hosted Preview, deployment or activation evidence.
+The GCS credential-handoff description below records the historical M2a
+checkpoint. M2c later replaced that raw-token DTO with a tokenless
+authorized-operation handoff; see
+`documentation/communication-note-secure-submission-gcs-authority-handoff-m2c.md`.
 
 ## Exact-version Google Cloud KMS wrapping
 
