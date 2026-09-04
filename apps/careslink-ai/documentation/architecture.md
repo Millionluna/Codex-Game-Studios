@@ -160,9 +160,10 @@ formal singletons are `undefined`, readiness is `false`, and only an explicit
 `TEST_ONLY` capability can run the source seam. Tests mock provider/HTTPS work;
 there is no live evidence, cloud call/resource, route/worker composition,
 Preview deployment, Production change, real care data or model call. M2c later
-removed the GCS raw-token DTO from the object-store source boundary, but a
-private GCS authority/owned transport and independent WIF/IAM/KMS and bucket
-control-plane attestation remain future gates. See
+removed the GCS raw-token DTO from the object-store source boundary, and M2d
+later supplies its source-only private GCS authority/owned transport. Live
+composition and independent WIF/IAM/KMS and bucket control-plane attestation
+remain future gates. See
 `documentation/communication-note-secure-submission-provider-trust-m2b.md`.
 
 ### Google Cloud Storage authority handoff M2c — source only
@@ -189,6 +190,44 @@ Production change, real care data or model call belongs to M2c. See
 The local gate passed 50/50 focused tests across 2 files and 3240/3240 complete
 tests across 224 files, plus TypeScript, zero-warning ESLint, the 64/64-page
 production build, 27-chunk client-boundary scan, adapter sync and diff checks.
+
+### Google Cloud Storage private authority M2d — source only
+
+M2d adds two server-only source modules under versions
+`google-cloud-gcs-private-authority.communication-note.2026-09-04.m2d.v1`
+and `google-cloud-gcs-https-transport.communication-note.2026-09-04.m2d.v1`.
+The authority privately prepares an independently requested GCS-scoped
+service-account credential, retains it behind an opaque one-use handle and
+projects only an M2c tokenless authorized-operation port. The GCS-specific Node
+HTTPS transport owns the private authorization header and admits only the exact
+metadata, direct generation-pinned media and multipart-upload profiles needed
+by one complete M2c logical operation.
+
+The source contract binds upstream expiry, root/operation/request abort,
+single-use identity, exact bucket/prefix and permission set, five-second request
+bounds, one authority-owned 30-second logical deadline, public-only pinned DNS
+with Google-published IPv6-prefix admission plus connected-peer recheck,
+TLS/server-name verification before secret commit, no
+redirect/retry/proxy/compression, response caps and late byte cleanup. The M2c
+adapter remains unaware of credentials and M2d; only the private authority may
+import its contract and the M2d GCS transport. The authority separately reuses
+M2b's owned provider-protocol HTTPS transport for the Vercel-to-STS-to-IAM
+identity exchange only; it does not compose the M2b KMS trust handle.
+
+Both M2d readiness latches remain `false`, both formal exports remain
+`undefined`, and the formal preparation path fails before OIDC or network work.
+The authority's executable preparation seam is explicitly `TEST_ONLY`, and the
+transport factory remains quarantined to that authority and source tests.
+Provider, DNS, TLS and HTTPS boundaries are mocked. This is not live
+Vercel/Google authentication, WIF/IAM, bucket-posture, network, Preview,
+deployment or activation evidence. The final same-revision local gate passed
+25/25 M2d tests across 2 files, 105/105 focused regressions across 5 files and
+3265/3265 complete tests across 226 files, plus TypeScript, zero-warning ESLint,
+the 64/64-page Next.js 16.2.9 Turbopack production build, 27-chunk client scan,
+73-file adapter sync and diff check. The first sandboxed build attempt hit a
+temporary-local-port permission restriction; the permitted rerun passed, so it
+was not a code failure. See
+`documentation/communication-note-secure-submission-gcs-private-authority-m2d.md`.
 
 ### PostgreSQL 16.15 local isolated gate — 2026-08-24
 
@@ -495,8 +534,9 @@ The contract/domain/schema portion and a feature-flagged NDIS dual-write/shadow-
   source path to owned HTTPS, pinned WIF/service-account exchange and
   authenticated exact parent/version reads, but remains TestOnly with mocked
   provider evidence. M2c removes the GCS raw-token DTO/header from the adapter
-  source boundary, but private credential authority, owned GCS transport, live
-  IAM/resource attestation, bucket propagation and historical-copy purge evidence, independently
+  source boundary, and M2d adds a default-off source authority plus owned GCS
+  transport. Their formal exports remain absent; live IAM/resource attestation,
+  bucket propagation and historical-copy purge evidence, independently
   observed database quiescence, no-data Hosted proof, worker vault grant and
   separate activation approvals remain absent.
 - On deleted `r9`, the security advisor returned 26 global findings (23 INFO, 3 WARN for pre-existing public authenticated-executable `get`/`list`/`pull` security-definer functions) and zero generation findings; see the [security-definer executable remediation](https://supabase.com/docs/guides/database/database-linter?lint=0029_authenticated_security_definer_function_executable). The performance advisor returned 155 global findings (144 INFO, 11 WARN); generation scope contained 20 INFO only—14 [unindexed composite foreign keys](https://supabase.com/docs/guides/database/database-linter?lint=0001_unindexed_foreign_keys) and 6 [unused fresh indexes](https://supabase.com/docs/guides/database/database-linter?lint=0005_unused_index)—with zero generation WARN/ERROR. This is not an all-project green result; no mechanical bulk index addition was made, and zero-row unused-index findings are not runtime-usage evidence.
@@ -519,6 +559,7 @@ There is no app-owned email delivery service, push service, deployed queue worke
 - `documentation/communication-note-secure-submission-runtime-m1z.md` - current source-only encrypted staging, policy-bound admission and maintenance boundary.
 - `documentation/communication-note-secure-submission-provider-trust-m2b.md` - default-off WIF, owned HTTPS and authenticated exact-version KMS source boundary.
 - `documentation/communication-note-secure-submission-gcs-authority-handoff-m2c.md` - tokenless, one-logical-operation GCS source handoff and remaining provider/bucket trust gates.
+- `documentation/communication-note-secure-submission-gcs-private-authority-m2d.md` - default-off private GCS authority, GCS-only HTTPS source transport and remaining live trust gates.
 - `documentation/seo.md` - public Companion indexing boundary.
 - `documentation/v1-implementation-readiness-audit.zh.md` - requirement map, implementation delta and approval gates.
 - `documentation/prd.md` - historical NDIS pilot decision with V1 baseline precedence.

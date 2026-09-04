@@ -92,6 +92,8 @@ describe("V1 shadow runtime boundary", () => {
       "src/lib/v1/communication-note-preview-product-runtime-supabase-management-bridge.server.ts",
       "src/lib/v1/communication-note-points-admission-purpose-caller.server.ts",
       "src/lib/v1/note-generation-encrypted-payload-gcs-private-object-store.server.ts",
+      "src/lib/v1/note-generation-google-cloud-gcs-https-transport-m2d.server.ts",
+      "src/lib/v1/note-generation-google-cloud-gcs-private-authority-m2d.server.ts",
       "src/lib/v1/note-generation-google-cloud-kms-wrap-adapter.server.ts",
       "src/lib/v1/native-auth-boundary.server.ts",
       "src/lib/v1/openai-communication-note-provider.server.ts",
@@ -1279,13 +1281,32 @@ describe("V1 shadow runtime boundary", () => {
     }
   });
 
-  it("keeps the M2c GCS authorized-operation adapter outside product runtime composition", () => {
-    const importers = walkSourceFiles("src").filter((file) =>
+  it("quarantines the M2c GCS contract and M2d authority/transport outside product runtime composition", () => {
+    const authority = join(
+      process.cwd(),
+      "src/lib/v1/note-generation-google-cloud-gcs-private-authority-m2d.server.ts",
+    );
+    const sourceFiles = walkSourceFiles("src");
+    const m2cContractImporters = sourceFiles.filter((file) =>
       readFileSync(file, "utf8").includes(
         "note-generation-encrypted-payload-gcs-private-object-store.server",
       ),
     );
-    expect(importers).toEqual([]);
+    expect(m2cContractImporters).toEqual([authority]);
+
+    const transportImporters = sourceFiles.filter((file) =>
+      readFileSync(file, "utf8").includes(
+        "note-generation-google-cloud-gcs-https-transport-m2d.server",
+      ),
+    );
+    expect(transportImporters).toEqual([authority]);
+
+    const authorityImporters = sourceFiles.filter((file) =>
+      readFileSync(file, "utf8").includes(
+        "note-generation-google-cloud-gcs-private-authority-m2d.server",
+      ),
+    );
+    expect(authorityImporters).toEqual([]);
   });
 });
 

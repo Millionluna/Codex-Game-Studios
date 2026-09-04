@@ -29,6 +29,10 @@ const forbiddenMarkers = [
   "google-cloud-kms-wrap.communication-note.2026-09-03.m2a.v1",
   "gcs-private-object-store.communication.2026-09-03.m2a.v1",
   "gcs-private-object-store.communication.2026-09-03.m2c.v1",
+  "google-cloud-gcs-https-transport.communication-note.2026-09-04.m2d.v1",
+  "SOURCE_GCS_HTTPS_TRANSPORT_NOT_COMPOSED",
+  "google-cloud-gcs-private-authority.communication-note.2026-09-04.m2d.v1",
+  "SOURCE_GCS_PRIVATE_AUTHORITY_NOT_COMPOSED",
   "binding.communication.openai.synthetic-preview.2026-09-03.m2a.v1",
   "provider-https-transport.communication-note.2026-09-03.m2b.v1",
   "SOURCE_TRANSPORT_NOT_COMPOSED",
@@ -37,25 +41,25 @@ const forbiddenMarkers = [
 ];
 
 if (!existsSync(buildIdPath) || !existsSync(chunksRoot)) {
-  throw new Error("M1r/M1s/M1t/M1u/M1v/M2a/M2b/M2c client-boundary check requires a completed Next.js build");
+  throw new Error("M1r/M1s/M1t/M1u/M1v/M2a/M2b/M2c/M2d client-boundary check requires a completed Next.js build");
 }
 
 const chunkFiles = walkFiles(chunksRoot).filter((file) =>
   [".js", ".mjs", ".json", ".map"].includes(extname(file)),
 );
 if (chunkFiles.length === 0) {
-  throw new Error("M1r/M1s/M1t/M1u/M1v/M2a/M2b/M2c client-boundary check found no static chunk files");
+  throw new Error("M1r/M1s/M1t/M1u/M1v/M2a/M2b/M2c/M2d client-boundary check found no static chunk files");
 }
 for (const file of chunkFiles) {
   const source = readFileSync(file, "utf8");
   const marker = forbiddenMarkers.find((candidate) => source.includes(candidate));
   if (marker) {
-      throw new Error(`M1r/M1s/M1t/M1u/M1v/M2a/M2b/M2c server-only marker leaked into client chunk: ${marker}`);
+      throw new Error(`M1r/M1s/M1t/M1u/M1v/M2a/M2b/M2c/M2d server-only marker leaked into client chunk: ${marker}`);
   }
 }
 
 process.stdout.write(
-  `M1r/M1s/M1t/M1u/M1v/M2a/M2b/M2c client boundary passed across ${chunkFiles.length} static chunk files.\n`,
+  `M1r/M1s/M1t/M1u/M1v/M2a/M2b/M2c/M2d client boundary passed across ${chunkFiles.length} static chunk files.\n`,
 );
 
 function walkFiles(directory) {

@@ -106,7 +106,17 @@ zero-warning ESLint, the optimized Next.js 16.2.9 Turbopack build with 64/64
 generated pages, the 27-static-chunk M1r–M2c client-boundary scan, 73-file
 adapter sync and diff checks also passed.
 
-## Remaining implementation and approval gates
+## Successor checkpoint
+
+M2d later adds a source-only private GCS authority and GCS-specific owned HTTPS
+transport while preserving this tokenless M2c adapter contract. That successor
+addresses only the source-implementation portion of the first gate below. It
+does not retroactively turn this M2c evidence into live Google identity, IAM,
+DNS/TLS, bucket, Preview, deployment or activation evidence. The M2c counts
+above remain the historical results for this exact checkpoint; M2d results are
+recorded separately in the M2d note from its final same-revision validation.
+
+## Remaining implementation and approval gates at the M2c checkpoint
 
 Before formal composition, all of the following remain required:
 

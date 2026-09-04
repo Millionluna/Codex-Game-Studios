@@ -3685,9 +3685,11 @@ operation, while concurrent top-level operations use isolated sessions.
 Root/request abort, the 30-second whole-operation bound across a seven-request
 recovery chain, non-empty multipart timeout cleanup, transport-error redaction,
 late fulfilled/rejected response observation and mutable byte clearing are
-exercised. Runtime-boundary tests prove there is no non-test
-source importer, and the post-build scanner retains the historical M2a marker
-while adding the M2c version marker.
+exercised. At this checkpoint, runtime-boundary tests proved there was no
+non-test source importer, and the post-build scanner retained the historical
+M2a marker while adding the M2c version marker. M2d later permits only its
+private-authority module to import the M2c contract; product composition remains
+excluded.
 
 The focused gate passed **50/50 tests across 2 files**. The complete local
 Vitest suite passed **3240/3240 tests across 224 files**. TypeScript, full
@@ -3704,6 +3706,60 @@ that adapter boundary; they cannot detect a fresh wrapper around an underlying
 credential/capability or reuse across separate adapter instances. The future
 private authority must enforce that lifecycle. Formal readiness and activation remain closed. See
 `documentation/communication-note-secure-submission-gcs-authority-handoff-m2c.md`.
+
+### Communication Note GCS private authority M2d — source/build evidence
+
+M2d adds a server-only private authority and GCS-specific Node HTTPS transport
+for the M2c tokenless authorized-operation contract. The authority source binds
+the exact Preview identity, custom audience, Google STS and pinned service
+account chain, GCS audience/scope, bucket/prefix, permission hash, upstream
+expiry and root signal. It keeps the operation credential behind a private
+one-use handle and projects only a tokenless authorized-operation port. Each
+top-level logical operation requires a separately prepared GCS credential and
+the exact synchronous direct-return M2c callback.
+
+The focused gate covers cold import, `READY=false`, `undefined`
+formal exports and fixed-failure formal preparation before OIDC/network work;
+the exact frozen authority request and tokenless outward projection; wrong
+identity/resource/expiry inputs; clone, proxy, spread, replay and concurrent
+consumption; root/operation/request abort; success, failure, timeout and late
+cleanup; and fixed content-free errors. It must also cover an M2c multi-request
+recovery operation using one fresh session and a new session for every
+top-level operation.
+
+The transport gate covers exact `storage.googleapis.com` metadata, direct
+generation-pinned media and multipart-upload endpoint/method/query/header/body
+and `200`/`404`/`412` status profiles; public-only all-address DNS preflight,
+Google-published IPv6-prefix admission, request-pinned resolution, public
+connected-peer recheck and TLS/server-name
+verification before private header/body commit; redirect/retry/proxy/compression
+denial; five-second request and 30-second logical-operation bounds; response
+caps, late fulfill/reject handling and mutable-byte clearing. Static tests must
+keep the M2c store contract and M2d transport limited to the M2d authority and
+prove the authority has no non-test product importer. The M2b provider-protocol
+transport importer set must contain only the historical M2b KMS trust module
+and this M2d authority; that reuse covers identity exchange, not M2b KMS trust
+composition. The post-build scanner must retain M2a/M2c markers and reject both
+M2d version/status marker pairs.
+
+The final same-revision gate passed **25/25 M2d tests across 2 files** (13
+authority and 12 transport), **105/105 focused regression tests across 5
+files**, and **3265/3265 complete Vitest tests across 226 files**. TypeScript and
+full ESLint with `--max-warnings=0` passed. The Next.js 16.2.9 Turbopack
+production build generated 64/64 pages, the client-boundary scan passed across
+27 static chunks, and Codex adapter sync passed across 73 files. The
+`git diff --check` command also passed. The first sandboxed build attempt was
+denied when Next tried to
+bind a temporary local port; the elevated local rerun succeeded, confirming an
+environment restriction rather than a code failure.
+
+Provider, DNS, TLS and HTTPS boundaries are mocked in this source gate. Passing
+it does not establish live Vercel or Google token
+acceptance, WIF/impersonation/KMS/bucket IAM, authenticated bucket posture or
+history, a real network/GCS result, Preview, billing, deployment, Production,
+real-care-data or model-call evidence. Both M2d readiness latches and the M2c
+store readiness remain `false`; formal exports remain `undefined`. See
+`documentation/communication-note-secure-submission-gcs-private-authority-m2d.md`.
 
 ### Current live/read-only evidence
 
