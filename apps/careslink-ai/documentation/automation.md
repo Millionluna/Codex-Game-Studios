@@ -1342,7 +1342,12 @@ The exact-allowlist Node HTTPS transport performs public-address DNS preflight,
 pins resolution into each request, rechecks the connected peer, verifies TLS,
 rejects redirects and retries, bounds every request to five seconds and the
 whole preparation chain to 30 seconds, and applies endpoint-specific byte and
-header limits. Mutable body/chunk copies are scrubbed. Immutable JavaScript JWT
+header limits. IPv6 admission is now a static fail-closed allowlist of the
+`ALLOCATED` IANA Global Unicast rows reviewed 2026-09-04: reserved and
+unallocated space, `2001::/23`, `2002::/16` and `2001:db8::/32` are rejected
+for the Vercel, STS and IAM identity profiles before HTTPS, while future IANA
+allocations require manual snapshot review. Mutable body/chunk copies are
+scrubbed. Immutable JavaScript JWT
 and access-token strings cannot be reliably zeroized; M2b drops references but
 makes no string-zeroization claim.
 
@@ -1400,12 +1405,22 @@ compression, and bounds request/operation time, bytes and late cleanup. Raw
 tokens and `Authorization` remain private to the authority/transport and do not
 enter the M2c DTO, logs, evidence or client configuration.
 
+The corrective review gate composes the M2d authority with the actual M2b
+provider-transport module while mocking DNS/HTTPS. Reserved or unallocated IPv6
+therefore fails during the first Vercel profile before `node:https` and before
+the GCS transport is created. Import quarantine now scans controlled scripts at
+repository root, `src`, `scripts` and `supabase/functions`, covers `.ts`,
+`.tsx`, `.mts`, `.cts`, `.js`, `.jsx`, `.mjs` and `.cjs`, excludes tests and
+retains the exact authority-only importer assertions.
+
 This adds no active automation. Both M2d readiness latches remain `false`, both
 formal exports remain `undefined`, the formal preparation path fails before
 OIDC/network work and no product runtime imports either module. Provider, DNS,
 TLS and HTTPS effects in source tests are mocked. The final same-revision local
-gate passed 25/25 M2d tests across 2 files, 105/105 focused regressions across 5
-files and 3265/3265 complete tests across 226 files, plus TypeScript,
+gate passed 27/27 M2d tests across 3 files (13 authority, 12 GCS transport and 2
+authority-to-M2b composition), 20/20 M2b provider-transport tests, 127/127
+focused regressions across 7 files and 3270/3270 complete tests across 227
+files, plus TypeScript,
 zero-warning ESLint, the 64/64-page Next.js 16.2.9 Turbopack build, 27-chunk
 client scan, 73-file adapter sync and diff check. The initially sandboxed build
 was denied only by temporary-local-port binding policy and passed on the

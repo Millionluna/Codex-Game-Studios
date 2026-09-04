@@ -3656,6 +3656,14 @@ the M2a KMS adapter to M2b and prove there is no M2b product runtime importer.
 The post-build client-boundary scanner also treats the M2a/M2b policy and
 version markers as forbidden static-chunk content.
 
+The M2d corrective review also reruns the shared M2b transport gate after
+replacing its partial IPv6 denylist with a static, fail-closed allowlist of the
+IANA IPv6 Global Unicast registry's `ALLOCATED` rows. The 20/20 transport suite
+checks reserved, special-purpose and unallocated rejection plus allocated
+boundary admission for the Vercel, STS and IAM profiles. `2001::/23` and
+`2002::/16` remain conservatively absent, `2001:db8::/32` is explicitly
+excluded, and future IANA allocations require deliberate snapshot review.
+
 All provider and Node HTTPS effects in these focused tests are mocked. The
 suites make no live WIF, IAM, KMS, network, Hosted Preview, billing, deployment,
 Production, real-care-data or model-call claim. M2c later removes and tests the
@@ -3739,12 +3747,20 @@ keep the M2c store contract and M2d transport limited to the M2d authority and
 prove the authority has no non-test product importer. The M2b provider-protocol
 transport importer set must contain only the historical M2b KMS trust module
 and this M2d authority; that reuse covers identity exchange, not M2b KMS trust
-composition. The post-build scanner must retain M2a/M2c markers and reject both
-M2d version/status marker pairs.
+composition. A separate test uses the actual M2b transport factory from the
+M2d authority while mocking only OIDC, DNS, HTTPS and the GCS transport. It
+proves `2001:2::1` and `3fff::1` stop during the first Vercel DNS preflight,
+before `node:https` or GCS transport creation. Runtime quarantine scans the
+controlled repository root, `src`, `scripts` and `supabase/functions` across
+`.ts`, `.tsx`, `.mts`, `.cts`, `.js`, `.jsx`, `.mjs` and `.cjs`; it excludes
+tests and preserves the exact authority-only importer assertions. The
+post-build scanner must retain M2a/M2c markers and reject both M2d
+version/status marker pairs.
 
-The final same-revision gate passed **25/25 M2d tests across 2 files** (13
-authority and 12 transport), **105/105 focused regression tests across 5
-files**, and **3265/3265 complete Vitest tests across 226 files**. TypeScript and
+The corrected same-revision gate passed **27/27 M2d tests across 3 files** (13
+authority, 12 GCS transport and 2 authority-to-M2b composition), **20/20 M2b
+provider-transport tests**, **127/127 focused regression tests across 7
+files**, and **3270/3270 complete Vitest tests across 227 files**. TypeScript and
 full ESLint with `--max-warnings=0` passed. The Next.js 16.2.9 Turbopack
 production build generated 64/64 pages, the client-boundary scan passed across
 27 static chunks, and Codex adapter sync passed across 73 files. The

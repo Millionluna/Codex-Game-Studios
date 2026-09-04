@@ -56,6 +56,13 @@ independently for that operation and is not a reused KMS operation token.
 For the Vercel-to-STS-to-IAM identity exchange only, the authority reuses M2b's
 owned provider-protocol HTTPS transport. It does not consume or compose the M2b
 KMS trust handle, and that source reuse is not live provider or IAM evidence.
+The corrective review pass changed that shared transport's IPv6 admission from
+a partial denylist to a static, fail-closed allowlist of `ALLOCATED` rows in the
+IANA IPv6 Global Unicast Address Space registry. Reserved and unallocated space,
+the deliberately omitted `2001::/23` and `2002::/16` rows, and the explicit
+`2001:db8::/32` documentation exception are rejected for the Vercel, STS and IAM
+profiles before HTTPS begins. New IANA allocations remain denied until this
+auditable snapshot is manually reviewed and updated.
 
 The outward handle and authorized-operation port contain no access token,
 bearer header, service-account JSON, generic header map or credential lifecycle
@@ -96,7 +103,12 @@ the historical M2b KMS trust module and this M2d authority as non-test source
 importers. The M2d GCS transport does not import either authority, and no
 product route, worker, submitter, stager, maintenance composition or scheduler
 imports either M2d module. The M2c adapter does not learn about M2d and
-continues to accept only its tokenless authorized-operation port.
+continues to accept only its tokenless authorized-operation port. The runtime
+quarantine now checks the complete controlled script range at repository root,
+`src`, `scripts` and `supabase/functions`, covering `.ts`, `.tsx`, `.mts`,
+`.cts`, `.js`, `.jsx`, `.mjs` and `.cjs` while excluding tests. This preserves
+the exact permitted importer assertions across product and scheduler-capable
+source instead of checking TypeScript application source alone.
 
 Post-build scanning retains the historical M2a and current M2c markers and adds
 both M2d version and source-status markers. This is a client-bundle and source
@@ -113,11 +125,17 @@ authority-owned operation expiry, consumer-failure in-flight abort, globally
 reachable address admission, late completion, byte clearing and fixed error
 projection; plus an
 M2c multi-request response-loss recovery operation using one session and a
-fresh authority/port for the next top-level operation.
+fresh authority/port for the next top-level operation. A new composition test
+runs the M2d authority against the actual M2b provider-transport module (with
+DNS and HTTPS mocked) and proves reserved or unallocated IPv6 fails during the
+first Vercel profile before `node:https` or the GCS transport can run. The M2b
+transport suite also exercises rejected and allocated IPv6 boundaries across
+the Vercel, STS and IAM profiles.
 
-The final same-revision local gate passed **25/25 M2d tests across 2 files**
-(13 authority and 12 transport), **105/105 focused regression tests across 5
-files**, and **3265/3265 complete Vitest tests across 226 files**. TypeScript and
+The corrected same-revision local gate passed **27/27 M2d tests across 3 files**
+(13 authority, 12 GCS transport and 2 authority-to-M2b composition), **20/20
+M2b provider-transport tests**, **127/127 focused regression tests across 7
+files**, and **3270/3270 complete Vitest tests across 227 files**. TypeScript and
 full ESLint with zero warnings passed. The Next.js 16.2.9 Turbopack production
 build generated 64/64 pages, the client-boundary scan passed across 27 static
 chunks, Codex adapter sync passed across 73 files, and `git diff --check`
@@ -146,10 +164,10 @@ Before formal composition, all of the following remain required:
    lifecycle and post-change propagation state;
 4. independently prove absence, expiry or purge of historical noncurrent,
    soft-deleted, retained and backup copies;
-5. refresh and review the pinned Google IPv6 snapshot, then run the exact
-   reviewed revision on a separately authorized disposable, no-data Preview and
-   retain content-free identity, IAM, DNS/TLS, GCS operation and teardown
-   evidence;
+5. refresh and review both the pinned Google IPv6 snapshot and the static IANA
+   allocated-global-unicast snapshot, then run the exact reviewed revision on a
+   separately authorized disposable, no-data Preview and retain content-free
+   identity, IAM, DNS/TLS, GCS operation and teardown evidence;
 6. complete the Supabase purpose credential/session boundary with independently
    observed quiescence, persistent maintenance, exact-version decrypt/consume,
    worker composition and a separately approved scheduler;

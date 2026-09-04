@@ -153,7 +153,13 @@ the HTTPS request, rechecks the connected peer and preserves certificate and
 server-name verification. It permits only the exact Vercel, STS, pinned IAM
 Credentials, parent-key, numeric-version and numeric-version `rawEncrypt`
 method/resource profiles, with five-second request bounds, one 30-second chain
-deadline, no redirect/retry, fixed byte caps and content-free failures.
+deadline, no redirect/retry, fixed byte caps and content-free failures. Its IPv6
+gate is a static fail-closed allowlist of the `ALLOCATED` IANA IPv6 Global
+Unicast rows reviewed 2026-09-04. Reserved and unallocated addresses, the
+conservatively omitted `2001::/23` and `2002::/16` rows, and
+`2001:db8::/32` fail before HTTPS for the Vercel, STS and IAM identity
+profiles. Newly allocated space remains closed until the snapshot is manually
+reviewed.
 
 This is not an active trust root. The formal preparation path fails closed,
 formal singletons are `undefined`, readiness is `false`, and only an explicit
@@ -213,6 +219,13 @@ adapter remains unaware of credentials and M2d; only the private authority may
 import its contract and the M2d GCS transport. The authority separately reuses
 M2b's owned provider-protocol HTTPS transport for the Vercel-to-STS-to-IAM
 identity exchange only; it does not compose the M2b KMS trust handle.
+The corrective review gate exercises that authority-to-real-M2b-module
+composition with mocked DNS/HTTPS and proves reserved or unallocated IPv6
+fails before `node:https` and before the GCS transport is created. Runtime
+quarantine now scans the controlled repository root, `src`, `scripts` and
+`supabase/functions` ranges across `.ts`, `.tsx`, `.mts`, `.cts`, `.js`,
+`.jsx`, `.mjs` and `.cjs`, excludes tests, and retains the exact authority-only
+importer assertions.
 
 Both M2d readiness latches remain `false`, both formal exports remain
 `undefined`, and the formal preparation path fails before OIDC or network work.
@@ -221,8 +234,10 @@ transport factory remains quarantined to that authority and source tests.
 Provider, DNS, TLS and HTTPS boundaries are mocked. This is not live
 Vercel/Google authentication, WIF/IAM, bucket-posture, network, Preview,
 deployment or activation evidence. The final same-revision local gate passed
-25/25 M2d tests across 2 files, 105/105 focused regressions across 5 files and
-3265/3265 complete tests across 226 files, plus TypeScript, zero-warning ESLint,
+27/27 M2d tests across 3 files (13 authority, 12 GCS transport and 2
+authority-to-M2b composition), 20/20 M2b provider-transport tests, 127/127
+focused regressions across 7 files and 3270/3270 complete tests across 227
+files, plus TypeScript, zero-warning ESLint,
 the 64/64-page Next.js 16.2.9 Turbopack production build, 27-chunk client scan,
 73-file adapter sync and diff check. The first sandboxed build attempt hit a
 temporary-local-port permission restriction; the permitted rerun passed, so it
@@ -531,8 +546,9 @@ The contract/domain/schema portion and a feature-flagged NDIS dual-write/shadow-
   Its formal Cookie principal is exact-Preview-conditional, but the formal
   submitter/maintenance remain absent. M2a supplies default-off KMS,
   private-store and purpose-session protocol adapters. M2b now narrows the KMS
-  source path to owned HTTPS, pinned WIF/service-account exchange and
-  authenticated exact parent/version reads, but remains TestOnly with mocked
+  source path to owned HTTPS, pinned WIF/service-account exchange, fail-closed
+  IANA-allocated IPv6 admission and authenticated exact parent/version reads,
+  but remains TestOnly with mocked
   provider evidence. M2c removes the GCS raw-token DTO/header from the adapter
   source boundary, and M2d adds a default-off source authority plus owned GCS
   transport. Their formal exports remain absent; live IAM/resource attestation,

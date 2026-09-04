@@ -1282,29 +1282,43 @@ describe("V1 shadow runtime boundary", () => {
   });
 
   it("quarantines the M2c GCS contract and M2d authority/transport outside product runtime composition", () => {
+    const m2cContract = join(
+      process.cwd(),
+      "src/lib/v1/note-generation-encrypted-payload-gcs-private-object-store.server.ts",
+    );
+    const transport = join(
+      process.cwd(),
+      "src/lib/v1/note-generation-google-cloud-gcs-https-transport-m2d.server.ts",
+    );
     const authority = join(
       process.cwd(),
       "src/lib/v1/note-generation-google-cloud-gcs-private-authority-m2d.server.ts",
     );
-    const sourceFiles = walkSourceFiles("src");
-    const m2cContractImporters = sourceFiles.filter((file) =>
-      readFileSync(file, "utf8").includes(
-        "note-generation-encrypted-payload-gcs-private-object-store.server",
-      ),
+    const controlledRuntimeFiles = walkControlledScriptFiles().filter(
+      (file) => !isTestScriptFile(file),
+    );
+    const exactImporters = (target: string, moduleSpecifier: string) =>
+      controlledRuntimeFiles.filter(
+        (file) =>
+          file !== target &&
+          readFileSync(file, "utf8").includes(moduleSpecifier),
+      );
+
+    const m2cContractImporters = exactImporters(
+      m2cContract,
+      "note-generation-encrypted-payload-gcs-private-object-store.server",
     );
     expect(m2cContractImporters).toEqual([authority]);
 
-    const transportImporters = sourceFiles.filter((file) =>
-      readFileSync(file, "utf8").includes(
-        "note-generation-google-cloud-gcs-https-transport-m2d.server",
-      ),
+    const transportImporters = exactImporters(
+      transport,
+      "note-generation-google-cloud-gcs-https-transport-m2d.server",
     );
     expect(transportImporters).toEqual([authority]);
 
-    const authorityImporters = sourceFiles.filter((file) =>
-      readFileSync(file, "utf8").includes(
-        "note-generation-google-cloud-gcs-private-authority-m2d.server",
-      ),
+    const authorityImporters = exactImporters(
+      authority,
+      "note-generation-google-cloud-gcs-private-authority-m2d.server",
     );
     expect(authorityImporters).toEqual([]);
   });
@@ -1373,5 +1387,12 @@ function isSourceFile(path: string) {
   return (
     [".ts", ".tsx"].includes(extname(path)) &&
     !/\.test\.(?:ts|tsx)$/.test(path)
+  );
+}
+
+function isTestScriptFile(path: string): boolean {
+  return (
+    /(?:^|[/\\])__tests__(?:[/\\]|$)/.test(path) ||
+    /\.(?:test|spec)\.(?:ts|tsx|mts|cts|js|jsx|mjs|cjs)$/.test(path)
   );
 }
