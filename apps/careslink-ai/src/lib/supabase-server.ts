@@ -1,29 +1,23 @@
-import { createServerClient as createSupabaseServerClient } from "@supabase/ssr";
+import {
+  createServerClient as createSupabaseServerClient,
+  type CookieMethodsServer,
+  type CookieOptions,
+} from "@supabase/ssr";
 import { cookies as nextCookies } from "next/headers";
+import {
+  getSupabasePublicAuthConfig,
+  type SupabasePublicAuthEnv,
+} from "./supabase-public-auth-config";
 
-type SupabasePublicAuthEnv = {
-  NEXT_PUBLIC_SUPABASE_ANON_KEY?: string;
-  NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY?: string;
-  NEXT_PUBLIC_SUPABASE_URL?: string;
-  SUPABASE_ANON_KEY?: string;
-  SUPABASE_PUBLISHABLE_KEY?: string;
-  SUPABASE_SERVICE_ROLE_KEY?: string;
-  SUPABASE_URL?: string;
-};
+export { getSupabasePublicAuthConfig } from "./supabase-public-auth-config";
 
 type ServerCookieStore = {
   getAll(): Array<{ name: string; value: string }>;
   set(
     name: string,
     value: string,
-    options?: Record<string, unknown>,
+    options?: CookieOptions,
   ): void;
-};
-
-type CookieToSet = {
-  name: string;
-  value: string;
-  options: Record<string, unknown>;
 };
 
 type SupabaseAuthUser = {
@@ -86,8 +80,8 @@ type CreateServerClientFunction = (
   supabaseKey: string,
   options: {
     cookies: {
-      getAll(): Array<{ name: string; value: string }>;
-      setAll(cookiesToSet: CookieToSet[]): void;
+      getAll: CookieMethodsServer["getAll"];
+      setAll: NonNullable<CookieMethodsServer["setAll"]>;
     };
   },
 ) => CareslinkServerSupabaseClient;
@@ -96,6 +90,7 @@ type CreateCareslinkServerSupabaseClientOptions = {
   cookieStore?: ServerCookieStore;
   createServerClient?: CreateServerClientFunction;
   env?: SupabasePublicAuthEnv;
+  responseHeaders?: Pick<Headers, "set">;
 };
 
 type ClearCareslinkSupabaseAuthCookiesOptions = {
@@ -105,30 +100,11 @@ type ClearCareslinkSupabaseAuthCookiesOptions = {
 const SUPABASE_AUTH_COOKIE_PATTERN =
   /^sb-[a-z0-9]+-auth-token(?:-code-verifier)?(?:\.\d+)?$/i;
 
-export function getSupabasePublicAuthConfig(
-  env: SupabasePublicAuthEnv = process.env as SupabasePublicAuthEnv,
-) {
-  const supabaseUrl = env.SUPABASE_URL ?? env.NEXT_PUBLIC_SUPABASE_URL;
-  const publishableKey =
-    env.SUPABASE_PUBLISHABLE_KEY ??
-    env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
-    env.SUPABASE_ANON_KEY ??
-    env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  if (!supabaseUrl || !publishableKey) {
-    return undefined;
-  }
-
-  return {
-    supabaseUrl,
-    publishableKey,
-  };
-}
-
 export async function createCareslinkServerSupabaseClient({
   cookieStore,
   createServerClient = createSupabaseServerClient as unknown as CreateServerClientFunction,
   env = process.env as SupabasePublicAuthEnv,
+  responseHeaders,
 }: CreateCareslinkServerSupabaseClientOptions = {}) {
   const config = getSupabasePublicAuthConfig(env);
 
@@ -143,7 +119,7 @@ export async function createCareslinkServerSupabaseClient({
       getAll() {
         return store.getAll();
       },
-      setAll(cookiesToSet) {
+      setAll(cookiesToSet, headers) {
         try {
           cookiesToSet.forEach(({ name, value, options }) => {
             store.set(name, value, options);
@@ -152,6 +128,10 @@ export async function createCareslinkServerSupabaseClient({
           // Server Components cannot always mutate cookies. Route handlers and
           // server actions can, and middleware can refresh sessions separately.
         }
+
+        Object.entries(headers).forEach(([name, value]) => {
+          responseHeaders?.set(name, value);
+        });
       },
     },
   });

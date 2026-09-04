@@ -14,6 +14,7 @@ type WorkspaceServerAuthEnv = {
   SUPABASE_ANON_KEY?: string;
   SUPABASE_PUBLISHABLE_KEY?: string;
   SUPABASE_URL?: string;
+  VERCEL_ENV?: string;
 };
 
 type SupabaseAuthUser = {
@@ -120,6 +121,14 @@ export function createWorkspaceAccountFromSupabaseUser(
 export function isDemoWorkspaceAuthEnabled(
   env: WorkspaceServerAuthEnv = process.env as WorkspaceServerAuthEnv,
 ) {
+  if (
+    env.NODE_ENV === "production" ||
+    env.VERCEL_ENV === "preview" ||
+    env.VERCEL_ENV === "production"
+  ) {
+    return false;
+  }
+
   if (env.CARESLINK_ENABLE_DEMO_AUTH === "true") {
     return true;
   }
@@ -128,7 +137,7 @@ export function isDemoWorkspaceAuthEnabled(
     return false;
   }
 
-  return env.NODE_ENV !== "production";
+  return true;
 }
 
 function createSupabaseAuthClientFromEnv(

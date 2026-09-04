@@ -104,31 +104,60 @@ describe("referral workspace server auth", () => {
     });
   });
 
-  it("allows demo fallback only when explicitly enabled outside production", async () => {
+  it("never allows demo fallback in production, even when explicitly enabled", async () => {
     await expect(
       resolveWorkspaceAccountFromRequest(createAuthRequest(), {
-        demoAccountId: "user-free",
+        demoAccountId: "user-admin",
         env: { NODE_ENV: "production" },
       }),
     ).resolves.toEqual({ source: "none" });
 
     await expect(
       resolveWorkspaceAccountFromRequest(createAuthRequest(), {
-        demoAccountId: "user-free",
+        demoAccountId: "user-admin",
         env: { NODE_ENV: "production", CARESLINK_ENABLE_DEMO_AUTH: "true" },
       }),
-    ).resolves.toMatchObject({
-      source: "demo",
-      account: {
-        id: "user-free",
-        role: "provider",
-      },
-    });
+    ).resolves.toEqual({ source: "none" });
 
+    expect(
+      isDemoWorkspaceAuthEnabled({
+        NODE_ENV: "production",
+        CARESLINK_ENABLE_DEMO_AUTH: "true",
+      }),
+    ).toBe(false);
+    expect(
+      isDemoWorkspaceAuthEnabled({
+        NODE_ENV: "development",
+        VERCEL_ENV: "preview",
+        CARESLINK_ENABLE_DEMO_AUTH: "true",
+      }),
+    ).toBe(false);
+  });
+
+  it("honors explicit demo auth flags outside production", () => {
     expect(isDemoWorkspaceAuthEnabled({ NODE_ENV: "test" })).toBe(true);
     expect(
       isDemoWorkspaceAuthEnabled({
         NODE_ENV: "test",
+        CARESLINK_ENABLE_DEMO_AUTH: "true",
+      }),
+    ).toBe(true);
+    expect(
+      isDemoWorkspaceAuthEnabled({
+        NODE_ENV: "test",
+        CARESLINK_ENABLE_DEMO_AUTH: "false",
+      }),
+    ).toBe(false);
+
+    expect(
+      isDemoWorkspaceAuthEnabled({
+        NODE_ENV: "development",
+        CARESLINK_ENABLE_DEMO_AUTH: "true",
+      }),
+    ).toBe(true);
+    expect(
+      isDemoWorkspaceAuthEnabled({
+        NODE_ENV: "development",
         CARESLINK_ENABLE_DEMO_AUTH: "false",
       }),
     ).toBe(false);
