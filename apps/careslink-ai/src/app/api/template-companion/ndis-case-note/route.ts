@@ -28,6 +28,7 @@ import {
   validateNdisCaseNotePrivacyAttestation,
 } from "@/lib/ndis-case-note-companion";
 import { generateNdisCaseNoteDraft } from "@/lib/openai-ndis-case-note";
+import { isCaresLinkV1PointsUiEnabled } from "@/lib/points-ui-feature.server";
 import { resolveWorkspaceAccountFromSupabaseSession } from "@/lib/referral-workspace-session";
 import { createCareslinkServerSupabaseClient } from "@/lib/supabase-server";
 
@@ -74,6 +75,20 @@ export async function POST(request: Request) {
         error: "Use a provider account to generate case note drafts.",
       },
       { status: 403 },
+    );
+  }
+
+  if (isCaresLinkV1PointsUiEnabled()) {
+    return NextResponse.json(
+      {
+        ok: false,
+        code: "service_unavailable",
+        error: "The case note companion is temporarily unavailable.",
+      },
+      {
+        status: 503,
+        headers: { "Cache-Control": "private, no-store" },
+      },
     );
   }
 

@@ -7,7 +7,7 @@ const NON_TRANSACTIONAL_SQL_PATTERN = /^(?:create\s+(?:unique\s+)?index\s+concur
 
 export const COMMUNICATION_NOTE_PREVIEW_TRANSACTIONAL_MIGRATION_POLICY =
   Object.freeze({
-    version: "2026-09-04.preview-transactional-migrations.14",
+    version: "2026-09-05.preview-transactional-migrations.18",
     productionProjectRef: "adocsnwnslxhxcjgbyee",
     expectedCliVersion: "2.115.0",
     manifestSha256:
@@ -16,6 +16,8 @@ export const COMMUNICATION_NOTE_PREVIEW_TRANSACTIONAL_MIGRATION_POLICY =
     disposablePreviewBaselineMigrationCount: 19,
     disposablePreviewBaselineHistorySha256:
       "b742d12dee926ccfe76158cf524e503bcdc576a08e928a7147741faf4a314424",
+    emptyMigrationHistorySha256:
+      "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
     disposablePreviewBaselinePublicCatalogObjectCount: 555,
     disposablePreviewBaselinePublicCatalogSha256:
       "1bced92adab2e275fb835d3a7dc322e22e1c043fa88617844a0e32f8993e6d95",
@@ -135,6 +137,7 @@ export const COMMUNICATION_NOTE_PREVIEW_TRANSACTIONAL_MIGRATION_POLICY =
       "careslink_v1_generation_executor",
       "careslink_v1_generation_owner",
       "careslink_v1_generation_owner_api_executor",
+      "careslink_v1_generation_points_admission_caller",
       "careslink_v1_generation_points_admission_executor",
       "careslink_v1_generation_points_settlement_executor",
       "careslink_v1_generation_registration_control_executor",
@@ -260,18 +263,24 @@ const OUTER_TRANSACTION_MIGRATIONS = new Set([
   "20260904054437_add_v1_points_wallet_read.sql",
 ]);
 
-const FIXED_ERROR_CODES = new Set([
-  "TRANSACTIONAL_MIGRATION_MANIFEST_INVALID",
-  "TRANSACTIONAL_MIGRATION_FILE_INVALID",
-  "TRANSACTIONAL_MIGRATION_SQL_INVALID",
-  "TRANSACTIONAL_MIGRATION_HISTORY_INVALID",
-]);
+export const COMMUNICATION_NOTE_PREVIEW_TRANSACTIONAL_MIGRATION_ERROR_CODES =
+  Object.freeze({
+    manifestInvalid: "TRANSACTIONAL_MIGRATION_MANIFEST_INVALID",
+    fileInvalid: "TRANSACTIONAL_MIGRATION_FILE_INVALID",
+    sqlInvalid: "TRANSACTIONAL_MIGRATION_SQL_INVALID",
+    historyInvalid: "TRANSACTIONAL_MIGRATION_HISTORY_INVALID",
+  });
+
+const FIXED_ERROR_CODES = new Set(Object.values(
+  COMMUNICATION_NOTE_PREVIEW_TRANSACTIONAL_MIGRATION_ERROR_CODES,
+));
 
 export class CommunicationNotePreviewTransactionalMigrationPolicyError extends Error {
   constructor(code) {
     const fixed = FIXED_ERROR_CODES.has(code)
       ? code
-      : "TRANSACTIONAL_MIGRATION_SQL_INVALID";
+      : COMMUNICATION_NOTE_PREVIEW_TRANSACTIONAL_MIGRATION_ERROR_CODES
+          .sqlInvalid;
     super(fixed);
     this.name = "CommunicationNotePreviewTransactionalMigrationPolicyError";
     this.code = fixed;
@@ -340,6 +349,16 @@ export async function loadPinnedCommunicationNotePreviewMigrations() {
       COMMUNICATION_NOTE_PREVIEW_TRANSACTIONAL_MIGRATION_POLICY.manifestSha256
   ) {
     fail("TRANSACTIONAL_MIGRATION_MANIFEST_INVALID");
+  }
+  const createdApplicationRoles = migrations.flatMap((migration) =>
+    extractDirectCareslinkRoleCreations(migration.statements)
+  ).sort();
+  if (!sameStringArray(
+    createdApplicationRoles,
+    COMMUNICATION_NOTE_PREVIEW_TRANSACTIONAL_MIGRATION_POLICY
+      .applicationRoles,
+  )) {
+    fail("TRANSACTIONAL_MIGRATION_SQL_INVALID");
   }
   return Object.freeze({
     migrations: Object.freeze(migrations),
@@ -609,6 +628,48 @@ export function isTransactionControlStatement(statement) {
   return /^(?:begin\b|start\s+transaction\b|commit\b|end\b|rollback\b|abort\b|savepoint\b|release(?:\s+savepoint)?\b|prepare\s+transaction\b|set\s+transaction\b)/u.test(
     statementCommand(statement),
   );
+}
+
+export function extractDirectCareslinkRoleCreations(statements) {
+  if (!Array.isArray(statements)) {
+    fail("TRANSACTIONAL_MIGRATION_SQL_INVALID");
+  }
+  const roles = [];
+  for (const statement of statements) {
+    if (typeof statement !== "string") {
+      fail("TRANSACTIONAL_MIGRATION_SQL_INVALID");
+    }
+    const first = takeSqlWord(statement);
+    if (first?.word !== "create") continue;
+    const second = takeSqlWord(first.rest);
+    if (second?.word === "user" || second?.word === "group") {
+      fail("TRANSACTIONAL_MIGRATION_SQL_INVALID");
+    }
+    if (second?.word !== "role") continue;
+    const roleSource = stripLeadingSqlTrivia(second.rest);
+    if (roleSource.startsWith('"')) {
+      fail("TRANSACTIONAL_MIGRATION_SQL_INVALID");
+    }
+    const role = takeSqlWord(roleSource);
+    if (!role) fail("TRANSACTIONAL_MIGRATION_SQL_INVALID");
+    if (role.word.startsWith("careslink_")) {
+      if (!/^careslink_[a-z0-9_]+$/u.test(role.word)) {
+        fail("TRANSACTIONAL_MIGRATION_SQL_INVALID");
+      }
+      roles.push(role.word);
+    }
+  }
+  return Object.freeze(roles);
+}
+
+function takeSqlWord(value) {
+  const source = stripLeadingSqlTrivia(String(value));
+  const match = /^([a-z_][a-z0-9_$]*)/iu.exec(source);
+  if (!match) return null;
+  return Object.freeze({
+    word: match[1].toLowerCase(),
+    rest: source.slice(match[0].length),
+  });
 }
 
 function statementCommand(statement) {

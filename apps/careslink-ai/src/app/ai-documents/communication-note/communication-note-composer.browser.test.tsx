@@ -21,6 +21,30 @@ vi.mock("next/image", async () => {
 });
 
 import { CommunicationNoteComposer } from "./communication-note-composer";
+import { getCommunicationNoteGenerationErrorMessage } from "../../../lib/communication-note-generation-contract";
+
+type ComposerLocale = React.ComponentProps<typeof CommunicationNoteComposer>["locale"];
+const ERROR_COPY_CASES = [
+  {
+    locale: "en", reason: "The server reports insufficient Points.",
+    snapshot: "The page-load balance snapshot may be out of date.",
+    generic: "The server did not confirm whether this exact request was accepted.",
+    transport: "Generation status cannot be confirmed right now.",
+    replay: "Check status safely",
+  },
+  {
+    locale: "zh-Hans", reason: "服务器报告 Points 余额不足。",
+    snapshot: "页面载入时的余额快照可能已过期。",
+    generic: "服务器未确认是否已接纳此精确请求。",
+    transport: "暂时无法确认生成状态。", replay: "安全查询状态",
+  },
+  {
+    locale: "zh-Hant", reason: "伺服器回報 Points 餘額不足。",
+    snapshot: "頁面載入時的餘額快照可能已過期。",
+    generic: "伺服器未確認是否已接納此精確請求。",
+    transport: "暫時無法確認生成狀態。", replay: "安全查詢狀態",
+  },
+] as const;
 
 const AVAILABLE_POINTS_PREVIEW = {
   status: "AVAILABLE" as const,
@@ -505,6 +529,73 @@ describe("Communication Note composer browser boundary", () => {
     expect(vi.getTimerCount()).toBe(0);
   });
 
+  it.each(ERROR_COPY_CASES)("explains insufficient Points in $locale while preserving the exact locked request", async (copy) => {
+    vi.useFakeTimers();
+    const uuid = vi.spyOn(window.crypto, "randomUUID").mockReturnValue(
+      "11111111-1111-4111-8111-111111111111",
+    );
+    const fetcher = mockGenerationError(409, "POINTS_INSUFFICIENT",
+      getCommunicationNoteGenerationErrorMessage("POINTS_INSUFFICIENT"));
+    vi.stubGlobal("fetch", fetcher);
+    await prepareConnectedSubmission(copy.locale);
+    const points = container.querySelector('[aria-labelledby="communication-note-points-title"]');
+    const initialBalance = points?.textContent;
+    const submit = container.querySelector<HTMLButtonElement>('button[type="submit"]')!;
+    expect(submit.disabled).toBe(false);
+    await act(async () => submit.click());
+
+    const alert = container.querySelector('[role="alert"]');
+    expect(alert?.textContent).toContain(copy.reason);
+    expect(alert?.textContent).toContain(copy.snapshot);
+    expect(alert?.textContent).toContain(copy.generic);
+    expect(alert?.textContent).toContain(copy.replay);
+    expect(points?.textContent).toBe(initialBalance);
+    expect(submit.disabled).toBe(true);
+    for (const field of FIELD_NAMES) expect(getField(field).disabled).toBe(true);
+    expect(vi.getTimerCount()).toBe(0);
+
+    await act(async () => submit.click());
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    await clickButton(copy.replay);
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    const firstRequest = fetcher.mock.calls[0][1];
+    const replayRequest = fetcher.mock.calls[1][1];
+    expect(replayRequest?.body).toBe(firstRequest?.body);
+    expect(replayRequest?.headers).toEqual(firstRequest?.headers);
+    expect(uuid).toHaveBeenCalledTimes(1);
+    expect(submit.disabled).toBe(true);
+    expect(points?.textContent).toBe(initialBalance);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it.each(ERROR_COPY_CASES)("keeps the generic response warning for other registered errors in $locale", async (copy) => {
+    vi.stubGlobal("fetch", mockGenerationError(502, "GENERATION_FAILED",
+      getCommunicationNoteGenerationErrorMessage("GENERATION_FAILED")));
+    await prepareConnectedSubmission(copy.locale);
+    await act(async () => container.querySelector<HTMLButtonElement>('button[type="submit"]')?.click());
+    const alert = container.querySelector('[role="alert"]');
+    expect(alert?.textContent).toContain(copy.generic);
+    expect(alert?.textContent).not.toContain(copy.reason);
+    expect(alert?.textContent).not.toContain(copy.snapshot);
+    expect(getDisabledGenerationButton()).toBeDefined();
+  });
+
+  it.each(ERROR_COPY_CASES.flatMap((copy) => [
+    { ...copy, code: "POINTS_INSUFFICIENT" },
+    { ...copy, code: "UNKNOWN_ERROR" },
+  ]))("uses the safe fallback for untrusted $code responses in $locale", async (copy) => {
+    const untrustedMessage = "private-server-message <script>unsafe</script>";
+    vi.stubGlobal("fetch", mockGenerationError(409, copy.code, untrustedMessage));
+    await prepareConnectedSubmission(copy.locale);
+    await act(async () => container.querySelector<HTMLButtonElement>('button[type="submit"]')?.click());
+    const alert = container.querySelector('[role="alert"]');
+    expect(alert?.textContent).toContain(copy.transport);
+    expect(alert?.textContent).not.toContain(copy.reason);
+    expect(container.textContent).not.toContain(untrustedMessage);
+    expect(alert?.querySelector("script")).toBeNull();
+    expect(getDisabledGenerationButton()).toBeDefined();
+  });
+
   it("aborts an in-flight status request when the composer unmounts", async () => {
     let requestSignal: AbortSignal | undefined;
     const fetcher = vi.fn(
@@ -551,11 +642,12 @@ describe("Communication Note composer browser boundary", () => {
 async function renderComposer(
   generationAvailable = false,
   pointsPreview: React.ComponentProps<typeof CommunicationNoteComposer>["pointsPreview"] = AVAILABLE_POINTS_PREVIEW,
+  locale: ComposerLocale = "en",
 ) {
   await act(async () => {
     root.render(
       <CommunicationNoteComposer
-        locale="en"
+        locale={locale}
         pointsPreview={pointsPreview}
         generationAvailable={generationAvailable}
       />,
@@ -563,8 +655,8 @@ async function renderComposer(
   });
 }
 
-async function prepareConnectedSubmission() {
-  await renderComposer(true);
+async function prepareConnectedSubmission(locale: ComposerLocale = "en") {
+  await renderComposer(true, AVAILABLE_POINTS_PREVIEW, locale);
   await fillFields({
     occurred_at: "2026-09-01T14:30:00+10:00",
     contact_channel: "Phone",
@@ -574,7 +666,7 @@ async function prepareConnectedSubmission() {
     stated_outcome: "The family representative acknowledged the update.",
     follow_up: "The support worker will record any further contact.",
   });
-  await submitLocalReview();
+  await submitLocalReview(locale);
   for (const checkbox of container.querySelectorAll<HTMLInputElement>(
     'input[type="checkbox"]',
   )) {
@@ -618,9 +710,19 @@ function setNativeValue(
   setter.call(control, value);
 }
 
-async function submitLocalReview() {
-  await clickButton("Review facts and privacy");
+async function submitLocalReview(locale: ComposerLocale = "en") {
+  await clickButton({ en: "Review facts and privacy", "zh-Hans": "检查事实与隐私", "zh-Hant": "檢查事實與隱私" }[locale]);
   await flushAnimationFrames();
+}
+
+function mockGenerationError(status: number, code: string, message: string) {
+  return vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => {
+    void _input;
+    void _init;
+    return { status, json: async () => ({ error: {
+      code, message, correlationId: "22222222-2222-4222-8222-222222222222",
+    } }) };
+  });
 }
 
 async function flushAnimationFrames() {

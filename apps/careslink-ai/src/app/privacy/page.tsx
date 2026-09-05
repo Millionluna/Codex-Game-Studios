@@ -6,6 +6,7 @@ import {
   withLocale,
   type Locale,
 } from "@/lib/referral-workspace-i18n";
+import { isCaresLinkV1PointsUiEnabled } from "@/lib/points-ui-feature.server";
 
 type SearchParams = Record<string, string | string[] | undefined>;
 
@@ -22,7 +23,8 @@ export default async function PrivacyNoticePage({
 }) {
   const params = await searchParams;
   const locale = getLocaleFromSearchParams(params);
-  const copy = getPrivacyCopy(locale);
+  const pointsUiEnabled = isCaresLinkV1PointsUiEnabled();
+  const copy = getPrivacyCopy(locale, pointsUiEnabled);
 
   return (
     <AppShell locale={locale} languageSwitcherHref="/privacy">
@@ -64,10 +66,15 @@ export default async function PrivacyNoticePage({
               {copy.contactLink}
             </a>
             <Link
-              href={withLocale("/template-companion/ndis-case-note", locale)}
+              href={withLocale(
+                pointsUiEnabled
+                  ? "/ai-documents"
+                  : "/template-companion/ndis-case-note",
+                locale,
+              )}
               className="hover:underline"
             >
-              {copy.backToCompanion}
+              {copy.backToWorkspace}
             </Link>
           </div>
         </footer>
@@ -76,7 +83,7 @@ export default async function PrivacyNoticePage({
   );
 }
 
-function getPrivacyCopy(locale: Locale) {
+function getPrivacyCopy(locale: Locale, pointsUiEnabled: boolean) {
   if (locale === "zh-Hans") {
     return {
       kicker: "CaresLink AI 数据说明",
@@ -97,7 +104,9 @@ function getPrivacyCopy(locale: Locale) {
           paragraphs: [
             "Communication Note Composer 当前是独立的本地版本：七个字段、本地隐私发现和清理预览只保留在当前浏览器标签页内，不会发送给 Product API 或 OpenAI，也不会保存、扣除 Points、创建临时结果或导出草稿。",
             "未来的联网生成功能必须单独启用，在发送任何内容前再次通过服务端隐私与契约检查，并先在本说明中明确更新其处理方式。",
-            "对于已联网的 NDIS Case Note Companion，完成浏览器隐私复核与两项确认后，服务端仍会独立检查输入。只有通过检查的结构化事实才会发送给 OpenAI 生成受控格式草稿。",
+            pointsUiEnabled
+              ? "Points 预览期间，NDIS Case Note 生成功能已暂停。打开相关页面不会提交结构化事实、调用 OpenAI 或创建新草稿。"
+              : "对于已联网的 NDIS Case Note Companion，完成浏览器隐私复核与两项确认后，服务端仍会独立检查输入。只有通过检查的结构化事实才会发送给 OpenAI 生成受控格式草稿。",
             "OpenAI 请求使用 store:false。我们不把这一设置描述为 zero data retention；服务提供方仍可能按其适用条款和安全流程处理请求。",
           ],
         },
@@ -111,7 +120,9 @@ function getPrivacyCopy(locale: Locale) {
         {
           title: "使用量与产品分析",
           paragraphs: [
-            "产品事件仅记录 metadata，例如事件名称、哈希标识、允许的来源维度、语言、时间、credits reserve/commit/release 状态和模型 token 计数。",
+            pointsUiEnabled
+              ? "Points 预览期间不会记录新的 NDIS 生成或付费意向事件。此前保留的产品事件 metadata 可能包含历史余额的预留、完成或释放状态以及模型 token 计数。"
+              : "产品事件仅记录 metadata，例如事件名称、哈希标识、允许的来源维度、语言、时间、credits reserve/commit/release 状态和模型 token 计数。",
             "Telemetry 和管理员聚合视图不应包含输入、输出、participant facts、原始粘贴文本或自由文本错误。",
           ],
         },
@@ -126,7 +137,9 @@ function getPrivacyCopy(locale: Locale) {
       contact:
         "自动隐私检查只能识别部分明显线索，不能保证完全去标识化。提交前仍需由用户人工复核。",
       contactLink: "CaresLink 联系渠道",
-      backToCompanion: "返回 Case Note Companion",
+      backToWorkspace: pointsUiEnabled
+        ? "返回 AI 文档"
+        : "返回 Case Note Companion",
     };
   }
 
@@ -149,7 +162,9 @@ function getPrivacyCopy(locale: Locale) {
         paragraphs: [
           "The current Communication Note Composer is a separate local-only release: its seven fields, local privacy findings and cleaned preview stay in the current browser tab. They are not sent to the Product API or OpenAI, saved, charged against Points, placed in a temporary result or exported as a draft.",
           "Any future connected generation must be enabled separately, repeat server-side privacy and contract checks before sending content, and first update this notice with its processing terms.",
-          "For the connected NDIS Case Note Companion, the server independently validates the input after browser privacy review and both confirmations. Only reviewed structured facts that pass those checks are sent to OpenAI for a controlled-format draft.",
+          pointsUiEnabled
+            ? "During the Points preview, NDIS Case Note generation is paused. Opening the related page does not submit structured facts, call OpenAI or create a new draft."
+            : "For the connected NDIS Case Note Companion, the server independently validates the input after browser privacy review and both confirmations. Only reviewed structured facts that pass those checks are sent to OpenAI for a controlled-format draft.",
           "OpenAI requests use store:false. We do not describe that setting as zero data retention; the service provider may still process requests under its applicable terms and security processes.",
         ],
       },
@@ -163,7 +178,9 @@ function getPrivacyCopy(locale: Locale) {
       {
         title: "Usage and product analytics",
         paragraphs: [
-          "Product events contain metadata such as event name, hashed identifiers, allowlisted attribution, language, timestamps, credit reserve/commit/release status and model token counts.",
+          pointsUiEnabled
+            ? "During the Points preview, no new NDIS generation or paid-offer events are recorded. Retained product-event metadata from earlier activity may include historical balance reservation, completion or release status and model token counts."
+            : "Product events contain metadata such as event name, hashed identifiers, allowlisted attribution, language, timestamps, credit reserve/commit/release status and model token counts.",
           "Telemetry and aggregate admin views should not contain input, output, participant facts, original pasted text or free-text errors.",
         ],
       },
@@ -178,6 +195,8 @@ function getPrivacyCopy(locale: Locale) {
     contact:
       "Automated privacy checks catch only some obvious clues and cannot guarantee complete de-identification. The user must review every submission.",
     contactLink: "CaresLink contact channel",
-    backToCompanion: "Back to Case Note Companion",
+    backToWorkspace: pointsUiEnabled
+      ? "Back to AI Documents"
+      : "Back to Case Note Companion",
   };
 }

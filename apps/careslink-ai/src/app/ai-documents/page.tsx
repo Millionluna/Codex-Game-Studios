@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import {
   ArrowRight,
+  Coins,
   FileCheck2,
   FileText,
   FolderOpen,
@@ -23,6 +24,7 @@ import {
 } from "@/lib/generated-material-draft-store";
 import { isCommunicationNoteComposerEnabled } from "@/lib/communication-note-composer-feature";
 import { parseNdisCaseNoteMaterial } from "@/lib/ndis-case-note-companion";
+import { isCaresLinkV1PointsUiEnabled } from "@/lib/points-ui-feature.server";
 import { withWorkspaceAccount } from "@/lib/referral-workspace-auth";
 import { getWorkspaceAccessGateWithServerSession } from "@/lib/referral-workspace-session";
 import {
@@ -49,9 +51,10 @@ export default async function AiDocumentsPage({
   const locale = getLocaleFromSearchParams(params);
   const copy = getAiDocumentsCopy(locale);
   const workspaceCopy = getReferralWorkspaceCopy(locale);
+  const pointsUiEnabled = isCaresLinkV1PointsUiEnabled();
   const gate = await getWorkspaceAccessGateWithServerSession(params);
   const communicationNoteComposerEnabled =
-    isCommunicationNoteComposerEnabled();
+    pointsUiEnabled && isCommunicationNoteComposerEnabled();
 
   if (gate.status === "signed_out") {
     return (
@@ -98,12 +101,15 @@ export default async function AiDocumentsPage({
 
   const [savedDrafts, creditUsage] = await Promise.all([
     getOwnerDrafts(gate.account.id),
-    getCreditUsage(gate.account.id, gate.source === "supabase"),
+    pointsUiEnabled
+      ? Promise.resolve(null)
+      : getCreditUsage(gate.account.id, gate.source === "supabase"),
   ]);
   const latestDraft = savedDrafts[0];
 
   return (
     <AppShell
+      balanceNavigation={pointsUiEnabled ? "points" : "plan-usage"}
       locale={locale}
       languageSwitcherHref="/ai-documents"
       workspaceAccountId={accountParam}
@@ -120,15 +126,29 @@ export default async function AiDocumentsPage({
                 {copy.description}
               </p>
             </div>
-            <Link
-              href={href("/template-companion/ndis-case-note")}
-              className="coral-action w-full sm:w-auto"
-            >
-              <FileText className="size-4" aria-hidden="true" />
-              {copy.createCaseNote}
-            </Link>
+            {pointsUiEnabled ? (
+              <Link
+                href={href("/plan-and-usage")}
+                className="jade-action w-full sm:w-auto"
+              >
+                <Coins className="size-4" aria-hidden="true" />
+                {copy.viewPointsPreview}
+              </Link>
+            ) : (
+              <Link
+                href={href("/template-companion/ndis-case-note")}
+                className="coral-action w-full sm:w-auto"
+              >
+                <FileText className="size-4" aria-hidden="true" />
+                {copy.createCaseNote}
+              </Link>
+            )}
           </div>
-          <dl className="grid border-t border-line sm:grid-cols-3">
+          <dl
+            className={`grid border-t border-line ${
+              pointsUiEnabled ? "sm:grid-cols-2" : "sm:grid-cols-3"
+            }`}
+          >
             <DocumentStat label={copy.savedLabel} value={savedDrafts.length} />
             <DocumentStat
               label={copy.latestLabel}
@@ -138,17 +158,19 @@ export default async function AiDocumentsPage({
                   : copy.notYet
               }
             />
-            <DocumentStat
-              label={copy.creditsLabel}
-              value={
-                creditUsage
-                  ? copy.creditBalance(
-                      creditUsage.remainingCredits,
-                      creditUsage.creditLimit,
-                    )
-                  : copy.creditsUnavailable
-              }
-            />
+            {pointsUiEnabled ? null : (
+              <DocumentStat
+                label={copy.creditsLabel}
+                value={
+                  creditUsage
+                    ? copy.creditBalance(
+                        creditUsage.remainingCredits,
+                        creditUsage.creditLimit,
+                      )
+                    : copy.creditsUnavailable
+                }
+              />
+            )}
           </dl>
         </header>
 
@@ -163,11 +185,21 @@ export default async function AiDocumentsPage({
               </div>
               <div className="divide-y divide-line">
                 <DocumentToolRow
-                  href={href("/template-companion/ndis-case-note")}
+                  href={
+                    pointsUiEnabled
+                      ? undefined
+                      : href("/template-companion/ndis-case-note")
+                  }
                   title={copy.caseNoteTitle}
-                  description={copy.caseNoteDescription}
+                  description={
+                    pointsUiEnabled
+                      ? copy.caseNotePointsDescription
+                      : copy.caseNoteDescription
+                  }
                   status={
-                    creditUsage
+                    pointsUiEnabled
+                      ? copy.pointsPreviewStatus
+                      : creditUsage
                       ? copy.creditToolStatus(creditUsage.remainingCredits)
                       : copy.creditsUnavailable
                   }
@@ -240,7 +272,9 @@ export default async function AiDocumentsPage({
                     {copy.emptyTitle}
                   </p>
                   <p className="mt-2 max-w-xl text-sm leading-6 text-muted">
-                    {copy.emptyDescription}
+                    {pointsUiEnabled
+                      ? copy.emptyPointsDescription
+                      : copy.emptyDescription}
                   </p>
                 </div>
               )}
@@ -279,8 +313,14 @@ export default async function AiDocumentsPage({
               href={href("/plan-and-usage")}
               className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-brand hover:underline"
             >
-              <KeyRound className="size-4" aria-hidden="true" />
-              {copy.viewPlanUsage}
+              {pointsUiEnabled ? (
+                <Coins className="size-4" aria-hidden="true" />
+              ) : (
+                <KeyRound className="size-4" aria-hidden="true" />
+              )}
+              {pointsUiEnabled
+                ? copy.viewPointsPreview
+                : copy.viewPlanUsage}
             </Link>
           </aside>
         </div>
@@ -331,17 +371,14 @@ function DocumentToolRow({
   status,
   icon,
 }: {
-  href: string;
+  href?: string;
   title: string;
   description: string;
   status: string;
   icon: React.ReactNode;
 }) {
-  return (
-    <Link
-      href={href}
-      className="group grid gap-4 px-5 py-5 hover:bg-[#f8faf7] sm:grid-cols-[2.25rem_minmax(0,1fr)_auto] sm:items-center sm:px-6"
-    >
+  const content = (
+    <>
       <span className="text-brand">{icon}</span>
       <span className="min-w-0">
         <span className="block text-sm font-semibold text-foreground">
@@ -351,14 +388,35 @@ function DocumentToolRow({
           {description}
         </span>
       </span>
-      <span className="flex items-center gap-2 text-xs font-semibold text-brand">
+      <span
+        className={`flex items-center gap-2 text-xs font-semibold ${
+          href ? "text-brand" : "text-[#635f57]"
+        }`}
+      >
         {status}
-        <ArrowRight
-          className="size-4 transition group-hover:translate-x-0.5"
-          aria-hidden="true"
-        />
+        {href ? (
+          <ArrowRight
+            className="size-4 transition group-hover:translate-x-0.5"
+            aria-hidden="true"
+          />
+        ) : (
+          <LockKeyhole className="size-4" aria-hidden="true" />
+        )}
       </span>
+    </>
+  );
+
+  return href ? (
+    <Link
+      href={href}
+      className="group grid gap-4 px-5 py-5 hover:bg-[#f8faf7] sm:grid-cols-[2.25rem_minmax(0,1fr)_auto] sm:items-center sm:px-6"
+    >
+      {content}
     </Link>
+  ) : (
+    <div className="grid gap-4 bg-[#fafaf7] px-5 py-5 sm:grid-cols-[2.25rem_minmax(0,1fr)_auto] sm:items-center sm:px-6">
+      {content}
+    </div>
   );
 }
 
@@ -462,6 +520,7 @@ function getAiDocumentsCopy(locale: Locale) {
       description:
         "从一个明确任务开始。AI 只整理你提供的去标识化事实，最终内容由你复核后使用。",
       createCaseNote: "创建 Case Note 草稿",
+      viewPointsPreview: "查看 Points 预览",
       savedLabel: "已保存文档",
       latestLabel: "最近更新",
       workspaceLabel: "工作区状态",
@@ -479,6 +538,9 @@ function getAiDocumentsCopy(locale: Locale) {
       caseNoteTitle: "NDIS Case Note AI 助手",
       caseNoteDescription:
         "把去标识化的支持事实整理成中性、可复核的 case note 草稿。",
+      caseNotePointsDescription:
+        "此生成工具尚未连接 Points。你仍可在下方查看和删除已有草稿。",
+      pointsPreviewStatus: "Points 预览期间不可生成",
       communicationNoteTitle: "Communication Note 输入与隐私复核",
       communicationNoteDescription:
         "整理联系时间、渠道、参与角色和可观察事实；先在浏览器内完成隐私预检。",
@@ -496,6 +558,8 @@ function getAiDocumentsCopy(locale: Locale) {
       emptyTitle: "还没有保存的文档。",
       emptyDescription:
         "使用当前账号生成并保存 Case Note 草稿后，它会显示在这里。",
+      emptyPointsDescription:
+        "此预览启用前保存的草稿会显示在这里；新的 NDIS 生成目前不可用。",
       savedMetadataOnly: "已保存的引导式材料草稿",
       guidedLayer: "下一步",
       nextActionTitle: "先完成一份可复核的草稿",
@@ -528,6 +592,7 @@ function getAiDocumentsCopy(locale: Locale) {
     description:
       "Start with one defined task. AI organises only the de-identified facts you provide, and you review every draft before use.",
     createCaseNote: "Create case note draft",
+    viewPointsPreview: "View Points preview",
     savedLabel: "Saved documents",
     latestLabel: "Latest update",
     workspaceLabel: "Workspace status",
@@ -545,6 +610,9 @@ function getAiDocumentsCopy(locale: Locale) {
     caseNoteTitle: "NDIS Case Note AI Companion",
     caseNoteDescription:
       "Turn de-identified support facts into neutral case-note wording for review.",
+    caseNotePointsDescription:
+      "This generator is not yet connected to Points. Existing drafts remain available to review or delete below.",
+    pointsPreviewStatus: "Generation unavailable in Points preview",
     communicationNoteTitle: "Communication Note intake & privacy review",
     communicationNoteDescription:
       "Structure the contact time, channel, parties by role and observable facts, then complete a browser-only privacy preflight.",
@@ -562,6 +630,8 @@ function getAiDocumentsCopy(locale: Locale) {
     emptyTitle: "No saved documents yet.",
     emptyDescription:
       "Generate and save a case-note draft with this account, and it will appear here.",
+    emptyPointsDescription:
+      "Drafts saved before this preview will appear here. New NDIS generation is not currently available.",
     savedMetadataOnly: "Saved guided material draft",
     guidedLayer: "Next action",
     nextActionTitle: "Complete one reviewable draft first",

@@ -1034,7 +1034,7 @@ function getGenerationSurfaceCopy(
       FAILED: "Communication Note generation failed. The server has finalised the job.",
       CANCELLED: "Communication Note generation was cancelled by the server.",
     })[status],
-    error: () => "The server did not confirm whether this exact request was accepted. To avoid duplicate work, this page stays locked; check the same request safely.",
+    error: generationErrorEn,
   };
 }
 
@@ -1044,8 +1044,24 @@ function generationStatusZhHans(status: CommunicationNoteGenerationJob["status"]
 function generationStatusZhHant(status: CommunicationNoteGenerationJob["status"]) {
   return ({ QUEUED: "生成任務已排隊，Points 已由伺服器預留。", RUNNING: "正在生成；離開頁面不會取消伺服器任務。", SUCCEEDED: "Communication Note 草稿已由伺服器生成並儲存。", FAILED: "生成失敗，伺服器已結束該任務。", CANCELLED: "伺服器已取消生成任務。" })[status];
 }
-function generationErrorZhHans() { return "服务器未确认是否已接纳此精确请求。为避免重复生成，页面会保持锁定；请使用相同请求安全查询状态。"; }
-function generationErrorZhHant() { return "伺服器未確認是否已接納此精確請求。為避免重複生成，頁面會保持鎖定；請使用相同請求安全查詢狀態。"; }
+function generationErrorEn(code: string) {
+  const reason = code === "POINTS_INSUFFICIENT"
+    ? "The server reports insufficient Points. The page-load balance snapshot may be out of date. "
+    : "";
+  return `${reason}The server did not confirm whether this exact request was accepted. To avoid duplicate work, this page stays locked; check the same request safely.`;
+}
+function generationErrorZhHans(code: string) {
+  const reason = code === "POINTS_INSUFFICIENT"
+    ? "服务器报告 Points 余额不足。页面载入时的余额快照可能已过期。"
+    : "";
+  return `${reason}服务器未确认是否已接纳此精确请求。为避免重复生成，页面会保持锁定；请使用相同请求安全查询状态。`;
+}
+function generationErrorZhHant(code: string) {
+  const reason = code === "POINTS_INSUFFICIENT"
+    ? "伺服器回報 Points 餘額不足。頁面載入時的餘額快照可能已過期。"
+    : "";
+  return `${reason}伺服器未確認是否已接納此精確請求。為避免重複生成，頁面會保持鎖定；請使用相同請求安全查詢狀態。`;
+}
 function connectedPointsBalanceZhHans(preview: CommunicationNotePointsPreview, locale: CommunicationNoteComposerLocale) {
   return preview.status === "AVAILABLE" ? `页面载入时余额：可用 ${formatPointsNumber(preview.availablePoints, locale)} · 已预留 ${formatPointsNumber(preview.reservedPoints, locale)}` : preview.status === "NOT_READY" ? "此账户的 Points 余额尚未就绪。" : "Points 费率和余额不可用。";
 }

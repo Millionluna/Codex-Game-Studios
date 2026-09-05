@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { redirect } from "next/navigation";
+import { AppShell } from "@/components/app-shell";
 import {
   getAccountCreditStore,
   type AccountCreditSummary,
@@ -18,6 +20,7 @@ import {
   parseNdisCaseNoteMaterial,
   type NdisCaseNoteMaterial,
 } from "@/lib/ndis-case-note-companion";
+import { isCaresLinkV1PointsUiEnabled } from "@/lib/points-ui-feature.server";
 import { resolveWorkspaceAccountFromSupabaseSession } from "@/lib/referral-workspace-session";
 import { CARESLINK_AI_NOINDEX_ROBOTS } from "@/lib/seo-policy";
 import { createCareslinkServerSupabaseClient } from "@/lib/supabase-server";
@@ -56,6 +59,10 @@ export default async function NdisCaseNoteCompanionPage({
     redirect(`/referral-workspace?lang=${attribution.locale}`);
   }
 
+  if (isCaresLinkV1PointsUiEnabled()) {
+    return <NdisCaseNotePointsHoldingSurface locale={attribution.locale} />;
+  }
+
   const claimToken = getClaimToken(params);
   const claim = claimToken
     ? await getNdisCaseNoteCompanionStore().getClaim(claimToken)
@@ -78,6 +85,78 @@ export default async function NdisCaseNoteCompanionPage({
       initialCreditUsage={creditUsage}
     />
   );
+}
+
+function NdisCaseNotePointsHoldingSurface({
+  locale,
+}: {
+  locale: NdisCaseNoteCompanionAttribution["locale"];
+}) {
+  const copy = getPointsHoldingCopy(locale);
+  const localeQuery = `?lang=${encodeURIComponent(locale)}`;
+
+  return (
+    <AppShell
+      balanceNavigation="points"
+      locale={locale}
+      languageSwitcherHref={NDIS_CASE_NOTE_COMPANION_PATH}
+      workspaceRole="provider"
+      workspaceSessionSource="supabase"
+    >
+      <div className="mx-auto max-w-[920px]">
+        <section
+          aria-labelledby="ndis-points-transition-title"
+          className="document-paper p-6 sm:p-8"
+        >
+          <p className="micro-label text-brand">{copy.eyebrow}</p>
+          <h1
+            id="ndis-points-transition-title"
+            className="document-title mt-3"
+          >
+            {copy.title}
+          </h1>
+          <p className="mt-4 max-w-2xl text-sm leading-6 text-muted sm:text-base">
+            {copy.description}
+          </p>
+          <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+            <Link href={`/ai-documents${localeQuery}`} className="jade-action">
+              {copy.openDocuments}
+            </Link>
+            <Link
+              href={`/plan-and-usage${localeQuery}`}
+              className="inline-flex min-h-11 items-center justify-center rounded-md border border-line px-4 text-sm font-semibold text-brand hover:bg-white"
+            >
+              {copy.openPoints}
+            </Link>
+          </div>
+        </section>
+      </div>
+    </AppShell>
+  );
+}
+
+function getPointsHoldingCopy(
+  locale: NdisCaseNoteCompanionAttribution["locale"],
+) {
+  if (locale === "zh-Hans") {
+    return {
+      eyebrow: "Points 切换中",
+      title: "NDIS Case Note 助手暂时停用",
+      description:
+        "NDIS 生成功能正在切换到 Points 系统。打开此页面不会读取、预留或扣减任何余额。",
+      openDocuments: "返回 AI 文档",
+      openPoints: "查看 Points",
+    };
+  }
+
+  return {
+    eyebrow: "Points transition",
+    title: "NDIS Case Note Companion is paused",
+    description:
+      "NDIS generation is moving to the Points system. Opening this page does not read, reserve or deduct any balance.",
+    openDocuments: "Back to AI Documents",
+    openPoints: "View Points",
+  };
 }
 
 async function getAccountCreditSummary(

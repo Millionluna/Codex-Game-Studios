@@ -1,13 +1,14 @@
 ﻿import { renderToStaticMarkup } from "react-dom/server";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { getReferralWorkspaceCopy } from "../../lib/referral-workspace-i18n";
 
 const googleOAuthMock = vi.hoisted(() => ({
   isGoogleOAuthAvailable: vi.fn(async () => false),
 }));
 
+vi.mock("server-only", () => ({}));
 vi.mock("@/lib/google-oauth", () => ({
   isGoogleOAuthAvailable: googleOAuthMock.isGoogleOAuthAvailable,
 }));
@@ -15,6 +16,9 @@ vi.mock("@/lib/auth-page-context", async () =>
   import("../../lib/auth-page-context"),
 );
 vi.mock("@/lib/seo-policy", async () => import("../../lib/seo-policy"));
+vi.mock("@/lib/points-ui-feature.server", async () =>
+  import("../../lib/points-ui-feature.server"),
+);
 
 vi.mock("@/components/app-shell", async () =>
   import("../../components/app-shell"),
@@ -199,8 +203,13 @@ async function renderPage(
 }
 
 describe("auth and access gate pages", () => {
+  beforeEach(() => {
+    vi.stubEnv("CARESLINK_V1_POINTS_UI_ENABLED", "false");
+  });
+
   afterEach(() => {
     googleOAuthMock.isGoogleOAuthAvailable.mockResolvedValue(false);
+    vi.unstubAllEnvs();
   });
 
   it("renders localized login form without demo account choices", async () => {
@@ -300,7 +309,99 @@ describe("auth and access gate pages", () => {
     }
   });
 
-  it("shows AI Documents context and noindex metadata for its exact next route", async () => {
+  it("routes the exact-true NDIS auth context to a persistent Points cutover", async () => {
+    vi.stubEnv("CARESLINK_V1_POINTS_UI_ENABLED", "true");
+    const loginModule = await import("./login/page");
+    const registerModule = await import("./register/page");
+    const next =
+      "/template-companion/ndis-case-note?source=ndis-case-note-download&resourceSlug=ndis-case-note-template";
+    const loginMarkup = await renderPage(loginModule.default, {
+      lang: "en",
+      next,
+    });
+    const registerMarkup = await renderPage(registerModule.default, {
+      lang: "zh-Hans",
+      next,
+    });
+
+    expect(loginMarkup).toContain(
+      "Sign in to view available AI Documents tools and Points.",
+    );
+    expect(loginMarkup).toContain("NDIS Case Note Companion is paused");
+    expect(loginMarkup).toContain(
+      'name="next" value="/ai-documents?entry=ndis-case-note-points-cutover"',
+    );
+    expect(loginMarkup).toContain(
+      'href="/auth/register?next=%2Fai-documents%3Fentry%3Dndis-case-note-points-cutover&amp;lang=en"',
+    );
+    expect(loginMarkup).not.toContain("NDIS Case Note AI Companion");
+    expect(loginMarkup).not.toContain("Generate, review or save");
+    expect(loginMarkup).not.toContain("create guided document drafts");
+    expect(loginMarkup).not.toContain("Start from de-identified support facts");
+
+    expect(registerMarkup).toContain(
+      "创建账户后查看当前可用的 AI Documents 与 Points。",
+    );
+    expect(registerMarkup).toContain("NDIS Case Note 助手在 Points 切换期间暂停");
+    expect(registerMarkup).toContain(
+      'name="next" value="/ai-documents?entry=ndis-case-note-points-cutover"',
+    );
+    expect(registerMarkup).toContain(
+      'href="/auth/login?next=%2Fai-documents%3Fentry%3Dndis-case-note-points-cutover&amp;lang=zh-Hans"',
+    );
+    expect(registerMarkup).not.toContain("NDIS Case Note AI 助手");
+    expect(registerMarkup).not.toContain("生成、复核或保存草稿");
+    expect(registerMarkup).not.toContain("生成引导式文档草稿");
+    expect(registerMarkup).not.toContain("保存到你的账户");
+
+    await expect(
+      loginModule.generateMetadata({
+        searchParams: Promise.resolve({ lang: "en", next }),
+      }),
+    ).resolves.toMatchObject({
+      title: "NDIS Case Note paused · AI Documents & Points sign-in",
+    });
+    await expect(
+      registerModule.generateMetadata({
+        searchParams: Promise.resolve({ lang: "zh-Hans", next }),
+      }),
+    ).resolves.toMatchObject({
+      title: "NDIS Case Note 已暂停 · 注册 AI Documents 与 Points",
+    });
+
+    const persistedNext =
+      "/ai-documents?entry=ndis-case-note-points-cutover";
+    const persistedLoginMarkup = await renderPage(loginModule.default, {
+      lang: "zh-Hans",
+      next: persistedNext,
+    });
+    const persistedRegisterMarkup = await renderPage(registerModule.default, {
+      lang: "en",
+      next: persistedNext,
+    });
+
+    expect(persistedLoginMarkup).toContain("NDIS Case Note 助手在 Points 切换期间暂停");
+    expect(persistedRegisterMarkup).toContain(
+      "The NDIS Case Note Companion is paused during the Points transition.",
+    );
+  });
+
+  it("does not activate the Points auth cutover for a non-exact flag value", async () => {
+    vi.stubEnv("CARESLINK_V1_POINTS_UI_ENABLED", "TRUE");
+    const { default: LoginPage } = await import("./login/page");
+    const next = "/template-companion/ndis-case-note";
+    const markup = await renderPage(LoginPage, { lang: "en", next });
+
+    expect(markup).toContain(
+      "Sign in to continue to the NDIS Case Note Companion.",
+    );
+    expect(markup).toContain(
+      'name="next" value="/template-companion/ndis-case-note"',
+    );
+  });
+
+  it("keeps direct AI Documents copy and metadata under the exact-true Points flag", async () => {
+    vi.stubEnv("CARESLINK_V1_POINTS_UI_ENABLED", "true");
     const loginModule = await import("./login/page");
     const registerModule = await import("./register/page");
     const searchParams = { lang: "en", next: "/ai-documents" };

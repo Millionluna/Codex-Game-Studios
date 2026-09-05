@@ -1,5 +1,13 @@
 import type { Metadata } from "next";
-import { CalendarClock, Coins, FileText, ShieldCheck } from "lucide-react";
+import {
+  CalendarClock,
+  CircleAlert,
+  Coins,
+  FileText,
+  LogIn,
+  RefreshCw,
+  ShieldCheck,
+} from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
@@ -15,15 +23,28 @@ import {
   getReferralWorkspaceCopy,
   withLocale,
   type Locale,
+  type ReferralWorkspaceCopy,
 } from "@/lib/referral-workspace-i18n";
+import {
+  resolveCaresLinkV1PointsPageData,
+  type CaresLinkV1PointsPageData,
+} from "@/lib/v1/points-page-data.server";
+import { isCaresLinkV1PointsUiEnabled } from "@/lib/points-ui-feature.server";
 
 type SearchParams = Record<string, string | string[] | undefined>;
 
 export const metadata: Metadata = {
   title: "Plan & Usage",
-  description: "Review the current free plan and metadata-only credit usage.",
+  description: "Review account access and usage information.",
   robots: { index: false, follow: false },
 };
+
+export const dynamic = "force-dynamic";
+
+const AUTH_REQUIRED_POINTS_PAGE_DATA = Object.freeze({
+  status: "AUTH_REQUIRED",
+  unit: "POINTS",
+}) satisfies CaresLinkV1PointsPageData;
 
 export default async function PlanAndUsagePage({
   searchParams,
@@ -34,12 +55,17 @@ export default async function PlanAndUsagePage({
   const locale = getLocaleFromSearchParams(params);
   const copy = getPlanUsageCopy(locale);
   const workspaceCopy = getReferralWorkspaceCopy(locale);
+  const pointsUiEnabled = isCaresLinkV1PointsUiEnabled();
   const gate = await getWorkspaceAccessGateWithServerSession(params);
 
   if (gate.status === "signed_out") {
     return (
       <ReferralWorkspaceLoginGate
-        copy={workspaceCopy}
+        copy={
+          pointsUiEnabled
+            ? getPointsLoginWorkspaceCopy(workspaceCopy, locale)
+            : workspaceCopy
+        }
         locale={locale}
         languageSwitcherHref="/plan-and-usage"
         loginHref="/auth/login?next=%2Fplan-and-usage"
@@ -55,6 +81,36 @@ export default async function PlanAndUsagePage({
   const accountParam = gate.source === "demo" ? gate.account.id : undefined;
   const href = (path: string) =>
     withWorkspaceAccount(withLocale(path, locale), accountParam);
+
+  if (pointsUiEnabled) {
+    const points =
+      gate.source === "supabase"
+        ? await resolveCaresLinkV1PointsPageData()
+        : AUTH_REQUIRED_POINTS_PAGE_DATA;
+
+    return (
+      <AppShell
+        balanceNavigation="points"
+        locale={locale}
+        languageSwitcherHref="/plan-and-usage"
+        workspaceAccountId={accountParam}
+        workspaceRole="provider"
+        workspaceSessionSource={gate.source}
+      >
+        <PointsPreviewSurface
+          data={points}
+          locale={locale}
+          openDocumentsHref={href("/ai-documents")}
+          refreshHref={href("/plan-and-usage")}
+          signInHref={withLocale(
+            "/auth/login?next=%2Fplan-and-usage",
+            locale,
+          )}
+        />
+      </AppShell>
+    );
+  }
+
   const usage =
     gate.source === "supabase"
       ? await getUsageSafely(gate.account.id)
@@ -184,6 +240,311 @@ export default async function PlanAndUsagePage({
       </div>
     </AppShell>
   );
+}
+
+function PointsPreviewSurface({
+  data,
+  locale,
+  openDocumentsHref,
+  refreshHref,
+  signInHref,
+}: {
+  data: CaresLinkV1PointsPageData;
+  locale: Locale;
+  openDocumentsHref: string;
+  refreshHref: string;
+  signInHref: string;
+}) {
+  const copy = getPointsPreviewCopy(locale);
+
+  return (
+    <div className="mx-auto max-w-[1180px]">
+      <header className="document-paper overflow-hidden">
+        <div className="grid gap-6 p-6 sm:p-8 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
+          <div>
+            <div className="flex items-center gap-2 text-brand">
+              <Coins className="size-4" aria-hidden="true" />
+              <p className="micro-label">{copy.eyebrow}</p>
+            </div>
+            <h1 className="document-title mt-3">{copy.title}</h1>
+            <p className="mt-4 max-w-2xl text-sm leading-6 text-muted sm:text-base">
+              {copy.description}
+            </p>
+            <span className="workspace-status-pill workspace-status-pill--locked mt-4">
+              {copy.previewStatus}
+            </span>
+          </div>
+          <Link
+            href={openDocumentsHref}
+            className="jade-action w-full sm:w-auto"
+          >
+            <FileText className="size-4" aria-hidden="true" />
+            {copy.openDocuments}
+          </Link>
+        </div>
+      </header>
+
+      <section
+        className="document-paper mt-4 overflow-hidden"
+        aria-live="polite"
+        aria-atomic="true"
+      >
+        <div className="px-5 py-5 sm:px-6">
+          <h2 className="text-lg font-semibold text-foreground">
+            {copy.balanceTitle}
+          </h2>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-[#405b52]">
+            {copy.balanceDescription}
+          </p>
+        </div>
+        <PointsPreviewState
+          copy={copy}
+          data={data}
+          locale={locale}
+          refreshHref={refreshHref}
+          signInHref={signInHref}
+        />
+      </section>
+
+      <aside className="care-glass mt-4 p-5 sm:p-6">
+        <div className="flex items-center gap-2 text-brand">
+          <ShieldCheck className="size-4" aria-hidden="true" />
+          <h2 className="text-base font-semibold text-foreground">
+            {copy.boundaryTitle}
+          </h2>
+        </div>
+        <p className="mt-3 max-w-3xl text-sm leading-6 text-[#385249]">
+          {copy.boundary}
+        </p>
+      </aside>
+    </div>
+  );
+}
+
+function PointsPreviewState({
+  copy,
+  data,
+  locale,
+  refreshHref,
+  signInHref,
+}: {
+  copy: ReturnType<typeof getPointsPreviewCopy>;
+  data: CaresLinkV1PointsPageData;
+  locale: Locale;
+  refreshHref: string;
+  signInHref: string;
+}) {
+  if (data.status === "AVAILABLE") {
+    return (
+      <>
+        <dl className="grid border-t border-line sm:grid-cols-2">
+          <PointsMetric
+            label={copy.availablePoints}
+            locale={locale}
+            value={data.availablePoints}
+          />
+          <PointsMetric
+            label={copy.reservedPoints}
+            locale={locale}
+            value={data.reservedPoints}
+          />
+        </dl>
+        <div className="flex flex-wrap items-center gap-2 border-t border-line px-5 py-4 text-sm leading-6 text-[#405b52] sm:px-6">
+          <CalendarClock className="size-4 shrink-0" aria-hidden="true" />
+          <p>
+            {copy.readOnly} {copy.checkedAt(formatPointsTimestamp(data.serverTime, locale))}
+          </p>
+        </div>
+      </>
+    );
+  }
+
+  if (data.status === "NOT_READY") {
+    return (
+      <PointsStateMessage
+        actionHref={refreshHref}
+        actionLabel={copy.tryAgain}
+        detail={copy.notReadyDetail}
+        icon={CalendarClock}
+        title={copy.notReadyTitle}
+      />
+    );
+  }
+
+  if (data.status === "AUTH_REQUIRED") {
+    return (
+      <PointsStateMessage
+        actionHref={signInHref}
+        actionLabel={copy.signIn}
+        detail={copy.authDetail}
+        icon={LogIn}
+        title={copy.authTitle}
+      />
+    );
+  }
+
+  return (
+    <PointsStateMessage
+      actionHref={refreshHref}
+      actionLabel={copy.tryAgain}
+      detail={copy.unavailableDetail}
+      icon={CircleAlert}
+      role="alert"
+      title={copy.unavailableTitle}
+    />
+  );
+}
+
+function PointsMetric({
+  label,
+  locale,
+  value,
+}: {
+  label: string;
+  locale: Locale;
+  value: number;
+}) {
+  return (
+    <div className="border-b border-line px-5 py-5 last:border-b-0 sm:border-b-0 sm:border-r sm:last:border-r-0 sm:px-6">
+      <dt className="text-sm font-semibold text-[#405b52]">{label}</dt>
+      <dd className="mt-3 text-3xl font-semibold tabular-nums text-foreground">
+        {value.toLocaleString(locale === "zh-Hans" ? "zh-CN" : "en-AU")}
+      </dd>
+    </div>
+  );
+}
+
+function PointsStateMessage({
+  actionHref,
+  actionLabel,
+  detail,
+  icon: Icon,
+  role,
+  title,
+}: {
+  actionHref: string;
+  actionLabel: string;
+  detail: string;
+  icon: typeof CalendarClock;
+  role?: "alert";
+  title: string;
+}) {
+  return (
+    <div className="border-t border-line px-5 py-8 sm:px-6 sm:py-10" role={role}>
+      <div className="flex size-10 items-center justify-center rounded-md bg-brand-soft text-brand">
+        <Icon className="size-5" aria-hidden="true" />
+      </div>
+      <h3 className="mt-4 text-lg font-semibold text-foreground">{title}</h3>
+      <p className="mt-2 max-w-2xl text-sm leading-6 text-[#405b52]">
+        {detail}
+      </p>
+      <Link href={actionHref} className="taito-secondary mt-5 w-full sm:w-auto">
+        {Icon === LogIn ? (
+          <LogIn className="size-4" aria-hidden="true" />
+        ) : (
+          <RefreshCw className="size-4" aria-hidden="true" />
+        )}
+        {actionLabel}
+      </Link>
+    </div>
+  );
+}
+
+function getPointsLoginWorkspaceCopy(
+  workspaceCopy: ReferralWorkspaceCopy,
+  locale: Locale,
+): ReferralWorkspaceCopy {
+  const pointsCopy = getPointsPreviewCopy(locale);
+
+  return {
+    ...workspaceCopy,
+    auth: {
+      ...workspaceCopy.auth,
+      gate: {
+        ...workspaceCopy.auth.gate,
+        eyebrow: pointsCopy.eyebrow,
+        title: pointsCopy.signInTitle,
+        description: pointsCopy.signInDescription,
+        loginCta: pointsCopy.signIn,
+        registerCta: pointsCopy.register,
+        previewBoundary: pointsCopy.boundary,
+      },
+    },
+  };
+}
+
+function formatPointsTimestamp(value: string, locale: Locale) {
+  return new Intl.DateTimeFormat(locale === "zh-Hans" ? "zh-CN" : "en-AU", {
+    dateStyle: "medium",
+    timeStyle: "short",
+    timeZone: "UTC",
+  }).format(new Date(value));
+}
+
+function getPointsPreviewCopy(locale: Locale) {
+  if (locale === "zh-Hans") {
+    return {
+      eyebrow: "Points 预览",
+      title: "Points 余额",
+      description: "显示当前已验证服务商账户的只读 Points 余额。",
+      previewStatus: "预览 · 尚未启用",
+      openDocuments: "打开 AI 文档",
+      balanceTitle: "余额快照",
+      balanceDescription: "服务器会根据当前有效会话重新核验此余额。",
+      availablePoints: "预览 Points 余额",
+      reservedPoints: "已预留 Points",
+      readOnly: "这是只读预览，此余额目前不能使用。",
+      checkedAt: (date: string) => `核验时间：${date} UTC。`,
+      notReadyTitle: "Points 预览尚未就绪",
+      notReadyDetail: "此账户目前没有可显示的预览余额，请稍后再试。",
+      unavailableTitle: "暂时无法载入 Points 预览",
+      unavailableDetail: "此页面没有预留或使用 Points，请重试。",
+      authTitle: "需要已验证的登录会话",
+      authDetail: "请使用服务商账户登录，以查看 Points 预览。",
+      tryAgain: "重新载入 Points",
+      signIn: "登录查看 Points",
+      signInTitle: "登录查看 Points 预览",
+      signInDescription: "使用已验证的服务商账户查看当前只读 Points 余额。",
+      register: "创建服务商账户",
+      boundaryTitle: "预览边界",
+      boundary:
+        "此页面只读取服务器核验的余额快照，不能发放、购买、预留、使用或转换 Points。",
+    };
+  }
+
+  return {
+    eyebrow: "Points preview",
+    title: "Points",
+    description:
+      "Read-only balance information for the current verified provider account.",
+    previewStatus: "Preview · not active",
+    openDocuments: "Open AI Documents",
+    balanceTitle: "Balance snapshot",
+    balanceDescription:
+      "The server verifies this balance for the current active session.",
+    availablePoints: "Preview Points balance",
+    reservedPoints: "Reserved Points",
+    readOnly: "Read-only preview. This balance cannot be used yet.",
+    checkedAt: (date: string) => `Checked ${date} UTC.`,
+    notReadyTitle: "Your Points preview isn’t ready yet",
+    notReadyDetail:
+      "No preview balance is available for this account yet. Try again later.",
+    unavailableTitle: "We can’t load the Points preview right now",
+    unavailableDetail:
+      "This page did not reserve or use Points. Try again.",
+    authTitle: "A verified sign-in is required",
+    authDetail:
+      "Sign in with your provider account to view the Points preview.",
+    tryAgain: "Reload Points",
+    signIn: "Sign in to view Points",
+    signInTitle: "Sign in to view your Points preview",
+    signInDescription:
+      "Use your verified provider account to view the current read-only Points balance.",
+    register: "Create provider account",
+    boundaryTitle: "Preview boundary",
+    boundary:
+      "This surface only reads a server-verified balance snapshot. It cannot grant, purchase, reserve, use or convert Points.",
+  };
 }
 
 function UsageMetric({ label, value }: { label: string; value: number }) {

@@ -88,6 +88,24 @@ describe("AppShell", () => {
     expect(markup).not.toContain("account=");
   });
 
+  it("labels the balance destination as Points only for an explicit cutover surface", () => {
+    const markup = renderToStaticMarkup(
+      <AppShell
+        balanceNavigation="points"
+        locale="en"
+        languageSwitcherHref="/ai-documents"
+        workspaceRole="provider"
+        workspaceSessionSource="supabase"
+      >
+        <div>Points cutover workspace</div>
+      </AppShell>,
+    );
+
+    expect(markup).toContain('href="/plan-and-usage?lang=en"');
+    expect(markup).toContain(">Points<");
+    expect(markup).not.toContain("Plan &amp; Usage");
+  });
+
   it("shows only admin navigation for a real admin session", () => {
     const markup = renderToStaticMarkup(
       <AppShell

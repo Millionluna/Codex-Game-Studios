@@ -24,6 +24,7 @@ describe("Supabase server auth client", () => {
       },
     };
     const createServerClient = vi.fn(() => createdClient);
+    const responseHeaders = { set: vi.fn() };
 
     const client = await createCareslinkServerSupabaseClient({
       env: {
@@ -33,6 +34,7 @@ describe("Supabase server auth client", () => {
       },
       cookieStore,
       createServerClient,
+      responseHeaders,
     });
 
     expect(client).toBe(createdClient);
@@ -59,6 +61,7 @@ describe("Supabase server auth client", () => {
               value: string;
               options: Record<string, unknown>;
             }>,
+            headers: Record<string, string>,
           ): void;
         };
       },
@@ -67,18 +70,31 @@ describe("Supabase server auth client", () => {
 
     expect(cookies.getAll()).toEqual([{ name: "sb-access-token", value: "token" }]);
 
-    cookies.setAll([
+    cookies.setAll(
+      [
+        {
+          name: "sb-refresh-token",
+          value: "refresh",
+          options: { path: "/", httpOnly: true },
+        },
+      ],
       {
-        name: "sb-refresh-token",
-        value: "refresh",
-        options: { path: "/", httpOnly: true },
+        "Cache-Control": "private, no-store",
+        Expires: "0",
+        Pragma: "no-cache",
       },
-    ]);
+    );
 
     expect(cookieStore.set).toHaveBeenCalledWith("sb-refresh-token", "refresh", {
       path: "/",
       httpOnly: true,
     });
+    expect(responseHeaders.set).toHaveBeenCalledWith(
+      "Cache-Control",
+      "private, no-store",
+    );
+    expect(responseHeaders.set).toHaveBeenCalledWith("Expires", "0");
+    expect(responseHeaders.set).toHaveBeenCalledWith("Pragma", "no-cache");
   });
 
   it("returns no client when public Supabase auth env is missing", async () => {

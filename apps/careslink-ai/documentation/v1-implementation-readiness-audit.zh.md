@@ -286,7 +286,7 @@ NDIS pilot 质量的评分。
 2. 旧 credit 与新 Points 语义冲突，不能并行显示两套余额。
 3. Shadow revision model 尚未接入数据库或 route；`generated_material_drafts` 仍不是 canonical revision model，无法承诺跨端恢复和 export snapshot。
 4. Shadow contract 支持 `zh-Hant`，但现有 runtime locale/UI/output 仍缺失；不能静默 fallback。
-5. 生产 refresh-token error cluster 需要根因、cookie cleanup与 recovery negative tests。
+5. 生产 refresh-token error cluster 已在 2026-09-04 获得本地 source 修复与可复现负向测试：Next 16 Proxy 会传播刷新/删除 Cookie 和 Supabase 防缓存头，真实 `@supabase/ssr` 配合本地 fake Auth 的 `refresh_token_not_found` 路径已通过；完整 234 文件 / 3,351 测试及 64/64 页面 production build 通过并识别 Proxy。但尚无 Vercel Preview、真实 Supabase Auth 或 Production recovery 证据，因此受保护、可销毁 Preview E2E 仍是发布阻断。
 6. service-role 写路径较多；target domain必须缩小到 RPC/owner-safe API，不应复制 legacy pattern。
 
 ### 负责人需再次批准的生产决策

@@ -5,6 +5,9 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 import {
+  acquireCommunicationNotePreviewMigrationHistoryLock,
+  createSafeTransactionalMigrationFailureEvidence,
+  initializeMissingPreviewMigrationHistory,
   parseTransactionalMigrationArguments,
   runTransactionalMigrationHarness,
 } from
@@ -12,6 +15,7 @@ import {
 import {
   COMMUNICATION_NOTE_PREVIEW_TRANSACTIONAL_MIGRATION_POLICY as POLICY,
   CommunicationNotePreviewTransactionalMigrationPolicyError,
+  extractDirectCareslinkRoleCreations,
   isTransactionControlStatement,
   loadPinnedCommunicationNotePreviewMigrations,
   splitSupabaseCliMigrationStatements,
@@ -22,10 +26,40 @@ const RUNNER_PATH = fileURLToPath(new URL(
   "./communication-note-preview-transactional-migrations.mjs",
   import.meta.url,
 ));
+const SENTINEL_DATABASE_ERROR =
+  "sentinel-database-error-must-never-reach-diagnostics";
+
+function transactionFailure(checkpoint, migrationOrdinal) {
+  return {
+    stage: "M00",
+    errorType: "TRANSACTIONAL_MIGRATION_TRANSACTION_FAILED",
+    checkpoint,
+    ...(migrationOrdinal === undefined ? {} : { migrationOrdinal }),
+  };
+}
+
+function preconditionFailure(checkpoint) {
+  return {
+    stage: "M00",
+    errorType: "TRANSACTIONAL_MIGRATION_RESET_PRECONDITION_INVALID",
+    checkpoint,
+  };
+}
+
+function postcheckFailure(checkpoint) {
+  return {
+    stage: "M00",
+    errorType: "TRANSACTIONAL_MIGRATION_POSTCHECK_FAILED",
+    checkpoint,
+  };
+}
 
 describe("Communication Note Preview transactional migration policy", () => {
   it("pins all 46 repository migrations and removes only 26 known wrappers in memory", async () => {
     const bundle = await loadPinnedCommunicationNotePreviewMigrations();
+    expect(POLICY.version).toBe(
+      "2026-09-05.preview-transactional-migrations.18",
+    );
     expect(bundle).toMatchObject({
       manifestSha256: POLICY.manifestSha256,
       outerTransactionCount: 26,
@@ -161,6 +195,37 @@ describe("Communication Note Preview transactional migration policy", () => {
     expect(signedMigration.executionSql).toMatch(/lock\s+table/i);
   });
 
+  it("keeps the permanent application-role policy synchronized with migrations", async () => {
+    const bundle = await loadPinnedCommunicationNotePreviewMigrations();
+    const createdRoles = bundle.migrations.flatMap((entry) =>
+      extractDirectCareslinkRoleCreations(entry.statements)
+    ).sort();
+
+    expect(createdRoles).toEqual([...new Set(createdRoles)]);
+    expect(createdRoles).toEqual(POLICY.applicationRoles);
+    expect(createdRoles).toContain(
+      "careslink_v1_generation_points_admission_caller",
+    );
+  });
+
+  it("extracts only direct unquoted application role creations", () => {
+    expect(extractDirectCareslinkRoleCreations([
+      "-- create role careslink_comment\nselect 'create role careslink_string'",
+      "do $$ begin execute 'create role careslink_dynamic'; end $$",
+      "/* outer /* nested */ done */ CREATE /* gap */ ROLE careslink_direct nologin",
+      "create role unrelated_role nologin",
+    ])).toEqual(["careslink_direct"]);
+
+    for (const unsupported of [
+      'create role "careslink_quoted" nologin',
+      "create user careslink_user nologin",
+      "create group careslink_group",
+    ]) {
+      expect(() => extractDirectCareslinkRoleCreations([unsupported]))
+        .toThrowError("TRANSACTIONAL_MIGRATION_SQL_INVALID");
+    }
+  });
+
   it("matches the CLI statement boundary contract for quotes, comments, dollar bodies and parentheses", () => {
     const statements = splitSupabaseCliMigrationStatements(`
       -- header ; stays attached
@@ -267,6 +332,23 @@ describe("Communication Note Preview transactional migration policy", () => {
     expect(source).toMatch(
       /array_agg\(\s*relation\.relname::pg_catalog\.text/gu,
     );
+    const postcheckCalls = [...source.matchAll(
+      /fail\(\s*"TRANSACTIONAL_MIGRATION_POSTCHECK_FAILED",\s*"([a-z_]+)",?\s*\)/gu,
+    )].map((match) => match[1]).sort();
+    const allPostcheckFailCalls = source.match(
+      /fail\(\s*"TRANSACTIONAL_MIGRATION_POSTCHECK_FAILED"/gu,
+    ) ?? [];
+    expect(allPostcheckFailCalls).toHaveLength(postcheckCalls.length);
+    expect(postcheckCalls).toEqual([
+      "application_roles",
+      "committed_history",
+      "connection_postcommit",
+      "rebuilt_state",
+      "reset_namespace_and_globals",
+      "staged_history",
+      "system_data_precommit",
+      "temporary_residue_or_connection",
+    ]);
   });
 
   it("requires the exact disposable Preview reset authorization argument", () => {
@@ -343,6 +425,107 @@ describe("Communication Note Preview transactional migration policy", () => {
 });
 
 describe("Communication Note Preview transactional migration runtime", () => {
+  it("initializes only an absent history schema and records no fabricated baseline", async () => {
+    const client = new FakeMigrationClient({ historySchemaMissing: true });
+    const evidence = await runTransactionalMigrationHarness(harnessInput(client));
+    expect(evidence).toMatchObject({
+      baselineMigrations: 0,
+      migrationHistoryInitialized: true,
+      baselineHistorySha256: POLICY.emptyMigrationHistorySha256,
+      migrations: 1,
+      appliedInSingleTransaction: 1,
+    });
+    const schemaIndex = client.events.indexOf(
+      "create schema supabase_migrations authorization postgres",
+    );
+    const lockIndex = client.events.findIndex((sql) =>
+      sql.startsWith("lock table supabase_migrations.schema_migrations")
+    );
+    expect(schemaIndex).toBeGreaterThan(client.events.findIndex((sql) =>
+      sql.includes("pg_try_advisory_xact_lock")
+    ));
+    expect(schemaIndex).toBeLessThan(lockIndex);
+    expect(client.events.some((sql) => /create.*if not exists/iu.test(sql))).toBe(false);
+    expect(client.events.some((sql) => /^grant /iu.test(sql))).toBe(false);
+    expect(client.historySchemaExists).toBe(true);
+    expect(client.historyTableExists).toBe(true);
+    expect(client.history).toEqual([{
+      version: "20260101000000", name: "one", statements: ["select 1"],
+    }]);
+    expect(client.historyRecordCount).toBe(1);
+  });
+
+  it("does not repair a partial existing history schema", async () => {
+    const client = new FakeMigrationClient({ historyTableMissing: true });
+    let failure;
+    try { await runTransactionalMigrationHarness(harnessInput(client)); }
+    catch (error) { failure = error; }
+    expect(createSafeTransactionalMigrationFailureEvidence(failure)).toEqual(
+      transactionFailure("migration_history_lock_relation_missing"),
+    );
+    expect(client.events.some((sql) => sql.startsWith("create "))).toBe(false);
+    expect(client.events.at(-1)).toBe("rollback");
+    expect(client.historySchemaExists).toBe(true);
+    expect(client.historyTableExists).toBe(false);
+  });
+
+  it.each([
+    { historySchemaMissing: false, baselineHistoryCount: 0,
+      baselineHistorySha256: POLICY.emptyMigrationHistorySha256 },
+    { historySchemaMissing: true, baselineHistoryCount: 19,
+      baselineHistorySha256: POLICY.disposablePreviewBaselineHistorySha256 },
+    { historySchemaMissing: true, baselineHistoryCount: 0,
+      baselineHistorySha256: POLICY.disposablePreviewBaselineHistorySha256 },
+  ])("rejects an incompatible history baseline: %j", async (options) => {
+    const client = new FakeMigrationClient(options);
+    await expect(runTransactionalMigrationHarness(harnessInput(client))).rejects
+      .toMatchObject({
+        code: "TRANSACTIONAL_MIGRATION_RESET_PRECONDITION_INVALID",
+        checkpoint: "baseline_history",
+      });
+    expect(client.events).not.toContain("delete from supabase_migrations.schema_migrations");
+    expect(client.schemaRebuilt).toBe(false);
+    expect(client.historySchemaExists).toBe(!options.historySchemaMissing);
+    expect(client.historyRecordCount).toBe(0);
+  });
+
+  it("rejects malformed schema observations without running DDL", async () => {
+    for (const observed of [
+      { rowCount: 0, rows: [] },
+      { rowCount: 2, rows: [{ migration_history_schema_missing: true }] },
+      { rowCount: 1, rows: [{ migration_history_schema_missing: "true" }] },
+      { rowCount: 1, rows: [{}] },
+    ]) {
+      const queries = [];
+      let failure;
+      try {
+        await initializeMissingPreviewMigrationHistory({
+          async query(sql) { queries.push(sql); return observed; },
+        });
+      } catch (error) { failure = error; }
+      expect(createSafeTransactionalMigrationFailureEvidence(failure)).toEqual(
+        transactionFailure("inspect_migration_history_schema"),
+      );
+      expect(queries).toHaveLength(1);
+    }
+  });
+
+  it("keeps an initialization failure when rollback also fails", async () => {
+    const client = new FakeMigrationClient({
+      historySchemaMissing: true, rollbackFails: true,
+      queryFailureIncludes: "create table supabase_migrations.schema_migrations",
+    });
+    let failure;
+    try { await runTransactionalMigrationHarness(harnessInput(client)); }
+    catch (error) { failure = error; }
+    expect(createSafeTransactionalMigrationFailureEvidence(failure)).toEqual(
+      transactionFailure("create_migration_history_table"),
+    );
+    expect(client.events.at(-1)).toBe("rollback");
+    expect(client.events).not.toContain("commit");
+    expect(JSON.stringify(failure)).not.toContain(SENTINEL_DATABASE_ERROR);
+  });
+
   it("commits schema and history together and verifies the committed history", async () => {
     const migrations = [migration("20260101000000", "one")];
     const client = new FakeMigrationClient();
@@ -360,6 +543,7 @@ describe("Communication Note Preview transactional migration runtime", () => {
       postgres: 17,
       migrations: 1,
       baselineMigrations: 19,
+      migrationHistoryInitialized: false,
       appliedInSingleTransaction: 1,
       migrationParserContractVersion: "2.115.0",
       isolationLevel: "read_committed_with_explicit_table_locks",
@@ -445,16 +629,44 @@ describe("Communication Note Preview transactional migration runtime", () => {
       migrationFails: true,
       initialHistory,
     });
-    await expect(runTransactionalMigrationHarness({
-      client,
-      backgroundState: { failed: false },
-      expectedPostgresMajor: 17,
-      resetAuthorizationSha256:
-        POLICY.disposablePreviewBaselineHistorySha256,
-      migrations: [migration("20260101000000", "one")],
-      manifestSha256: "b".repeat(64),
-      outerTransactionCount: 0,
-    })).rejects.toThrowError("TRANSACTIONAL_MIGRATION_TRANSACTION_FAILED");
+    let failure;
+    try {
+      await runTransactionalMigrationHarness({
+        client,
+        backgroundState: { failed: false },
+        expectedPostgresMajor: 17,
+        resetAuthorizationSha256:
+          POLICY.disposablePreviewBaselineHistorySha256,
+        migrations: [migration("20260101000000", "one")],
+        manifestSha256: "b".repeat(64),
+        outerTransactionCount: 0,
+      });
+    } catch (error) {
+      failure = error;
+    }
+    expect(failure).toMatchObject({
+      code: "TRANSACTIONAL_MIGRATION_TRANSACTION_FAILED",
+      checkpoint: "execute_migration",
+      migrationOrdinal: 1,
+    });
+    const diagnostic = createSafeTransactionalMigrationFailureEvidence(
+      failure,
+    );
+    expect(diagnostic).toEqual({
+      stage: "M00",
+      errorType: "TRANSACTIONAL_MIGRATION_TRANSACTION_FAILED",
+      checkpoint: "execute_migration",
+      migrationOrdinal: 1,
+    });
+    expect(JSON.stringify({ failure, diagnostic })).not.toContain(
+      SENTINEL_DATABASE_ERROR,
+    );
+    for (const invalidOrdinal of [0, 47, 1.5, "1", null]) {
+      failure.migrationOrdinal = invalidOrdinal;
+      expect(createSafeTransactionalMigrationFailureEvidence(failure)).toEqual(
+        transactionFailure("execute_migration"),
+      );
+    }
     expect(client.events.filter((event) =>
       event.startsWith("drop function ")
     )).toHaveLength(1);
@@ -466,7 +678,374 @@ describe("Communication Note Preview transactional migration runtime", () => {
     expect(client.schemaRebuilt).toBe(false);
   });
 
-  it("fails closed before reset when the hosted baseline or zero-data proof differs", async () => {
+  it("reports only the bounded ordinal for a later migration failure", async () => {
+    const client = new FakeMigrationClient({
+      migrationFailureSql: "select 2;",
+    });
+    const migrations = [
+      migration("20260101000000", "one"),
+      migration("20260101000001", "two", "select 2"),
+    ];
+
+    await expect(runTransactionalMigrationHarness({
+      client,
+      backgroundState: { failed: false },
+      expectedPostgresMajor: 17,
+      resetAuthorizationSha256:
+        POLICY.disposablePreviewBaselineHistorySha256,
+      migrations,
+      manifestSha256: "b".repeat(64),
+      outerTransactionCount: 0,
+    })).rejects.toMatchObject({
+      code: "TRANSACTIONAL_MIGRATION_TRANSACTION_FAILED",
+      checkpoint: "execute_migration",
+      migrationOrdinal: 2,
+    });
+    expect(client.events).toContain("rollback");
+    expect(client.history).toEqual([]);
+  });
+
+  it("distinguishes migration execution from history recording", async () => {
+    const client = new FakeMigrationClient({
+      historyRecordFailureOrdinal: 2,
+    });
+    const migrations = [
+      migration("20260101000000", "one"),
+      migration("20260101000001", "two", "select 2"),
+    ];
+
+    await expect(runTransactionalMigrationHarness({
+      client,
+      backgroundState: { failed: false },
+      expectedPostgresMajor: 17,
+      resetAuthorizationSha256:
+        POLICY.disposablePreviewBaselineHistorySha256,
+      migrations,
+      manifestSha256: "b".repeat(64),
+      outerTransactionCount: 0,
+    })).rejects.toMatchObject({
+      code: "TRANSACTIONAL_MIGRATION_TRANSACTION_FAILED",
+      checkpoint: "record_migration_history",
+      migrationOrdinal: 2,
+    });
+    expect(client.events).toContain("rollback");
+    expect(client.history).toEqual([]);
+  });
+
+  it("attaches a fixed non-migration transaction checkpoint without an ordinal", async () => {
+    const client = new FakeMigrationClient({
+      queryFailureIncludes: "set local lock_timeout",
+    });
+
+    let failure;
+    try {
+      await runTransactionalMigrationHarness({
+        client,
+        backgroundState: { failed: false },
+        expectedPostgresMajor: 17,
+        resetAuthorizationSha256:
+          POLICY.disposablePreviewBaselineHistorySha256,
+        migrations: [migration("20260101000000", "one")],
+        manifestSha256: "b".repeat(64),
+        outerTransactionCount: 0,
+      });
+    } catch (error) {
+      failure = error;
+    }
+    expect(failure).toMatchObject({
+      code: "TRANSACTIONAL_MIGRATION_TRANSACTION_FAILED",
+      checkpoint: "configure_lock_timeout",
+    });
+    expect(failure).not.toHaveProperty("migrationOrdinal");
+    expect(createSafeTransactionalMigrationFailureEvidence(failure)).toEqual({
+      stage: "M00",
+      errorType: "TRANSACTIONAL_MIGRATION_TRANSACTION_FAILED",
+      checkpoint: "configure_lock_timeout",
+    });
+    expect(client.events).toContain("rollback");
+  });
+
+  it("maps a committed-history query error to the existing postcheck checkpoint", async () => {
+    const client = new FakeMigrationClient({
+      queryFailureIncludes:
+        "select version, coalesce(name, '') as name, statements",
+      queryFailureOccurrence: 3,
+    });
+
+    await expect(runTransactionalMigrationHarness({
+      client,
+      backgroundState: { failed: false },
+      expectedPostgresMajor: 17,
+      resetAuthorizationSha256:
+        POLICY.disposablePreviewBaselineHistorySha256,
+      migrations: [migration("20260101000000", "one")],
+      manifestSha256: "b".repeat(64),
+      outerTransactionCount: 0,
+    })).rejects.toMatchObject({
+      code: "TRANSACTIONAL_MIGRATION_POSTCHECK_FAILED",
+      checkpoint: "committed_history",
+    });
+    expect(client.events).toContain("commit");
+    expect(client.events).not.toContain("rollback");
+  });
+
+  it("rejects spoofed diagnostic fields and never serializes raw errors", () => {
+    const hostile = Object.assign(new Error(SENTINEL_DATABASE_ERROR), {
+      code: "TRANSACTIONAL_MIGRATION_TRANSACTION_FAILED",
+      checkpoint: "execute_migration",
+      migrationOrdinal: 1,
+      detail: SENTINEL_DATABASE_ERROR,
+      query: SENTINEL_DATABASE_ERROR,
+    });
+    const diagnostic = createSafeTransactionalMigrationFailureEvidence(
+      hostile,
+    );
+    expect(diagnostic).toEqual({
+      stage: "M00",
+      errorType: "TRANSACTIONAL_MIGRATION_INTERNAL_FAILED",
+    });
+    expect(JSON.stringify(diagnostic)).not.toContain(SENTINEL_DATABASE_ERROR);
+  });
+
+  it.each([
+    ["42501", "migration_history_lock_permission_denied"],
+    ["55P03", "migration_history_lock_not_available"],
+    ["57014", "migration_history_lock_query_canceled"],
+    ["42P01", "migration_history_lock_relation_missing"],
+    ["3F000", "migration_history_lock_schema_missing"],
+    ["25P01", "migration_history_lock_transaction_required"],
+    ["25P02", "migration_history_lock_transaction_aborted"],
+    ["40P01", "migration_history_lock_deadlock"],
+  ])("classifies history-lock SQLSTATE %s without leaking or continuing", async (
+    queryFailureCode, checkpoint,
+  ) => {
+    for (const rollbackFails of [false, true]) {
+      const client = new FakeMigrationClient({
+        queryFailureIncludes: "lock table supabase_migrations.schema_migrations",
+        queryFailureCode,
+        rollbackFails,
+      });
+      let failure;
+      try {
+        await runTransactionalMigrationHarness({
+          client,
+          backgroundState: { failed: false },
+          expectedPostgresMajor: 17,
+          resetAuthorizationSha256: POLICY.disposablePreviewBaselineHistorySha256,
+          migrations: [migration("20260101000000", "one")],
+          manifestSha256: "b".repeat(64),
+          outerTransactionCount: 0,
+        });
+      } catch (error) {
+        failure = error;
+      }
+      const evidence = createSafeTransactionalMigrationFailureEvidence(failure);
+      expect(evidence).toEqual(transactionFailure(checkpoint));
+      expect(JSON.stringify(failure)).not.toContain(SENTINEL_DATABASE_ERROR);
+      expect(JSON.stringify(evidence)).not.toContain(queryFailureCode);
+      expect(client.events).toHaveLength(8);
+      expect(client.events.slice(-2)).toEqual([
+        "lock table supabase_migrations.schema_migrations in share row exclusive mode",
+        "rollback",
+      ]);
+      expect(client.schemaRebuilt).toBe(false);
+      expect(client.history).toEqual([]);
+    }
+  });
+
+  it("ignores unknown, inherited, accessor and non-string history-lock codes", async () => {
+    let getterCalls = 0;
+    const accessor = Object.defineProperty(new Error(SENTINEL_DATABASE_ERROR), "code", {
+      get() { getterCalls += 1; throw new Error(SENTINEL_DATABASE_ERROR); },
+    });
+    for (const error of [
+      sensitiveDatabaseFailure(),
+      Object.create({ code: "42501" }),
+      accessor,
+      { code: 42501 },
+      { code: "42501 " },
+      { code: new String("42501") },
+      { code: "__proto__" },
+      { code: "toString" },
+      { code: "TRANSACTIONAL_MIGRATION_TRANSACTION_FAILED" },
+      null,
+      "42501",
+    ]) {
+      let failure;
+      const queries = [];
+      try {
+        await acquireCommunicationNotePreviewMigrationHistoryLock({
+          async query(sql) { queries.push(sql); throw error; },
+        });
+      } catch (caught) {
+        failure = caught;
+      }
+      expect(queries).toHaveLength(1);
+      expect(createSafeTransactionalMigrationFailureEvidence(failure)).toEqual(
+        transactionFailure("migration_history_lock"),
+      );
+      expect(JSON.stringify(failure)).not.toContain(SENTINEL_DATABASE_ERROR);
+    }
+    expect(getterCalls).toBe(0);
+  });
+
+  it("rejects a mutated code even on a genuine runner error instance", () => {
+    let genuineFailure;
+    try {
+      parseTransactionalMigrationArguments([]);
+    } catch (error) {
+      genuineFailure = error;
+    }
+    Object.assign(genuineFailure, {
+      code: SENTINEL_DATABASE_ERROR,
+      checkpoint: "execute_migration",
+      migrationOrdinal: 1,
+      detail: SENTINEL_DATABASE_ERROR,
+      query: SENTINEL_DATABASE_ERROR,
+    });
+
+    const diagnostic = createSafeTransactionalMigrationFailureEvidence(
+      genuineFailure,
+    );
+    expect(diagnostic).toEqual({
+      stage: "M00",
+      errorType: "TRANSACTIONAL_MIGRATION_INTERNAL_FAILED",
+    });
+    expect(JSON.stringify(diagnostic)).not.toContain(SENTINEL_DATABASE_ERROR);
+  });
+
+  it("preserves the original checkpoint when rollback also fails", async () => {
+    const client = new FakeMigrationClient({
+      migrationFails: true,
+      rollbackFails: true,
+    });
+    let failure;
+    try {
+      await runTransactionalMigrationHarness({
+        client,
+        backgroundState: { failed: false },
+        expectedPostgresMajor: 17,
+        resetAuthorizationSha256:
+          POLICY.disposablePreviewBaselineHistorySha256,
+        migrations: [migration("20260101000000", "one")],
+        manifestSha256: "b".repeat(64),
+        outerTransactionCount: 0,
+      });
+    } catch (error) {
+      failure = error;
+    }
+
+    expect(createSafeTransactionalMigrationFailureEvidence(failure)).toEqual(
+      transactionFailure("execute_migration", 1),
+    );
+    expect(client.events).toContain("rollback");
+    expect(JSON.stringify(failure)).not.toContain(SENTINEL_DATABASE_ERROR);
+  });
+
+  it.each([false, true])("assigns a safe diagnostic to every query (initialize=%s)", async (historySchemaMissing) => {
+    const expectedDiagnostics = [
+      transactionFailure("begin_transaction"),
+      transactionFailure("configure_statement_timeout"),
+      transactionFailure("configure_lock_timeout"),
+      transactionFailure("configure_idle_transaction_timeout"),
+      transactionFailure("target_attestation"),
+      transactionFailure("inspect_migration_history_schema"),
+      ...(historySchemaMissing ? [
+        transactionFailure("create_migration_history_schema"),
+        transactionFailure("create_migration_history_table"),
+        transactionFailure("restrict_migration_history_access"),
+      ] : []),
+      transactionFailure("migration_history_lock"),
+      preconditionFailure("lock_public_tables"),
+      preconditionFailure("lock_strong_system_tables"),
+      preconditionFailure("read_only_system_lock_capability"),
+      preconditionFailure("lock_read_only_system_tables"),
+      preconditionFailure("baseline_history"),
+      preconditionFailure("baseline_public_catalog"),
+      preconditionFailure("baseline_public_members"),
+      preconditionFailure("baseline_schema_less_dependencies"),
+      preconditionFailure("baseline_publications"),
+      preconditionFailure("baseline_event_triggers"),
+      preconditionFailure("baseline_default_acls"),
+      preconditionFailure("baseline_catalog"),
+      preconditionFailure("baseline_public_metadata"),
+      preconditionFailure("baseline_public_data"),
+      preconditionFailure("preserved_system_snapshot"),
+      preconditionFailure("preserved_system_semantic_snapshot"),
+      transactionFailure("drop_baseline_public_routines"),
+      transactionFailure("drop_baseline_public_tables"),
+      transactionFailure("inspect_reset_namespace"),
+      transactionFailure("inspect_retained_default_acls"),
+      transactionFailure("inspect_retained_publications"),
+      transactionFailure("inspect_retained_event_triggers"),
+      transactionFailure("clear_migration_history"),
+      transactionFailure("read_cleared_history"),
+      transactionFailure("execute_migration", 1),
+      transactionFailure("record_migration_history", 1),
+      transactionFailure("read_staged_history"),
+      transactionFailure("inspect_system_data_postreset"),
+      transactionFailure("inspect_schema_names_postreset"),
+      transactionFailure("inspect_preserved_snapshot_postreset"),
+      transactionFailure("inspect_preserved_semantics_postreset"),
+      transactionFailure("inspect_application_roles_postreset"),
+      transactionFailure("inspect_publications_postreset"),
+      transactionFailure("inspect_event_triggers_postreset"),
+      transactionFailure("inspect_default_acls_postreset"),
+      transactionFailure("inspect_application_grants_postreset"),
+      transactionFailure("inspect_public_schema_postreset"),
+      transactionFailure("inspect_temporary_residue"),
+      transactionFailure("inspect_system_data_precommit"),
+      transactionFailure("commit_transaction"),
+      postcheckFailure("committed_history"),
+    ];
+    const successfulClient = new FakeMigrationClient({ historySchemaMissing });
+    await runTransactionalMigrationHarness({
+      client: successfulClient,
+      backgroundState: { failed: false },
+      expectedPostgresMajor: 17,
+      resetAuthorizationSha256:
+        POLICY.disposablePreviewBaselineHistorySha256,
+      migrations: [migration("20260101000000", "one")],
+      manifestSha256: "b".repeat(64),
+      outerTransactionCount: 0,
+    });
+    expect(successfulClient.events).toHaveLength(expectedDiagnostics.length);
+
+    for (const [index, expectedDiagnostic] of expectedDiagnostics.entries()) {
+      const client = new FakeMigrationClient({
+        queryFailureAtCall: index + 1,
+        historySchemaMissing,
+      });
+      let failure;
+      try {
+        await runTransactionalMigrationHarness({
+          client,
+          backgroundState: { failed: false },
+          expectedPostgresMajor: 17,
+          resetAuthorizationSha256:
+            POLICY.disposablePreviewBaselineHistorySha256,
+          migrations: [migration("20260101000000", "one")],
+          manifestSha256: "b".repeat(64),
+          outerTransactionCount: 0,
+        });
+      } catch (error) {
+        failure = error;
+      }
+      const diagnostic = createSafeTransactionalMigrationFailureEvidence(
+        failure,
+      );
+      expect(diagnostic).toEqual(expectedDiagnostic);
+      if (historySchemaMissing && client.events.includes("rollback")) {
+        expect(client.historySchemaExists).toBe(false);
+        expect(client.historyTableExists).toBe(false);
+      }
+      expect(JSON.stringify(diagnostic)).not.toContain(
+        SENTINEL_DATABASE_ERROR,
+      );
+    }
+  });
+
+  it.each([false, true])("fails closed on baseline or zero-data drift (initialize=%s)", async (historySchemaMissing) => {
     for (const options of [
       { baselineFingerprintValid: false },
       { schemaMemberFingerprintValid: false },
@@ -485,7 +1064,7 @@ describe("Communication Note Preview transactional migration runtime", () => {
       { protectedSemanticBaselineValid: false },
       { readOnlySystemLockCapabilityValid: false },
     ]) {
-      const client = new FakeMigrationClient(options);
+      const client = new FakeMigrationClient({ ...options, historySchemaMissing });
       await expect(runTransactionalMigrationHarness({
         client,
         backgroundState: { failed: false },
@@ -504,6 +1083,8 @@ describe("Communication Note Preview transactional migration runtime", () => {
         event.startsWith("drop function ") || event.startsWith("drop table ")
       )).toBe(false);
       expect(client.schemaRebuilt).toBe(false);
+      expect(client.historySchemaExists).toBe(!historySchemaMissing);
+      expect(client.historyTableExists).toBe(!historySchemaMissing);
     }
   });
 
@@ -512,7 +1093,7 @@ describe("Communication Note Preview transactional migration runtime", () => {
       { targetBypassRls: false },
       { targetCanCreateRoles: false },
     ]) {
-      const client = new FakeMigrationClient(options);
+      const client = new FakeMigrationClient({ ...options, historySchemaMissing: true });
       await expect(runTransactionalMigrationHarness({
         client,
         backgroundState: { failed: false },
@@ -524,6 +1105,8 @@ describe("Communication Note Preview transactional migration runtime", () => {
         outerTransactionCount: 0,
       })).rejects.toThrowError("TRANSACTIONAL_MIGRATION_TARGET_INVALID");
       expect(client.events).toContain("rollback");
+      expect(client.events.some((event) => event.startsWith("create "))).toBe(false);
+      expect(client.historySchemaExists).toBe(false);
       expect(client.events.some((event) =>
         event.startsWith("drop function ") || event.startsWith("drop table ")
       )).toBe(false);
@@ -552,6 +1135,75 @@ describe("Communication Note Preview transactional migration runtime", () => {
         code: "TRANSACTIONAL_MIGRATION_RESET_PRECONDITION_INVALID",
         checkpoint: "read_only_system_lock_capability",
       });
+    }
+  });
+
+  it("attaches a fixed checkpoint at every postcheck transaction boundary", async () => {
+    const cases = [
+      {
+        options: { publicNamespaceClearedValid: false },
+        checkpoint: "reset_namespace_and_globals",
+        committed: false,
+      },
+      {
+        options: { stagedHistoryValid: false },
+        checkpoint: "staged_history",
+        committed: false,
+      },
+      {
+        options: { protectedObjectsDriftAfterReset: true },
+        checkpoint: "rebuilt_state",
+        committed: false,
+      },
+      {
+        options: { reverseAppRoleMembership: true },
+        checkpoint: "application_roles",
+        committed: false,
+      },
+      {
+        options: { residueValid: false },
+        checkpoint: "temporary_residue_or_connection",
+        committed: false,
+      },
+      {
+        options: { systemDataDriftsBeforeCommit: true },
+        checkpoint: "system_data_precommit",
+        committed: false,
+      },
+      {
+        options: {},
+        checkpoint: "connection_postcommit",
+        committed: true,
+        backgroundState: postcommitFailureState(),
+      },
+      {
+        options: { committedHistoryValid: false },
+        checkpoint: "committed_history",
+        committed: true,
+      },
+    ];
+
+    for (const entry of cases) {
+      const client = new FakeMigrationClient(entry.options);
+      const backgroundState = entry.backgroundState ?? { failed: false };
+      await expect(runTransactionalMigrationHarness({
+        client,
+        backgroundState,
+        expectedPostgresMajor: 17,
+        resetAuthorizationSha256:
+          POLICY.disposablePreviewBaselineHistorySha256,
+        migrations: [migration("20260101000000", "one")],
+        manifestSha256: "e".repeat(64),
+        outerTransactionCount: 0,
+      })).rejects.toMatchObject({
+        code: "TRANSACTIONAL_MIGRATION_POSTCHECK_FAILED",
+        checkpoint: entry.checkpoint,
+      });
+      expect(client.events).toContain(entry.committed ? "commit" : "rollback");
+      expect(client.events).not.toContain(
+        entry.committed ? "rollback" : "commit",
+      );
+      expect(client.schemaRebuilt).toBe(entry.committed);
     }
   });
 
@@ -613,19 +1265,60 @@ describe("Communication Note Preview transactional migration runtime", () => {
   });
 });
 
-function migration(version, name) {
+function harnessInput(client) {
+  return {
+    client,
+    backgroundState: { failed: false },
+    expectedPostgresMajor: 17,
+    resetAuthorizationSha256: POLICY.disposablePreviewBaselineHistorySha256,
+    migrations: [migration("20260101000000", "one")],
+    manifestSha256: "a".repeat(64),
+    outerTransactionCount: 0,
+  };
+}
+
+function migration(version, name, statement = "select 1") {
   return Object.freeze({
     version,
     name,
-    statements: Object.freeze(["select 1"]),
-    executionSql: "select 1;",
+    statements: Object.freeze([statement]),
+    executionSql: `${statement};`,
   });
+}
+
+function sensitiveDatabaseFailure(code = SENTINEL_DATABASE_ERROR) {
+  return Object.assign(new Error(SENTINEL_DATABASE_ERROR), {
+    code,
+    detail: SENTINEL_DATABASE_ERROR,
+    query: SENTINEL_DATABASE_ERROR,
+  });
+}
+
+function postcommitFailureState() {
+  let reads = 0;
+  return {
+    get failed() {
+      reads += 1;
+      return reads > 1;
+    },
+  };
 }
 
 class FakeMigrationClient {
   constructor({
     migrationFails = false,
+    migrationFailureSql = null,
+    historyRecordFailureOrdinal = null,
+    rollbackFails = false,
+    queryFailureAtCall = null,
+    queryFailureIncludes = null,
+    queryFailureOccurrence = 1,
+    queryFailureCode = SENTINEL_DATABASE_ERROR,
     initialHistory = [],
+    historySchemaMissing = false,
+    historyTableMissing = false,
+    baselineHistoryCount = null,
+    baselineHistorySha256 = null,
     targetBypassRls = true,
     targetCanCreateRoles = true,
     baselineFingerprintValid = true,
@@ -656,11 +1349,31 @@ class FakeMigrationClient {
     reverseAppRoleMembership = false,
     readOnlySystemLockCapabilityValid = true,
     systemDataDriftsBeforeCommit = false,
+    stagedHistoryValid = true,
+    committedHistoryValid = true,
+    residueValid = true,
   } = {}) {
     this.events = [];
     this.history = structuredClone(initialHistory);
     this.pendingHistory = structuredClone(initialHistory);
+    this.historySchemaExists = !historySchemaMissing;
+    this.historyTableExists = !historySchemaMissing && !historyTableMissing;
+    this.pendingHistorySchemaExists = this.historySchemaExists;
+    this.pendingHistoryTableExists = this.historyTableExists;
+    this.pendingHistoryInitialized = false;
+    this.baselineHistoryCount = baselineHistoryCount;
+    this.baselineHistorySha256 = baselineHistorySha256;
     this.migrationFails = migrationFails;
+    this.migrationFailureSql = migrationFailureSql;
+    this.historyRecordFailureOrdinal = historyRecordFailureOrdinal;
+    this.historyRecordCount = 0;
+    this.rollbackFails = rollbackFails;
+    this.queryFailureAtCall = queryFailureAtCall;
+    this.queryCallCount = 0;
+    this.queryFailureIncludes = queryFailureIncludes;
+    this.queryFailureOccurrence = queryFailureOccurrence;
+    this.queryFailureCode = queryFailureCode;
+    this.queryFailureMatchCount = 0;
     this.targetBypassRls = targetBypassRls;
     this.targetCanCreateRoles = targetCanCreateRoles;
     this.baselineFingerprintValid = baselineFingerprintValid;
@@ -700,31 +1413,86 @@ class FakeMigrationClient {
     this.readOnlySystemLockCapabilityValid =
       readOnlySystemLockCapabilityValid;
     this.systemDataDriftsBeforeCommit = systemDataDriftsBeforeCommit;
+    this.stagedHistoryValid = stagedHistoryValid;
+    this.committedHistoryValid = committedHistoryValid;
+    this.residueValid = residueValid;
     this.systemDataCheckCount = 0;
     this.schemaRebuilt = false;
     this.pendingSchemaRebuilt = false;
+    this.transactionOpen = false;
   }
 
   async query(query) {
     const sql = typeof query === "string" ? query : query.text;
     const normalized = sql.replace(/\s+/gu, " ").trim();
     this.events.push(normalized);
-    if (normalized === "select 1;" && this.migrationFails) {
-      throw new Error("fixed migration failure");
+    this.queryCallCount += 1;
+    if (this.queryCallCount === this.queryFailureAtCall) {
+      throw sensitiveDatabaseFailure(this.queryFailureCode);
+    }
+    if (
+      typeof this.queryFailureIncludes === "string" &&
+      normalized.includes(this.queryFailureIncludes)
+    ) {
+      this.queryFailureMatchCount += 1;
+      if (this.queryFailureMatchCount === this.queryFailureOccurrence) {
+        throw sensitiveDatabaseFailure(this.queryFailureCode);
+      }
+    }
+    if (
+      (normalized === "select 1;" && this.migrationFails) ||
+      normalized === this.migrationFailureSql
+    ) {
+      throw sensitiveDatabaseFailure();
+    }
+    if (normalized === "rollback" && this.rollbackFails) {
+      throw sensitiveDatabaseFailure();
     }
     if (normalized === "begin isolation level read committed") {
       this.pendingHistory = [...this.history];
       this.pendingSchemaRebuilt = this.schemaRebuilt;
+      this.transactionOpen = true;
+      this.pendingHistorySchemaExists = this.historySchemaExists;
+      this.pendingHistoryTableExists = this.historyTableExists;
+      this.pendingHistoryInitialized = false;
     }
     if (normalized === "rollback") {
       this.pendingHistory = [...this.history];
       this.pendingSchemaRebuilt = this.schemaRebuilt;
+      this.transactionOpen = false;
+      this.pendingHistorySchemaExists = this.historySchemaExists;
+      this.pendingHistoryTableExists = this.historyTableExists;
+      this.pendingHistoryInitialized = false;
     }
     if (normalized === "commit") {
       this.history = [...this.pendingHistory];
       this.schemaRebuilt = this.pendingSchemaRebuilt;
+      this.transactionOpen = false;
+      this.historySchemaExists = this.pendingHistorySchemaExists;
+      this.historyTableExists = this.pendingHistoryTableExists;
+    }
+    if (normalized.includes("as migration_history_schema_missing")) {
+      return { rowCount: 1, rows: [{
+        migration_history_schema_missing: !this.pendingHistorySchemaExists,
+      }] };
+    }
+    if (normalized === "create schema supabase_migrations authorization postgres") {
+      if (this.pendingHistorySchemaExists) throw sensitiveDatabaseFailure("42P06");
+      this.pendingHistorySchemaExists = true;
+      this.pendingHistoryInitialized = true;
+    }
+    if (normalized.startsWith("create table supabase_migrations.schema_migrations")) {
+      this.pendingHistoryTableExists = true;
+    }
+    if (normalized.startsWith("lock table supabase_migrations.schema_migrations")) {
+      if (!this.pendingHistorySchemaExists) throw sensitiveDatabaseFailure("3F000");
+      if (!this.pendingHistoryTableExists) throw sensitiveDatabaseFailure("42P01");
     }
     if (typeof query === "object" && normalized.startsWith("insert into")) {
+      this.historyRecordCount += 1;
+      if (this.historyRecordCount === this.historyRecordFailureOrdinal) {
+        throw sensitiveDatabaseFailure();
+      }
       this.pendingHistory.push({
         version: query.values[0],
         name: query.values[1],
@@ -795,10 +1563,13 @@ class FakeMigrationClient {
         rowCount: 1,
         rows: [{
           history_count: this.baselineFingerprintValid
-            ? POLICY.disposablePreviewBaselineMigrationCount
+            ? (this.baselineHistoryCount ?? (this.pendingHistoryInitialized
+                ? 0 : POLICY.disposablePreviewBaselineMigrationCount))
             : 18,
           history_sha256: this.baselineFingerprintValid
-            ? POLICY.disposablePreviewBaselineHistorySha256
+            ? (this.baselineHistorySha256 ?? (this.pendingHistoryInitialized
+                ? POLICY.emptyMigrationHistorySha256
+                : POLICY.disposablePreviewBaselineHistorySha256))
             : "0".repeat(64),
         }],
       };
@@ -1079,7 +1850,16 @@ class FakeMigrationClient {
       return { rowCount: null, rows: [] };
     }
     if (normalized.startsWith("select version,")) {
-      return { rowCount: this.pendingHistory.length, rows: [...this.pendingHistory] };
+      const history = this.transactionOpen
+        ? this.pendingHistory
+        : this.history;
+      const valid = this.transactionOpen
+        ? this.stagedHistoryValid
+        : this.committedHistoryValid;
+      const rows = valid || history.length === 0
+        ? [...history]
+        : history.slice(0, -1);
+      return { rowCount: rows.length, rows };
     }
     if (
       normalized.startsWith("select (select pg_catalog.count(*) = 0 from auth.users)")
@@ -1142,7 +1922,7 @@ class FakeMigrationClient {
       return {
         rowCount: 1,
         rows: [{
-          temporary_roles_absent: true,
+          temporary_roles_absent: this.residueValid,
           authorizations_empty: true,
           revocations_empty: true,
           claims_empty: true,

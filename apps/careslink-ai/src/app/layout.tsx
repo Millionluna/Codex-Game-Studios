@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
+import { DocumentLanguageSync } from "@/components/document-language-sync";
 import { SafeVercelAnalytics } from "@/components/safe-vercel-analytics";
 import { CARESLINK_AI_NOINDEX_ROBOTS } from "@/lib/seo-policy";
 import "./globals.css";
@@ -45,6 +47,9 @@ export default function RootLayout({
         />
       </head>
       <body className="flex min-h-full flex-col">
+        <Suspense fallback={null}>
+          <DocumentLanguageSync />
+        </Suspense>
         {children}
         <SafeVercelAnalytics />
       </body>

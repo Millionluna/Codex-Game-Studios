@@ -78,6 +78,10 @@ describe("Supabase auth callback", () => {
     expect(response.headers.get("location")).not.toContain("code=");
     expect(response.headers.get("location")).not.toContain("access_token");
     expect(response.headers.get("location")).not.toContain("refresh_token");
+    expectAuthCallbackResponseHeaders(response);
+    expect(
+      supabaseServerMock.createCareslinkServerSupabaseClient,
+    ).toHaveBeenCalledWith({ responseHeaders: expect.any(Headers) });
   });
 
   it("does not let user-editable metadata self-assign the admin role", async () => {
@@ -168,6 +172,7 @@ describe("Supabase auth callback", () => {
     expect(finalUrl.hash).toBe("");
     expect(finalUrl.href).not.toContain("access_denied");
     expect(finalUrl.href).not.toContain("private-provider-message");
+    expectAuthCallbackResponseHeaders(response);
   });
 
   it("keeps the password-reset callback restricted to update-password", async () => {
@@ -186,8 +191,18 @@ describe("Supabase auth callback", () => {
     expect(response.headers.get("location")).toBe(
       "https://ai.careslink.com.au/auth/update-password",
     );
+    expectAuthCallbackResponseHeaders(response);
   });
 });
+
+function expectAuthCallbackResponseHeaders(response: Response) {
+  expect(response.headers.get("cache-control")).toBe(
+    "private, no-cache, no-store, must-revalidate, max-age=0",
+  );
+  expect(response.headers.get("expires")).toBe("0");
+  expect(response.headers.get("pragma")).toBe("no-cache");
+  expect(response.headers.get("referrer-policy")).toBe("no-referrer");
+}
 
 function followBrowserRedirect(sourceHref: string, location: string) {
   const source = new URL(sourceHref);
