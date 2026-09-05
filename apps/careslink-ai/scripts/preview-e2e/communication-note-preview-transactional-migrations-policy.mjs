@@ -7,7 +7,7 @@ const NON_TRANSACTIONAL_SQL_PATTERN = /^(?:create\s+(?:unique\s+)?index\s+concur
 
 export const COMMUNICATION_NOTE_PREVIEW_TRANSACTIONAL_MIGRATION_POLICY =
   Object.freeze({
-    version: "2026-09-04.preview-transactional-migrations.15",
+    version: "2026-09-05.preview-transactional-migrations.16",
     productionProjectRef: "adocsnwnslxhxcjgbyee",
     expectedCliVersion: "2.115.0",
     manifestSha256:
@@ -261,18 +261,24 @@ const OUTER_TRANSACTION_MIGRATIONS = new Set([
   "20260904054437_add_v1_points_wallet_read.sql",
 ]);
 
-const FIXED_ERROR_CODES = new Set([
-  "TRANSACTIONAL_MIGRATION_MANIFEST_INVALID",
-  "TRANSACTIONAL_MIGRATION_FILE_INVALID",
-  "TRANSACTIONAL_MIGRATION_SQL_INVALID",
-  "TRANSACTIONAL_MIGRATION_HISTORY_INVALID",
-]);
+export const COMMUNICATION_NOTE_PREVIEW_TRANSACTIONAL_MIGRATION_ERROR_CODES =
+  Object.freeze({
+    manifestInvalid: "TRANSACTIONAL_MIGRATION_MANIFEST_INVALID",
+    fileInvalid: "TRANSACTIONAL_MIGRATION_FILE_INVALID",
+    sqlInvalid: "TRANSACTIONAL_MIGRATION_SQL_INVALID",
+    historyInvalid: "TRANSACTIONAL_MIGRATION_HISTORY_INVALID",
+  });
+
+const FIXED_ERROR_CODES = new Set(Object.values(
+  COMMUNICATION_NOTE_PREVIEW_TRANSACTIONAL_MIGRATION_ERROR_CODES,
+));
 
 export class CommunicationNotePreviewTransactionalMigrationPolicyError extends Error {
   constructor(code) {
     const fixed = FIXED_ERROR_CODES.has(code)
       ? code
-      : "TRANSACTIONAL_MIGRATION_SQL_INVALID";
+      : COMMUNICATION_NOTE_PREVIEW_TRANSACTIONAL_MIGRATION_ERROR_CODES
+          .sqlInvalid;
     super(fixed);
     this.name = "CommunicationNotePreviewTransactionalMigrationPolicyError";
     this.code = fixed;

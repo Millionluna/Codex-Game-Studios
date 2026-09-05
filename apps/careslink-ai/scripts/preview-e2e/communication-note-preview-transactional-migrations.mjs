@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 
 import {
+  COMMUNICATION_NOTE_PREVIEW_RUNNER_TERMINAL_IDENTITY_ERROR_CODES as IDENTITY_ERROR_CODES,
   COMMUNICATION_NOTE_PREVIEW_RUNNER_TERMINAL_IDENTITY_POLICY as IDENTITY_POLICY,
   CommunicationNotePreviewRunnerTerminalIdentityPolicyError,
   extractCommunicationNoteDisposablePreviewResetDatabaseTarget,
@@ -10,6 +11,7 @@ import {
 import { assertVerifiedPreviewTlsConnection } from
   "./communication-note-preview-runner-terminal-identity.mjs";
 import {
+  COMMUNICATION_NOTE_PREVIEW_TRANSACTIONAL_MIGRATION_ERROR_CODES as POLICY_ERROR_CODES,
   COMMUNICATION_NOTE_PREVIEW_TRANSACTIONAL_MIGRATION_POLICY as POLICY,
   CommunicationNotePreviewTransactionalMigrationPolicyError,
   loadPinnedCommunicationNotePreviewMigrations,
@@ -36,6 +38,8 @@ const FIXED_ERRORS = new Set([
   "TRANSACTIONAL_MIGRATION_POSTCHECK_FAILED",
   "TRANSACTIONAL_MIGRATION_INTERNAL_FAILED",
 ]);
+const FIXED_POLICY_ERRORS = new Set(Object.values(POLICY_ERROR_CODES));
+const FIXED_IDENTITY_ERRORS = new Set(Object.values(IDENTITY_ERROR_CODES));
 const FIXED_PRECONDITION_CHECKPOINTS = new Set([
   "lock_public_tables",
   "lock_strong_system_tables",
@@ -70,6 +74,43 @@ const FIXED_POSTCHECK_CHECKPOINTS = new Set([
   "system_data_precommit",
   "connection_postcommit",
   "committed_history",
+]);
+const FIXED_TRANSACTION_CHECKPOINTS = new Set([
+  "begin_transaction",
+  "configure_statement_timeout",
+  "configure_lock_timeout",
+  "configure_idle_transaction_timeout",
+  "target_attestation",
+  "migration_history_lock",
+  "reset_preconditions",
+  "drop_baseline_public_routines",
+  "drop_baseline_public_tables",
+  "inspect_reset_namespace",
+  "inspect_retained_default_acls",
+  "inspect_retained_publications",
+  "inspect_retained_event_triggers",
+  "clear_migration_history",
+  "read_cleared_history",
+  "execute_migration",
+  "record_migration_history",
+  "read_staged_history",
+  "inspect_system_data_postreset",
+  "inspect_schema_names_postreset",
+  "inspect_preserved_snapshot_postreset",
+  "inspect_preserved_semantics_postreset",
+  "inspect_application_roles_postreset",
+  "inspect_publications_postreset",
+  "inspect_event_triggers_postreset",
+  "inspect_default_acls_postreset",
+  "inspect_application_grants_postreset",
+  "inspect_public_schema_postreset",
+  "inspect_temporary_residue",
+  "inspect_system_data_precommit",
+  "commit_transaction",
+]);
+const MIGRATION_ORDINAL_CHECKPOINTS = new Set([
+  "execute_migration",
+  "record_migration_history",
 ]);
 
 const DISPOSABLE_PREVIEW_RESET_ARGUMENT =
@@ -1573,7 +1614,7 @@ where pg_catalog.left(namespace.nspname, 3) <> 'pg_'
   and namespace.nspname <> 'information_schema'`;
 
 class CommunicationNotePreviewTransactionalMigrationError extends Error {
-  constructor(code, checkpoint) {
+  constructor(code, checkpoint, migrationOrdinal) {
     const fixed = FIXED_ERRORS.has(code)
       ? code
       : "TRANSACTIONAL_MIGRATION_INTERNAL_FAILED";
@@ -1582,6 +1623,9 @@ class CommunicationNotePreviewTransactionalMigrationError extends Error {
     this.code = fixed;
     if (isFixedCheckpoint(fixed, checkpoint)) {
       this.checkpoint = checkpoint;
+    }
+    if (isSafeMigrationOrdinal(fixed, checkpoint, migrationOrdinal)) {
+      this.migrationOrdinal = migrationOrdinal;
     }
   }
 }
@@ -1594,14 +1638,26 @@ function isFixedCheckpoint(code, checkpoint) {
     ) || (
       code === "TRANSACTIONAL_MIGRATION_POSTCHECK_FAILED" &&
       FIXED_POSTCHECK_CHECKPOINTS.has(checkpoint)
+    ) || (
+      code === "TRANSACTIONAL_MIGRATION_TRANSACTION_FAILED" &&
+      FIXED_TRANSACTION_CHECKPOINTS.has(checkpoint)
     )
   );
 }
 
-function fail(code, checkpoint) {
+function isSafeMigrationOrdinal(code, checkpoint, migrationOrdinal) {
+  return code === "TRANSACTIONAL_MIGRATION_TRANSACTION_FAILED" &&
+    MIGRATION_ORDINAL_CHECKPOINTS.has(checkpoint) &&
+    Number.isSafeInteger(migrationOrdinal) &&
+    migrationOrdinal >= 1 &&
+    migrationOrdinal <= POLICY.migrationCount;
+}
+
+function fail(code, checkpoint, migrationOrdinal) {
   throw new CommunicationNotePreviewTransactionalMigrationError(
     code,
     checkpoint,
+    migrationOrdinal,
   );
 }
 
@@ -1913,9 +1969,13 @@ async function assertDisposablePreviewResetPreconditions(client) {
 async function assertDisposablePreviewResetPostconditions(
   client,
   preserved,
+  setCheckpoint,
 ) {
+  setCheckpoint("inspect_system_data_postreset");
   const systemData = await client.query(SYSTEM_DATA_EMPTY_SQL);
+  setCheckpoint("inspect_schema_names_postreset");
   const currentSchemas = await client.query(NON_SYSTEM_SCHEMA_NAMES_SQL);
+  setCheckpoint("inspect_preserved_snapshot_postreset");
   const currentPreserved = await client.query({
     text: PRESERVED_SYSTEM_SNAPSHOT_SQL,
     values: [
@@ -1923,6 +1983,7 @@ async function assertDisposablePreviewResetPostconditions(
       POLICY.rebuiltApplicationSchemas,
     ],
   });
+  setCheckpoint("inspect_preserved_semantics_postreset");
   const currentSemantic = await client.query({
     text: PRESERVED_SYSTEM_SEMANTIC_SNAPSHOT_SQL,
     values: [
@@ -1931,14 +1992,19 @@ async function assertDisposablePreviewResetPostconditions(
       POLICY.applicationRoles,
     ],
   });
+  setCheckpoint("inspect_application_roles_postreset");
   const applicationRoles = await client.query(APPLICATION_ROLE_POSTCHECK_SQL);
+  setCheckpoint("inspect_publications_postreset");
   const publications = await client.query(GLOBAL_PUBLICATION_FINGERPRINT_SQL);
+  setCheckpoint("inspect_event_triggers_postreset");
   const eventTriggers = await client.query(
     GLOBAL_EVENT_TRIGGER_FINGERPRINT_SQL,
   );
+  setCheckpoint("inspect_default_acls_postreset");
   const publicDefaultAcls = await client.query(
     PUBLIC_DEFAULT_ACL_FINGERPRINT_SQL,
   );
+  setCheckpoint("inspect_application_grants_postreset");
   const protectedApplicationGrants = await client.query({
     text: PROTECTED_APPLICATION_ACL_GRANTS_SQL,
     values: [
@@ -1947,6 +2013,7 @@ async function assertDisposablePreviewResetPostconditions(
       POLICY.preservedSystemSchemas,
     ],
   });
+  setCheckpoint("inspect_public_schema_postreset");
   const publicSchema = await client.query({
     text: PUBLIC_SCHEMA_METADATA_SQL,
     values: [POLICY.applicationRoles],
@@ -2145,14 +2212,20 @@ export async function runTransactionalMigrationHarness({
   }
   let transactionOpen = false;
   let baselineCount = 0;
+  let checkpoint = "begin_transaction";
+  let migrationOrdinal;
   try {
     await client.query("begin isolation level read committed");
     transactionOpen = true;
+    checkpoint = "configure_statement_timeout";
     await client.query("set local statement_timeout = '210s'");
+    checkpoint = "configure_lock_timeout";
     await client.query("set local lock_timeout = '10s'");
+    checkpoint = "configure_idle_transaction_timeout";
     await client.query(
       "set local idle_in_transaction_session_timeout = '225s'",
     );
+    checkpoint = "target_attestation";
     const target = await client.query(`select
       current_user,
       session_user,
@@ -2197,21 +2270,29 @@ export async function runTransactionalMigrationHarness({
     if (targetRow.migration_lock !== true) {
       fail("TRANSACTIONAL_MIGRATION_CONCURRENT_RUN_DENIED");
     }
+    checkpoint = "migration_history_lock";
     await client.query(`lock table supabase_migrations.schema_migrations
       in share row exclusive mode`);
+    checkpoint = "reset_preconditions";
     const resetBaseline = await assertDisposablePreviewResetPreconditions(
       client,
     );
     baselineCount = resetBaseline.baselineCount;
+    checkpoint = "drop_baseline_public_routines";
     await client.query(DROP_BASELINE_PUBLIC_ROUTINES_SQL);
+    checkpoint = "drop_baseline_public_tables";
     await client.query(DROP_BASELINE_PUBLIC_TABLES_SQL);
+    checkpoint = "inspect_reset_namespace";
     const clearedPublic = await client.query(PUBLIC_NAMESPACE_CLEARED_SQL);
+    checkpoint = "inspect_retained_default_acls";
     const retainedDefaultAcls = await client.query(
       PUBLIC_DEFAULT_ACL_FINGERPRINT_SQL,
     );
+    checkpoint = "inspect_retained_publications";
     const retainedPublications = await client.query(
       GLOBAL_PUBLICATION_FINGERPRINT_SQL,
     );
+    checkpoint = "inspect_retained_event_triggers";
     const retainedEventTriggers = await client.query(
       GLOBAL_EVENT_TRIGGER_FINGERPRINT_SQL,
     );
@@ -2251,9 +2332,11 @@ export async function runTransactionalMigrationHarness({
         "reset_namespace_and_globals",
       );
     }
+    checkpoint = "clear_migration_history";
     await client.query(
       "delete from supabase_migrations.schema_migrations",
     );
+    checkpoint = "read_cleared_history";
     const history = await client.query(`select version,
       coalesce(name, '') as name,
       statements
@@ -2265,8 +2348,11 @@ export async function runTransactionalMigrationHarness({
     if (historyState.appliedCount !== 0) {
       fail("TRANSACTIONAL_MIGRATION_HISTORY_INVALID");
     }
-    for (const migration of historyState.pending) {
+    for (const [index, migration] of historyState.pending.entries()) {
+      migrationOrdinal = index + 1;
+      checkpoint = "execute_migration";
       await client.query(migration.executionSql);
+      checkpoint = "record_migration_history";
       await client.query({
         text: `insert into supabase_migrations.schema_migrations(
           version, name, statements
@@ -2274,6 +2360,8 @@ export async function runTransactionalMigrationHarness({
         values: [migration.version, migration.name, migration.statements],
       });
     }
+    migrationOrdinal = undefined;
+    checkpoint = "read_staged_history";
     const finalHistory = await client.query(`select version,
       coalesce(name, '') as name,
       statements
@@ -2291,7 +2379,11 @@ export async function runTransactionalMigrationHarness({
     await assertDisposablePreviewResetPostconditions(
       client,
       resetBaseline,
+      (nextCheckpoint) => {
+        checkpoint = nextCheckpoint;
+      },
     );
+    checkpoint = "inspect_temporary_residue";
     const residue = await client.query(`select
       not exists (
         select 1 from pg_catalog.pg_roles as role_record
@@ -2331,6 +2423,7 @@ export async function runTransactionalMigrationHarness({
         "temporary_residue_or_connection",
       );
     }
+    checkpoint = "inspect_system_data_precommit";
     const finalSystemData = await client.query(SYSTEM_DATA_EMPTY_SQL);
     const finalSystemDataRow = finalSystemData.rows[0];
     if (
@@ -2343,9 +2436,12 @@ export async function runTransactionalMigrationHarness({
         "system_data_precommit",
       );
     }
+    checkpoint = "commit_transaction";
     await client.query("commit");
     transactionOpen = false;
   } catch (error) {
+    const failureCheckpoint = checkpoint;
+    const failureMigrationOrdinal = migrationOrdinal;
     if (transactionOpen) {
       try {
         await client.query("rollback");
@@ -2359,7 +2455,11 @@ export async function runTransactionalMigrationHarness({
     ) {
       throw error;
     }
-    fail("TRANSACTIONAL_MIGRATION_TRANSACTION_FAILED");
+    fail(
+      "TRANSACTIONAL_MIGRATION_TRANSACTION_FAILED",
+      failureCheckpoint,
+      failureMigrationOrdinal,
+    );
   }
   if (backgroundState.failed) {
     fail(
@@ -2367,15 +2467,23 @@ export async function runTransactionalMigrationHarness({
       "connection_postcommit",
     );
   }
-  const committed = await client.query(`select version,
-    coalesce(name, '') as name,
-    statements
-    from supabase_migrations.schema_migrations order by version`);
-  const committedState = validateCommunicationNotePreviewMigrationHistory(
-    committed.rows,
-    migrations,
-  );
+  let committedState = null;
+  try {
+    const committed = await client.query(`select version,
+      coalesce(name, '') as name,
+      statements
+      from supabase_migrations.schema_migrations order by version`);
+    committedState = validateCommunicationNotePreviewMigrationHistory(
+      committed.rows,
+      migrations,
+    );
+  } catch (error) {
+    if (error instanceof CommunicationNotePreviewTransactionalMigrationPolicyError) {
+      throw error;
+    }
+  }
   if (
+    committedState === null ||
     committedState.appliedCount !== migrations.length ||
     committedState.pending.length !== 0
   ) {
@@ -2502,29 +2610,70 @@ function safeCode(error) {
     : "";
 }
 
-function safeCheckpoint(error) {
+function safeErrorType(error) {
+  const candidate = safeCode(error);
+  if (
+    (error instanceof CommunicationNotePreviewTransactionalMigrationError &&
+      FIXED_ERRORS.has(candidate)) ||
+    (error instanceof CommunicationNotePreviewTransactionalMigrationPolicyError &&
+      FIXED_POLICY_ERRORS.has(candidate)) ||
+    (error instanceof CommunicationNotePreviewRunnerTerminalIdentityPolicyError &&
+      FIXED_IDENTITY_ERRORS.has(candidate))
+  ) {
+    return candidate;
+  }
+  return "TRANSACTIONAL_MIGRATION_INTERNAL_FAILED";
+}
+
+function safeCheckpoint(error, expectedCode) {
   if (!error || typeof error !== "object") return "";
-  const code = safeCode(error);
+  if (safeCode(error) !== expectedCode) return "";
   const descriptor = Object.getOwnPropertyDescriptor(error, "checkpoint");
   const checkpoint = descriptor && "value" in descriptor
     ? descriptor.value
     : "";
-  return isFixedCheckpoint(code, checkpoint) ? checkpoint : "";
+  return isFixedCheckpoint(expectedCode, checkpoint) ? checkpoint : "";
+}
+
+function safeMigrationOrdinal(error, expectedCode, checkpoint) {
+  if (!error || typeof error !== "object") return null;
+  const descriptor = Object.getOwnPropertyDescriptor(
+    error,
+    "migrationOrdinal",
+  );
+  const migrationOrdinal = descriptor && "value" in descriptor
+    ? descriptor.value
+    : null;
+  return isSafeMigrationOrdinal(
+      expectedCode,
+      checkpoint,
+      migrationOrdinal,
+    )
+    ? migrationOrdinal
+    : null;
+}
+
+export function createSafeTransactionalMigrationFailureEvidence(error) {
+  const errorType = safeErrorType(error);
+  const checkpoint = safeCheckpoint(error, errorType);
+  const migrationOrdinal = safeMigrationOrdinal(
+    error,
+    errorType,
+    checkpoint,
+  );
+  return Object.freeze({
+    stage: "M00",
+    errorType,
+    ...(checkpoint ? { checkpoint } : {}),
+    ...(migrationOrdinal === null ? {} : { migrationOrdinal }),
+  });
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
   main().catch((error) => {
-    const code = error instanceof CommunicationNotePreviewTransactionalMigrationError ||
-        error instanceof CommunicationNotePreviewTransactionalMigrationPolicyError ||
-        error instanceof CommunicationNotePreviewRunnerTerminalIdentityPolicyError
-      ? error.code
-      : "TRANSACTIONAL_MIGRATION_INTERNAL_FAILED";
-    const checkpoint = safeCheckpoint(error);
-    process.stderr.write(`${JSON.stringify({
-      stage: "M00",
-      errorType: code,
-      ...(checkpoint ? { checkpoint } : {}),
-    })}\n`);
+    process.stderr.write(`${JSON.stringify(
+      createSafeTransactionalMigrationFailureEvidence(error),
+    )}\n`);
     process.exitCode = 1;
   });
 }
