@@ -2,6 +2,14 @@
 
 ## Status — 2026-09-05
 
+**Latest result: r8 passed the hosted PostgreSQL 17 fixed migration/lock gate.**
+Commit `68391e0` ran the versioned invocation entry point and all 46 migrations
+in one transaction, then the disposable Preview was deleted. This run used the
+existing, validated 19-row migration-history path; it did not exercise
+missing-schema initialization or application/browser/login E2E.
+
+### r6 history-lock diagnosis
+
 The no-data Micro Preview r6 attempt (`careslink-points-ui-v1-e2e-r6-20260905`,
 commit `4d596de`) returned `migration_history_lock_schema_missing`: the history
 namespace was absent at lock acquisition. It stopped before reset preconditions,
@@ -10,9 +18,10 @@ Preview was deleted; three absence checks and an independent listing confirmed
 that only healthy Production remained. The earlier r5 generic checkpoint did not
 identify a cause and must not be retroactively relabelled as the same SQLSTATE.
 
-The subsequent `.18` initialization fix is local-only and verified with synthetic
-PostgreSQL 16.15 fixtures. It has not been rerun on hosted PostgreSQL 17 and does
-not establish a passing application E2E. No new cloud resource, Production
+At that stage, the subsequent `.18` initialization fix was local-only and verified
+with synthetic PostgreSQL 16.15 fixtures. Its missing-schema initialization path
+still has no hosted PostgreSQL 17 pass and does not establish application E2E.
+No new cloud resource, Production
 connection, model call, hosted permission change, deployment, commit or push was
 performed in this local-fix batch.
 
@@ -79,7 +88,8 @@ No real CLI, cloud connection or database write is performed by these tests.
 
 Local correction verification: 61 new invocation tests passed; the full suite
 passed 236 files / 3,463 tests. TypeScript, ESLint, adapter synchronization
-(73 files) and diff checks passed. This does not establish a hosted PG17 pass.
+(73 files) and diff checks passed. Those local tests alone do not establish a
+hosted PG17 pass; r8's distinct hosted evidence is recorded below.
 
 After a **new** resource authorization, the lifecycle owner should call this
 versioned entry point instead of recreating a credential adapter in `/tmp`:
@@ -99,6 +109,63 @@ Replace the three non-secret identity placeholders only with the new create
 result and independently verified branch list. The reset digest identifies the
 fixed operation; it is not a substitute for user authorization. Never run this
 entry point outside an already-established cleanup lifecycle.
+
+### r8 hosted pass — 2026-09-05
+
+After a new one-Preview cost/scope confirmation, exactly one no-data,
+non-default, non-persistent Preview was created:
+
+- Name: `careslink-points-ui-v1-e2e-r8-20260905`
+- Branch ID: `6cb4c9a1-8814-447e-a720-cbdc1c6f9533`
+- Project ref: `hrchubfgrvujdwsmgqyx`
+- Parent ref: `adocsnwnslxhxcjgbyee`
+- Creation timestamp: `2026-09-05T06:13:09.897398+00:00`
+- Code: `68391e0590e010d91ae00f056ea7d66a104394e3`
+- Policy: `2026-09-05.preview-transactional-migrations.18`
+
+The temporary lifecycle handled readiness and exact-target deletion only. The
+committed entry point handled CLI credentials and called the unchanged runner.
+It passed the original migration-history lock, all fixed baseline proofs, the
+46-migration transaction and postcommit checks. Selected runner evidence:
+
+```json
+{
+  "postgres": 17,
+  "migrations": 46,
+  "baselineMigrations": 19,
+  "migrationHistoryInitialized": false,
+  "appliedInSingleTransaction": 46,
+  "outerTransactionsRemovedInMemory": 26,
+  "manifestSha256": "3add3cad0232b89b206eb948eabe86045179ca7f978d0027e44121381919a7e8",
+  "migrationParserContractVersion": "2.115.0",
+  "isolationLevel": "read_committed_with_explicit_table_locks",
+  "fullChainAtomic": true,
+  "publicNamespacePreserved": true,
+  "applicationObjectsRebuilt": true,
+  "baselineHistorySha256": "b742d12dee926ccfe76158cf524e503bcdc576a08e928a7147741faf4a314424",
+  "preservedSystemSchemas": 11,
+  "applicationRoles": 16,
+  "protectedApplicationAclGrants": 26,
+  "ledgersEmpty": true,
+  "temporaryRolesAbsent": true
+}
+```
+
+The remaining emitted catalog/member/dependency/publication/event-trigger/default
+ACL/non-application ACL digests matched the unchanged policy pins. The invocation
+returned `preview_invocation: ok=true`. Cleanup deleted the exact branch and
+returned `previewAbsent=true`, `productionOnly=true`, `consecutiveChecks=3`.
+An independent MCP listing then confirmed only healthy default Production remained.
+The credential-free temporary lifecycle script and directory were removed.
+
+No second Preview was created. No Production SQL, AI model call, deployment or
+real care data was included. The disposable test schema/history was intentionally
+removed with the Preview, not retained for reuse.
+
+This result closes the **fixed existing-history migration/lock gate only**. The
+`migrationHistoryInitialized=false` evidence must not be relabelled as a hosted
+test of missing-schema initialization. Application/login/points UI E2E is also
+still outstanding; do not infer release readiness from this migration-only pass.
 
 ## Findings and unchanged safety boundary
 
@@ -198,11 +265,9 @@ query boundaries; the full application suite passed 235 files / 3,402 tests.
 TypeScript, ESLint, adapter sync (73 files) and diff
 checks passed. The local server stopped and the synthetic fixture was removed.
 
-Commit `3e67789` was pushed and existing PR #36 updated without deployment.
-This change records the post-r7 invocation correction, its tests and evidence;
-the correction has only been validated locally. Next is to reconfirm the cost
-and scope of one disposable no-data Preview, then use the versioned entry point
-inside its cleanup lifecycle to verify the initialization fix and remaining
-baseline/migration gates on PostgreSQL 17. The newly learned
+Commits `3e67789` and `68391e0` were pushed and existing PR #36 updated without
+deployment. This documentation-only change records the r8 hosted pass for PR #36.
+Next is the separately scoped authenticated points UI E2E. This pass does not
+authorize a new Preview or deployment. The newly learned
 schema-missing cause does not justify changing unrelated baseline fingerprints,
 accepting arbitrary existing history or granting extra hosted-role privileges.
