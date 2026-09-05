@@ -16,6 +16,90 @@ not establish a passing application E2E. No new cloud resource, Production
 connection, model call, hosted permission change, deployment, commit or push was
 performed in this local-fix batch.
 
+### r7 hosted attempt — 2026-09-05
+
+After a new one-Preview cost/scope confirmation, the execution-only r7 attempt
+used commit `3e67789` and created exactly one no-data, non-default, non-persistent
+Preview, `careslink-points-ui-v1-e2e-r7-20260905` (branch ID
+`40764b04-a349-4b5a-8896-9e459ea6908b`, ref `vvlcnhivvugzxuqtwabk`). Its readiness
+checks passed. The temporary orchestration script then stopped at its
+`credentials` stage with `FIXED_PREVIEW_EXECUTION_FAILED`, before launching the
+transactional migration runner. No database connection, reset, migration or lock
+test was performed by the local runner; this is **not** a new hosted result for
+policy `.18`.
+
+Cleanup deleted that exact Preview. Three consecutive absence checks and an
+independent branch listing confirmed that only healthy Production remained.
+There was no second create attempt, deployment, model call or Production SQL.
+The temporary script did not persist or print credential-bearing JSON.
+
+Offline inspection found a defect in that temporary script: it required `REF`
+and `STATUS` from `supabase branches get -o json`. The pinned
+[CLI 2.115.0 standard-env formatter](https://github.com/supabase/cli/blob/v2.115.0/apps/cli/src/legacy/commands/branches/branches.format.ts)
+emits database URLs and API environment values, but not those two metadata
+fields. Reproduction using synthetic data confirms that this mapping loses the
+required envelope keys and is rejected as
+`RUNNER_TERMINAL_IDENTITY_BRANCH_JSON_INVALID` before connecting. This is a
+confirmed local invocation defect; the generic live `credentials` checkpoint
+does not distinguish it from every other possible failure inside that stage.
+
+### Local invocation correction after r7
+
+The repository already had a compatible
+`communication-note-preview-disposable-branch-envelope.mjs` converter; the r7
+temporary script bypassed it. The new versioned
+`communication-note-preview-transactional-invocation.mjs` entry point composes
+that existing converter with the branch-control and downstream target guards.
+It does not change policy `.18`, migration SQL or database permissions.
+
+- Require the locked branch UUID/name/ref, PostgreSQL 17, pinned CA and explicit
+  reset-authorization argument. Check CLI 2.115.0, CA bytes and migration manifest.
+- Retrieve and validate the exact branch list **before** requesting credentials,
+  then repeat that validation after retrieval. Both observations must prove a
+  healthy, no-data, non-default, non-persistent child of the pinned parent.
+- Feed the actual CLI standard-env JSON into the existing converter. Metadata
+  comes from the second validated list, never assumed `REF`/`STATUS` fields or a
+  hardcoded healthy status. The converter independently binds both database URLs
+  to the expected Preview and checks role/password consistency. Conflicting
+  supplied metadata is rejected; unused API keys and JWT secrets are discarded.
+- Pass only the canonical envelope to the unchanged runner via anonymous stdin,
+  with a restricted child environment. Never print or save branch credentials.
+  Outer failures carry fixed, distinct checkpoints; raw CLI errors are discarded.
+- Invoke the runner once, with a 15-minute process timeout and cancellation
+  propagation. Do not retry, create/delete branches, or deploy from this entry
+  point. The outer lifecycle owner must still delete the exact authorized Preview
+  in `finally` and verify its absence, including after invocation failure.
+
+The entry-point tests use synthetic CLI 2.115.0 output and injected I/O only.
+They reproduce the old r7 mapping failure and cover the corrected route,
+before/after metadata changes, Production/DSN mismatch, missing/contradictory
+fields, environment injection, secret exclusion, every CLI call failure, and
+the default subprocess wiring/failure/cancellation paths with process doubles.
+No real CLI, cloud connection or database write is performed by these tests.
+
+Local correction verification: 61 new invocation tests passed; the full suite
+passed 236 files / 3,463 tests. TypeScript, ESLint, adapter synchronization
+(73 files) and diff checks passed. This does not establish a hosted PG17 pass.
+
+After a **new** resource authorization, the lifecycle owner should call this
+versioned entry point instead of recreating a credential adapter in `/tmp`:
+
+```sh
+node scripts/preview-e2e/communication-note-preview-transactional-invocation.mjs \
+  --expected-branch-id=NEW_BRANCH_UUID \
+  --expected-branch-name=NEW_BRANCH_NAME \
+  --expected-branch-ref=NEW_BRANCH_REF \
+  --expected-pg-major=17 \
+  --ssl-root-cert-path=/Users/milliohusky/Downloads/prod-ca-2021.crt \
+  --expected-ssl-root-cert-sha256=700723581420dd1ac98fd7e9ac529f0ef210eadcaf87fc868a3ad7d114c2f3b7 \
+  --authorized-disposable-preview-reset=b742d12dee926ccfe76158cf524e503bcdc576a08e928a7147741faf4a314424
+```
+
+Replace the three non-secret identity placeholders only with the new create
+result and independently verified branch list. The reset digest identifies the
+fixed operation; it is not a substitute for user authorization. Never run this
+entry point outside an already-established cleanup lifecycle.
+
 ## Findings and unchanged safety boundary
 
 The exact `LOCK TABLE supabase_migrations.schema_migrations IN SHARE ROW EXCLUSIVE
@@ -114,8 +198,11 @@ query boundaries; the full application suite passed 235 files / 3,402 tests.
 TypeScript, ESLint, adapter sync (73 files) and diff
 checks passed. The local server stopped and the synthetic fixture was removed.
 
-Next: commit and update existing PR #36 without deployment. A separately
-authorized disposable Preview is still needed to verify the initialization fix
-and the remaining baseline/migration gates on PostgreSQL 17. The newly learned
+Commit `3e67789` was pushed and existing PR #36 updated without deployment.
+This change records the post-r7 invocation correction, its tests and evidence;
+the correction has only been validated locally. Next is to reconfirm the cost
+and scope of one disposable no-data Preview, then use the versioned entry point
+inside its cleanup lifecycle to verify the initialization fix and remaining
+baseline/migration gates on PostgreSQL 17. The newly learned
 schema-missing cause does not justify changing unrelated baseline fingerprints,
 accepting arbitrary existing history or granting extra hosted-role privileges.
