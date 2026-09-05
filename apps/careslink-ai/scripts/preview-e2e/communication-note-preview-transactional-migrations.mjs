@@ -75,6 +75,18 @@ const FIXED_POSTCHECK_CHECKPOINTS = new Set([
   "connection_postcommit",
   "committed_history",
 ]);
+// SQLSTATE is consumed only here, never copied into diagnostic evidence.
+// 57014 also covers explicit cancellation, not just statement timeout.
+const HISTORY_LOCK_FAILURE_CHECKPOINTS = new Map([
+  ["42501", "migration_history_lock_permission_denied"],
+  ["55P03", "migration_history_lock_not_available"],
+  ["57014", "migration_history_lock_query_canceled"],
+  ["42P01", "migration_history_lock_relation_missing"],
+  ["3F000", "migration_history_lock_schema_missing"],
+  ["25P01", "migration_history_lock_transaction_required"],
+  ["25P02", "migration_history_lock_transaction_aborted"],
+  ["40P01", "migration_history_lock_deadlock"],
+]);
 const FIXED_TRANSACTION_CHECKPOINTS = new Set([
   "begin_transaction",
   "configure_statement_timeout",
@@ -82,6 +94,7 @@ const FIXED_TRANSACTION_CHECKPOINTS = new Set([
   "configure_idle_transaction_timeout",
   "target_attestation",
   "migration_history_lock",
+  ...HISTORY_LOCK_FAILURE_CHECKPOINTS.values(),
   "reset_preconditions",
   "drop_baseline_public_routines",
   "drop_baseline_public_tables",
@@ -1661,6 +1674,19 @@ function fail(code, checkpoint, migrationOrdinal) {
   );
 }
 
+export async function acquireCommunicationNotePreviewMigrationHistoryLock(client) {
+  try {
+    await client.query(`lock table supabase_migrations.schema_migrations
+      in share row exclusive mode`);
+  } catch (error) {
+    fail(
+      "TRANSACTIONAL_MIGRATION_TRANSACTION_FAILED",
+      HISTORY_LOCK_FAILURE_CHECKPOINTS.get(safeCode(error)) ??
+        "migration_history_lock",
+    );
+  }
+}
+
 export function parseTransactionalMigrationArguments(argv) {
   if (!Array.isArray(argv)) {
     fail("TRANSACTIONAL_MIGRATION_ARGUMENT_INVALID");
@@ -2271,8 +2297,7 @@ export async function runTransactionalMigrationHarness({
       fail("TRANSACTIONAL_MIGRATION_CONCURRENT_RUN_DENIED");
     }
     checkpoint = "migration_history_lock";
-    await client.query(`lock table supabase_migrations.schema_migrations
-      in share row exclusive mode`);
+    await acquireCommunicationNotePreviewMigrationHistoryLock(client);
     checkpoint = "reset_preconditions";
     const resetBaseline = await assertDisposablePreviewResetPreconditions(
       client,

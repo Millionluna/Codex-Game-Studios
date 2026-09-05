@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 import {
+  acquireCommunicationNotePreviewMigrationHistoryLock,
   createSafeTransactionalMigrationFailureEvidence,
   parseTransactionalMigrationArguments,
   runTransactionalMigrationHarness,
@@ -56,7 +57,7 @@ describe("Communication Note Preview transactional migration policy", () => {
   it("pins all 46 repository migrations and removes only 26 known wrappers in memory", async () => {
     const bundle = await loadPinnedCommunicationNotePreviewMigrations();
     expect(POLICY.version).toBe(
-      "2026-09-05.preview-transactional-migrations.16",
+      "2026-09-05.preview-transactional-migrations.17",
     );
     expect(bundle).toMatchObject({
       manifestSha256: POLICY.manifestSha256,
@@ -703,6 +704,88 @@ describe("Communication Note Preview transactional migration runtime", () => {
     expect(JSON.stringify(diagnostic)).not.toContain(SENTINEL_DATABASE_ERROR);
   });
 
+  it.each([
+    ["42501", "migration_history_lock_permission_denied"],
+    ["55P03", "migration_history_lock_not_available"],
+    ["57014", "migration_history_lock_query_canceled"],
+    ["42P01", "migration_history_lock_relation_missing"],
+    ["3F000", "migration_history_lock_schema_missing"],
+    ["25P01", "migration_history_lock_transaction_required"],
+    ["25P02", "migration_history_lock_transaction_aborted"],
+    ["40P01", "migration_history_lock_deadlock"],
+  ])("classifies history-lock SQLSTATE %s without leaking or continuing", async (
+    queryFailureCode, checkpoint,
+  ) => {
+    for (const rollbackFails of [false, true]) {
+      const client = new FakeMigrationClient({
+        queryFailureIncludes: "lock table supabase_migrations.schema_migrations",
+        queryFailureCode,
+        rollbackFails,
+      });
+      let failure;
+      try {
+        await runTransactionalMigrationHarness({
+          client,
+          backgroundState: { failed: false },
+          expectedPostgresMajor: 17,
+          resetAuthorizationSha256: POLICY.disposablePreviewBaselineHistorySha256,
+          migrations: [migration("20260101000000", "one")],
+          manifestSha256: "b".repeat(64),
+          outerTransactionCount: 0,
+        });
+      } catch (error) {
+        failure = error;
+      }
+      const evidence = createSafeTransactionalMigrationFailureEvidence(failure);
+      expect(evidence).toEqual(transactionFailure(checkpoint));
+      expect(JSON.stringify(failure)).not.toContain(SENTINEL_DATABASE_ERROR);
+      expect(JSON.stringify(evidence)).not.toContain(queryFailureCode);
+      expect(client.events).toHaveLength(7);
+      expect(client.events.slice(-2)).toEqual([
+        "lock table supabase_migrations.schema_migrations in share row exclusive mode",
+        "rollback",
+      ]);
+      expect(client.schemaRebuilt).toBe(false);
+      expect(client.history).toEqual([]);
+    }
+  });
+
+  it("ignores unknown, inherited, accessor and non-string history-lock codes", async () => {
+    let getterCalls = 0;
+    const accessor = Object.defineProperty(new Error(SENTINEL_DATABASE_ERROR), "code", {
+      get() { getterCalls += 1; throw new Error(SENTINEL_DATABASE_ERROR); },
+    });
+    for (const error of [
+      sensitiveDatabaseFailure(),
+      Object.create({ code: "42501" }),
+      accessor,
+      { code: 42501 },
+      { code: "42501 " },
+      { code: new String("42501") },
+      { code: "__proto__" },
+      { code: "toString" },
+      { code: "TRANSACTIONAL_MIGRATION_TRANSACTION_FAILED" },
+      null,
+      "42501",
+    ]) {
+      let failure;
+      const queries = [];
+      try {
+        await acquireCommunicationNotePreviewMigrationHistoryLock({
+          async query(sql) { queries.push(sql); throw error; },
+        });
+      } catch (caught) {
+        failure = caught;
+      }
+      expect(queries).toHaveLength(1);
+      expect(createSafeTransactionalMigrationFailureEvidence(failure)).toEqual(
+        transactionFailure("migration_history_lock"),
+      );
+      expect(JSON.stringify(failure)).not.toContain(SENTINEL_DATABASE_ERROR);
+    }
+    expect(getterCalls).toBe(0);
+  });
+
   it("rejects a mutated code even on a genuine runner error instance", () => {
     let genuineFailure;
     try {
@@ -1073,9 +1156,9 @@ function migration(version, name, statement = "select 1") {
   });
 }
 
-function sensitiveDatabaseFailure() {
+function sensitiveDatabaseFailure(code = SENTINEL_DATABASE_ERROR) {
   return Object.assign(new Error(SENTINEL_DATABASE_ERROR), {
-    code: SENTINEL_DATABASE_ERROR,
+    code,
     detail: SENTINEL_DATABASE_ERROR,
     query: SENTINEL_DATABASE_ERROR,
   });
@@ -1100,6 +1183,7 @@ class FakeMigrationClient {
     queryFailureAtCall = null,
     queryFailureIncludes = null,
     queryFailureOccurrence = 1,
+    queryFailureCode = SENTINEL_DATABASE_ERROR,
     initialHistory = [],
     targetBypassRls = true,
     targetCanCreateRoles = true,
@@ -1147,6 +1231,7 @@ class FakeMigrationClient {
     this.queryCallCount = 0;
     this.queryFailureIncludes = queryFailureIncludes;
     this.queryFailureOccurrence = queryFailureOccurrence;
+    this.queryFailureCode = queryFailureCode;
     this.queryFailureMatchCount = 0;
     this.targetBypassRls = targetBypassRls;
     this.targetCanCreateRoles = targetCanCreateRoles;
@@ -1202,7 +1287,7 @@ class FakeMigrationClient {
     this.events.push(normalized);
     this.queryCallCount += 1;
     if (this.queryCallCount === this.queryFailureAtCall) {
-      throw sensitiveDatabaseFailure();
+      throw sensitiveDatabaseFailure(this.queryFailureCode);
     }
     if (
       typeof this.queryFailureIncludes === "string" &&
@@ -1210,7 +1295,7 @@ class FakeMigrationClient {
     ) {
       this.queryFailureMatchCount += 1;
       if (this.queryFailureMatchCount === this.queryFailureOccurrence) {
-        throw sensitiveDatabaseFailure();
+        throw sensitiveDatabaseFailure(this.queryFailureCode);
       }
     }
     if (
