@@ -10,6 +10,7 @@ import pg from "pg";
 import {
   acquireCommunicationNotePreviewMigrationHistoryLock as lockHistory,
   createSafeTransactionalMigrationFailureEvidence as safeEvidence,
+  initializeMissingPreviewMigrationHistory as initializeHistory,
 } from "./communication-note-preview-transactional-migrations.mjs";
 
 // This fixture cannot accept an existing database, URL, role or filesystem target.
@@ -75,10 +76,102 @@ async function verifyScenarios(owner, actor, peer, passed, onScenario) {
     }
   };
 
-  await owner.query(`create schema supabase_migrations;
-    create table ${TABLE} (version text primary key);
-    insert into ${TABLE} values ('synthetic-baseline');
-    create role history_lock_actor nologin nosuperuser nocreatedb nocreaterole noinherit;
+  await owner.query(`create role anon nologin;
+    create role authenticated nologin;
+    create role service_role nologin;
+    alter default privileges grant all on tables to anon, authenticated, service_role;
+    alter default privileges grant usage on schemas to anon, authenticated, service_role`);
+
+  const assertHistoryAbsent = async () => {
+    const { rows } = await peer.query(`select
+      pg_catalog.to_regnamespace('supabase_migrations') is null as absent`);
+    assert.deepEqual(rows, [{ absent: true }]);
+  };
+  await scenario("bootstrap-empty-history-with-private-acls-and-rollback", async () => {
+    await owner.query("begin");
+    assert.equal(await initializeHistory(owner), true);
+    await lockHistory(owner);
+    const columns = await owner.query(`select attname,
+      pg_catalog.format_type(atttypid, atttypmod) as type, attnotnull
+      from pg_catalog.pg_attribute where attrelid = '${TABLE}'::regclass
+        and attnum > 0 and not attisdropped order by attnum`);
+    assert.deepEqual(columns.rows, [
+      { attname: "version", type: "text", attnotnull: true },
+      { attname: "statements", type: "text[]", attnotnull: false },
+      { attname: "name", type: "text", attnotnull: false },
+    ]);
+    const rows = await owner.query(`select * from ${TABLE}`);
+    assert.equal(rows.rowCount, 0);
+    for (const role of ["anon", "authenticated", "service_role"]) {
+      const access = await owner.query(`select
+        pg_catalog.has_schema_privilege($1, 'supabase_migrations', 'USAGE') as schema_access,
+        pg_catalog.has_table_privilege($1, '${TABLE}', 'SELECT') as table_access`, [role]);
+      assert.deepEqual(access.rows, [{ schema_access: false, table_access: false }]);
+    }
+    // The uncommitted namespace is invisible to a different session.
+    await assertHistoryAbsent();
+  });
+  await assertHistoryAbsent();
+
+  await scenario("bootstrap-removes-history-on-later-transaction-error", async () => {
+    await owner.query("begin");
+    assert.equal(await initializeHistory(owner), true);
+    await lockHistory(owner);
+    await owner.query(`insert into ${TABLE}(version, name, statements)
+      values ('synthetic-rollback', 'rollback', array['select 1'])`);
+    await assert.rejects(owner.query("select 1 / 0"), { code: "22012" });
+  });
+  await assertHistoryAbsent();
+
+  await scenario("partial-existing-schema-is-not-repaired", async () => {
+    await owner.query("begin; create schema supabase_migrations");
+    assert.equal(await initializeHistory(owner), false);
+    await expectLockFailure(owner, "relation_missing");
+  });
+  await assertHistoryAbsent();
+
+  await scenario("bootstrap-race-does-not-adopt-competing-schema", async () => {
+    await owner.query("begin");
+    await assert.rejects(initializeHistory({
+      async query(sql) {
+        const result = await owner.query(sql);
+        if (sql.includes("as migration_history_schema_missing")) {
+          await peer.query("create schema supabase_migrations");
+        }
+        return result;
+      },
+    }), (error) => {
+      assert.deepEqual(safeEvidence(error), {
+        stage: "M00", errorType: "TRANSACTIONAL_MIGRATION_TRANSACTION_FAILED",
+        checkpoint: "create_migration_history_schema",
+      });
+      return true;
+    });
+  });
+  const competitor = await peer.query(`select
+    pg_catalog.to_regnamespace('supabase_migrations') is not null as preserved,
+    pg_catalog.to_regclass('${TABLE}') is null as no_table`);
+  assert.deepEqual(competitor.rows, [{ preserved: true, no_table: true }]);
+  await peer.query("drop schema supabase_migrations"); // Exact empty synthetic race fixture.
+
+  await scenario("bootstrap-commits-history-atomically", async () => {
+    await owner.query("begin");
+    assert.equal(await initializeHistory(owner), true);
+    await lockHistory(owner);
+    await owner.query(`insert into ${TABLE}(version) values ('synthetic-baseline')`);
+    await owner.query("commit");
+    const { rows } = await peer.query(`select version, name, statements from ${TABLE}`);
+    assert.deepEqual(rows, [{ version: "synthetic-baseline", name: null, statements: null }]);
+  });
+  await scenario("existing-history-is-left-unchanged", async () => {
+    await owner.query("begin");
+    assert.equal(await initializeHistory(owner), false);
+    await lockHistory(owner);
+    const { rows } = await owner.query(`select version, name, statements from ${TABLE}`);
+    assert.deepEqual(rows, [{ version: "synthetic-baseline", name: null, statements: null }]);
+  });
+
+  await owner.query(`create role history_lock_actor nologin nosuperuser nocreatedb nocreaterole noinherit;
     grant usage on schema supabase_migrations to history_lock_actor`);
   await actor.query("set role history_lock_actor");
 
@@ -165,12 +258,12 @@ async function verifyScenarios(owner, actor, peer, passed, onScenario) {
     const { rows } = await peer.query(`select version from ${TABLE}`);
     assert.deepEqual(rows, [{ version: "synthetic-baseline" }]);
     await peer.query("begin; set local lock_timeout = '100ms'");
-    await assert.rejects(peer.query(`insert into ${TABLE} values ('blocked-writer')`), {
+    await assert.rejects(peer.query(`insert into ${TABLE}(version) values ('blocked-writer')`), {
       code: "55P03",
     });
     await peer.query("rollback");
     await owner.query("rollback");
-    await peer.query(`begin; insert into ${TABLE} values ('writer-after-release')`);
+    await peer.query(`begin; insert into ${TABLE}(version) values ('writer-after-release')`);
   });
   await scenario("rollback-releases-lock-and-preserves-fixture", async () => {
     const { rows } = await peer.query(`select version from ${TABLE}`);

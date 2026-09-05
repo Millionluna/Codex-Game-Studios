@@ -93,6 +93,10 @@ const FIXED_TRANSACTION_CHECKPOINTS = new Set([
   "configure_lock_timeout",
   "configure_idle_transaction_timeout",
   "target_attestation",
+  "inspect_migration_history_schema",
+  "create_migration_history_schema",
+  "create_migration_history_table",
+  "restrict_migration_history_access",
   "migration_history_lock",
   ...HISTORY_LOCK_FAILURE_CHECKPOINTS.values(),
   "reset_preconditions",
@@ -1687,6 +1691,45 @@ export async function acquireCommunicationNotePreviewMigrationHistoryLock(client
   }
 }
 
+// Caller must already hold the attested Preview transaction/advisory lock.
+// Never adopt a concurrently created schema or repair a partially existing one.
+export async function initializeMissingPreviewMigrationHistory(client) {
+  let checkpoint = "inspect_migration_history_schema";
+  try {
+    const observed = await client.query(`select
+      pg_catalog.to_regnamespace('supabase_migrations') is null
+        as migration_history_schema_missing`);
+    const missing = observed.rows[0]?.migration_history_schema_missing;
+    if (observed.rowCount !== 1 || typeof missing !== "boolean") {
+      fail("TRANSACTIONAL_MIGRATION_TRANSACTION_FAILED", checkpoint);
+    }
+    if (!missing) return false;
+
+    checkpoint = "create_migration_history_schema";
+    await client.query("create schema supabase_migrations authorization postgres");
+    checkpoint = "create_migration_history_table";
+    // Same columns/types/order as CLI 2.115.0's CreateMigrationTable; no old
+    // migration rows are synthesized. Explicit CREATE makes races fail closed.
+    await client.query(`create table supabase_migrations.schema_migrations (
+      version pg_catalog.text not null primary key,
+      statements pg_catalog.text[],
+      name pg_catalog.text
+    )`);
+    checkpoint = "restrict_migration_history_access";
+    // These are new objects owned by this transaction, not existing ACLs.
+    await client.query(`revoke all on schema supabase_migrations
+      from public, anon, authenticated, service_role;
+      revoke all on table supabase_migrations.schema_migrations
+      from public, anon, authenticated, service_role`);
+    return true;
+  } catch (error) {
+    if (error instanceof CommunicationNotePreviewTransactionalMigrationError) {
+      throw error;
+    }
+    fail("TRANSACTIONAL_MIGRATION_TRANSACTION_FAILED", checkpoint);
+  }
+}
+
 export function parseTransactionalMigrationArguments(argv) {
   if (!Array.isArray(argv)) {
     fail("TRANSACTIONAL_MIGRATION_ARGUMENT_INVALID");
@@ -1713,7 +1756,7 @@ export function parseTransactionalMigrationArguments(argv) {
   });
 }
 
-async function assertDisposablePreviewResetPreconditions(client) {
+async function assertDisposablePreviewResetPreconditions(client, historyInitialized) {
   let checkpoint = "lock_public_tables";
   try {
     await client.query(LOCK_PUBLIC_TABLES_SQL);
@@ -1748,9 +1791,11 @@ async function assertDisposablePreviewResetPreconditions(client) {
     if (
       fingerprint.rowCount !== 1 ||
       fingerprintRow?.history_count !==
-        POLICY.disposablePreviewBaselineMigrationCount ||
+        (historyInitialized ? 0 : POLICY.disposablePreviewBaselineMigrationCount) ||
       fingerprintRow?.history_sha256 !==
-        POLICY.disposablePreviewBaselineHistorySha256
+        (historyInitialized
+          ? POLICY.emptyMigrationHistorySha256
+          : POLICY.disposablePreviewBaselineHistorySha256)
     ) {
       fail("TRANSACTIONAL_MIGRATION_RESET_PRECONDITION_INVALID", checkpoint);
     }
@@ -2238,6 +2283,7 @@ export async function runTransactionalMigrationHarness({
   }
   let transactionOpen = false;
   let baselineCount = 0;
+  let historyInitialized = false;
   let checkpoint = "begin_transaction";
   let migrationOrdinal;
   try {
@@ -2296,11 +2342,14 @@ export async function runTransactionalMigrationHarness({
     if (targetRow.migration_lock !== true) {
       fail("TRANSACTIONAL_MIGRATION_CONCURRENT_RUN_DENIED");
     }
+    checkpoint = "inspect_migration_history_schema";
+    historyInitialized = await initializeMissingPreviewMigrationHistory(client);
     checkpoint = "migration_history_lock";
     await acquireCommunicationNotePreviewMigrationHistoryLock(client);
     checkpoint = "reset_preconditions";
     const resetBaseline = await assertDisposablePreviewResetPreconditions(
       client,
+      historyInitialized,
     );
     baselineCount = resetBaseline.baselineCount;
     checkpoint = "drop_baseline_public_routines";
@@ -2518,6 +2567,7 @@ export async function runTransactionalMigrationHarness({
     postgres: expectedPostgresMajor,
     migrations: migrations.length,
     baselineMigrations: baselineCount,
+    migrationHistoryInitialized: historyInitialized,
     appliedInSingleTransaction: migrations.length,
     outerTransactionsRemovedInMemory: outerTransactionCount,
     manifestSha256,
@@ -2527,7 +2577,9 @@ export async function runTransactionalMigrationHarness({
     publicNamespacePreserved: true,
     applicationObjectsRebuilt: true,
     baselineHistorySha256:
-      POLICY.disposablePreviewBaselineHistorySha256,
+      historyInitialized
+        ? POLICY.emptyMigrationHistorySha256
+        : POLICY.disposablePreviewBaselineHistorySha256,
     baselinePublicCatalogSha256:
       POLICY.disposablePreviewBaselinePublicCatalogSha256,
     baselinePublicSchemaMembersSha256:

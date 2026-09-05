@@ -7,7 +7,7 @@ const NON_TRANSACTIONAL_SQL_PATTERN = /^(?:create\s+(?:unique\s+)?index\s+concur
 
 export const COMMUNICATION_NOTE_PREVIEW_TRANSACTIONAL_MIGRATION_POLICY =
   Object.freeze({
-    version: "2026-09-05.preview-transactional-migrations.17",
+    version: "2026-09-05.preview-transactional-migrations.18",
     productionProjectRef: "adocsnwnslxhxcjgbyee",
     expectedCliVersion: "2.115.0",
     manifestSha256:
@@ -16,6 +16,8 @@ export const COMMUNICATION_NOTE_PREVIEW_TRANSACTIONAL_MIGRATION_POLICY =
     disposablePreviewBaselineMigrationCount: 19,
     disposablePreviewBaselineHistorySha256:
       "b742d12dee926ccfe76158cf524e503bcdc576a08e928a7147741faf4a314424",
+    emptyMigrationHistorySha256:
+      "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
     disposablePreviewBaselinePublicCatalogObjectCount: 555,
     disposablePreviewBaselinePublicCatalogSha256:
       "1bced92adab2e275fb835d3a7dc322e22e1c043fa88617844a0e32f8993e6d95",
