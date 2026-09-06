@@ -5,7 +5,6 @@ import {
   ArrowLeft,
   CheckCircle2,
   Coins,
-  FileText,
   Languages,
   LockKeyhole,
   MessageSquareText,
@@ -35,8 +34,7 @@ import {
   submitCommunicationNoteGeneration,
   type CommunicationNoteGenerationClientResult,
 } from "../../../lib/communication-note-generation-client";
-import type { CommunicationNoteGenerationJob } from "../../../lib/communication-note-generation-contract";
-import { buildCommunicationNoteDocumentHref } from "../../../lib/communication-note-document-contract";
+import { buildCommunicationNoteGenerationJobHref } from "../../../lib/communication-note-generation-contract";
 import { replaceCommunicationNoteLocation } from "../../../lib/communication-note-document-navigation";
 
 type CommunicationNoteComposerProps = {
@@ -51,9 +49,6 @@ const INITIAL_CONFIRMATIONS: CommunicationNoteComposerConfirmations = {
   reviewedNoIdentifiers: false,
   processingAuthorityConfirmed: false,
 };
-const GENERATION_POLL_INTERVAL_MS = 1_500;
-const GENERATION_MAX_AUTOMATIC_POLLS = 40;
-
 export function CommunicationNoteComposer({
   locale,
   pointsPreview = UNAVAILABLE_COMMUNICATION_NOTE_POINTS_PREVIEW,
@@ -76,38 +71,19 @@ export function CommunicationNoteComposer({
     Readonly<{ body: string; idempotencyKey: string }> | undefined
   >(undefined);
   const abortControllerRef = useRef<AbortController | undefined>(undefined);
-  const replayTimerRef = useRef<
-    ReturnType<typeof setTimeout> | undefined
-  >(undefined);
-  const automaticPollCountRef = useRef(0);
-  const [generationJob, setGenerationJob] =
-    useState<CommunicationNoteGenerationJob>();
   const [generationError, setGenerationError] = useState<string>();
   const [generationPending, setGenerationPending] = useState(false);
   const [requestLocked, setRequestLocked] = useState(false);
   const generationCopy = getGenerationSurfaceCopy(locale);
-  const savedDraftHref =
-    generationJob?.status === "SUCCEEDED"
-      ? buildCommunicationNoteDocumentHref({
-          canonicalId: generationJob.result.canonicalId,
-          revisionId: generationJob.result.revisionId,
-          locale,
-        })
-      : undefined;
-
-  function clearReplayTimer() {
-    if (replayTimerRef.current !== undefined) {
-      clearTimeout(replayTimerRef.current);
-      replayTimerRef.current = undefined;
-    }
-  }
 
   useEffect(() => {
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
       abortControllerRef.current?.abort();
-      clearReplayTimer();
+      abortControllerRef.current = undefined;
+      requestRef.current = undefined;
+      inFlightRef.current = false;
     };
   }, []);
 
@@ -145,10 +121,9 @@ export function CommunicationNoteComposer({
       !requestLocked,
   );
 
-  async function replayGenerationStatus() {
+  async function submitOrReplayGeneration() {
     const request = requestRef.current;
     if (!request || inFlightRef.current) return;
-    clearReplayTimer();
     inFlightRef.current = true;
     setGenerationPending(true);
     setGenerationError(undefined);
@@ -160,7 +135,7 @@ export function CommunicationNoteComposer({
         signal: controller.signal,
       });
       if (!mountedRef.current || requestRef.current !== request) return;
-      handleGenerationResult(result, request);
+      handleGenerationResult(result);
     } catch {
       if (!mountedRef.current || controller.signal.aborted) return;
       setGenerationError(generationCopy.transportError);
@@ -173,32 +148,18 @@ export function CommunicationNoteComposer({
     }
   }
 
-  function handleGenerationResult(
-    result: CommunicationNoteGenerationClientResult,
-    request: Readonly<{ body: string; idempotencyKey: string }>,
-  ) {
-    clearReplayTimer();
+  function handleGenerationResult(result: CommunicationNoteGenerationClientResult) {
     if (!result.ok) {
       setGenerationError(generationCopy.error(result.error.code));
       return;
     }
-    const job = result.admission.job;
-    setGenerationJob(job);
-    if (job.status === "QUEUED" || job.status === "RUNNING") {
-      if (
-        automaticPollCountRef.current >= GENERATION_MAX_AUTOMATIC_POLLS
-      ) {
-        setGenerationError(generationCopy.pollingPaused);
-        return;
-      }
-      replayTimerRef.current = setTimeout(() => {
-        replayTimerRef.current = undefined;
-        if (requestRef.current === request) {
-          automaticPollCountRef.current += 1;
-          void replayGenerationStatus();
-        }
-      }, GENERATION_POLL_INTERVAL_MS);
-    }
+    const jobHref = buildCommunicationNoteGenerationJobHref({
+      jobId: result.admission.job.jobId,
+      locale,
+    });
+    requestRef.current = undefined;
+    inFlightRef.current = false;
+    replaceCommunicationNoteLocation(jobHref);
   }
 
   async function submitGeneration(event: React.FormEvent<HTMLFormElement>) {
@@ -208,11 +169,9 @@ export function CommunicationNoteComposer({
       body: JSON.stringify(readySubmission),
       idempotencyKey: window.crypto.randomUUID(),
     });
-    clearReplayTimer();
-    automaticPollCountRef.current = 0;
     setRequestLocked(true);
     requestRef.current = request;
-    await replayGenerationStatus();
+    await submitOrReplayGeneration();
   }
 
   function resetReview() {
@@ -716,41 +675,11 @@ export function CommunicationNoteComposer({
                     ? generationCopy.boundary(pointsPreview.status === "AVAILABLE" ? formatPointsNumber(pointsPreview.generationCostPoints, locale) : undefined)
                     : surface.generationBoundary}
                 </p>
-                {generationJob ? (
-                  <div
-                    className={`mt-3 ${
-                      savedDraftHref
-                        ? "border border-[#aad4c2] bg-[#e2f2ea] p-3"
-                        : ""
-                    }`}
-                  >
-                    <p
-                      role="status"
-                      aria-live="polite"
-                      className="text-sm leading-6 text-foreground"
-                    >
-                      {generationCopy.status(generationJob.status)}
-                    </p>
-                    {savedDraftHref ? (
-                      <a
-                        href={savedDraftHref}
-                        className="jade-action mt-3 w-full"
-                        onClick={(event) => {
-                          event.preventDefault();
-                          replaceCommunicationNoteLocation(savedDraftHref);
-                        }}
-                      >
-                        <FileText className="size-4" aria-hidden="true" />
-                        {generationCopy.openSavedDraft}
-                      </a>
-                    ) : null}
-                  </div>
-                ) : null}
                 {generationError ? (
                   <div role="alert" className="mt-3 border border-[#efc7c7] bg-[#fff2f2] px-3 py-2 text-sm text-danger">
                     {generationError}
-                    <button type="button" className="taito-secondary mt-2 w-full" onClick={() => void replayGenerationStatus()}>
-                      {generationCopy.checkStatus}
+                    <button type="button" className="taito-secondary mt-2 w-full" onClick={() => void submitOrReplayGeneration()}>
+                      {generationCopy.replayRequest}
                     </button>
                   </div>
                 ) : null}
@@ -998,12 +927,9 @@ type GenerationSurfaceCopy = Readonly<{
   boundaries: readonly string[];
   pointsBalance(preview: CommunicationNotePointsPreview, locale: CommunicationNoteComposerLocale): string;
   action: string;
-  openSavedDraft: string;
-  checkStatus: string;
+  replayRequest: string;
   transportError: string;
-  pollingPaused: string;
   boundary(cost?: string): string;
-  status(status: CommunicationNoteGenerationJob["status"]): string;
   error(code: string): string;
 }>;
 
@@ -1021,12 +947,9 @@ function getGenerationSurfaceCopy(
       boundaries: ["只有完成本地检查并确认的清理事实才会发送至服务器。", "生成任务与正式草稿由服务器保存；页面离开不会取消任务。", "本工作流不提供临床、法律、护理、监管或合规建议。"],
       pointsBalance: connectedPointsBalanceZhHans,
       action: "提交生成 Communication Note",
-      openSavedDraft: "打开已保存草稿",
-      checkStatus: "安全查询状态",
+      replayRequest: "重试同一请求",
       transportError: "暂时无法确认生成状态。可使用相同请求安全查询；离开页面不会取消服务器任务。",
-      pollingPaused: "自动状态查询已暂停。任务可能仍在服务器运行；请使用相同请求安全查询状态。",
       boundary: (cost) => `服务器将在接纳请求时重新核验${cost ? `并预留 ${cost} Points` : " Points"}。AI 会异步生成并保存正式草稿；内容不构成专业建议。`,
-      status: generationStatusZhHans,
       error: generationErrorZhHans,
     };
   }
@@ -1041,12 +964,9 @@ function getGenerationSurfaceCopy(
       boundaries: ["只有完成本機檢查並確認的清理事實才會傳送至伺服器。", "生成任務與正式草稿由伺服器儲存；離開頁面不會取消任務。", "本工作流程不提供臨床、法律、護理、監管或合規建議。"],
       pointsBalance: connectedPointsBalanceZhHant,
       action: "提交生成 Communication Note",
-      openSavedDraft: "開啟已儲存草稿",
-      checkStatus: "安全查詢狀態",
+      replayRequest: "重試同一請求",
       transportError: "暫時無法確認生成狀態。可使用相同請求安全查詢；離開頁面不會取消伺服器任務。",
-      pollingPaused: "自動狀態查詢已暫停。任務可能仍在伺服器運行；請使用相同請求安全查詢狀態。",
       boundary: (cost) => `伺服器將在接納請求時重新核驗${cost ? `並預留 ${cost} Points` : " Points"}。AI 會非同步生成並儲存正式草稿；內容不構成專業建議。`,
-      status: generationStatusZhHant,
       error: generationErrorZhHant,
     };
   }
@@ -1062,27 +982,11 @@ function getGenerationSurfaceCopy(
       ? `Page-load balance snapshot: ${formatPointsNumber(preview.availablePoints, numberLocale)} available · ${formatPointsNumber(preview.reservedPoints, numberLocale)} reserved`
       : preview.status === "NOT_READY" ? "The Points balance is not ready for this account." : "The Points rate and balance are unavailable.",
     action: "Submit Communication Note generation",
-    openSavedDraft: "Open saved draft",
-    checkStatus: "Check status safely",
+    replayRequest: "Retry exact request",
     transportError: "Generation status cannot be confirmed right now. You can safely replay the same request; leaving this page does not cancel server work.",
-    pollingPaused: "Automatic status checks have paused. The job may still be running on the server; check the same request safely.",
     boundary: (cost) => `On admission the server rechecks eligibility${cost ? ` and reserves ${cost} Points` : " and the Points cost"}. AI generation is asynchronous and saves a canonical draft. It is not professional advice.`,
-    status: (status) => ({
-      QUEUED: "Generation queued. Points are reserved by the server.",
-      RUNNING: "Generation is running. Leaving this page does not cancel server work.",
-      SUCCEEDED: "Communication Note draft generated and saved by the server.",
-      FAILED: "Communication Note generation failed. The server has finalised the job.",
-      CANCELLED: "Communication Note generation was cancelled by the server.",
-    })[status],
     error: generationErrorEn,
   };
-}
-
-function generationStatusZhHans(status: CommunicationNoteGenerationJob["status"]) {
-  return ({ QUEUED: "生成任务已排队，Points 已由服务器预留。", RUNNING: "正在生成；离开页面不会取消服务器任务。", SUCCEEDED: "Communication Note 草稿已由服务器生成并保存。", FAILED: "生成失败，服务器已结束该任务。", CANCELLED: "服务器已取消生成任务。" })[status];
-}
-function generationStatusZhHant(status: CommunicationNoteGenerationJob["status"]) {
-  return ({ QUEUED: "生成任務已排隊，Points 已由伺服器預留。", RUNNING: "正在生成；離開頁面不會取消伺服器任務。", SUCCEEDED: "Communication Note 草稿已由伺服器生成並儲存。", FAILED: "生成失敗，伺服器已結束該任務。", CANCELLED: "伺服器已取消生成任務。" })[status];
 }
 function generationErrorEn(code: string) {
   const reason = code === "POINTS_INSUFFICIENT"

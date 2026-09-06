@@ -40,9 +40,11 @@ When all future activation gates are separately reviewed, the source path is:
    matches and requires both privacy/authority confirmations.
 3. The UI gate and an `AVAILABLE`, affordable Points snapshot are required
    before the submit button can send anything.
-4. The browser freezes one JSON body and one caller-owned idempotency key. All
-   automatic status checks and manual uncertain-response checks replay those
-   exact bytes and that exact key. Inputs remain locked after submission.
+4. The browser freezes one JSON body and one caller-owned idempotency key until
+   it receives a validated admission. While that first response remains
+   uncertain in the mounted page, a manual retry replays the exact bytes and
+   key. A validated admission moves to the owner job URL and drops that replay
+   material instead of using the mutation as a status poll.
 5. M1x rejects Bearer credentials, resolves an exact Cookie principal, checks
    same-origin HTTPS mutation transport, bounds and strictly parses the body,
    and repeats both the composer review and canonical privacy scan server-side.
@@ -57,9 +59,9 @@ When all future activation gates are separately reviewed, the source path is:
 8. The purpose-scoped Points repository performs one atomic database admission:
    reauthorize the current session and privacy proof, accept the staged payload,
    reserve exactly 20 Points and persist a fresh attempt-zero `QUEUED` job.
-9. The route returns only `{ created, job }`. The browser may replay the same
-   request to observe the current owner-safe job state. It never decrements a
-   displayed balance itself.
+9. The route returns only `{ created, job }`. Once the response identifies the
+   job, its owner-safe state is read through the separate metadata-only status
+   boundary. The browser never decrements a displayed balance itself.
 10. A separately registered asynchronous worker may later claim the durable
     row. It is not imported, invoked or scheduled by the page, client, route or
     M1y submitter composition.
@@ -81,10 +83,11 @@ default-off error and cannot leak private database/vault fields.
 ## Browser and response boundary
 
 - Cleaned facts exist only in React memory until the independently gated submit.
-- No draft facts or identifiers are placed in URLs, browser storage, history,
-  logs, beacons or client-side cache APIs.
-- Only one polling timer can exist. After 40 automatic status replays, polling
-  pauses and offers an exact-request manual check. Unmount aborts only a pending
+- No draft facts, request keys or content hashes are placed in URLs, browser
+  storage, history, logs, beacons or client-side cache APIs. After admission,
+  the URL carries only the non-secret job UUID and explicit UI locale.
+- Only one status-read timer can exist. After 40 automatic GET checks, polling
+  pauses and offers one real owner-status read. Unmount aborts only a pending
   browser request and clears polling; it does not claim to cancel a durable
   server job.
 - Server errors use the fixed M1x vocabulary and localised fixed UI copy; raw
@@ -115,9 +118,10 @@ implemented and separately approved:
    activation set remains empty or closed.
 6. Approve the provider/model policy, credentials, budget/kill switch and
    model-call evidence. M1y makes zero model calls.
-7. Add owner-authorized job recovery plus a canonical document/detail viewer so
-   a page reload can recover the job and terminal success can open the saved
-   draft; M1y keeps replay material only in memory and displays only job state.
+7. Install and prove the owner-authorized status reader against a separately
+   approved no-data Preview. The canonical document viewer and source-level job
+   recovery page now exist, but their formal read composition remains
+   default-off and unproved against Hosted Auth/database state.
 8. Pass current-revision browser/API/Auth/database/worker/Points/payload tests on
    a disposable no-data Preview, then obtain separate deployment and activation
    approval. Production and real care data remain outside that approval.
@@ -210,11 +214,9 @@ never inherit current confirmation. Generated `content.disclaimer` is not used
 as a trusted product boundary. No edit, copy, self-review mutation or export
 control is simulated.
 
-Terminal `SUCCEEDED` generation state now exposes one exact canonical/revision
-result link. Its normal click uses replace navigation to discard the composer
-history entry and its in-memory facts. The URL contains only the document UUID,
-revision UUID and explicit UI locale; it contains no facts, content hash, job
-ID or idempotency key.
+The saved result surface accepts only an exact canonical/revision link. Its URL
+contains only the document UUID, revision UUID and explicit UI locale; it
+contains no facts, content hash, job ID or idempotency key.
 
 This completes the canonical result page and known-success entry portion of
 item 7. It does not add owner-authorized queued/running job recovery after a
@@ -231,3 +233,54 @@ local-only route was used for a desktop browser visual and accessibility-tree
 check, returned HTTP 200 without a Next error overlay or server error, and was
 deleted immediately afterward. No Preview, deployment, hosted Supabase read,
 Production mutation, real care data or model call was used.
+
+## Owner job recovery page slice (2026-09-07)
+
+The source-level owner job route now exists at
+`/ai-documents/communication-note/jobs/{jobId}`. The composer stops replaying a
+successful admission as a status poll: after the first validated `{created,
+job}` response, it clears the in-memory request-body/key reference and replaces
+the page with the canonical job URL containing only the job UUID and explicit
+locale. If that initial response is still uncertain, the same mounted composer
+retains one exact-request manual replay path; no replay material is written to
+browser storage or history.
+
+The job page is independent of the Points, composer and generation UI gates.
+Its server component first requires a real Supabase provider account, then
+validates and canonicalises the job UUID and query. Malformed identifiers do
+not bypass authentication or become an account/job oracle. Signed-out return
+paths, canonical redirects and language links contain only validated job UUIDs
+and one supported locale. The page and GET boundary are private/no-store,
+no-referrer, no-sniff and non-indexable.
+
+After that server gate, the client loader performs only owner-scoped,
+same-origin metadata GETs. It permits one in-flight request and one timer,
+checks `QUEUED` and `RUNNING` at 1.5-second intervals, pauses after 40 automatic
+checks, and stops automatically for `SUCCEEDED`, `FAILED` or `CANCELLED`.
+Focus, restored visibility, cross-tab Auth storage changes, restored network
+and BFCache restoration clear the visible state before reauthorization;
+`pagehide` and unmount abort and clear pending work, while request generations
+discard late responses.
+
+The green CaresLink status surface reports no percentage or completion estimate.
+Success links the exact server-acknowledged document/revision and keeps
+`Draft – review required` visible. Failed and cancelled jobs expose only a
+clean new-note navigation, without pretending to retry, cancel or refund.
+Unavailable state offers a real GET check; forbidden and missing jobs share one
+content-free not-found description. English, Simplified Chinese and Traditional
+Chinese copy are explicit.
+
+This slice recovers a known job after refresh and after later status-response
+loss. It cannot recover an initial admission response lost before the browser
+receives the job UUID. Solving that case without persisting the idempotency key
+requires a separately reviewed owner-scoped recent-job discovery boundary.
+The source status composition remains default-off; no Preview, deployment,
+Production mutation, real care data, Points mutation or model call is included.
+
+Verification for this slice: 15 focused files / 218 tests and the complete 260
+files / 3,883 tests passed. TypeScript, full zero-warning ESLint, the Next.js
+16.2.9 Webpack production build with 64/64 generated pages, the 107-static-chunk
+client-boundary scan, 73-file Codex adapter sync and `git diff --check` passed.
+A temporary synthetic local-only route received a desktop browser,
+accessibility-tree, console and framework-overlay check and was deleted after
+inspection. This remains local source/build evidence only.

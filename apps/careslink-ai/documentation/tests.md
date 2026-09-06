@@ -3799,9 +3799,55 @@ accessibility-tree check, returned HTTP 200 without a framework overlay or
 server error, and was deleted after inspection.
 
 This is not Preview, deployment, hosted Supabase, Production, real-care-data or
-model-call evidence. Owner-authorized generation job recovery after reload,
-editing, persisted self-review, saved-document indexing and revision-bound
-Copy/TXT/DOCX/PDF export remain unimplemented.
+model-call evidence. At that checkpoint, owner-authorized generation job
+recovery after reload, editing, persisted self-review, saved-document indexing
+and revision-bound Copy/TXT/DOCX/PDF export remained unimplemented. The next
+section records the later source-only known-job recovery slice.
+
+### Communication Note owner job recovery page — local source/build evidence
+
+The composer now replaces a validated admission with the canonical
+`/ai-documents/communication-note/jobs/{jobId}?lang={locale}` route, clears its
+in-memory request bytes and idempotency key, and stops using POST as a status
+poll. While the initial admission response is still uncertain in the mounted
+composer, one manual action can replay the exact original bytes and key. No
+facts, request key or content hash are written to URLs, history, browser
+storage, beacons or client caches.
+
+The independent provider-gated job page performs same-origin, no-store GET
+reads. Its shared strict parser validates the exact Communication job state,
+timestamp ordering, terminal result shape and canonical UUID binding. Browser
+tests cover queued/running polling, the 40-check bound, terminal stop, manual
+checks, focus/visibility/storage/online/BFCache reauthorization, pagehide and
+unmount cleanup, abort and late-response rejection, session-loss clearing,
+three explicit locales, safe canonical redirects, exact saved-revision links
+and content-free forbidden/not-found/unavailable states. The status live region
+contains only the concise status text, not timestamps, controls or the job UUID.
+
+The server read port accepts only `get({jobId})`. Source tests prove auth before
+identifier interpretation, fixed 401/403/404/503 mappings, unknown and
+wrong-owner `NOT_FOUND` equivalence, wrong-Note hiding, response hardening,
+canonical UUID output, accessor rejection and default failure before request,
+Auth or repository access. Its formal reader remains exactly `undefined` with
+readiness `false`; no environment variable can install a database caller.
+
+The focused gate passed **218/218 tests across 15 files**. The complete local
+Vitest suite passed **3,883/3,883 tests across 260 files**. TypeScript, full
+zero-warning ESLint and the Next.js 16.2.9 Webpack production build with 64/64
+generated pages passed; the build lists both the job page and GET API as
+dynamic routes. The client-boundary scan passed across 107 static chunks, the
+Codex adapter check passed across 73 files and `git diff --check` passed. A
+temporary synthetic local route received a desktop browser, accessibility-tree,
+console and framework-overlay check, returned HTTP 200 with the approved green
+CaresLink identity, and was deleted immediately afterward.
+
+This is source/build evidence only. It does not install the required
+Communication-only purpose-scoped database reader, exercise Hosted Auth/RLS,
+create a Preview, deploy, mutate Production or real care data, reserve Points,
+or call a model. It recovers only a job whose UUID reached the browser. If the
+initial POST response is lost before that UUID arrives and the page is then
+refreshed, recovery still requires a separately reviewed owner-scoped recent-job
+or admission-receipt boundary.
 
 ### Current live/read-only evidence
 

@@ -27,7 +27,10 @@ vi.mock("next/image", async () => {
 });
 
 import { CommunicationNoteComposer } from "./communication-note-composer";
-import { getCommunicationNoteGenerationErrorMessage } from "../../../lib/communication-note-generation-contract";
+import {
+  getCommunicationNoteGenerationErrorMessage,
+  type CommunicationNoteGenerationJob,
+} from "../../../lib/communication-note-generation-contract";
 
 type ComposerLocale = React.ComponentProps<typeof CommunicationNoteComposer>["locale"];
 const ERROR_COPY_CASES = [
@@ -36,19 +39,19 @@ const ERROR_COPY_CASES = [
     snapshot: "The page-load balance snapshot may be out of date.",
     generic: "The server did not confirm whether this exact request was accepted.",
     transport: "Generation status cannot be confirmed right now.",
-    replay: "Check status safely",
+    replay: "Retry exact request",
   },
   {
     locale: "zh-Hans", reason: "服务器报告 Points 余额不足。",
     snapshot: "页面载入时的余额快照可能已过期。",
     generic: "服务器未确认是否已接纳此精确请求。",
-    transport: "暂时无法确认生成状态。", replay: "安全查询状态",
+    transport: "暂时无法确认生成状态。", replay: "重试同一请求",
   },
   {
     locale: "zh-Hant", reason: "伺服器回報 Points 餘額不足。",
     snapshot: "頁面載入時的餘額快照可能已過期。",
     generic: "伺服器未確認是否已接納此精確請求。",
-    transport: "暫時無法確認生成狀態。", replay: "安全查詢狀態",
+    transport: "暫時無法確認生成狀態。", replay: "重試同一請求",
   },
 ] as const;
 
@@ -331,48 +334,30 @@ describe("Communication Note composer browser boundary", () => {
     expectNoBrowserIo(io);
   });
 
-  it("submits immutable reviewed bytes once and safely replays the same idempotency key", async () => {
+  it("submits immutable reviewed bytes once and replaces the composer with the recoverable job URL", async () => {
     vi.useFakeTimers();
     const idempotencyKey = "11111111-1111-4111-8111-111111111111";
     vi.spyOn(window.crypto, "randomUUID").mockReturnValue(idempotencyKey);
     const createdAt = "2026-09-03T02:00:00.000Z";
-    const fetcher = vi.fn()
-      .mockResolvedValueOnce({
-        status: 202,
-        json: async () => ({ created: true, job: {
+    const jobId = "22222222-2222-4222-8222-222222222222";
+    const fetcher = vi.fn().mockResolvedValueOnce({
+      status: 202,
+      json: async () => ({
+        created: true,
+        job: {
           jobId: "22222222-2222-4222-8222-222222222222",
-          status: "QUEUED", noteType: "communication",
-          serviceCode: "note.communication.generate", attemptCount: 0,
-          createdAt, updatedAt: createdAt,
-        } }),
-      })
-      .mockResolvedValueOnce({
-        status: 200,
-        json: async () => ({ created: false, job: {
-          jobId: "22222222-2222-4222-8222-222222222222",
-          status: "RUNNING", noteType: "communication",
-          serviceCode: "note.communication.generate", attemptCount: 1,
-          createdAt, updatedAt: "2026-09-03T02:00:01.000Z",
-          startedAt: "2026-09-03T02:00:00.500Z",
-        } }),
-      });
+          status: "QUEUED",
+          noteType: "communication",
+          serviceCode: "note.communication.generate",
+          attemptCount: 0,
+          createdAt,
+          updatedAt: createdAt,
+        },
+      }),
+    });
     vi.stubGlobal("fetch", fetcher);
 
-    await renderComposer(true);
-    await fillFields({
-      occurred_at: "2026-09-01T14:30:00+10:00",
-      contact_channel: "Phone",
-      parties_by_role: "Support worker\nFamily representative",
-      observable_facts: "The family representative requested an update.",
-      action_taken: "The support worker provided the recorded update.",
-      stated_outcome: "The family representative acknowledged the update.",
-      follow_up: "The support worker will record any further contact.",
-    });
-    await submitLocalReview();
-    for (const checkbox of container.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')) {
-      await act(async () => checkbox.click());
-    }
-
+    await prepareConnectedSubmission();
     const submit = container.querySelector<HTMLButtonElement>('button[type="submit"]');
     expect(submit?.disabled).toBe(false);
     await act(async () => {
@@ -402,215 +387,83 @@ describe("Communication Note composer browser boundary", () => {
       /userId|ownerUserId|sessionId|accessToken|authorization/i,
     );
     expect(getField("observable_facts").disabled).toBe(true);
-    expect(text()).toContain("Points are reserved by the server");
-    expect(vi.getTimerCount()).toBe(1);
-    expect(
-      [...container.querySelectorAll<HTMLButtonElement>("button")].some(
-        (button) => button.textContent?.includes("Check status safely"),
-      ),
-    ).toBe(false);
-
-    await act(async () => vi.advanceTimersByTimeAsync(1500));
-    expect(fetcher).toHaveBeenCalledTimes(2);
-    const secondInit = fetcher.mock.calls[1]?.[1] as RequestInit;
-    expect(secondInit.body).toBe(firstBody);
-    expect(secondInit.headers).toEqual(firstInit.headers);
-    expect(text()).toContain("Generation is running");
-    expect(vi.getTimerCount()).toBe(1);
-
-    const signal = secondInit.signal as AbortSignal;
-    await act(async () => root.unmount());
-    root = createRoot(container);
-    expect(signal.aborted).toBe(false);
+    const expectedHref =
+      `/ai-documents/communication-note/jobs/${jobId}?lang=en`;
+    expect(navigationMocks.replaceLocation).toHaveBeenCalledExactlyOnceWith(
+      expectedHref,
+    );
+    expect(expectedHref).not.toMatch(
+      /observable_facts|idempotency|contentHash|revisionId|participant/i,
+    );
     expect(vi.getTimerCount()).toBe(0);
-    vi.useRealTimers();
+    await act(async () => vi.advanceTimersByTimeAsync(60_000));
+    expect(fetcher).toHaveBeenCalledTimes(1);
   });
 
-  it("stops polling after a terminal response", async () => {
-    vi.useFakeTimers();
+  it.each([
+    "RUNNING",
+    "SUCCEEDED",
+    "FAILED",
+    "CANCELLED",
+  ] as const)("navigates every valid replayed %s admission to its owner job page", async (status) => {
     vi.spyOn(window.crypto, "randomUUID").mockReturnValue(
       "11111111-1111-4111-8111-111111111111",
     );
-    const createdAt = "2026-09-03T02:00:00.000Z";
-    const fetcher = vi
-      .fn()
-      .mockResolvedValueOnce({
-        status: 202,
-        json: async () => ({
-          created: true,
-          job: {
-            jobId: "22222222-2222-4222-8222-222222222222",
-            status: "QUEUED",
-            noteType: "communication",
-            serviceCode: "note.communication.generate",
-            attemptCount: 0,
-            createdAt,
-            updatedAt: createdAt,
-          },
-        }),
-      })
-      .mockResolvedValueOnce({
-        status: 200,
-        json: async () => ({
-          created: false,
-          job: {
-            jobId: "22222222-2222-4222-8222-222222222222",
-            status: "FAILED",
-            noteType: "communication",
-            serviceCode: "note.communication.generate",
-            attemptCount: 1,
-            createdAt,
-            updatedAt: "2026-09-03T02:00:02.000Z",
-            startedAt: "2026-09-03T02:00:00.500Z",
-            finishedAt: "2026-09-03T02:00:02.000Z",
-            failureCode: "GENERATION_FAILED",
-          },
-        }),
-      });
-    vi.stubGlobal("fetch", fetcher);
-
-    await prepareConnectedSubmission();
-    await act(async () =>
-      container.querySelector<HTMLButtonElement>('button[type="submit"]')?.click(),
-    );
-    expect(vi.getTimerCount()).toBe(1);
-    await act(async () => vi.advanceTimersByTimeAsync(1_500));
-    expect(fetcher).toHaveBeenCalledTimes(2);
-    expect(text()).toContain("generation failed");
-    expect(vi.getTimerCount()).toBe(0);
-    await act(async () => vi.advanceTimersByTimeAsync(15_000));
-    expect(fetcher).toHaveBeenCalledTimes(2);
-  });
-
-  it("opens the exact saved revision with replace navigation after terminal success", async () => {
-    vi.useFakeTimers();
-    vi.spyOn(window.crypto, "randomUUID").mockReturnValue(
-      "11111111-1111-4111-8111-111111111111",
-    );
-    const createdAt = "2026-09-03T02:00:00.000Z";
-    const canonicalId = "44444444-4444-4444-8444-444444444444";
-    const revisionId = "55555555-5555-4555-8555-555555555555";
-    const fetcher = vi
-      .fn()
-      .mockResolvedValueOnce({
-        status: 202,
-        json: async () => ({
-          created: true,
-          job: {
-            jobId: "22222222-2222-4222-8222-222222222222",
-            status: "QUEUED",
-            noteType: "communication",
-            serviceCode: "note.communication.generate",
-            attemptCount: 0,
-            createdAt,
-            updatedAt: createdAt,
-          },
-        }),
-      })
-      .mockResolvedValueOnce({
-        status: 200,
-        json: async () => ({
-          created: false,
-          job: {
-            jobId: "22222222-2222-4222-8222-222222222222",
-            status: "SUCCEEDED",
-            noteType: "communication",
-            serviceCode: "note.communication.generate",
-            attemptCount: 1,
-            createdAt,
-            updatedAt: "2026-09-03T02:00:02.000Z",
-            startedAt: "2026-09-03T02:00:00.500Z",
-            finishedAt: "2026-09-03T02:00:02.000Z",
-            result: {
-              canonicalId,
-              revisionId,
-              contentHash: "a".repeat(64),
-              revisionNumber: 1,
-              baseRevisionId: null,
-              saveState: "SERVER_ACKNOWLEDGED",
-            },
-          },
-        }),
-      });
+    const job = generationJob(status);
+    const fetcher = vi.fn().mockResolvedValueOnce({
+      status: 200,
+      json: async () => ({ created: false, job }),
+    });
     vi.stubGlobal("fetch", fetcher);
 
     await prepareConnectedSubmission("zh-Hant");
     await act(async () =>
       container.querySelector<HTMLButtonElement>('button[type="submit"]')?.click(),
     );
-    await act(async () => vi.advanceTimersByTimeAsync(1_500));
-
-    const resultLink = [...container.querySelectorAll<HTMLAnchorElement>("a")].find(
-      (anchor) => anchor.textContent?.includes("開啟已儲存草稿"),
-    );
     const expectedHref =
-      `/ai-documents/communication-note/documents/${canonicalId}` +
-      `?lang=zh-Hant&revisionId=${revisionId}`;
-    expect(resultLink?.getAttribute("href")).toBe(expectedHref);
-    expect(resultLink?.getAttribute("href")).not.toMatch(
-      /contentHash|jobId|idempotency|observable_facts/i,
-    );
-    expect(text()).toContain("草稿已由伺服器生成並儲存");
-    expect(vi.getTimerCount()).toBe(0);
-
-    await act(async () => resultLink?.click());
+      `/ai-documents/communication-note/jobs/${job.jobId}?lang=zh-Hant`;
     expect(navigationMocks.replaceLocation).toHaveBeenCalledExactlyOnceWith(
       expectedHref,
     );
+    expect(fetcher).toHaveBeenCalledTimes(1);
   });
 
-  it("pauses after 40 automatic polls and keeps manual replay byte-identical", async () => {
-    vi.useFakeTimers();
+  it("keeps an uncertain initial request in memory for one exact manual replay", async () => {
     const idempotencyKey = "11111111-1111-4111-8111-111111111111";
     vi.spyOn(window.crypto, "randomUUID").mockReturnValue(idempotencyKey);
     const createdAt = "2026-09-03T02:00:00.000Z";
-    let callCount = 0;
-    const fetcher = vi.fn(
-      async (_input: RequestInfo | URL, _init?: RequestInit) => {
-        void _input;
-        void _init;
-        callCount += 1;
-        const created = callCount === 1;
-        return {
-          status: created ? 202 : 200,
-          json: async () => ({
-            created,
-            job: {
-              jobId: "22222222-2222-4222-8222-222222222222",
-              status: "QUEUED",
-              noteType: "communication",
-              serviceCode: "note.communication.generate",
-              attemptCount: 0,
-              createdAt,
-              updatedAt: createdAt,
-            },
-          }),
-        };
-      },
-    );
+    const fetcher = vi
+      .fn()
+      .mockRejectedValueOnce(new TypeError("network unavailable"))
+      .mockResolvedValueOnce({
+        status: 202,
+        json: async () => ({
+          created: true,
+          job: generationJob("QUEUED", createdAt),
+        }),
+      });
     vi.stubGlobal("fetch", fetcher);
 
     await prepareConnectedSubmission();
     await act(async () =>
       container.querySelector<HTMLButtonElement>('button[type="submit"]')?.click(),
     );
+    expect(text()).toContain("Generation status cannot be confirmed right now");
+    expect(text()).toContain("Retry exact request");
     const firstInit = fetcher.mock.calls[0]?.[1] as RequestInit;
 
-    await act(async () => vi.advanceTimersByTimeAsync(40 * 1_500));
-    expect(fetcher).toHaveBeenCalledTimes(41);
-    expect(text()).toContain("Automatic status checks have paused");
-    expect(vi.getTimerCount()).toBe(0);
-
-    await clickButton("Check status safely");
-    expect(fetcher).toHaveBeenCalledTimes(42);
-    const manualInit = fetcher.mock.calls[41]?.[1] as RequestInit;
+    await clickButton("Retry exact request");
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    const manualInit = fetcher.mock.calls[1]?.[1] as RequestInit;
     expect(manualInit.body).toBe(firstInit.body);
     expect(manualInit.headers).toEqual(firstInit.headers);
     expect(manualInit.headers).toEqual({
       "Content-Type": "application/json",
       "Idempotency-Key": idempotencyKey,
     });
-    expect(vi.getTimerCount()).toBe(0);
+    expect(navigationMocks.replaceLocation).toHaveBeenCalledExactlyOnceWith(
+      "/ai-documents/communication-note/jobs/22222222-2222-4222-8222-222222222222?lang=en",
+    );
   });
 
   it.each(ERROR_COPY_CASES)("explains insufficient Points in $locale while preserving the exact locked request", async (copy) => {
@@ -807,6 +660,64 @@ function mockGenerationError(status: number, code: string, message: string) {
       code, message, correlationId: "22222222-2222-4222-8222-222222222222",
     } }) };
   });
+}
+
+function generationJob(
+  status: CommunicationNoteGenerationJob["status"],
+  createdAt = "2026-09-03T02:00:00.000Z",
+): CommunicationNoteGenerationJob {
+  const base = {
+    jobId: "22222222-2222-4222-8222-222222222222",
+    noteType: "communication" as const,
+    serviceCode: "note.communication.generate" as const,
+    createdAt,
+  };
+  if (status === "QUEUED") {
+    return {
+      ...base,
+      status,
+      attemptCount: 0,
+      updatedAt: createdAt,
+    };
+  }
+
+  const startedAt = "2026-09-03T02:00:00.500Z";
+  const finishedAt = "2026-09-03T02:00:02.000Z";
+  const activeBase = {
+    ...base,
+    attemptCount: 1,
+    startedAt,
+    updatedAt: status === "RUNNING" ? startedAt : finishedAt,
+  };
+  if (status === "RUNNING") return { ...activeBase, status };
+  if (status === "SUCCEEDED") {
+    return {
+      ...activeBase,
+      status,
+      finishedAt,
+      result: {
+        canonicalId: "44444444-4444-4444-8444-444444444444",
+        revisionId: "55555555-5555-4555-8555-555555555555",
+        contentHash: "a".repeat(64),
+        revisionNumber: 1,
+        baseRevisionId: null,
+        saveState: "SERVER_ACKNOWLEDGED",
+      },
+    };
+  }
+  if (status === "FAILED") {
+    return {
+      ...activeBase,
+      status,
+      finishedAt,
+      failureCode: "GENERATION_FAILED",
+    };
+  }
+  return {
+    ...activeBase,
+    status: "CANCELLED",
+    finishedAt,
+  };
 }
 
 async function flushAnimationFrames() {
