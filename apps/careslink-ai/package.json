@@ -13,6 +13,7 @@
     "test:local:communication-note-preview-history-lock": "node scripts/preview-e2e/communication-note-preview-history-lock-local-pg16.mjs",
     "test:local:portal-follow-up-concurrency": "node scripts/preview-e2e/portal-referral-follow-up-concurrency-local-pg16.mjs",
     "test:preview:e2e:policy": "vitest run scripts/preview-e2e",
+    "test:preview:points:offline": "vitest run scripts/preview-e2e/points-preview-identity-policy.test.mjs scripts/preview-e2e/points-preview-identity-invocation.test.mjs scripts/preview-e2e/points-preview-platform-contract.test.mjs scripts/preview-e2e/communication-note-preview-transactional-invocation.test.mjs scripts/preview-e2e/deployment-cleanup-policy.test.mjs",
     "test:preview:e2e:worker-rpc": "node scripts/preview-e2e/note-worker-rpc-concurrency.mjs"
   },
   "dependencies": {

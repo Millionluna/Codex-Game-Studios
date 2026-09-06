@@ -30,6 +30,72 @@ Run the offline policy gate with:
 pnpm test:preview:e2e:policy
 ```
 
+### Points fixture diagnostics (2026-09-06)
+
+The narrower Points UI verification has durable, credential-free offline modules:
+
+- `points-preview-identity-policy.mjs`: canonical Provider fixture app metadata,
+  a fixed parameterized SELECT, and fixed-field boolean diagnostics.
+- `points-preview-identity-invocation.mjs`: required, explicitly injected read-only
+  adapters; exact disposable-branch re-attestation before and after the query.
+- `points-preview-platform-contract.mjs`: Preview-only Vercel 59.5.0 argument
+  assembly and top-level deployment response parsing. No CLI execution.
+
+Run the dedicated offline gate from the app directory:
+
+```sh
+pnpm test:preview:points:offline
+```
+
+This command cannot create cloud resources or users. It tests injected synthetic
+adapters, including the existing migration invocation and cleanup policy. These
+modules are not a complete live harness assembler and do not independently prove
+the future generated harness imports them. Before any new authorized live run,
+lock their source digests and test their actual call sites; do not retype private
+variants of their predicates, CLI field mappings or deployment arguments.
+
+The identity invocation consumes an already-created synthetic Auth response in
+`{ status, body }` form and the pre-ledgered `expectedUserId`. Its
+`readCliOutput(argv)` callback returns pinned Supabase CLI output; the validated
+branch converter exposes `pipelineStatus`, not raw `status`. Its
+`readIdentityProof({ expectedBranchRef, text, values })` callback must execute the
+fixed SELECT once, on the already TLS-verified disposable connection, and return
+`{ projectRef, result: { rowCount, rows } }`. Derive `projectRef` from the verified
+connection descriptor, never echo the caller's expected ref as proof. The
+invocation provides no default CLI, network, connection or credential loader.
+
+Collect Auth and database diagnostics before rejecting an invalid Auth response;
+query only the pre-ledgered expected ID, never an ID supplied by that response.
+Any branch/connection mismatch, adapter exception or failed predicate stops this
+invocation without retries. The lifecycle owner must still clean up in `finally`.
+For predicate failures, `PointsPreviewIdentityError.diagnostics` contains only
+fixed field names and booleans. Never append the raw response, query arguments,
+database errors, email, ID or token. CLI/database transport failures carry only a
+fixed checkpoint and code, not fabricated field-level evidence.
+
+Time eligibility uses one materialized database `clock_timestamp()` sample for
+confirmation and ban predicates. Auth timestamp strings are checked for format,
+not compared with the controller's clock. All nine database fields must be
+strictly `true`, with exactly one row and the exact expected field shape. Missing,
+null, wrong-role, anonymous, banned or unconfirmed users remain rejected. Fixture
+metadata requires both authoritative `app_metadata.role=provider` and the legacy
+compatibility field `careslink_role=provider`; user metadata grants no authority.
+See the [Supabase Admin Auth contract](https://supabase.com/docs/reference/javascript/auth-admin-createuser)
+and [PostgreSQL clock semantics](https://www.postgresql.org/docs/17/functions-datetime.html#FUNCTIONS-DATETIME-CURRENT).
+
+Vercel argument assembly always uses `--target preview`; it never adds the
+production-only `--skip-domain` flag or changes to Production to accommodate it.
+Runtime/build environment flags contain names only, with values supplied privately
+by the owner. CLI output parsing returns private cleanup coordinates, not safe
+report data or ownership proof; REST project/team/run/time/protection attestation
+is still required. A malformed create response must never trigger another create.
+
+Offline qualification is not a successful Auth session. Subsequent password
+login, actual session/RPC proof, refresh/revoke/re-login and two-owner browser
+isolation remain unverified until a separately authorized hosted run passes.
+The previous second-account rejection had no per-field diagnostics, so clock
+skew is a demonstrated script risk, not a proven cause of that specific failure.
+
 ## Required preflight
 
 1. Pin the source snapshot, Node runtime, Vercel API/CLI adapter and Supabase
