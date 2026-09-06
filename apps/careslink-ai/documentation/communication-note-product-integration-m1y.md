@@ -140,3 +140,94 @@ gates. Source tests exercise only explicit TestOnly factories and capabilities.
 These results are also recorded in `documentation/tests.md`. They are
 source/build evidence only and do not constitute Preview, Hosted, provider,
 model, real-data or Production evidence.
+
+## Saved-result read slice (2026-09-07)
+
+`GET /api/ai-documents/communication-note/documents/{documentId}` now selects
+the current saved revision, or the exact revision named by `?revisionId=`.
+It reuses the existing cookie/active-session Product API runtime and
+`DOCUMENT_DETAIL` capability. The existing default-off, target and database
+gates are unchanged. Reading does not consult Points, submit a job, invoke a
+model, create a revision or write browser storage.
+
+The response includes the selected content, revision identity/hash, language,
+version metadata and the persistent draft notice. It omits owner/session IDs,
+privacy-proof IDs, mutation IDs and checkpoint/job internals. Current-version
+self-review status comes from the Product API; historical versions use
+`UNKNOWN`, never the current revision's confirmation. Missing translations
+remain absent. Missing, deleted, foreign-owner and non-Communication documents
+do not expose content. All responses are private/no-store and non-indexable.
+
+This is the result-reader/API portion of item 7 above, not completion of that
+item. The canonical result page, success link, job recovery after reload,
+editing, self-review mutation and export UI remain outstanding. Local tests use
+synthetic data, the memory Product API and mocked RPC transport through the real
+Supabase response parser; no hosted database or generation was exercised.
+
+Verification for this slice: 2 focused files / 42 tests and the full 245 files /
+3,727 tests passed. TypeScript, zero-warning lint on the added files, adapter
+sync (73 files) and `git diff --check` passed. No browser page or production
+build was exercised for this API-only slice.
+
+## Canonical result-page slice (2026-09-07)
+
+The owner-scoped result route now exists at
+`/ai-documents/communication-note/documents/{documentId}`. It preserves the
+approved green CaresLink identity and reverse Logo, and does not depend on the
+generation UI, composer or Points flags. The server page first requires a real
+Supabase provider account; demo-account query parameters are not accepted.
+
+Private content is not serialized into the initial page HTML. After the server
+gate, a same-origin client loader calls only the fixed document-detail API with
+`credentials=same-origin` and `cache=no-store`. Its strict response parser
+checks the exact status envelope, canonical/revision binding, three-locale
+shape, version ordering, current-version binding, Communication-only fact
+schema, content hash syntax, server save acknowledgement and the current versus
+historical self-review discriminant. Invalid, late and superseded responses
+cannot render backend text or an older principal's document.
+
+After the provider gate, malformed document/revision identifiers return a
+content-free not-found surface without mounting the loader. Extra query keys,
+unsupported locale values and non-canonical UUID casing are redirected to the
+fixed URL containing only a supported locale and validated document/revision
+UUIDs; arbitrary query text is never forwarded to the private API.
+
+The loader clears rendered content before rechecking on window focus, restored
+visibility, cross-tab storage changes and BFCache page restoration. It also
+clears and aborts on `pagehide`. The page path has explicit
+`private, no-store`, no-referrer, no-sniff and no-index response headers. An API
+`AUTH_REQUIRED` response replaces the current history entry with a fixed safe
+login return path; `NOT_FOUND` and `UNAVAILABLE` remain distinct content-free
+states.
+
+The result surface renders the exact selected revision, English draft,
+independent Simplified and Traditional Chinese review versions, explicit
+missing-translation states, confirmed cleaned facts, review prompts and version
+history. `Draft – review required` remains permanently visible.
+`SERVER_ACKNOWLEDGED` is described only as saved, and `CONFIRMED` remains a
+human self-review of a draft. Historical revisions display only `UNKNOWN` and
+never inherit current confirmation. Generated `content.disclaimer` is not used
+as a trusted product boundary. No edit, copy, self-review mutation or export
+control is simulated.
+
+Terminal `SUCCEEDED` generation state now exposes one exact canonical/revision
+result link. Its normal click uses replace navigation to discard the composer
+history entry and its in-memory facts. The URL contains only the document UUID,
+revision UUID and explicit UI locale; it contains no facts, content hash, job
+ID or idempotency key.
+
+This completes the canonical result page and known-success entry portion of
+item 7. It does not add owner-authorized queued/running job recovery after a
+reload or lost terminal response. Editing, persisted self-review mutation,
+saved-document indexing and revision-bound Copy/TXT/DOCX/PDF export also remain
+separate slices.
+
+Verification for the combined read/page slice: 8 focused files / 115 tests and
+the complete 251 files / 3,779 tests passed. TypeScript and full zero-warning
+ESLint passed. The Next.js 16.2.9 Webpack production build completed 64/64
+generated pages and included both the result page and API as dynamic routes;
+the client-boundary scan passed across 105 static chunks. A temporary synthetic
+local-only route was used for a desktop browser visual and accessibility-tree
+check, returned HTTP 200 without a Next error overlay or server error, and was
+deleted immediately afterward. No Preview, deployment, hosted Supabase read,
+Production mutation, real care data or model call was used.

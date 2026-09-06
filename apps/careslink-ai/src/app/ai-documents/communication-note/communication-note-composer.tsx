@@ -5,6 +5,7 @@ import {
   ArrowLeft,
   CheckCircle2,
   Coins,
+  FileText,
   Languages,
   LockKeyhole,
   MessageSquareText,
@@ -35,6 +36,8 @@ import {
   type CommunicationNoteGenerationClientResult,
 } from "../../../lib/communication-note-generation-client";
 import type { CommunicationNoteGenerationJob } from "../../../lib/communication-note-generation-contract";
+import { buildCommunicationNoteDocumentHref } from "../../../lib/communication-note-document-contract";
+import { replaceCommunicationNoteLocation } from "../../../lib/communication-note-document-navigation";
 
 type CommunicationNoteComposerProps = {
   locale: CommunicationNoteComposerLocale;
@@ -83,6 +86,14 @@ export function CommunicationNoteComposer({
   const [generationPending, setGenerationPending] = useState(false);
   const [requestLocked, setRequestLocked] = useState(false);
   const generationCopy = getGenerationSurfaceCopy(locale);
+  const savedDraftHref =
+    generationJob?.status === "SUCCEEDED"
+      ? buildCommunicationNoteDocumentHref({
+          canonicalId: generationJob.result.canonicalId,
+          revisionId: generationJob.result.revisionId,
+          locale,
+        })
+      : undefined;
 
   function clearReplayTimer() {
     if (replayTimerRef.current !== undefined) {
@@ -706,9 +717,34 @@ export function CommunicationNoteComposer({
                     : surface.generationBoundary}
                 </p>
                 {generationJob ? (
-                  <p role="status" aria-live="polite" className="mt-3 text-sm leading-6 text-foreground">
-                    {generationCopy.status(generationJob.status)}
-                  </p>
+                  <div
+                    className={`mt-3 ${
+                      savedDraftHref
+                        ? "border border-[#aad4c2] bg-[#e2f2ea] p-3"
+                        : ""
+                    }`}
+                  >
+                    <p
+                      role="status"
+                      aria-live="polite"
+                      className="text-sm leading-6 text-foreground"
+                    >
+                      {generationCopy.status(generationJob.status)}
+                    </p>
+                    {savedDraftHref ? (
+                      <a
+                        href={savedDraftHref}
+                        className="jade-action mt-3 w-full"
+                        onClick={(event) => {
+                          event.preventDefault();
+                          replaceCommunicationNoteLocation(savedDraftHref);
+                        }}
+                      >
+                        <FileText className="size-4" aria-hidden="true" />
+                        {generationCopy.openSavedDraft}
+                      </a>
+                    ) : null}
+                  </div>
                 ) : null}
                 {generationError ? (
                   <div role="alert" className="mt-3 border border-[#efc7c7] bg-[#fff2f2] px-3 py-2 text-sm text-danger">
@@ -962,6 +998,7 @@ type GenerationSurfaceCopy = Readonly<{
   boundaries: readonly string[];
   pointsBalance(preview: CommunicationNotePointsPreview, locale: CommunicationNoteComposerLocale): string;
   action: string;
+  openSavedDraft: string;
   checkStatus: string;
   transportError: string;
   pollingPaused: string;
@@ -984,6 +1021,7 @@ function getGenerationSurfaceCopy(
       boundaries: ["只有完成本地检查并确认的清理事实才会发送至服务器。", "生成任务与正式草稿由服务器保存；页面离开不会取消任务。", "本工作流不提供临床、法律、护理、监管或合规建议。"],
       pointsBalance: connectedPointsBalanceZhHans,
       action: "提交生成 Communication Note",
+      openSavedDraft: "打开已保存草稿",
       checkStatus: "安全查询状态",
       transportError: "暂时无法确认生成状态。可使用相同请求安全查询；离开页面不会取消服务器任务。",
       pollingPaused: "自动状态查询已暂停。任务可能仍在服务器运行；请使用相同请求安全查询状态。",
@@ -1003,6 +1041,7 @@ function getGenerationSurfaceCopy(
       boundaries: ["只有完成本機檢查並確認的清理事實才會傳送至伺服器。", "生成任務與正式草稿由伺服器儲存；離開頁面不會取消任務。", "本工作流程不提供臨床、法律、護理、監管或合規建議。"],
       pointsBalance: connectedPointsBalanceZhHant,
       action: "提交生成 Communication Note",
+      openSavedDraft: "開啟已儲存草稿",
       checkStatus: "安全查詢狀態",
       transportError: "暫時無法確認生成狀態。可使用相同請求安全查詢；離開頁面不會取消伺服器任務。",
       pollingPaused: "自動狀態查詢已暫停。任務可能仍在伺服器運行；請使用相同請求安全查詢狀態。",
@@ -1023,6 +1062,7 @@ function getGenerationSurfaceCopy(
       ? `Page-load balance snapshot: ${formatPointsNumber(preview.availablePoints, numberLocale)} available · ${formatPointsNumber(preview.reservedPoints, numberLocale)} reserved`
       : preview.status === "NOT_READY" ? "The Points balance is not ready for this account." : "The Points rate and balance are unavailable.",
     action: "Submit Communication Note generation",
+    openSavedDraft: "Open saved draft",
     checkStatus: "Check status safely",
     transportError: "Generation status cannot be confirmed right now. You can safely replay the same request; leaving this page does not cancel server work.",
     pollingPaused: "Automatic status checks have paused. The job may still be running on the server; check the same request safely.",

@@ -3777,6 +3777,32 @@ real-care-data or model-call evidence. Both M2d readiness latches and the M2c
 store readiness remain `false`; formal exports remain `undefined`. See
 `documentation/communication-note-secure-submission-gcs-private-authority-m2d.md`.
 
+### Communication Note saved result page — local source/build evidence
+
+The canonical result route and terminal-success entry now have local evidence.
+The page requires the real Supabase provider gate before mounting a
+same-origin, no-store document loader. Tests cover strict response parsing,
+canonical/revision binding, current-versus-history self-review semantics,
+three independent locale surfaces, missing translations, content-free
+auth/not-found/unavailable states, response headers, session-lifecycle
+rechecks, late-response rejection, malformed-identifier blocking, safe query
+canonicalization and replace navigation from an exact terminal success result.
+The result surface never renders generated disclaimer text as a trusted
+boundary and does not simulate edit, self-review mutation, Copy or export.
+
+The focused gate passed **115/115 tests across 8 files**. The complete local
+Vitest suite passed **3,779/3,779 tests across 251 files**. TypeScript, full
+zero-warning ESLint and the Next.js 16.2.9 Webpack production build with 64/64
+generated pages passed. The client-boundary scan passed across 105 static
+chunks. A temporary synthetic local route received a desktop browser and
+accessibility-tree check, returned HTTP 200 without a framework overlay or
+server error, and was deleted after inspection.
+
+This is not Preview, deployment, hosted Supabase, Production, real-care-data or
+model-call evidence. Owner-authorized generation job recovery after reload,
+editing, persisted self-review, saved-document indexing and revision-bound
+Copy/TXT/DOCX/PDF export remain unimplemented.
+
 ### Current live/read-only evidence
 
 - Supabase migrations, tables, RLS flags, policies, grants, function grants and aggregate row counts were checked read-only.

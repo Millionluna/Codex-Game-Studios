@@ -6,6 +6,12 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+const navigationMocks = vi.hoisted(() => ({ replaceLocation: vi.fn() }));
+
+vi.mock("../../../lib/communication-note-document-navigation", () => ({
+  replaceCommunicationNoteLocation: navigationMocks.replaceLocation,
+}));
+
 vi.mock("next/image", async () => {
   const React = await import("react");
 
@@ -89,6 +95,7 @@ let originalSendBeaconDescriptor: PropertyDescriptor | undefined;
 let animationFrameCallbacks: FrameRequestCallback[];
 
 beforeEach(() => {
+  vi.clearAllMocks();
   (
     globalThis as typeof globalThis & {
       IS_REACT_ACT_ENVIRONMENT: boolean;
@@ -473,6 +480,83 @@ describe("Communication Note composer browser boundary", () => {
     expect(vi.getTimerCount()).toBe(0);
     await act(async () => vi.advanceTimersByTimeAsync(15_000));
     expect(fetcher).toHaveBeenCalledTimes(2);
+  });
+
+  it("opens the exact saved revision with replace navigation after terminal success", async () => {
+    vi.useFakeTimers();
+    vi.spyOn(window.crypto, "randomUUID").mockReturnValue(
+      "11111111-1111-4111-8111-111111111111",
+    );
+    const createdAt = "2026-09-03T02:00:00.000Z";
+    const canonicalId = "44444444-4444-4444-8444-444444444444";
+    const revisionId = "55555555-5555-4555-8555-555555555555";
+    const fetcher = vi
+      .fn()
+      .mockResolvedValueOnce({
+        status: 202,
+        json: async () => ({
+          created: true,
+          job: {
+            jobId: "22222222-2222-4222-8222-222222222222",
+            status: "QUEUED",
+            noteType: "communication",
+            serviceCode: "note.communication.generate",
+            attemptCount: 0,
+            createdAt,
+            updatedAt: createdAt,
+          },
+        }),
+      })
+      .mockResolvedValueOnce({
+        status: 200,
+        json: async () => ({
+          created: false,
+          job: {
+            jobId: "22222222-2222-4222-8222-222222222222",
+            status: "SUCCEEDED",
+            noteType: "communication",
+            serviceCode: "note.communication.generate",
+            attemptCount: 1,
+            createdAt,
+            updatedAt: "2026-09-03T02:00:02.000Z",
+            startedAt: "2026-09-03T02:00:00.500Z",
+            finishedAt: "2026-09-03T02:00:02.000Z",
+            result: {
+              canonicalId,
+              revisionId,
+              contentHash: "a".repeat(64),
+              revisionNumber: 1,
+              baseRevisionId: null,
+              saveState: "SERVER_ACKNOWLEDGED",
+            },
+          },
+        }),
+      });
+    vi.stubGlobal("fetch", fetcher);
+
+    await prepareConnectedSubmission("zh-Hant");
+    await act(async () =>
+      container.querySelector<HTMLButtonElement>('button[type="submit"]')?.click(),
+    );
+    await act(async () => vi.advanceTimersByTimeAsync(1_500));
+
+    const resultLink = [...container.querySelectorAll<HTMLAnchorElement>("a")].find(
+      (anchor) => anchor.textContent?.includes("開啟已儲存草稿"),
+    );
+    const expectedHref =
+      `/ai-documents/communication-note/documents/${canonicalId}` +
+      `?lang=zh-Hant&revisionId=${revisionId}`;
+    expect(resultLink?.getAttribute("href")).toBe(expectedHref);
+    expect(resultLink?.getAttribute("href")).not.toMatch(
+      /contentHash|jobId|idempotency|observable_facts/i,
+    );
+    expect(text()).toContain("草稿已由伺服器生成並儲存");
+    expect(vi.getTimerCount()).toBe(0);
+
+    await act(async () => resultLink?.click());
+    expect(navigationMocks.replaceLocation).toHaveBeenCalledExactlyOnceWith(
+      expectedHref,
+    );
   });
 
   it("pauses after 40 automatic polls and keeps manual replay byte-identical", async () => {
