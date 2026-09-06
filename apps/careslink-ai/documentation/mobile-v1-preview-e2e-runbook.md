@@ -12,11 +12,11 @@ procedure.
   its deadline, retry or horizon rules, execute
   `assertDeploymentCleanupPolicyRegression()` before any filesystem, environment,
   CLI or network adapter, and lock the exact policy file hash.
-- This repository does not yet contain the live harness assembler. The module is
-  therefore the canonical policy API, not proof that a future generated helper
-  consumed it. Before another live run, the assembler must prove the exact import
-  or copied hash and test both observation call sites and the request-only retry
-  path for conformance.
+- This repository contains credential-free Points lifecycle composition, but no
+  live adapter host or live harness assembler. The policy API and offline call-site
+  tests are not proof that a future generated helper consumed them. Before another
+  live run, the assembler must prove the exact import or copied hash and test both
+  observation call sites and the request-only retry path for conformance.
 - Live harnesses, credentials, machine runtime manifests, ledgers, deployment
   manifests, requests and staging belong only in a newly created `0700` private
   temporary directory. They must never be committed or included in a Vercel
@@ -40,6 +40,9 @@ The narrower Points UI verification has durable, credential-free offline modules
   adapters; exact disposable-branch re-attestation before and after the query.
 - `points-preview-platform-contract.mjs`: Preview-only Vercel 59.5.0 argument
   assembly and top-level deployment response parsing. No CLI execution.
+- `points-preview-lifecycle.mjs`: complete control-flow composition using those
+  imports, explicit adapter contracts, deadlines and `finally` cleanup. All cloud,
+  database and browser effects in its test suite are in-memory simulations.
 
 Run the dedicated offline gate from the app directory:
 
@@ -95,6 +98,85 @@ login, actual session/RPC proof, refresh/revoke/re-login and two-owner browser
 isolation remain unverified until a separately authorized hosted run passes.
 The previous second-account rejection had no per-field diagnostics, so clock
 skew is a demonstrated script risk, not a proven cause of that specific failure.
+
+### Points lifecycle offline composition (2026-09-07)
+
+`runPointsPreviewLifecycle({ configuration, adapters, clock, signal })` has no
+default adapters, credential loading, CLI entry point or automatic cloud action.
+The ordinary test command above also runs the lifecycle fault-injection matrix.
+It demonstrates orchestration, not actual migrations, session/RPC success, hosted
+browser coverage, remote resource deletion or readiness for Production.
+
+The lifecycle executes the canonical cleanup startup regression before its first
+adapter or clock call. Before preflight, it verifies the six imported dependency
+digests in `POINTS_PREVIEW_LIFECYCLE_SOURCE_PINS` and the caller-pinned digest of
+its own file. Configuration also requires a pinned commit/tree, distinct owner
+IDs, one run marker, exact project/team and a maximum ten-minute to two-hour
+window. Five minutes are reserved for cleanup. The future live host must verify
+the source/runtime/upload closure independently; a receipt echoing expected
+values is not evidence that the host actually performed the check.
+
+The business sequence is fixed: preflight and CLI version checks; durable private
+ledger; one dataless, nonpersistent branch; canonical inventory identity and ready
+state; fixed migration receipt; TLS-scoped connection and zero-data proof; two
+pre-ledgered user creations and the imported dual-source diagnostics; shadow
+balances 62/7; backend receipt; pre-ledgered Preview creation; REST ownership and
+URL binding; browser receipt; unchanged-points proof. Invalid identity diagnostics
+stop before Points seeding and deployment. Any uncertain create result stops
+business work and enters cleanup without a second create attempt.
+
+Every effect is an explicit function listed in `POINTS_PREVIEW_LIFECYCLE_ADAPTERS`.
+The host receives deeply frozen input and `{ deadlineMs, signal, timeoutMs? }`.
+It must perform real scoped checks when eventually authorized, not return
+synthetic receipts. Important contracts include:
+
+- `preflight`: verify commit/tree, upload pinning, protected Preview, disabled
+  models and Vercel CLI 59.5.0; the lifecycle separately checks Supabase 2.115.0.
+- `migrate`: invoke the reviewed fixed migration runner, returning 46 migrations
+  and the pinned manifest digest. The lifecycle does not execute SQL itself.
+- `openDatabase`: derive the project ref from the verified TLS connection.
+  `readIdentityProof` follows the exact-owner SELECT contract above.
+- `runBackendChecks`: require both accounts and all seven exported backend
+  checks. `runBrowserChecks`: require all eight exported browser checks.
+  Only the owned deployment's REST-attested URL may be visited.
+- `getDeployment` / `listDeployments`: return `{ status, body }` management API
+  responses, with complete pagination and exact project/team/time scope.
+  `deleteDeployment` must return the exact deleted UID. These functions never
+  translate HTTP or response-shape failures into transport exceptions.
+- `writeLedger`: atomically persist the private recovery record before each
+  creation, with no password, token or raw Auth response. IDs are retained only
+  in the private ledger, not the sanitized lifecycle result.
+- `quiesce`: join outstanding local work and attest a bounded remote acceptance
+  horizon. An aborted request alone does not establish that a remote create was
+  rejected. An unjoined operation prevents a successful cleanup result.
+
+The injected clock owns monotonic `now()`, bounded `sleep(ms)` and
+`arm(deadlineMs, callback)` (returning a timer cancellation function). Adapter
+calls are raced against these timers and aborted on timeout. External cancellation
+stops business calls; cleanup uses independent signals and the full hard deadline.
+A live adapter must honor cancellation and account for late remote acceptance.
+
+Cleanup closes the database gate and revokes sessions, resolves uncertain creates
+after the acceptance horizon, verifies deployment ownership, deletes the exact
+deployment and gathers three joint ID/marker/window absence observations. Both
+GET and paginated list observation calls use the canonical full deadline and
+30-second request cap. Only a locally classified `PointsPreviewTransportError`
+resets every sample and retries after five seconds; HTTP, scope, shape and
+ownership failures do not retry. Unknown create outcomes require either one
+owned marker match or a proven empty complete window, never a guessed target.
+
+The remaining independent cleanup steps delete fixture rows and exact users,
+verify global Auth/Points zero, close the connection, delete the guarded branch
+and observe branch absence three times. Failure in one cleanup step does not skip
+the other independent attempts. Private local artifacts may be deleted only when
+all cleanup steps and final ledger persistence pass; otherwise retain recovery
+evidence. The returned result contains only fixed stages, booleans, cleanup names
+and, if available, sanitized identity diagnostics.
+
+Before hosted verification: review and pin this composition, implement and test
+the private live adapter host, verify protection/environment/runtime boundaries,
+and obtain explicit authorization for the new bounded disposable run. Passing
+offline receipts does not authorize that run or resolve the prior hosted failure.
 
 ## Required preflight
 
