@@ -178,6 +178,57 @@ the private live adapter host, verify protection/environment/runtime boundaries,
 and obtain explicit authorization for the new bounded disposable run. Passing
 offline receipts does not authorize that run or resolve the prior hosted failure.
 
+### Prepared Points browser driver (2026-09-07)
+
+`points-preview-browser-checks.mjs` implements actual page interactions for the
+`runBrowserChecks` lifecycle adapter, not a callback that unconditionally returns
+success flags. `createPointsPreviewBrowserChecks` takes two caller-owned pages,
+two private synthetic credentials, the REST-attested deployment ID/URL, a clock
+and an exact-owner session revocation function. It returns a single-use adapter
+with the lifecycle's existing input/result shape. It does not launch a browser,
+load credentials, create users/deployments, acquire a protection bypass, save
+browser storage state, capture screenshots or write any report.
+
+The prepared flow opens the signed-out Points gates, logs A/B in via the actual
+password forms, reads the exact labelled 62/7 and zero-reserved metrics, rechecks A
+after B signs in, clicks both language links, follows the AI Documents/Points
+entry links, signs A out, proves B still works, revokes A's sessions, proves A's
+balance is hidden, proves B is unaffected, and logs A back in. Every content
+probe checks origin/path/language and rejects legacy credit content. The script
+returns only the eight fixed lifecycle booleans after every step passes. It closes
+both owned pages in `finally` and reports failures using fixed checkpoints only.
+
+The driver uses the standard Playwright Page/Locator interface available in the
+pinned local runtime. Semantic locators select exactly one visible control;
+the Documents return link is scoped to the main header because that page has
+two visible copies. Login submission is scoped to the password form, not OAuth.
+Credentials remain in memory and are never placed in argv, diagnostics or DOM
+probe arguments. Off-origin login navigation or form destinations stop before
+password entry. See the [Playwright Page API](https://playwright.dev/docs/api/class-page)
+and [Locator API](https://playwright.dev/docs/api/class-locator).
+
+The future private host must supply fresh, separate disposable contexts whose
+pages start at `about:blank`, with service workers blocked, protected-Preview
+access already authorized and egress constrained. Never pass normal user tabs.
+The host must independently pin the driver/runtime and deployment source, keep
+AI disabled, enforce scoped revocation and verify the final unchanged database
+state. Browser request interception alone is not proof of server-side egress
+isolation; redirects, service workers and popups need host-level consideration.
+No new bypass credential or project protection change is authorized here.
+
+All page operations receive a remaining-budget timeout capped at 30 seconds.
+Cancellation closes the owned pages and no subsequent business step starts.
+The outer lifecycle remains responsible for the hard deadline and for joining
+browser/context shutdown in `quiesce`, including factory or shutdown failures.
+
+Offline qualification consists of synthetic page-protocol fault injection plus
+the same serialized DOM probe evaluated against real Points/Documents component
+markup, with external data and the shell mocked. This catches selector/content
+drift but does not test real cookies, hydration, layout visibility, Vercel SSO,
+sessions, RPCs or hosted pages. Cloud/database/revocation/browser-context adapters
+and their private run manifest still need integration before a new authorized
+hosted run; this prepared page driver does not create that host automatically.
+
 ## Required preflight
 
 1. Pin the source snapshot, Node runtime, Vercel API/CLI adapter and Supabase
