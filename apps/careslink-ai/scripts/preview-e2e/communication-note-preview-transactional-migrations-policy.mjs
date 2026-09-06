@@ -7,12 +7,12 @@ const NON_TRANSACTIONAL_SQL_PATTERN = /^(?:create\s+(?:unique\s+)?index\s+concur
 
 export const COMMUNICATION_NOTE_PREVIEW_TRANSACTIONAL_MIGRATION_POLICY =
   Object.freeze({
-    version: "2026-09-05.preview-transactional-migrations.18",
+    version: "2026-09-07.preview-transactional-migrations.19",
     productionProjectRef: "adocsnwnslxhxcjgbyee",
     expectedCliVersion: "2.115.0",
     manifestSha256:
-      "3add3cad0232b89b206eb948eabe86045179ca7f978d0027e44121381919a7e8",
-    migrationCount: 46,
+      "90650837b534ceaecf4a88df4bc4d5fc734b8ed799c12bb29ccf18e625d47187",
+    migrationCount: 47,
     disposablePreviewBaselineMigrationCount: 19,
     disposablePreviewBaselineHistorySha256:
       "b742d12dee926ccfe76158cf524e503bcdc576a08e928a7147741faf4a314424",
@@ -135,6 +135,8 @@ export const COMMUNICATION_NOTE_PREVIEW_TRANSACTIONAL_MIGRATION_POLICY =
     ]),
     applicationRoles: Object.freeze([
       "careslink_v1_generation_executor",
+      "careslink_v1_generation_job_status_caller",
+      "careslink_v1_generation_job_status_executor",
       "careslink_v1_generation_owner",
       "careslink_v1_generation_owner_api_executor",
       "careslink_v1_generation_points_admission_caller",
@@ -232,6 +234,7 @@ export const COMMUNICATION_NOTE_PREVIEW_TRANSACTIONAL_MIGRATION_MANIFEST =
     ["20260902121601_add_v1_communication_note_points_terminal_settlement.sql", "6e5148f3e080ab767f586c27c86490ac1c05b80deed864f48783c331bbf41afd"],
     ["20260903041819_bind_v1_communication_note_encrypted_payload_admission.sql", "f264ca0b7569c72273613e451b9742269d36fce290dcc0991f874d7426164f3f"],
     ["20260904054437_add_v1_points_wallet_read.sql", "f936337a1ace09cf46434617ebe894fb0c5e26c980c529bddce797406412e566"],
+    ["20260906233034_add_v1_communication_note_job_status_reader.sql", "cfb2ea76f77c9fd7f28acdd49bdf95e9255c32e25ce8358974b2c6efe14d168c"],
   ].map(([basename, sha256]) => Object.freeze({ basename, sha256 })));
 
 const OUTER_TRANSACTION_MIGRATIONS = new Set([

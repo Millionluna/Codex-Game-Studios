@@ -38,7 +38,7 @@ describe("Communication Note TEST_ONLY runtime credential broker SQL", () => {
       .filter((name) => name.endsWith(".sql"))
       .sort();
 
-    expect(migrationNames).toHaveLength(46);
+    expect(migrationNames).toHaveLength(47);
     expect(migrationNames.every((name) => /^\d{14}_[a-z0-9_]+\.sql$/.test(name)))
       .toBe(true);
     expect(migrationNames.slice(39)).toEqual([
@@ -49,6 +49,7 @@ describe("Communication Note TEST_ONLY runtime credential broker SQL", () => {
       "20260902121601_add_v1_communication_note_points_terminal_settlement.sql",
       "20260903041819_bind_v1_communication_note_encrypted_payload_admission.sql",
       "20260904054437_add_v1_points_wallet_read.sql",
+      "20260906233034_add_v1_communication_note_job_status_reader.sql",
     ]);
     expect(migrationNames).not.toContain(
       SETUP_PATH.split("/").at(-1),

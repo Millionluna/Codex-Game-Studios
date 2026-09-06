@@ -284,3 +284,71 @@ client-boundary scan, 73-file Codex adapter sync and `git diff --check` passed.
 A temporary synthetic local-only route received a desktop browser,
 accessibility-tree, console and framework-overlay check and was deleted after
 inspection. This remains local source/build evidence only.
+
+## Communication-only job-status database slice (2026-09-07)
+
+The successor migration `20260906233034` adds the private
+`get_v1_communication_note_job_status(uuid,uuid,uuid,text,text)` wrapper.
+Its dedicated NOLOGIN/NOINHERIT/NOBYPASSRLS executor has no table privilege:
+it may call only the existing owner status reader. That reader retains forced
+owner RLS and both lock-aware fresh-session checks. The wrapper hides every
+non-Communication Note with the same `NOT_FOUND` used for foreign and missing
+jobs. Its empty search path, exact EXECUTE grants and separate caller follow
+the [Supabase function-privilege guidance](https://supabase.com/docs/guides/database/functions)
+and [owner RLS guidance](https://supabase.com/docs/guides/database/postgres/row-level-security).
+
+`careslink_v1_generation_job_status_caller` receives only private schema USAGE
+and EXECUTE on that wrapper. It cannot call the generic five-Note reader,
+enqueue/cancel functions, Points operations, or read tables directly. Neither
+new role receives runtime membership or LOGIN. PostgreSQL 16 may retain the
+creator's bootstrap ADMIN-only edge, with INHERIT and SET both false; the
+migration checks this explicitly instead of claiming no administrative edges.
+
+The injected server repository captures only a validated Cookie principal and
+accepts `get({jobId})`. It sends five bound parameters through one fixed SQL
+statement, validates the exact metadata envelope and UUID, and strips no
+unexpected backend fields. Driver text and permission errors become fixed
+unavailable responses; only the exact supported database codes survive.
+
+The independent `COMMUNICATION_NOTE_JOB_STATUS_READ` adapter uses separately
+branded target, resolver and session capabilities. It preserves the established
+bounded acquire/query/destroy/revoke lifecycle without sharing Points admission
+credentials. Each read uses one physical session, one statement and no retry.
+Unique acquisition nonces distinguish requests started in the same millisecond;
+timeout, abort, late completion, cleanup failure and request abort during cleanup
+all prevent a successful response. Destruction and revocation must provide
+bounded evidence of termination and an issuance tombstone. The adapter itself
+opens no connection: a real credential issuer/transport must still be installed
+and proved before formal composition can use it.
+
+The new source adapter and recovery reader both remain default-off; the formal
+recovery reader is still `undefined`. The migration and current source manifests
+are now pinned at 47 files. Updating these pins does not update historical
+Hosted evidence or authorize activation. The future recovery composition must
+use an independent read flag and the strict Cookie/current-session principal
+core; disabling new generation must not disable access to existing jobs.
+
+Local database verification runs with
+`node scripts/preview-e2e/communication-note-job-status-local-pg16.mjs`.
+It creates its own Unix-socket-only PostgreSQL 16 cluster and accepts no target
+arguments or database URL. Ten actual dependency migrations run through a
+non-superuser CREATEROLE actor. Nine scenarios verify role attributes and ACLs,
+all five states, no read mutation, hidden foreign/missing/other-Note jobs, expired
+sessions, denied generic/write access and expiry while waiting on an Auth row
+lock. The synthetic metadata fixture bypasses only FK triggers during setup;
+CHECK constraints, production reader bodies and forced RLS remain intact.
+This does not prove the admission lifecycle, Hosted Auth, PostgreSQL 17, TLS or
+credential issuance. The owned local cluster and fixtures are removed after
+process-exit confirmation.
+
+Next: prepare the same-revision disposable no-data Preview gate for the exact
+wrapper ACLs, actual session revocation and dedicated runtime credential
+issuance/cleanup. Only after that evidence should the read composition be
+installed in the existing job route. No deployment, Production access, real
+care data, Points mutation or model call is part of this source slice.
+
+Verification: the new repository/adapter gate passed 58 tests across 2 files;
+the related source/manifest gate passed 151 tests across 7 files; the full suite
+passed 3,941 tests across 262 files. TypeScript, full zero-warning lint,
+64-page Webpack build and 107-static-chunk client-boundary scan passed. The
+fixed local PostgreSQL runner passed all 9 scenarios and confirmed cleanup.

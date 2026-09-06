@@ -3849,6 +3849,45 @@ initial POST response is lost before that UUID arrives and the page is then
 refreshed, recovery still requires a separately reviewed owner-scoped recent-job
 or admission-receipt boundary.
 
+### Communication Note job-status database reader — local evidence (2026-09-07)
+
+The private Communication-only status wrapper, dedicated executor/caller roles,
+strict Cookie-principal repository and independent `COMMUNICATION_NOTE_JOB_STATUS_READ`
+session adapter are now source-complete. Formal recovery reader/adapter
+installation remains absent. The migration manifests now pin 47 SQL files;
+preflight and dependent coordinator policy digests were recomputed without
+changing their blocked activation states or historical Hosted claims.
+
+New repository/adapter tests passed **58/58 across 2 files**. They cover exact
+five-parameter SQL, owner/job binding, Cookie-only identity, expanded capability
+rejection, wrong purpose/role/Note/RPC, strict metadata parsing, fixed driver
+errors, request cancellation, acquisition/query/cleanup timeouts, late-response
+rejection, unique simultaneous acquisition identities and destruction/revocation
+failure. The real recovery handler was also exercised over the new repository.
+The related source/manifest gate passed **151/151 across 7 files**, and the full
+suite passed **3,941/3,941 across 262 files**. TypeScript, zero-warning full lint,
+the 64-page Webpack production build and 107-static-chunk client-boundary scan
+passed. No browser/UI changes were made in this batch.
+
+The fixed local PostgreSQL 16 runner applied **10 actual dependency migrations**
+with a non-superuser migration actor and passed **9 database scenarios**: role
+posture, exact function ACLs and empty search path, zero table/public-definer
+access, all five statuses without read mutations, foreign/missing equivalence,
+other four Note types hidden, expired/mismatched sessions, generic/write access
+denial and expiry during a proven Auth row lock wait. The reader caller was
+tested as a non-superuser session identity. All fixture queries used an isolated
+Unix-socket-only cluster created by the runner, and the cluster and temporary
+files were removed after process-exit confirmation.
+
+The local fixture bypasses FK triggers only during synthetic metadata setup;
+CHECK constraints, the actual reader functions and forced owner RLS remain in
+effect. This evidence does not cover paid admission, Hosted Auth, PostgreSQL 17,
+TLS, a real credential issuer, Supabase Hosted advisors or formal route
+activation. No Preview, deployment, Production or real care data, Points
+mutation or model call was involved. Next is a same-revision no-data Preview
+gate for the exact reader and its dedicated runtime credentials, followed by
+independent read composition in the existing job route.
+
 ### Current live/read-only evidence
 
 - Supabase migrations, tables, RLS flags, policies, grants, function grants and aggregate row counts were checked read-only.

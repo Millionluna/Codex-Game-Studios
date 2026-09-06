@@ -291,7 +291,7 @@ describe("Communication Note M1n approved runtime Hosted runner policy", () => {
       );
     expect(manifest.paths).toEqual([...manifest.paths].sort());
     expect(new Set(manifest.paths).size).toBe(manifest.paths.length);
-    expect(manifest.paths).toHaveLength(72);
+    expect(manifest.paths).toHaveLength(73);
     expect(manifest.paths).toContain("pnpm-lock.yaml");
     expect(manifest.paths).toContain("tsconfig.json");
     expect(manifest.paths).not.toContain("package-lock.json");
@@ -307,7 +307,7 @@ describe("Communication Note M1n approved runtime Hosted runner policy", () => {
     expect(manifest.paths).toContain(
       "supabase/migrations/20260904054437_add_v1_points_wallet_read.sql",
     );
-    expect(manifest.migrationVersions).toHaveLength(46);
+    expect(manifest.migrationVersions).toHaveLength(47);
     expect(manifest.migrationVersions.every((version) => /^\d{14}$/.test(version)))
       .toBe(true);
 
@@ -343,7 +343,7 @@ describe("Communication Note M1n approved runtime Hosted runner policy", () => {
     );
   });
 
-  it("passes the exact ordered 46-version migration manifest to preflight", async () => {
+  it("passes the exact ordered 47-version migration manifest to preflight", async () => {
     const appDirectory = fileURLToPath(new URL("../../", import.meta.url));
     const manifest =
       await readCommunicationNotePreviewApprovedRuntimeAdaptersHostedSourceManifest(
