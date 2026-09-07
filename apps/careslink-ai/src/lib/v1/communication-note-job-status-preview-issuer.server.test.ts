@@ -1,6 +1,6 @@
 import { createHash, createHmac } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createJobStatusPreviewIssuerService, JOB_STATUS_PREVIEW_ISSUER_READY } from "./communication-note-job-status-preview-issuer.server";
+import { createJobStatusPreviewIssuerService, JOB_STATUS_PREVIEW_ISSUER_READY, type JobStatusPreviewCustody } from "./communication-note-job-status-preview-issuer.server";
 import { CARESLINK_PRODUCTION_SUPABASE_REF as PARENT } from "./ndis-shadow-guard";
 
 const ports=vi.hoisted(()=>({control:vi.fn(),runtime:vi.fn(),resolver:vi.fn(),broker:vi.fn()}));
@@ -22,10 +22,17 @@ function response(data:unknown,status=200,url=URL){
 }
 function setup(){
   const loadAccessToken=vi.fn(async()=>({accessToken:"SYNTHETIC_OAUTH_TOKEN_NOT_REAL",scope:"environment:read" as const,expiresAt:new Date(Date.now()+60000).toISOString()}));
-  const loadDatabaseCredential=vi.fn(async()=>({projectRef:REF,password:"SYNTHETIC_DATABASE_PASSWORD",expiresAt:new Date(Date.now()+120000).toISOString()}));
-  const input={projectRef:REF,ca:CA,expectedCaSha256:createHash("sha256").update(CA).digest("hex"),
-    projectRefHmacKey:HMAC,loadAccessToken,loadDatabaseCredential};
-  return {input,loadAccessToken,loadDatabaseCredential,service:createJobStatusPreviewIssuerService(input)};
+  const loadDatabaseCredential=vi.fn(async()=>{});
+  const loadCa=vi.fn(async()=>CA);
+  const custody:JobStatusPreviewCustody={
+    consumeAccessToken:async(_ctx,consumer)=>consumer(await loadAccessToken()),
+    loadCa,
+    hmacProjectRef:async ref=>createHmac("sha256",HMAC).update(`careslink:job-status:project-ref:v1:${ref}`).digest("hex"),
+    consumeDatabaseCredential:loadDatabaseCredential,
+  };
+  const createCustody=vi.fn(async()=>custody);
+  const input={projectRef:REF,expectedCaSha256:createHash("sha256").update(CA).digest("hex"),createCustody};
+  return {input,loadAccessToken,loadDatabaseCredential,loadCa,createCustody,service:createJobStatusPreviewIssuerService(input)};
 }
 beforeEach(()=>{
   vi.clearAllMocks(); ports.control.mockReturnValue(()=>{});ports.runtime.mockReturnValue(()=>{});
@@ -44,8 +51,9 @@ describe("dedicated Preview issuer target binding (synthetic HTTPS/custody ports
     expect(ports.control.mock.calls[0][0]).toMatchObject({projectRef:REF,ca:CA});
     expect(ports.runtime.mock.calls[0][0]).toMatchObject({projectRef:REF,ca:CA,target:result.databaseTarget});
     expect(h.loadDatabaseCredential).not.toHaveBeenCalled();
-    await ports.control.mock.calls[0][0].loadCredential(context());
-    expect(h.loadDatabaseCredential).toHaveBeenCalledWith({projectRef:REF,purpose:"JOB_STATUS_ISSUER_CONTROL_ONLY"},expect.anything());
+    await ports.control.mock.calls[0][0].consumeCredential(context(),async()=>{});
+    expect(h.loadDatabaseCredential).toHaveBeenCalledWith({projectRef:REF,purpose:"JOB_STATUS_ISSUER_CONTROL_ONLY",databaseTarget:result.databaseTarget},expect.anything(),expect.any(Function));
+    expect(h.createCustody).toHaveBeenCalledTimes(2);
     expect(JSON.stringify(result)).not.toMatch(/SYNTHETIC_|password|accessToken|CERTIFICATE/);
   });
   it.each([
@@ -87,12 +95,21 @@ describe("dedicated Preview issuer target binding (synthetic HTTPS/custody ports
     const h=setup();await h.service.resolve(context());fetchMock.mockResolvedValue(response([{...branch(),persistent:true}]));
     await expect(h.service.resolve(context())).rejects.toThrow();expect(fetchMock).toHaveBeenCalledTimes(2);expect(ports.control).toHaveBeenCalledTimes(1);
   });
-  it.each(["production","wrong ca","zero hmac"])("rejects %s configuration before IO",kind=>{
+  it.each(["production","invalid ca hash"])("rejects %s configuration before IO",kind=>{
     const h=setup();const input={...h.input};
     if(kind==="production")input.projectRef=PARENT;
-    if(kind==="wrong ca")input.expectedCaSha256="0".repeat(64);
-    if(kind==="zero hmac")input.projectRefHmacKey=Buffer.alloc(32);
+    if(kind==="invalid ca hash")input.expectedCaSha256="invalid";
     expect(()=>createJobStatusPreviewIssuerService(input)).toThrow();expect(fetchMock).not.toHaveBeenCalled();
+  });
+  it("rejects a custody CA that does not match the deployment pin",async()=>{
+    const h=setup();h.loadCa.mockResolvedValue(Buffer.from("WRONG_CA"));
+    await expect(h.service.resolve(context())).rejects.toThrow();expect(ports.control).not.toHaveBeenCalled();
+  });
+  it("opens a fresh custody scope for cleanup after the original request aborts",async()=>{
+    const h=setup(),original=new AbortController();await h.service.resolve({signal:original.signal});original.abort();
+    const cleanup=context();await ports.control.mock.calls[0][0].consumeCredential(cleanup,async()=>{});
+    expect(h.createCustody).toHaveBeenLastCalledWith(cleanup);
+    expect(h.loadDatabaseCredential).toHaveBeenCalledTimes(1);
   });
   it("rejects expired token before HTTP",async()=>{
     const h=setup();h.loadAccessToken.mockResolvedValue({accessToken:"SYNTHETIC_OAUTH_TOKEN_NOT_REAL",scope:"environment:read",expiresAt:new Date().toISOString()});

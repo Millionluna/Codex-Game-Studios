@@ -1020,7 +1020,7 @@ describe("V1 shadow runtime boundary", () => {
     );
   });
 
-  it("quarantines the M1u GCP provider adapters to its own test and forbids ambient cloud authority", () => {
+  it("quarantines M1u GCP provider adapters to audited server type wiring/tests and forbids ambient cloud authority", () => {
     const relativePath =
       "src/lib/v1/communication-note-preview-product-runtime-gcp-adapters.server.ts";
     const modulePath = join(process.cwd(), relativePath);
@@ -1040,6 +1040,7 @@ describe("V1 shadow runtime boundary", () => {
 
     expect(importers).toEqual([
       testPath,
+      join(process.cwd(), "src/lib/v1/communication-note-job-status-custody.server.ts"),
       join(
         process.cwd(),
         "src/lib/v1/communication-note-preview-product-runtime-provider-bridges-m1v.server.test.ts",
@@ -1357,6 +1358,7 @@ describe("V1 shadow runtime boundary", () => {
       readFileSync(file, "utf8").includes("communication-note-job-recovery-composition"),
     )).toEqual([
       compositionTestPath,
+      join(process.cwd(), "src/lib/v1/communication-note-job-status-custody.server.ts"),
       join(process.cwd(), "src/lib/v1/communication-note-job-status-postgres.local.test.ts"),
     ]);
     expect(walkControlledScriptFiles().filter(file =>
@@ -1374,6 +1376,7 @@ describe("V1 shadow runtime boundary", () => {
       file !== postgresPath && file !== boundaryPath &&
       readFileSync(file, "utf8").includes("communication-note-job-status-postgres.server"),
     )).toEqual([
+      join(process.cwd(), "src/lib/v1/communication-note-job-status-custody.server.ts"),
       join(process.cwd(), "src/lib/v1/communication-note-job-status-postgres.local.test.ts"),
       join(process.cwd(), "src/lib/v1/communication-note-job-status-postgres.server.test.ts"),
       join(process.cwd(), "src/lib/v1/communication-note-job-status-preview-issuer.server.test.ts"),
@@ -1388,8 +1391,21 @@ describe("V1 shadow runtime boundary", () => {
     expect(issuerSource).not.toContain("process.env");
     expect(walkControlledScriptFiles().filter(file=>file!==issuerPath && file!==boundaryPath &&
       readFileSync(file,"utf8").includes("communication-note-job-status-preview-issuer.server"))).toEqual([
+      join(process.cwd(), "src/lib/v1/communication-note-job-status-custody.server.ts"),
       join(process.cwd(), "src/lib/v1/communication-note-job-status-preview-issuer.server.test.ts"),
+      join(process.cwd(), "src/lib/v1/communication-note-preview-product-runtime-gcp-adapters.server.test.ts"),
     ]);
+    const custodyPath = join(process.cwd(), "src/lib/v1/communication-note-job-status-custody.server.ts");
+    const custody = readFileSync(custodyPath, "utf8");
+    expect(custody).toMatch(/^import "server-only";/);
+    expect(custody).toContain("JOB_STATUS_CUSTODIED_RECOVERY_READY = false");
+    expect(custody).toContain('import type { createTestOnlyCaresLinkV1CommunicationNotePreviewProductRuntimeGcpAdapters }');
+    expect(custody).not.toMatch(/process\.env|readFileSync|service_role|sb_secret_|projectRefHmacKey/);
+    expect(walkControlledScriptFiles().filter(file => file !== custodyPath && file !== boundaryPath &&
+      readFileSync(file, "utf8").includes("communication-note-job-status-custody.server"))).toEqual([
+      join(process.cwd(), "src/lib/v1/communication-note-preview-product-runtime-gcp-adapters.server.test.ts"),
+    ]);
+    expect(route).not.toContain("communication-note-job-status-custody");
   });
 
   it("keeps service-role repositories outside the client component tree", () => {

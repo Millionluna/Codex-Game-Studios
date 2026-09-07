@@ -1,7 +1,7 @@
 # CaresLink AI Test Evidence
 
 > Evidence date: 2026-08-26, with source/local-only evidence updated through
-> 2026-09-03. This document separates **Existing**, **Proposed**, and **Gaps**.
+> 2026-09-07. This document separates **Existing**, **Proposed**, and **Gaps**.
 > Passing current tests does not mean Product Baseline V1.0 is implemented.
 
 ## Existing
@@ -4116,6 +4116,35 @@ Readiness remains false and the formal GET remains fixed 503. Real secret-custod
 wiring, Hosted PG17/TLS, browser/GoTrue and security-advisor checks remain open;
 no Production action, deployment, Points/model operation or UI/Logo change was
 performed. See the [implementation record](communication-note-product-integration-m1y.md#dedicated-issuer-candidate-and-bound-preview-service--2026-09-07).
+
+### Managed custody recovery wiring — local proof (2026-09-07)
+
+The recovery composition now has server-owned source wiring to the existing M1u
+workload/source-manifest verifier, managed HMAC and callback-only OAuth/CA/static
+password custody interfaces. This replaces the earlier raw credential-return
+ports and locally held project-ref HMAC key; it does not connect a live GCP
+factory or install the formal reader. Static-source password revocation remains
+branch deletion/password reset, not the 60-second delivery lifetime.
+
+- 13 new actual-M1u-adapter wiring cases use synthetic external WIF/KMS/Secret
+  Manager/branch HTTP responses. They cover target resolution, new cleanup
+  identity after cancellation, custody/scope/integrity failures, context reuse
+  denial and HTTP auth/session ordering before custody access.
+- 8 ownership-helper cases cover zero/duplicate/unawaited callbacks, cancellation,
+  late secrets, custody failure and late physical-result disposal. The issuer's
+  source suite is now 26 tests. PG17/TLS control tests still mock the PG client.
+- Full regression: **4,138 passed, 12 skipped, 271 files (270 passed / 1 skipped)**.
+  The separate owned real PG16 runner passed all 18 scenario groups and all
+  12 source issuer tests; its cluster was stopped and removed. No new real-GCP,
+  real-GoTrue, browser-to-database or Hosted PG17/TLS evidence is claimed.
+- TypeScript, zero-warning ESLint, webpack (64/64 pages), client-boundary scan,
+  adapter sync, whitespace and the unchanged 47-migration check-only gate passed.
+
+No cloud resource, Production mutation, model/Points call, UI/Logo change,
+deployment or push occurred. The candidate migration was not promoted and the
+formal GET still returns fixed 503. The next local browser/recovery scenario
+matrix and separate Hosted requirements are recorded in the
+[prepared integration gate](communication-note-product-integration-m1y.md#exact-next-recovery-integration-gate-prepared-not-executed).
 
 ### Current live/read-only evidence
 

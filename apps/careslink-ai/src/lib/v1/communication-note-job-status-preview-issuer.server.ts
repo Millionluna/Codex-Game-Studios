@@ -1,12 +1,15 @@
 import "server-only";
 
-import { createHash, createHmac } from "node:crypto";
+import { createHash } from "node:crypto";
 import { performance } from "node:perf_hooks";
 import { CARESLINK_PRODUCTION_SUPABASE_REF as PARENT } from "./ndis-shadow-guard";
 import { stringifyCaresLinkV1CanonicalJson } from "./canonical-json";
-import { createCaresLinkV1CommunicationNoteJobStatusPreviewDatabaseTarget } from "./communication-note-job-status-purpose-caller.server";
+import { createCaresLinkV1CommunicationNoteJobStatusPreviewDatabaseTarget,
+  type CaresLinkV1CommunicationNoteJobStatusPreviewDatabaseTarget as Target } from "./communication-note-job-status-purpose-caller.server";
 import { createJobStatusPgControlOpener, createJobStatusPgRuntimeOpener,
-  createJobStatusPostgresCredentialResolver, createJobStatusSqlBroker } from "./communication-note-job-status-postgres.server";
+  createJobStatusPostgresCredentialResolver, createJobStatusSqlBroker,
+  type JobStatusControlCredential } from "./communication-note-job-status-postgres.server";
+import { consumeJobStatusCustodyValue } from "./communication-note-job-status-custody-consumer.server";
 
 export const JOB_STATUS_PREVIEW_ISSUER_READY = false as const;
 const BRANCHES_URL = `https://api.supabase.com/v1/projects/${PARENT}/branches`;
@@ -14,7 +17,13 @@ const unavailable = () => new Error("Job status Preview issuer unavailable");
 const sha = (value: unknown) => createHash("sha256").update(stringifyCaresLinkV1CanonicalJson(value)).digest("hex");
 type Context = Readonly<{ signal: AbortSignal }>;
 type Token = Readonly<{ accessToken: string; scope: "environment:read"; expiresAt: string }>;
-type DatabaseCredential = Readonly<{ projectRef: string; password: string; expiresAt: string }>;
+export type JobStatusPreviewCustody = Readonly<{
+  consumeAccessToken(context: Context, consumer: (token: Token) => Promise<void>): Promise<void>;
+  loadCa(request: Readonly<{ controlPlaneEvidenceSha256: string }>, context: Context): Promise<Buffer>;
+  hmacProjectRef(ref: string, context: Context): Promise<string>;
+  consumeDatabaseCredential(request: Readonly<{ projectRef: string; purpose: "JOB_STATUS_ISSUER_CONTROL_ONLY"; databaseTarget: Target }>,
+    context: Context, consumer: (credential: JobStatusControlCredential) => Promise<void>): Promise<void>;
+}>;
 
 /** Server-owned composition, not an HTTP endpoint or formal reader installation.
  * Credential custody is an explicit deployment dependency. OAuth is used for
@@ -23,19 +32,14 @@ type DatabaseCredential = Readonly<{ projectRef: string; password: string; expir
  * Both physical connectors derive the SAME direct hostname and pinned CA here.
  */
 export function createJobStatusPreviewIssuerService(input: {
-  projectRef: string; ca: Buffer; expectedCaSha256: string; projectRefHmacKey: Buffer;
-  loadAccessToken(context: Context): Promise<Token>;
-  loadDatabaseCredential(request: Readonly<{ projectRef: string; purpose: "JOB_STATUS_ISSUER_CONTROL_ONLY" }>, context: Context): Promise<DatabaseCredential>;
+  projectRef: string; expectedCaSha256: string;
+  /** Fresh verified workload/custody scope for resolution and EACH control
+   * operation, including independent cleanup after the HTTP request aborts. */
+  createCustody(context: Context): Promise<JobStatusPreviewCustody>;
 }) {
-  const { projectRef, expectedCaSha256, loadAccessToken, loadDatabaseCredential } = input;
-  const ca = Buffer.from(input.ca), hmacKey = Buffer.from(input.projectRefHmacKey);
+  const { projectRef, expectedCaSha256, createCustody } = input;
   if (!/^[a-z0-9]{20}$/.test(projectRef) || projectRef === PARENT ||
-      ca.length === 0 || ca.length > 65536 || !/^[a-f0-9]{64}$/.test(expectedCaSha256) ||
-      createHash("sha256").update(ca).digest("hex") !== expectedCaSha256 ||
-      hmacKey.length !== 32 || hmacKey.every(byte => byte === 0)) throw unavailable();
-  const refHmac = (ref: string) => createHmac("sha256",hmacKey)
-    .update(`careslink:job-status:project-ref:v1:${ref}`).digest("hex");
-  const credentialRequest = Object.freeze({ projectRef, purpose: "JOB_STATUS_ISSUER_CONTROL_ONLY" as const });
+      !/^[a-f0-9]{64}$/.test(expectedCaSha256) || typeof createCustody !== "function") throw unavailable();
   return Object.freeze({ async resolve(context: Context) {
     active(context.signal);
     const started = Date.now(), startedMono = performance.now();
@@ -45,19 +49,25 @@ export function createJobStatusPreviewIssuerService(input: {
       if (Date.now() < started || Date.now() - started > 5000 || performance.now() - startedMono > 5000) throw unavailable();
     };
     try {
-      const token = await bounded(loadAccessToken({ signal }), signal);
+      const scope = { signal };
+      const custody = await bounded(createCustody(scope), signal);
       fresh();
-      if (token.scope !== "environment:read" || typeof token.accessToken !== "string" ||
-          !/^[A-Za-z0-9_.+\/=:-]{20,4096}$/.test(token.accessToken) ||
-          !timestamp(token.expiresAt) || Date.parse(token.expiresAt) <= Date.now() + 5000) throw unavailable();
-      const response = await bounded(fetch(BRANCHES_URL, { method:"GET", redirect:"error", cache:"no-store",
-        credentials:"omit", headers:{ authorization:`Bearer ${token.accessToken}`, accept:"application/json" }, signal }), signal);
-      fresh();
-      if (response.status !== 200 || response.redirected || response.url !== BRANCHES_URL ||
-          !/^application\/json(?:\s*;|$)/i.test(response.headers.get("content-type") ?? "")) {
-        await response.body?.cancel(); throw unavailable();
-      }
-      const rows: unknown = JSON.parse(await readBoundedBody(response,signal));
+      const rows: unknown = await consumeJobStatusCustodyValue({ signal,
+        consume: consumer => custody.consumeAccessToken(scope, consumer),
+        use: async (token: Token) => {
+          fresh();
+          if (token.scope !== "environment:read" || typeof token.accessToken !== "string" ||
+              !/^[A-Za-z0-9_.+\/=:-]{20,4096}$/.test(token.accessToken) ||
+              !timestamp(token.expiresAt) || Date.parse(token.expiresAt) <= Date.now() + 5000) throw unavailable();
+          const response = await bounded(fetch(BRANCHES_URL, { method:"GET", redirect:"error", cache:"no-store",
+            credentials:"omit", headers:{ authorization:`Bearer ${token.accessToken}`, accept:"application/json" }, signal }), signal);
+          fresh();
+          if (response.status !== 200 || response.redirected || response.url !== BRANCHES_URL ||
+              !/^application\/json(?:\s*;|$)/i.test(response.headers.get("content-type") ?? "")) {
+            await response.body?.cancel(); throw unavailable();
+          }
+          return JSON.parse(await readBoundedBody(response,signal)) as unknown;
+      } });
       fresh();
       if (!Array.isArray(rows) || rows.length > 1000) throw unavailable();
       const matches = rows.filter(row => row && typeof row === "object" && row.project_ref === projectRef);
@@ -74,17 +84,28 @@ export function createJobStatusPreviewIssuerService(input: {
       const evidence = { branchId:branch.id, projectRef, parentProjectRef:PARENT,
         isDefault:false, persistent:false, withData:false, status:branch.status,
         projectStatus:branch.preview_project_status, observedAt, expiresAt, caSha256:expectedCaSha256 };
+      const controlPlaneEvidenceSha256 = sha(evidence);
+      const ca = Buffer.from(await bounded(custody.loadCa({ controlPlaneEvidenceSha256 }, scope), signal));
+      if (ca.length === 0 || ca.length > 65536 || createHash("sha256").update(ca).digest("hex") !== expectedCaSha256) throw unavailable();
+      const [targetProjectRefHmac, productionProjectRefHmac] = await bounded(Promise.all([
+        custody.hmacProjectRef(projectRef, scope), custody.hmacProjectRef(PARENT, scope),
+      ]), signal);
       const databaseTarget = createCaresLinkV1CommunicationNoteJobStatusPreviewDatabaseTarget({
         status:"VALIDATED_DISPOSABLE_PREVIEW_TARGET_NOT_APPROVED", deploymentEnvironment:"PREVIEW",
-        targetClass:"DISPOSABLE_NO_DATA_NON_PRODUCTION_PREVIEW", targetProjectRefHmac:refHmac(projectRef),
-        productionProjectRefHmac:refHmac(PARENT), controlPlaneEvidenceSha256:sha(evidence),
+        targetClass:"DISPOSABLE_NO_DATA_NON_PRODUCTION_PREVIEW", targetProjectRefHmac,
+        productionProjectRefHmac, controlPlaneEvidenceSha256,
         databaseName:"postgres", postgresMajor:17, projectStatus:"ACTIVE_HEALTHY", connectionMode:"DIRECT", port:5432,
         tlsMode:"VERIFY_FULL_PINNED_CA", tlsRootCertificateSha256:expectedCaSha256, observedAt, expiresAt,
         defaultBranch:false, persistent:false, withData:false, productionExcluded:true, rawCredentialMaterialPresent:false });
       // PG17 is a required target contract, independently checked by BOTH real
       // connections before any issuer RPC or product query can execute.
+      const credentialRequest = Object.freeze({ projectRef, purpose: "JOB_STATUS_ISSUER_CONTROL_ONLY" as const, databaseTarget });
       const broker = createJobStatusSqlBroker(createJobStatusPgControlOpener({ projectRef, ca,
-        loadCredential: async callContext => bounded(loadDatabaseCredential(credentialRequest,callContext),callContext.signal) }));
+        consumeCredential: async (callContext, consumer) => {
+          const controlCustody = await bounded(createCustody(callContext), callContext.signal);
+          active(callContext.signal);
+          await bounded(controlCustody.consumeDatabaseCredential(credentialRequest, callContext, consumer), callContext.signal);
+        } }));
       const credentialResolver = createJobStatusPostgresCredentialResolver({ target:databaseTarget, broker,
         openRuntime:createJobStatusPgRuntimeOpener({projectRef,ca,target:databaseTarget}) });
       fresh();

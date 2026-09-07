@@ -1,4 +1,5 @@
 import "server-only";
+import { consumeJobStatusCustodyValue } from "./communication-note-job-status-custody-consumer.server";
 
 import { createHash, createHmac, pbkdf2Sync, randomBytes } from "node:crypto";
 import { realpath } from "node:fs/promises";
@@ -197,79 +198,94 @@ export function createJobStatusPgRuntimeOpener(input: { projectRef: string; ca: 
 /** Dedicated control-plane connector; never expose this port to a product route.
  * Uses the existing management operator, not an additional privileged LOGIN.
  * Every operation gets a new physical connection and exactly one autocommit RPC.
- * Credential custody must supply a fresh, project-bound secret, never ambient PG*.
+ * Custody supplies a fresh project-bound delivery of a STATIC source password,
+ * never ambient PG*. Delivery expiry does not revoke that source credential.
  */
+export type JobStatusControlCredential = Readonly<{
+  projectRef: string; password: string; deliveryExpiresAt: string;
+  credentialClass: "STATIC_SUPABASE_BRANCH_ADMIN_PASSWORD";
+  sourceExpiresAt: null; sourceRevocation: "BRANCH_DELETE_OR_PASSWORD_RESET";
+}>;
+export const JOB_STATUS_CONTROL_APPLICATION_NAME = "careslink-preview-runtime-credential-broker-management";
+
 export function createJobStatusPgControlOpener(input: {
   projectRef: string; ca: Buffer;
-  loadCredential(context: Context): Promise<{ projectRef: string; password: string; expiresAt: string }>;
+  consumeCredential(context: Context, consumer: (secret: JobStatusControlCredential) => Promise<void>): Promise<void>;
 }): (context: Context) => Promise<JobStatusSqlControlConnection> {
-  const { projectRef, loadCredential } = input;
+  const { projectRef, consumeCredential } = input;
   const ca = Buffer.from(input.ca);
   if (!/^[a-z0-9]{20}$/.test(projectRef) || projectRef === CARESLINK_PRODUCTION_SUPABASE_REF ||
       ca.length === 0 || ca.length > 65536) throw fail();
-  return async context => {
-    active(context.signal);
-    const secret = await loadCredential(context);
-    active(context.signal);
-    const now = Date.now();
-    if (secret.projectRef !== projectRef || typeof secret.password !== "string" ||
-        secret.password.length < 16 || secret.password.length > 256 || /[\u0000-\u001f\u007f]/.test(secret.password) ||
-        !timestamp(secret.expiresAt) || Date.parse(secret.expiresAt) < now + 10000 ||
-        Date.parse(secret.expiresAt) > now + 300000) throw fail();
-    const deadline = Math.min(Date.parse(secret.expiresAt), now + 10000);
-    const monotonicDeadline = performance.now() + deadline - now;
-    const fresh = () => Date.now() >= now && Date.now() < deadline && performance.now() < monotonicDeadline;
-    const config: ClientConfig = { host: `db.${projectRef}.supabase.co`, port: 5432,
-      database: "postgres", user: "postgres", password: secret.password,
-      ssl: { ca, rejectUnauthorized: true }, application_name: "careslink-job-status-control-only",
-      fallback_application_name: "", client_encoding: "UTF8", connectionTimeoutMillis: 1500,
-      query_timeout: 2500, statement_timeout: 2000, lock_timeout: 1000,
-      idle_in_transaction_session_timeout: 1000, keepAlive: false,
-      options: "-c search_path= -c idle_session_timeout=5000" };
-    const client = new Client(config);
-    const owned = client as Client & { password: unknown; connectionParameters: { password: unknown };
-      connection: { stream: { destroy(): void; encrypted?: boolean; authorized?: boolean } } };
-    let closed = false, used = false;
-    const end = async () => { if (!closed) { closed = true; owned.connection.stream.destroy(); await client.end(); } };
-    const abort = () => { void end().catch(() => {}); };
-    client.on("error", abort);
-    context.signal.addEventListener("abort", abort, { once: true });
-    try {
-      await client.connect();
-      active(context.signal);
-      if (!owned.connection.stream.encrypted || !owned.connection.stream.authorized || !fresh()) throw fail();
-      const identity = (await client.query(`select session_user::text as login, current_user::text as current,
-        current_database() as database, current_setting('server_version_num')::int/10000 as major,
-        current_setting('max_prepared_transactions')::int as prepared,
-        not rolsuper and rolcreaterole and rolbypassrls
-          and pg_catalog.pg_has_role(current_user,'pg_read_all_stats','USAGE')
-          and pg_catalog.pg_has_role(current_user,'pg_signal_backend','USAGE') as operator
-        from pg_catalog.pg_roles where rolname=current_user`)).rows[0];
-      if (!identity || identity.login !== "postgres" || identity.current !== "postgres" ||
-          identity.database !== "postgres" || identity.major !== 17 || identity.prepared !== 0 || identity.operator !== true) throw fail();
-      active(context.signal);
-      if (closed || !fresh()) throw fail();
-      return Object.freeze({ end: async () => {
-        context.signal.removeEventListener("abort", abort); await end();
-      }, async query(sql: string, values?: unknown[]) {
+  return async parent => {
+    const context = { signal: AbortSignal.any([parent.signal, AbortSignal.timeout(10000)]) };
+    return consumeJobStatusCustodyValue({ signal: context.signal,
+      consume: consumer => consumeCredential(context, consumer),
+      dispose: connection => connection.end(),
+      use: async (secret: JobStatusControlCredential): Promise<JobStatusSqlControlConnection> => {
         active(context.signal);
-        if (closed || used || !fresh() || sql !== JOB_STATUS_ISSUER_SQL || !Array.isArray(values) || values.length !== 2 ||
-            !["acquire","bind","fence","finalize"].includes(String(values[0])) ||
-            typeof values[1] !== "string" || Buffer.byteLength(values[1]) > 8192) throw fail();
-        used = true;
+        const now = Date.now();
+        if (secret.projectRef !== projectRef || typeof secret.password !== "string" ||
+            secret.password.length < 16 || secret.password.length > 256 || /[\u0000-\u001f\u007f]/.test(secret.password) ||
+            secret.credentialClass !== "STATIC_SUPABASE_BRANCH_ADMIN_PASSWORD" || secret.sourceExpiresAt !== null ||
+            secret.sourceRevocation !== "BRANCH_DELETE_OR_PASSWORD_RESET" ||
+            !timestamp(secret.deliveryExpiresAt) || Date.parse(secret.deliveryExpiresAt) < now + 10000 ||
+            Date.parse(secret.deliveryExpiresAt) > now + 60000) throw fail();
+        // The envelope expires; the underlying static admin password does not.
+        const deadline = Math.min(Date.parse(secret.deliveryExpiresAt), now + 10000);
+        const monotonicDeadline = performance.now() + deadline - now;
+        const fresh = () => Date.now() >= now && Date.now() < deadline && performance.now() < monotonicDeadline;
+        const config: ClientConfig = { host: `db.${projectRef}.supabase.co`, port: 5432,
+          database: "postgres", user: "postgres", password: secret.password,
+          ssl: { ca, rejectUnauthorized: true }, application_name: JOB_STATUS_CONTROL_APPLICATION_NAME,
+          fallback_application_name: "", client_encoding: "UTF8", connectionTimeoutMillis: 1500,
+          query_timeout: 2500, statement_timeout: 2000, lock_timeout: 1000,
+          idle_in_transaction_session_timeout: 1000, keepAlive: false,
+          options: "-c search_path= -c idle_session_timeout=5000" };
+        const client = new Client(config);
+        const owned = client as Client & { password: unknown; connectionParameters: { password: unknown };
+          connection: { stream: { destroy(): void; encrypted?: boolean; authorized?: boolean } } };
+        let closed = false, used = false;
+        const end = async () => { if (!closed) { closed = true; owned.connection.stream.destroy(); await client.end(); } };
+        const abort = () => { void end().catch(() => {}); };
+        client.on("error", abort);
+        context.signal.addEventListener("abort", abort, { once: true });
         try {
-          const result = await client.query(sql, [...values]);
+          await client.connect();
+          active(context.signal);
+          if (!owned.connection.stream.encrypted || !owned.connection.stream.authorized || !fresh()) throw fail();
+          const identity = (await client.query(`select session_user::text as login, current_user::text as current,
+            current_database() as database, current_setting('server_version_num')::int/10000 as major,
+            current_setting('max_prepared_transactions')::int as prepared,
+            not rolsuper and rolcreaterole and rolbypassrls
+              and pg_catalog.pg_has_role(current_user,'pg_read_all_stats','USAGE')
+              and pg_catalog.pg_has_role(current_user,'pg_signal_backend','USAGE') as operator
+            from pg_catalog.pg_roles where rolname=current_user`)).rows[0];
+          if (!identity || identity.login !== "postgres" || identity.current !== "postgres" ||
+              identity.database !== "postgres" || identity.major !== 17 || identity.prepared !== 0 || identity.operator !== true) throw fail();
           active(context.signal);
           if (closed || !fresh()) throw fail();
-          return { rows: result.rows };
-        } catch { throw fail(); }
-      } });
-    } catch {
-      context.signal.removeEventListener("abort", abort);
-      await end(); throw fail();
-    } finally {
-      config.password = undefined; owned.password = undefined; owned.connectionParameters.password = undefined;
-    }
+          return Object.freeze({ end: async () => {
+            context.signal.removeEventListener("abort", abort); await end();
+          }, async query(sql: string, values?: unknown[]) {
+            active(context.signal);
+            if (closed || used || !fresh() || sql !== JOB_STATUS_ISSUER_SQL || !Array.isArray(values) || values.length !== 2 ||
+                !["acquire","bind","fence","finalize"].includes(String(values[0])) ||
+                typeof values[1] !== "string" || Buffer.byteLength(values[1]) > 8192) throw fail();
+            used = true;
+            try {
+              const result = await client.query(sql, [...values]);
+              active(context.signal);
+              if (closed || !fresh()) throw fail();
+              return { rows: result.rows };
+            } catch { throw fail(); }
+          } });
+        } catch {
+          context.signal.removeEventListener("abort", abort);
+          await end(); throw fail();
+        } finally {
+          config.password = undefined; owned.password = undefined; owned.connectionParameters.password = undefined;
+        }
+    } });
   };
 }
 

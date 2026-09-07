@@ -101,8 +101,10 @@ describe("job-status PostgreSQL source boundary",()=>{
 
 describe("exclusive PostgreSQL issuer control connection",()=>{
   function control(){
-    const loadCredential=vi.fn(async()=>({projectRef:REF,password:"SYNTHETIC_CONTROL_PASSWORD",expiresAt:new Date(Date.now()+60000).toISOString()}));
-    const open=createJobStatusPgControlOpener({projectRef:REF,ca,loadCredential});
+    const loadCredential=vi.fn(async()=>({projectRef:REF,password:"SYNTHETIC_CONTROL_PASSWORD",deliveryExpiresAt:new Date(Date.now()+60000).toISOString()}));
+    const open=createJobStatusPgControlOpener({projectRef:REF,ca,
+      consumeCredential: async (_context, consumer) => consumer({ ...await loadCredential(),
+        credentialClass:"STATIC_SUPABASE_BRANCH_ADMIN_PASSWORD", sourceExpiresAt:null, sourceRevocation:"BRANCH_DELETE_OR_PASSWORD_RESET" }) });
     return {open,loadCredential};
   }
   const ctx=()=>({signal:new AbortController().signal});
@@ -121,7 +123,7 @@ describe("exclusive PostgreSQL issuer control connection",()=>{
   });
   it.each(["wrong ref","expired"])("denies %s custody before connecting",async mode=>{
     const h=control();h.loadCredential.mockResolvedValue({projectRef:mode==="wrong ref"?"zyxwvutsrqponmlkjihgf":REF,
-      password:"SYNTHETIC_CONTROL_PASSWORD",expiresAt:new Date(Date.now()+(mode==="expired"?-1000:60000)).toISOString()});
+      password:"SYNTHETIC_CONTROL_PASSWORD",deliveryExpiresAt:new Date(Date.now()+(mode==="expired"?-1000:60000)).toISOString()});
     await expect(h.open(ctx())).rejects.toThrow();expect(state.configs).toEqual([]);
   });
   it.each(["tls","major","operator","prepared"])("denies %s posture before issuer SQL",async mode=>{

@@ -46,6 +46,9 @@ const forbiddenMarkers = [
   "careslink-job-status-single-use",
   "careslink-job-status-control-only",
   "Job status Preview issuer unavailable",
+  "Job status managed custody unavailable",
+  "Job status credential custody unavailable",
+  "careslink-preview-runtime-credential-broker-management",
 ];
 
 if (!existsSync(buildIdPath) || !existsSync(chunksRoot)) {

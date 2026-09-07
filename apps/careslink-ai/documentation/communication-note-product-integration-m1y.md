@@ -626,3 +626,72 @@ integration gate. Review and promote the candidate into an explicit new manifest
 only as part of that gate; do not silently extend the previous 47-migration
 approval. Real GoTrue/browser Cookie checks, Hosted PG17/TLS, read-only security
 advisors, resource creation and formal activation remain separately bounded.
+
+## Managed custody wiring and recovery gate preparation — 2026-09-07
+
+The new `communication-note-job-status-custody.server.ts` connects the existing
+M1u workload verification, source-manifest verification, managed HMAC, OAuth
+custody and pinned-CA/password custody protocols to the dedicated issuer and
+Cookie/session recovery composition. Its GCP dependency is still explicitly
+injected and source-only; the formal GCP factory and formal GET remain off.
+There is no automatic credential discovery, exported HMAC key, new secret,
+cloud connection, source-manifest signing or deployment in this batch.
+
+The former raw-return token/password loaders have been removed. The fixed
+branch-list request executes inside OAuth custody's callback; the control
+connection opens inside database custody's callback. A single-consumption
+ownership helper rejects absent/duplicate/unawaited callbacks, observes late
+rejections, denies late secret delivery and closes late physical results after
+cancellation or custody failure. It does not claim secure erasure of immutable
+JavaScript strings. Both connectors continue using the same validated target/CA.
+
+The project-ref binding now uses M1u's managed HMAC port rather than returning a
+KMS key to application code. Every control operation creates and verifies a new
+workload/custody bundle, including fence/finalize on the resolver's independent
+cleanup signal after request cancellation. Existing M1u bundles require their
+original root signal, so reusing the aborted request bundle would be invalid.
+The control connection uses the exact existing custody-approved management
+application name and retains the one-fixed-autocommit-RPC restriction.
+
+Credential lifetime is explicit: the source is a
+`STATIC_SUPABASE_BRANCH_ADMIN_PASSWORD`, has `sourceExpiresAt:null` and requires
+branch deletion or password reset for revocation. Its unique callback delivery
+is capped at 60 seconds; the physical control connection is capped at 10 seconds
+and hard-closed on cancellation. Neither limit revokes the static password.
+This is separate from the issued runtime role's SCRAM/NOLOGIN/fence lifecycle.
+No database role, grant or migration definition changed in this batch.
+
+Local evidence: the existing real M1u adapter implementation now participates
+in 13 new wiring cases. Synthetic external WIF/KMS/Secret Manager/HTTP responses
+exercise successful target resolution, fresh cleanup custody, callback-only
+static-password delivery, WIF/manifest/CRC/scope/CA failures, bundle reuse denial
+and HTTP gate/anonymous/revoked/wrong-target/provider-failure ordering. Eight
+ownership-helper cases cover cancellation, duplicate/absent/unawaited delivery
+and late resource disposal. The issuer has 26 tests; the physical PG17 control
+connector remains mock-tested, not Hosted-verified.
+
+Full regression passed **4,138 tests, 12 separately selected skips, 271 files**.
+The owned real PG16 runner passed all 18 scenario groups and 12/12 source issuer
+tests, and reported `cleanup:{stopped:true,removed:true}`. TypeScript, zero-warning
+lint, webpack (64/64 pages), the client-boundary scan and adapter sync passed.
+These layers are not a browser-to-GCP-to-Hosted-PG17 end-to-end pass. Green UI,
+Logo, Points, AI generation and Production are unchanged.
+
+### Exact next recovery integration gate (prepared, not executed)
+
+1. Use the existing green job page and only synthetic Communication Note jobs.
+   Connect the actual client/HTTP composition in an explicitly test-only local
+   harness; do not add a formal-route fixture or enable runtime flags by default.
+2. Prove reload/close-reopen of the same job URL, queued/running polling,
+   success-to-saved-draft navigation, failed/cancelled states, offline recovery,
+   expired/revoked login and foreign-owner denial. A refresh is a read, never a
+   second generation request, new job, payload write or Points operation.
+3. Keep real browser evidence distinct from jsdom/in-process evidence. Browser
+   cookies against real GoTrue, live workload/secret custody and direct PG17/TLS
+   still need a separately authorized no-data Hosted gate and read-only advisors.
+   The existing approved check-only manifest is still exactly 47 migrations.
+   The unchanged candidate remains outside it:
+   `20260907083608_add_communication_note_job_status_issuer.sql`, SHA-256
+   `8e737fa2eade9b3a20a1f55d9eda90c25a7192db05cfda426e9e1059057b85a5`.
+   Review a new explicit manifest before promotion; no new gate is authorized
+   merely by this checklist.

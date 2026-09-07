@@ -2,11 +2,14 @@ import { createHash } from "node:crypto";
 import { createRequire } from "node:module";
 import { readFileSync } from "node:fs";
 
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 
 import * as gcpAdapters from "./communication-note-preview-product-runtime-gcp-adapters.server";
+import { createJobStatusManagedCustodyFactory, createJobStatusCustodiedRecoveryComposition,
+  JOB_STATUS_CUSTODIED_RECOVERY_READY } from "./communication-note-job-status-custody.server";
+import { createJobStatusPreviewIssuerService } from "./communication-note-job-status-preview-issuer.server";
 
 const crc32c = createRequire(import.meta.url)("fast-crc32c") as Readonly<{
   calculate(data: Uint8Array): number;
@@ -71,6 +74,107 @@ const MANIFEST_MAC = createHash("sha256")
 const FIXED_FAILURE = Object.freeze({
   code: "PRODUCT_API_DISABLED",
   message: "Communication Note preview GCP provider adapters are unavailable",
+});
+
+// Actual M1u validation + new custody/issuer + HTTP principal composition.
+// WIF, KMS, Secret Manager and branch HTTP are synthetic; no physical PG here.
+describe("job recovery wiring through existing M1u custody protocols", () => {
+  afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
+  function wired() {
+    vi.spyOn(Date, "now").mockReturnValue(Date.parse(NOW));
+    const h = validHarness();
+    const contexts: AbortSignal[] = [];
+    const createGcpBundle = vi.fn(async (context: { signal: AbortSignal }) => {
+      contexts.push(context.signal);
+      return gcpAdapters.createTestOnlyCaresLinkV1CommunicationNotePreviewProductRuntimeGcpAdapters(h.options, context);
+    });
+    const config = { projectRef: TARGET_PROJECT_REF, expectedCaSha256: CA_SHA256,
+      sourceRevisionSha256: SOURCE_REVISION_SHA256, sourceManifestSha256: SOURCE_MANIFEST_SHA256,
+      oauthAppReferenceSha256: OAUTH_APP_REFERENCE_SHA256, oauthGrantReferenceSha256: OAUTH_GRANT_REFERENCE_SHA256,
+      createGcpBundle };
+    const branch = { id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", project_ref: TARGET_PROJECT_REF,
+      parent_project_ref: "adocsnwnslxhxcjgbyee", is_default: false, persistent: false, with_data: false,
+      status: "FUNCTIONS_DEPLOYED", preview_project_status: "ACTIVE_HEALTHY", deletion_scheduled_at: null };
+    const fetchMock = vi.fn(async () => {
+      const response = new Response(JSON.stringify([branch]), { headers: { "content-type": "application/json" } });
+      Object.defineProperty(response, "url", { value: "https://api.supabase.com/v1/projects/adocsnwnslxhxcjgbyee/branches" });
+      return response;
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const createCustody = createJobStatusManagedCustodyFactory(config);
+    return { h, config, contexts, createGcpBundle, fetchMock, createCustody,
+      issuer: createJobStatusPreviewIssuerService({ ...config, createCustody }) };
+  }
+  it("verifies workload/manifest, consumes OAuth, loads pinned CA and uses managed HMAC without exporting its key", async () => {
+    const w = wired(); const result = await w.issuer.resolve(w.h.context);
+    expect(JOB_STATUS_CUSTODIED_RECOVERY_READY).toBe(false);
+    expect(w.h.events).toEqual(["oidc", "wif", "manifest"]);
+    expect(w.h.accessSecretVersion.mock.calls.map(call => (call[0] as { name: string }).name)).toEqual([MANAGEMENT_SECRET, CA_SECRET]);
+    expect(w.h.macSign).toHaveBeenCalledTimes(2);
+    expect(result.databaseTarget.targetProjectRefHmac).not.toBe(result.databaseTarget.productionProjectRefHmac);
+    expect(JSON.stringify(result)).not.toMatch(/accessToken|password|PRIVATE|CERTIFICATE|m1u-oauth/);
+    expect(w.fetchMock).toHaveBeenCalledOnce();
+  });
+  it("re-verifies a fresh cleanup scope after cancellation and delivers a static password only inside one callback", async () => {
+    const w = wired(), parent = new AbortController();
+    const result = await w.issuer.resolve({ signal: parent.signal }); parent.abort();
+    const cleanup = { signal: new AbortController().signal }, custody = await w.createCustody(cleanup);
+    const request = { projectRef: TARGET_PROJECT_REF, purpose: "JOB_STATUS_ISSUER_CONTROL_ONLY" as const, databaseTarget: result.databaseTarget };
+    const use = vi.fn(async (secret: unknown) => {
+      expect(secret).toMatchObject({ projectRef: TARGET_PROJECT_REF, password: DATABASE_PASSWORD,
+        credentialClass: "STATIC_SUPABASE_BRANCH_ADMIN_PASSWORD", sourceExpiresAt: null,
+        sourceRevocation: "BRANCH_DELETE_OR_PASSWORD_RESET", deliveryExpiresAt: "2026-09-01T12:01:00.000Z" });
+    });
+    await expect(custody.consumeDatabaseCredential(request, cleanup, use)).resolves.toBeUndefined();
+    expect(w.h.verifyAndExchange).toHaveBeenCalledTimes(2);
+    expect(w.contexts[0].aborted).toBe(true); expect(w.contexts[1]).toBe(cleanup.signal);
+    expect(w.h.accessSecretVersion).toHaveBeenLastCalledWith({ name: DATABASE_SECRET }, cleanup);
+    await expect(custody.consumeDatabaseCredential(request, cleanup, use)).rejects.toThrow(); expect(use).toHaveBeenCalledOnce();
+  });
+  it.each(["WIF", "manifest", "CRC", "OAuth scope", "CA pin"])("fails closed at %s without reading the database secret", async failure => {
+    const w = wired();
+    if (failure === "WIF") w.h.wifAccepted = false;
+    if (failure === "manifest") w.h.manifestAccepted = false;
+    if (failure === "CRC") w.h.badSecretCrc = true;
+    if (failure === "OAuth scope") w.h.secretValues.set(MANAGEMENT_SECRET, managementCredentialBytes({ oauthScope: "environment:write" }));
+    if (failure === "CA pin") w.h.secretValues.set(CA_SECRET, new TextEncoder().encode("WRONG_CA"));
+    await expect(w.issuer.resolve(w.h.context)).rejects.toThrow("Job status Preview issuer unavailable");
+    expect(w.h.accessSecretVersion.mock.calls.some(call => (call[0] as { name: string }).name === DATABASE_SECRET)).toBe(false);
+    if (failure !== "CA pin") expect(w.fetchMock).not.toHaveBeenCalled();
+  });
+  it("does not reuse a bundle already verified in an older context", async () => {
+    const w = wired(), bundle = await compose(w.h);
+    await bundle.workloadIdentityVerifierPort.verify(workloadRequest(), w.h.context);
+    w.createGcpBundle.mockResolvedValue(bundle);
+    await expect(w.issuer.resolve(w.h.context)).rejects.toThrow(); expect(w.fetchMock).not.toHaveBeenCalled();
+  });
+  it.each(["gate off", "anonymous", "revoked", "foreign ref", "provider failure"])("keeps HTTP %s ahead of unauthorized custody access", async failure => {
+    const w = wired(), jobId = "33333333-3333-4333-8333-333333333333";
+    const userId = "11111111-1111-4111-8111-111111111111", sessionId = "22222222-2222-4222-8222-222222222222";
+    const env = { CARESLINK_V1_PRODUCT_API_ENABLED: "true", CARESLINK_COMMUNICATION_NOTE_JOB_RECOVERY_ENABLED: failure === "gate off" ? "false" : "true",
+      CARESLINK_COMMUNICATION_NOTE_JOB_RECOVERY_EXPECTED_SUPABASE_REF: TARGET_PROJECT_REF,
+      CARESLINK_COMMUNICATION_NOTE_JOB_RECOVERY_EXPECTED_VERCEL_PROJECT_ID: PROJECT_ID,
+      VERCEL: "1", VERCEL_ENV: "preview", VERCEL_TARGET_ENV: "preview", VERCEL_PROJECT_ID: PROJECT_ID,
+      SUPABASE_URL: `https://${TARGET_PROJECT_REF}.supabase.co`, NEXT_PUBLIC_SUPABASE_URL: `https://${TARGET_PROJECT_REF}.supabase.co`,
+      SUPABASE_PUBLISHABLE_KEY: "sb_publishable_1234567890abcdef", NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "sb_publishable_1234567890abcdef" };
+    const createCookieAuthClient = vi.fn(async () => ({ auth: {
+      getClaims: async () => { w.h.events.push("claims"); return { data: { claims: failure === "anonymous" ? null : { sub: userId, session_id: sessionId } }, error: null }; },
+      getUser: async () => { w.h.events.push("user"); return { data: { user: { id: userId } }, error: null }; },
+    }, rpc: async () => { w.h.events.push("session"); return { data: failure === "revoked" ? "REVOKED" : "ACTIVE", error: null }; } }));
+    if (failure === "provider failure") w.h.wifAccepted = false;
+    const handle = createJobStatusCustodiedRecoveryComposition({ ...w.config, env, createCookieAuthClient,
+      ...(failure === "foreign ref" ? { projectRef: "bcdefghijklmnopqrstu" } : {}) });
+    if (failure === "gate off") { expect(handle).toBeUndefined(); expect(createCookieAuthClient).not.toHaveBeenCalled(); }
+    else {
+      const response = await handle!(new Request(`https://preview.example.invalid/api/ai-documents/communication-note/jobs/${jobId}`), jobId);
+      expect(response.status).toBe(["anonymous", "revoked"].includes(failure) ? 401 : 503);
+      expect(response.headers.get("cache-control")).toContain("no-store");
+      expect(await response.text()).not.toMatch(/PRIVATE|password|accessToken|m1u-oauth/);
+    }
+    if (failure === "provider failure") expect(w.h.events).toEqual(["claims", "session", "user", "oidc", "wif"]);
+    else expect(w.createGcpBundle).not.toHaveBeenCalled();
+    expect(w.h.accessSecretVersion).not.toHaveBeenCalled(); expect(w.fetchMock).not.toHaveBeenCalled();
+  });
 });
 
 describe("Communication Note M1u GCP provider adapters", () => {
