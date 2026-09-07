@@ -1,12 +1,13 @@
 import assert from "node:assert/strict";
 import { execFile, spawn } from "node:child_process";
-import { randomBytes } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import { mkdir, realpath, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import { setTimeout as delay } from "node:timers/promises";
 import pg from "pg";
 import { verifySelfReviewScenarios } from "../preview-e2e/communication-note-self-review-local-scenarios.mjs";
+import { verifyWordingEditScenarios } from "../preview-e2e/communication-note-edit-local-scenarios.mjs";
 
 const exec = promisify(execFile), childEnv = { PATH: "/usr/bin:/bin", LANG: "C", LC_ALL: "C" };
 const OWNER = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", SESSION = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
@@ -24,8 +25,10 @@ async function bounded(promise, milliseconds) {
 
 /** No existing URL/role/database inputs. The parent owns the one mkdtemp root
  * and removes it only after stop() proves this child exited. */
-export function createReviewBrowserDatabase(root) {
+export function createReviewBrowserDatabase(root, mode = "REVIEW") {
   assert.match(root, /^\/private\/tmp\/cl-job-browser-[a-zA-Z0-9]{6}$/u);
+  assert.ok(mode === "REVIEW" || mode === "EDIT");
+  const edit = mode === "EDIT";
   const base = join(root, "pg"), data = join(base, "data"), socket = join(base, "socket");
   let server, exited, owner, bootstrapMayBeRunning = false, closing = false;
   const clients = [], password = randomBytes(32).toString("hex");
@@ -38,7 +41,8 @@ export function createReviewBrowserDatabase(root) {
     catch (error) { await client.end(); throw error; }
   };
   return {
-    env: { CARESLINK_LOCAL_REVIEW_DATABASE: "OWNED_UNIX_SOCKET_ONLY", CARESLINK_LOCAL_REVIEW_PASSWORD: password },
+    env: { CARESLINK_LOCAL_REVIEW_DATABASE: "OWNED_UNIX_SOCKET_ONLY", CARESLINK_LOCAL_REVIEW_PASSWORD: password,
+      ...(edit ? { CARESLINK_LOCAL_EDIT_DATABASE: "OWNED_UNIX_SOCKET_ONLY" } : {}) },
     async start() {
       assert.equal(await realpath(root), root);
       let bin;
@@ -68,9 +72,27 @@ export function createReviewBrowserDatabase(root) {
       const passed = [];
       await verifySelfReviewScenarios(owner, await open(), await open(), passed, () => {});
       assert.equal(passed.length, 14);
+      if (edit) {
+        await verifyWordingEditScenarios(owner, await open(), await open(), passed, () => {});
+        assert.equal(passed.length, 33);
+      }
       // Reset only this just-created synthetic fixture after the full matrix.
       // The application LOGIN never receives this operator's privileges.
       await owner.query("delete from public.self_review_events");
+      if (edit) {
+        await owner.query("delete from public.ai_document_mutation_receipts");
+        await owner.query("delete from public.ai_document_sync_changes");
+        // Reset both synthetic documents before deleting newer revisions in
+        // reverse order; keep all FK/CHECK/RLS constraints enabled.
+        await owner.query(`update public.ai_documents d set current_revision_id=r.id,current_revision_number=1
+          from public.ai_document_revisions r where r.document_id=d.id and r.revision_number=1`);
+        const newer = (await owner.query("select id from public.ai_document_revisions where revision_number>1 order by revision_number desc")).rows;
+        for (const row of newer) await owner.query("delete from public.ai_document_revisions where id=$1", [row.id]);
+        await owner.query("update public.privacy_reviews set confirmed_at=statement_timestamp(),expires_at=statement_timestamp()+interval '30 minutes'");
+        await owner.query("grant usage on schema careslink_communication_edit to authenticated");
+        await owner.query("grant execute on function public.save_communication_note_wording(uuid,uuid,jsonb),careslink_communication_edit.save_wording(uuid,uuid,jsonb) to authenticated");
+        await owner.query("update public.communication_note_edit_flags set enabled=true");
+      }
       await owner.query("update public.ai_documents set current_revision_id=$2,current_revision_number=1 where id=$1", [REVIEW_DOC, REV]);
       await owner.query("delete from public.ai_document_revisions where id=$1 and document_id=$2", [REV2, REVIEW_DOC]);
       await owner.query(`create role ${RUNTIME} login noinherit nosuperuser nocreatedb nocreaterole noreplication nobypassrls password '${password}'`);
@@ -87,11 +109,24 @@ export function createReviewBrowserDatabase(root) {
       await runtime.query("commit");
       await runtime.end();
       console.log(JSON.stringify({ stage: "review-database-ready", postgresMajor: 16, matrixPassed: passed.length,
-        unixOnly: true, runtimePrivileged: false, authSynthetic: true, hostedVerified: false }));
+        unixOnly: true, runtimePrivileged: false, authSynthetic: true, hostedVerified: false, edit }));
     },
     async command(command) {
       assert.ok(owner); assert.equal(closing, false);
-      if (command === "advance") {
+      if (command === "advance" && edit) {
+        // Simulate a second editor through the real narrow RPC, not a direct
+        // document-pointer UPDATE. The stdin operator never accepts user SQL.
+        await owner.query("begin");await owner.query("set local role authenticated");
+        await owner.query("select set_config('request.jwt.claims',$1,true)", [JSON.stringify({ sub: OWNER,session_id: SESSION,
+          role: "authenticated",is_anonymous: false,exp: Math.floor(Date.now()/1000)+3600 })]);
+        const current = (await owner.query("select public.get_v1_shadow_document($1) as d", [REVIEW_DOC])).rows[0].d;
+        const base = current.revisions.find(r => r.revisionId === current.document.currentRevisionId);
+        assert.ok(base);
+        const update = { baseRevisionId: base.revisionId, englishDraft: base.content.englishDraft + " Synthetic concurrent update.",
+          reviewVersions: { "zh-Hans": base.content.reviewVersions["zh-Hans"] + " 合成并发修改。", "zh-Hant": base.content.reviewVersions["zh-Hant"] + " 合成並行修改。" }, wordingConfirmed: true };
+        await owner.query("select public.save_communication_note_wording($1,$2,$3::jsonb)", [REVIEW_DOC,randomUUID(),JSON.stringify(update)]);
+        await owner.query("commit");
+      } else if (command === "advance") {
         await owner.query("begin");
         await owner.query(`insert into public.ai_document_revisions(id,document_id,owner_user_id,revision_number,base_revision_id,
           privacy_review_id,content,content_hash,mutation_id,schema_version,contract_version)
@@ -106,6 +141,8 @@ export function createReviewBrowserDatabase(root) {
       } else if (command !== "status") throw new Error("FIXED_LOCAL_COMMAND_ONLY");
       const state = (await owner.query(`select
         (select count(*)::int from public.self_review_events) as review_events,
+        (select count(*)::int from public.ai_document_mutation_receipts) as edit_receipts,
+        (select count(*)::int from public.ai_document_sync_changes) as sync_changes,
         (select current_revision_number from public.ai_documents where id=$1) as revision,
         exists(select 1 from auth.sessions where id=$2) as session_active,
         (select count(*)::int from public.point_ledger_entries) as points_entries,
@@ -114,6 +151,13 @@ export function createReviewBrowserDatabase(root) {
     },
     async stop() {
       closing = true;
+      if (edit && owner) {
+        // Best effort only; shutdown still runs if initialization failed. The
+        // whole owned database is removed after process-exit proof regardless.
+        await owner.query("rollback").catch(() => {});
+        await owner.query("revoke execute on function public.save_communication_note_wording(uuid,uuid,jsonb),careslink_communication_edit.save_wording(uuid,uuid,jsonb) from authenticated").catch(() => {});
+        await owner.query("revoke usage on schema careslink_communication_edit from authenticated").catch(() => {});
+      }
       await Promise.allSettled(clients.map(c => bounded(c.end(), 7000)));
       if (server?.pid) {
         server.kill("SIGINT");

@@ -1296,3 +1296,82 @@ owned local editor browser fixture. Verify edit → one persisted new revision �
 fresh review → reload, plus stale/revoked save rejection, then clean up. Keep
 formal binding, candidate promotion and Hosted activation off. Export and the
 remaining Note-type application flows are still separate outstanding work.
+
+### Wording editor / real local database roundtrip (2026-09-08)
+
+The previous next step now has a built browser-to-PostgreSQL roundtrip. The
+formal revision route remains unbound/503. Only the temporary fixture composes
+the existing page, edit handler, durable writer, independent read and self-review
+paths. The approved green styling, Logo and three-language presentation did not
+change. No candidate SQL, approved migration, runtime flag or Hosted ACL changed.
+
+The handler accepts an explicit injected writer after its existing transport,
+Cookie DOCUMENT_WRITE, body, base revision, facts and privacy checks. It validates
+the exact receipt again and never falls through to generic append or memory on
+a failed, malformed, lost or aborted durable result. The local composition shares
+one synthetic Cookie client between authorization, read and write. Its additional
+owned-root edit guard admits only the three fixed parameters of the narrow edit
+RPC. Every RPC uses a fresh unprivileged LOGIN connection, transaction-local
+authenticated role/claims and the private Unix socket; draft text is not logged.
+
+Reproduce from the app directory:
+
+```sh
+node scripts/browser-e2e/communication-note-recovery.mjs --database-edit
+```
+
+This built-only mode first passes **33 PG16 scenario groups (14 review + 19
+edit)**, then resets only its new synthetic data with FK/CHECK/RLS constraints
+still enabled. The existing memory-only `--edit` and review-only
+`--database-review` modes remain separate. Fixed stdin controls are `status`,
+`advance`, `revoke` and `restore`; in edit mode `advance` represents a second
+editor through the real narrow RPC, not a direct current-pointer update.
+
+One owned run, `/private/tmp/cl-job-browser-V9PNag`, supplied this evidence:
+
+- Reviewed revision 1 → three-text wording edit → HTTP 200 and exactly one
+  persisted revision 2, one mutation receipt and one sync entry. Source facts
+  stayed fixed and the new revision required a fresh review.
+- Fresh three-checkbox confirmation → second review event → browser reload
+  independently read the same saved wording and CONFIRMED status. The permanent
+  draft notice remained visible. Historical revision 1 retained its original
+  wording and exposed no edit/review controls.
+- A second-editor RPC committed revision 3 while the browser still edited
+  revision 2. The stale save returned 409 and froze the form without applying
+  its text. An independent dedicated tab read revision 3 and the concurrent
+  wording, not the rejected stale text.
+- Deleting the fixed synthetic session before a later save returned 401. The
+  page cleared its private edit fields and navigated to the synthetic sign-in
+  boundary without an unload dialog. Final aggregate readback remained revision
+  3, two edit receipts, two sync entries and two review events, with the session
+  absent and zero Points ledger entries or generation jobs.
+
+**Remaining browser limitation:** clicking the stale form's “open current
+version” link triggered a browser-control timeout around its native unsaved-change
+confirmation; subsequent scoped inspection also timed out. That confirmation /
+navigation is not a passed gate. A second dedicated local tab was used only for
+independent current-version readback and the revoked-session test. No unrelated
+Safari or native app surface was inspected. The successful-flow screenshots
+were inspected at the unchanged desktop viewport; scoped warning/error logs on
+the normal flow and final sign-in tab were empty. No new responsive or real
+Offline/Online evidence is claimed.
+
+Both owned tabs closed. Shutdown reported database stopped, temporary root
+removed and formal source hashes unchanged; an independent check confirmed the
+exact root absent and port 3395 no longer listening. Only disposable synthetic
+test data was removed; it was not retained for recovery.
+
+Verification: **121/121 focused tests**, full **4,379 passed / 12 skipped in
+277 files (276 passed / 1 skipped)**, TypeScript, zero-warning lint, 64/64-page
+webpack build, 6/6-page fixture build, 109-chunk client-boundary scan and 73-file
+adapter sync passed. Auth issuance is synthetic; database Auth-session metadata,
+RLS, SQL transactions and persisted readback are real. This does not prove real
+Cookie/JWT issuance, Hosted GoTrue/PostgREST/TLS, whole-chain migration or runtime
+activation. No Hosted/Production operation, real care data, AI generation,
+Points mutation, push or deployment occurred.
+
+**Next:** implement the Communication Note Copy/TXT export slice against a
+specific saved revision, preserving the draft notice and required human-review
+boundary. Keep the native discard-confirmation interaction as an explicit
+pending browser acceptance item. Formal binding, candidate promotion, Hosted
+activation and the other four Note-type application flows remain separate work.

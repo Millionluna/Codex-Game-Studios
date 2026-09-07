@@ -10,8 +10,9 @@ const app = fileURLToPath(new URL("../../", import.meta.url));
 const port = 3395, host = "127.0.0.1";
 const prefix = "/private/tmp/cl-job-browser-";
 const args = process.argv.slice(2);
-if (args.length > 1 || (args.length === 1 && !["--built", "--database-review", "--edit"].includes(args[0]))) throw new Error("Use no argument, --built, --database-review or --edit for this local fixture");
-const databaseReview = args[0] === "--database-review";
+if (args.length > 1 || (args.length === 1 && !["--built", "--database-review", "--edit", "--database-edit"].includes(args[0]))) throw new Error("Use no argument, --built, --database-review, --edit or --database-edit for this local fixture");
+const databaseEdit = args[0] === "--database-edit";
+const databaseReview = args[0] === "--database-review" || databaseEdit;
 const built = args[0] === "--built" || databaseReview || args[0] === "--edit";
 const edit = args[0] === "--edit";
 let root, child, reviewDatabase, controls, stopped = false;
@@ -59,7 +60,7 @@ try {
   for (const path of tracked) sourceHashes.set(path, await readFile(join(app, path), "utf8"));
   root = await mkdtemp(prefix);
   if (databaseReview) {
-    reviewDatabase = createReviewBrowserDatabase(root);
+    reviewDatabase = createReviewBrowserDatabase(root, databaseEdit ? "EDIT" : "REVIEW");
     await reviewDatabase.start();
   }
   await copy("src/lib", "src/lib"); await copy("src/components", "src/components");
@@ -111,7 +112,7 @@ export default function FixtureControls() { return <main style={{padding:32}}>
 <a href={"/ai-documents/communication-note/jobs/"+JOB+"?lang=en"}>Open current job</a></main>; }
 `);
   if (databaseReview) await emit("src/app/page.tsx", `export default function ReviewDatabaseFixture() { return <main style={{padding:32}}>
-<h1>Local database review test</h1><p>Real local PostgreSQL storage; synthetic identity and draft only. No Hosted Auth, AI or Points.</p>
+<h1>Local database ${databaseEdit ? "edit and review" : "review"} test</h1><p>Real local PostgreSQL storage; synthetic identity and draft only. No Hosted Auth, AI or Points.</p>
 <p><a href="/ai-documents/communication-note/documents/${REVIEW_DOC}?lang=zh-Hans">打开简体中文复核页</a></p>
 <p><a href="/ai-documents/communication-note/documents/${REVIEW_DOC}?lang=en">Open English review</a></p>
 <p><a href="/ai-documents/communication-note/documents/${REVIEW_DOC}?lang=zh-Hant">開啟繁體中文複核頁</a></p>
@@ -143,6 +144,10 @@ export async function POST(request: Request, context: { params: Promise<{ docume
   if (edit) await emit("src/app/api/ai-documents/communication-note/documents/[documentId]/revisions/route.ts", `import { saveEditFixtureDocument } from "@/lib/__edit-fixture";
 export const dynamic = "force-dynamic";
 export async function POST(request: Request, context: { params: Promise<{ documentId: string }> }) { return saveEditFixtureDocument(request, (await context.params).documentId); }`);
+  if (databaseEdit) await emit("src/app/api/ai-documents/communication-note/documents/[documentId]/revisions/route.ts", `import { saveEditDatabaseDocument } from "@/lib/__review-database-fixture";
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+export async function POST(request: Request, context: { params: Promise<{ documentId: string }> }) { return saveEditDatabaseDocument(request, (await context.params).documentId); }`);
   await emit("src/app/auth/login/page.tsx", `export default function LoginFixture() { return <main style={{padding:32}}>
 <h1>Sign-in required</h1><p>Local synthetic login boundary. No real credentials are accepted.</p><a href="/">Test controls</a></main>; }
 `);
@@ -166,7 +171,7 @@ export async function POST(request: Request, context: { params: Promise<{ docume
   if (stopped) process.exit(0);
   const completion = launch([...(built ? ["start"] : ["dev", "--webpack"]), "--hostname", host, "--port", String(port)]);
   console.log(JSON.stringify({ stage: "browser-fixture-start", root, url: `http://${host}:${port}`, built,
-    syntheticOnly: true, hostedVerified: false, databaseReview }));
+    syntheticOnly: true, hostedVerified: false, databaseReview, databaseEdit }));
   if (reviewDatabase) {
     controls = createInterface({ input: process.stdin, crlfDelay: Infinity });
     let queue = Promise.resolve();

@@ -6,12 +6,14 @@ import type { CaresLinkV1ProductApiRuntime } from "./v1/product-api-runtime.serv
 import { createCaresLinkV1ProductApiContentHash } from "./v1/product-api-memory";
 import { scanCaresLinkV1CleanedFacts } from "./v1/privacy-review-scanner.server";
 import { validateCaresLinkV1CleanedFacts } from "./v1/shared-contracts";
+import type { CommunicationNoteDurableEditInput } from "./communication-note-edit-durable.server";
 
 /** No default runtime, read-permission fallback or formal binding. The eventual
  * durable adapter must atomically enforce owner/session, writable lifecycle,
  * privacy, current base and full-command idempotency, including lock waits. */
 export async function handleCommunicationNoteEdit(request: Request, canonicalId: string, binding?: Readonly<{
   runtime: CaresLinkV1ProductApiRuntime; localFixtureOrigin?: "http://127.0.0.1:3395";
+  write?: (input: CommunicationNoteDurableEditInput) => Promise<CommunicationNoteEditResult>;
 }>) {
   const reply = (result: CommunicationNoteEditResult) => Response.json(result, { status: EDIT_HTTP_STATUS[result.status], headers: {
     "Cache-Control": "private, no-store, max-age=0", Vary: "Cookie, Authorization", "Referrer-Policy": "no-referrer",
@@ -54,6 +56,15 @@ export async function handleCommunicationNoteEdit(request: Request, canonicalId:
     if (contentHash === base.contentHash) return reply({ status: "INVALID_REQUEST" });
     if (scanCaresLinkV1CleanedFacts({ englishDraft: command.englishDraft, ...command.reviewVersions }).findings.length) return reply({ status: "PRIVACY_REVIEW_REQUIRED" });
     if (request.signal.aborted) return reply({ status: "UNAVAILABLE" });
+    if (binding.write) {
+      // Explicit injected writer only. A failed/uncertain durable command must
+      // never fall through to a generic append or the synthetic memory store.
+      const saved = await binding.write({ request, canonicalId, mutationId, command, baseRevisionNumber: base.revisionNumber });
+      if (request.signal.aborted) return reply({ status: "UNAVAILABLE" });
+      return reply(parseCommunicationNoteEditResult(saved, {
+        canonicalId, mutationId, baseRevisionId: base.revisionId, baseRevisionNumber: base.revisionNumber,
+      }) ?? { status: "UNAVAILABLE" });
+    }
     const saved = await api.appendDocumentRevision(canonicalId, { baseRevisionId: base.revisionId, content, contentHash,
       schemaVersion: base.schemaVersion, privacyReviewId: base.privacyReviewId }, { idempotencyKey: mutationId });
     if (request.signal.aborted || saved.document.canonicalId !== canonicalId || saved.document.noteType !== "communication" ||

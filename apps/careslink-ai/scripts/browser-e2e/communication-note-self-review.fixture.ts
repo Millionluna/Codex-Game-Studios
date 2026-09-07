@@ -10,6 +10,8 @@ import { handleCommunicationNoteDocumentRead } from "../../src/lib/communication
 import { resolveCaresLinkV1ProductApiAuth } from "../../src/lib/v1/product-api-auth.server";
 import { createCommunicationNoteGenerationCurrentSessionStatusResolver } from "../../src/lib/communication-note-generation-current-session.server";
 import { createSupabaseCaresLinkV1ProductApi, type CaresLinkV1SupabaseRpcResult } from "../../src/lib/v1/product-api-supabase.server";
+import { createCommunicationNoteDurableEditWriter } from "../../src/lib/communication-note-edit-durable.server";
+import { handleCommunicationNoteEdit } from "../../src/lib/communication-note-edit.server";
 
 export const REVIEW_DOC = "11111111-1111-4111-8111-111111111111";
 const OWNER = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", SESSION = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
@@ -27,7 +29,7 @@ export function assertReviewDatabaseFixture() {
   return root;
 }
 
-/** Only these three parameterized RPCs are reachable through the synthetic
+/** Only these parameterized RPCs are reachable through the synthetic
  * adapter. SQL names, owners, claims, socket and role are never request inputs. */
 export function reviewFixtureRpcCommand(name: string, args?: Readonly<Record<string, unknown>>) {
   const definitions: Record<string, { sql: string; keys: string[] }> = {
@@ -36,6 +38,11 @@ export function reviewFixtureRpcCommand(name: string, args?: Readonly<Record<str
     confirm_communication_note_self_review: { sql: "select public.confirm_communication_note_self_review($1,$2,$3,$4,$5,$6) as data",
       keys: ["p_document_id", "p_revision_id", "p_mutation_id", "p_facts_confirmed", "p_wording_confirmed", "p_missing_facts_reviewed"] },
   };
+  if (process.env.CARESLINK_LOCAL_EDIT_DATABASE === "OWNED_UNIX_SOCKET_ONLY") {
+    assertReviewDatabaseFixture();
+    definitions.save_communication_note_wording = { sql: "select public.save_communication_note_wording($1,$2,$3::jsonb) as data",
+      keys: ["p_document_id", "p_mutation_id", "p_command"] };
+  }
   const def = Object.hasOwn(definitions, name) ? definitions[name] : undefined;
   if (!def || (args !== undefined && (!args || typeof args !== "object" || Array.isArray(args))) ||
       Object.keys(args ?? {}).length !== def.keys.length || !def.keys.every(k => Object.hasOwn(args ?? {}, k))) throw new Error("Fixture RPC denied");
@@ -85,7 +92,7 @@ export async function createReviewDatabaseAuthClient() {
       } catch (error) {
         await client.query("rollback").catch(() => {});
         const e = error as { code?: string; message?: string };
-        const message = e.code === "P0001" && ["AUTH_REQUIRED", "SESSION_REVOKED", "NOT_FOUND", "STALE_REVISION", "INVALID_REQUEST"].includes(e.message ?? "") ? e.message! : "UNAVAILABLE";
+        const message = e.code === "P0001" && ["AUTH_REQUIRED", "SESSION_REVOKED", "NOT_FOUND", "STALE_REVISION", "INVALID_REQUEST", "PRIVACY_REVIEW_REQUIRED"].includes(e.message ?? "") ? e.message! : "UNAVAILABLE";
         console.log(JSON.stringify({ fixture: "review-postgres-rpc", operation: name, committed: false, status: message, checkpoint,
           errorCode: /^[A-Z0-9]{5}$/.test(e.code ?? "") ? e.code : "UNCLASSIFIED" }));
         return { data: null, error: { code: "P0001", message } };
@@ -114,5 +121,26 @@ export async function confirmReviewDatabaseDocument(request: Request, documentId
     write: createCommunicationNoteDurableSelfReviewWriter({ env, createCookieClient: createReviewDatabaseAuthClient }),
   });
   console.log(JSON.stringify({ fixture: "review-postgres-http", status: response.status }));
+  return response;
+}
+
+export async function saveEditDatabaseDocument(request: Request, documentId: string) {
+  assertReviewDatabaseFixture();
+  if (process.env.CARESLINK_LOCAL_EDIT_DATABASE !== "OWNED_UNIX_SOCKET_ONLY") return new Response(null, { status: 503 });
+  if (request.headers.get("host") !== "127.0.0.1:3395") return new Response(null, { status: 400 });
+  const incoming = new URL(request.url);
+  const local = new Request(new URL(incoming.pathname + incoming.search, "http://127.0.0.1:3395"), request);
+  const client = await createReviewDatabaseAuthClient();
+  const editEnv = { ...env, CARESLINK_COMMUNICATION_NOTE_EDIT_ENABLED: "true", CARESLINK_V1_PRODUCT_API_DOCUMENT_WRITE_ENABLED: "true" };
+  const response = await handleCommunicationNoteEdit(local, documentId, {
+    localFixtureOrigin: "http://127.0.0.1:3395",
+    runtime: {
+      resolveAuth: async r => resolveCaresLinkV1ProductApiAuth(r, { env: editEnv, createCookieAuthClient: async () => client,
+        resolveSessionStatus: createCommunicationNoteGenerationCurrentSessionStatusResolver(client) }),
+      getProductApi: async principal => createSupabaseCaresLinkV1ProductApi({ client, principal }),
+    },
+    write: createCommunicationNoteDurableEditWriter({ env: editEnv, createCookieClient: async () => client }),
+  });
+  console.log(JSON.stringify({ fixture: "edit-postgres-http", status: response.status }));
   return response;
 }

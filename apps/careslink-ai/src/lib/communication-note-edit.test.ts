@@ -24,6 +24,45 @@ async function setup() {
   const getProductApi = vi.fn(async () => api);
   return { state, api, binding: { runtime: { resolveAuth, getProductApi } } };
 }
+
+describe("explicit durable writer transport binding", () => {
+  const ack = { status: "SAVED", canonicalId: DOC, baseRevisionId: REV, revisionId: NEXT, revisionNumber: 2,
+    mutationId: KEY, saveState: "SERVER_ACKNOWLEDGED", selfReviewStatus: "REQUIRED", draftNotice: "Draft – review required" } as const;
+  it("passes only the validated command to an explicit writer and never generic append", async () => {
+    const f = await setup(), write = vi.fn(async () => ack), append = vi.spyOn(f.api, "appendDocumentRevision");
+    const r = request();const result = await handleCommunicationNoteEdit(r, DOC, { ...f.binding, write });
+    expect(result.status).toBe(200);expect(await result.json()).toEqual(ack);
+    expect(write).toHaveBeenCalledExactlyOnceWith({ request: r, canonicalId: DOC, mutationId: KEY, command: body, baseRevisionNumber: 1 });
+    expect(append).not.toHaveBeenCalled();expect((await f.api.getDocument(DOC)).revisions).toHaveLength(1);
+  });
+  it.each(["UNAVAILABLE", "AUTH_REQUIRED", "NOT_FOUND", "STALE_REVISION", "PRIVACY_REVIEW_REQUIRED"] as const)("never falls back after %s", async status => {
+    const f = await setup(), append = vi.spyOn(f.api, "appendDocumentRevision"), write = vi.fn(async () => ({ status }));
+    const result = await handleCommunicationNoteEdit(request(), DOC, { ...f.binding, write });
+    expect(await result.json()).toEqual({ status });expect(write).toHaveBeenCalledTimes(1);expect(append).not.toHaveBeenCalled();
+  });
+  it.each([{ ...ack, canonicalId: NEXT }, { ...ack, mutationId: NEXT }, { ...ack, revisionNumber: 9 },
+    { ...ack, selfReviewStatus: "CONFIRMED" }, { ...ack, draftText: "private" }])("revalidates the bound writer receipt", async saved => {
+    const f = await setup(), append = vi.spyOn(f.api, "appendDocumentRevision");
+    const response = await handleCommunicationNoteEdit(request(), DOC, { ...f.binding, write: async () => saved as never });
+    expect(response.status).toBe(503);expect(await response.json()).toEqual({ status: "UNAVAILABLE" });expect(append).not.toHaveBeenCalled();
+  });
+  it("does not invoke the writer before valid origin/Auth/body/current-base checks", async () => {
+    const f = await setup(), write = vi.fn(async () => ack);
+    expect((await handleCommunicationNoteEdit(request(body, { origin: "https://foreign.test" }), DOC, { ...f.binding, write })).status).toBe(400);
+    expect((await handleCommunicationNoteEdit(request({ ...body, baseRevisionId: NEXT }), DOC, { ...f.binding, write })).status).toBe(409);
+    f.binding.runtime.resolveAuth.mockResolvedValue({ ok: false, status: 401, reason: "auth_required" });
+    const r = request();expect((await handleCommunicationNoteEdit(r, DOC, { ...f.binding, write })).status).toBe(401);
+    expect(r.bodyUsed).toBe(false);expect(write).not.toHaveBeenCalled();
+  });
+  it("treats writer throws or post-commit abort as uncertain without fallback", async () => {
+    const f = await setup(), append = vi.spyOn(f.api, "appendDocumentRevision"), controller = new AbortController();
+    const thrown = await handleCommunicationNoteEdit(request(), DOC, { ...f.binding, write: async () => { throw new Error("private backend"); } });
+    expect(thrown.status).toBe(503);expect(await thrown.json()).toEqual({ status: "UNAVAILABLE" });
+    const aborted = await handleCommunicationNoteEdit(new Request(request(), { signal: controller.signal }), DOC,
+      { ...f.binding, write: async () => { controller.abort();return ack; } });
+    expect(aborted.status).toBe(503);expect(append).not.toHaveBeenCalled();
+  });
+});
 const ack = { status: "SAVED", canonicalId: DOC, baseRevisionId: REV, revisionId: NEXT, revisionNumber: 2,
   mutationId: KEY, saveState: "SERVER_ACKNOWLEDGED", selfReviewStatus: "REQUIRED", draftNotice: "Draft – review required" } as const;
 const expected = { canonicalId: DOC, baseRevisionId: REV, mutationId: KEY, baseRevisionNumber: 1 };
