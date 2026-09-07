@@ -1471,3 +1471,78 @@ profile. Keep native Safari copy/TXT acceptance, native discard-confirmation
 navigation and real Offline/Online checks explicitly pending. PDF, bilingual
 review export, historical review evidence, batch export, durable export history,
 native sharing and Hosted activation are separate remaining work.
+
+## Communication Note DOCX Record copy (2026-09-08)
+
+The current self-reviewed Communication Note now has **Download DOCX** alongside
+Copy/TXT, with explicit English, Simplified Chinese and Traditional Chinese UI.
+The approved green UI, logo and typography are unchanged. Editing hides exports;
+unreviewed and historical versions remain disabled. Each click reuses the exact
+revision's fresh private Cookie read; stale revision, review reset, revoked
+session, not-found and aborted reads never fall back to the displayed copy.
+
+`communication-note-export-docx.ts` consumes the existing minimal Record copy
+payload and retains its template `communication-record-text.2026-09-08.1`, profile,
+wording and field order. Word paragraphs represent LF/CRLF/CR line breaks and
+native tabs preserve tab characters. XML-invalid characters are rejected across
+all formats, not silently replaced. The file contains English Note text and the
+same fixed version/time/language/draft/static-copy notices, with the draft notice
+also repeated in the page header. It contains no review translations, private
+checks, source facts, Points, model metadata, participant-based filename,
+external relationship, macro, embedded image or provider/owner author metadata.
+The custom properties contain only the public export template/profile identifiers.
+
+The `docx` dependency is pinned to **9.7.1** in the pnpm lockfile and loaded only
+after the DOCX action's successful fresh read. Its supported browser ArrayBuffer
+packer is used rather than a custom ZIP writer
+([official Packer API](https://docx.js.org/api/classes/Packer.html)). The browser
+checks cancellation before loading, before/after packing and before download.
+TXT and DOCX share local Blob cleanup: 60 seconds, access loss, unmount, replacement
+or failed click. A download-start message is not a saved-file receipt. No export
+API, persistent byte cache, database write, lifecycle/self-review mutation,
+Points charge, model call, public link, Hosted/Production change, push or deployment
+was added. PDF is not implemented by this batch.
+
+Verification:
+
+- **110 focused tests** and the full **4,468 passed / 12 skipped across 280 files
+  (279 passed / 1 skipped)** cover byte/field parity, independent ZIP/DEFLATE and
+  XML parsing, Unicode/tabs/spaces, long text, private-field exclusion, safe
+  filenames, packer failure, exact access/revision/review denial, duplicate
+  actions, cancellation, retry, Blob MIME/TTL/cleanup and all three locales.
+- TypeScript, zero-warning lint, 64/64-page webpack build, 111-chunk private-client
+  boundary scan and 73-file adapter sync passed. The final extra historical-DOCX
+  assertion changed tests only and passed the final full regression.
+- The actual product renderer, including pinned docx 9.7.1, was bundled by the
+  existing Vite toolchain into an isolated QA directory and executed with the
+  bundled Node runtime. A short Unicode fixture (one page) and a long fixture
+  (three pages) were rendered by the packaged LibreOffice renderer and **all four
+  final page images** inspected. Independent Python ZIP CRC, python-docx complete
+  paragraph parity and PDF text/page/header checks passed. Rendered PDFs are QA
+  intermediates, not evidence of a product PDF export feature.
+- The initial renderer environment omitted Chinese glyphs despite intact DOCX
+  text. A task-local Fontconfig file exposed existing macOS CJK/emoji fonts to
+  the bundled renderer; the same DOCX then rendered Chinese/emoji correctly.
+  No fonts were installed, embedded or uploaded, no desktop LibreOffice was
+  used and no app wording was rewritten. Earlier fixture-build/missing-input
+  diagnostic failures are not counted as verification passes. Cross-machine
+  font substitution and native Microsoft Word opening still require acceptance.
+- One 6/6-page built, PROCESS_MEMORY_ONLY fixture at
+  `/private/tmp/cl-job-browser-euLBVO` proved disabled-before-review → confirmed
+  review → actual client DOCX-start feedback, all three locale controls, 44-pixel
+  targets and visible keyboard focus. Inspected 390×844, 768×1024 and 1280×900
+  layouts had equal client/scroll widths; scoped warning/error logs were empty.
+  This verifies browser execution, not native delivery or a real database.
+- The dedicated tab was closed and viewport reset. The fixture reported stopped,
+  removed and source unchanged; independent checks found its exact root absent
+  and port 3395 closed. Only its disposable synthetic state was removed.
+
+Documents guidance drove real-file pagination/Unicode verification; Next.js,
+React and Impeccable guidance kept lazy loading, action state and the existing
+button/visual conventions intact.
+
+**Next:** implement PDF export using the same revision-bound minimal profile.
+Keep native Safari Copy/TXT/DOCX save/open, actual Microsoft Word compatibility,
+native discard-confirmation navigation and real Offline/Online acceptance pending.
+Bilingual/historical review export, batch export, durable export history, native
+sharing, other Note applications and Hosted activation remain separate work.

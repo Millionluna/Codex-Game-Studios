@@ -4489,6 +4489,39 @@ See the [database editor record](communication-note-product-integration-m1y.md#w
 
 See the [Copy/TXT implementation record](communication-note-product-integration-m1y.md#communication-note-copy--txt-record-copy-2026-09-08).
 
+### Communication Note DOCX Record copy (2026-09-08)
+
+- Current reviewed revision only, reusing the exact fresh Cookie read, minimal
+  English Record copy and template shared with Copy/TXT. The new dependency
+  `docx@9.7.1` is lazy-loaded after authorization; invalid XML text is rejected
+  consistently. No public URL, export API, persistent bytes or business write.
+- **110 focused tests** cover independent ZIP/DEFLATE/XML parsing, shared text
+  order, Unicode/tabs/spaces, long text, no internal fields/author identity or
+  external relationships, safe filename/MIME, denial/abort/retry, duplicate
+  clicks, historical disablement and 60-second Blob URL cleanup.
+- Final full regression: **4,468 passed / 12 skipped**, 280 files (279 passed /
+  1 skipped). TypeScript, zero-warning lint, 64/64-page webpack build, 111-chunk
+  private-client scan and 73-file adapter check passed. The final historical
+  test assertion postdated the build and changed no production source.
+- Actual product-code DOCX samples passed independent CRC and python-docx
+  paragraph parity checks. Packaged LibreOffice rendered one Unicode page and
+  three long-record pages; all final pages were inspected. Task-local Fontconfig
+  exposed existing system CJK/emoji fonts after the initial render omitted
+  Chinese glyphs. PDF text extraction confirmed Chinese, all 30 long-record
+  paragraphs and the draft notice on each page. These QA PDFs are not a product
+  PDF export feature or a native Word compatibility pass.
+- Built synthetic memory fixture `/private/tmp/cl-job-browser-euLBVO` passed
+  unreviewed disablement, review → real DOCX-start feedback, three locales,
+  390/768/1280-width layout, 44-pixel buttons and keyboard focus; console warnings
+  and errors were empty. Owned tab/viewport/server/root were cleaned, source
+  hashes unchanged and port closed. No real database/Hosted/AI/Points operation.
+- Native Safari Copy/TXT/DOCX delivery and Microsoft Word opening remain
+  **unpassed**, alongside earlier discard-confirmation and real Offline/Online
+  items. Next implementation: PDF; bilingual/historical/batch exports, durable
+  history, native sharing and Hosted activation remain open.
+
+See the [DOCX implementation record](communication-note-product-integration-m1y.md#communication-note-docx-record-copy-2026-09-08).
+
 ### Current live/read-only evidence
 
 - Supabase migrations, tables, RLS flags, policies, grants, function grants and aggregate row counts were checked read-only.
@@ -4561,7 +4594,7 @@ The following suites are required before the corresponding V1 slice can be calle
 1. The native App exists in a separate repository and is outside this task; this AI repository does not execute or attest its iOS/Android, offline, purchase or store gates.
 2. The OpenAPI/TypeScript contract and default-off durable `/v1` route adapter now exist, but there is no Preview- or Production-served Product API, generated client package, schema registry or previous-version compatibility fixture.
 3. The registration-retention source worktree passed its historical 1,381 tests across 125 files and all three focused migration contracts 39/39, with the `r21` 1,377-test / 124-file result, the `r9` 1,337-test / 122-file result and earlier baselines retained. The strict-local harness batch subsequently passed 1,400 tests across the same 125 files. All five Note types share a Production-unapplied private metadata/RPC layer with nine worker RPC identities, three newer owner RPC identities and one separately owned graceful-retirement control identity, but no caller execute grant. Deleted PostgreSQL 17.6 disposable `r9` proved the exact 14-migration, seven-suite and independent postcheck gate; deleted `r20` closed the PostgreSQL 17.6 true two-session claim/session/privacy race gate; deleted `r21` closed Attempt 1 historical replay across Attempt 2 success and post-purge state; deleted `r22` closed the hosted registration historical-retention gate with the exact 15/15 manifest, 7/7 suites and independent postcheck. The earlier disposable local PostgreSQL 16.15 gate closed its recorded engine, serial and true-two-session path with 27/27 repository migrations, exact V1 15/15, 7/7 suites and 3/3 races. The later owner-runtime PG16.15 run passed the new owner, additive-aware worker and durable rollback suites, independent posture postcheck and auth-session lock-wait race; #1-#24 and #26-#28 applied non-super, including fresh exact final #28, while #25 remained an explicit bootstrap-superuser transition. Migration #29 supplies graceful retirement with 14 forced-RLS tables. Its local strict rollback assertion passed inside the final clean 29/29 migration, 9/9 aggregate, independent posture and two-ordering retirement/claim race gate. Deleted Hosted r5 subsequently passed the exact 30/30 migration manifest, all 11 rollback suites and the independent owner/role/RLS/ACL/hard-off/zero-fixture postcheck. No worker/owner Preview or local cluster is retained. The five types still lack emergency revocation, attempt listing, a deployed worker, nested exact-key database vectors, account-delete/purge and orphan recovery, provider-start binding, safe sequential numeric parsing, real vault/KMS/retention, caller credentials/grants/routes, hosted GoTrue/PostgREST, real provider/model/STT integration and complete per-type golden sets; runtime activation remains open.
-4. Canonical document/revision/checkpoint states exist as memory/domain contracts plus historical isolated schema/RPC evidence and a Production-unapplied mobile-sync migration draft that was clean-applied only on a deleted disposable branch. Communication Note now has a local result renderer, a synthetic-memory wording editor, real-local-PostgreSQL self-review/edit browser roundtrip, an uninstalled durable wording-edit candidate with real local concurrency tests, and a minimal current-reviewed-revision Copy/TXT profile. Actual native paste/TXT delivery and native discard-confirmation navigation remain pending browser acceptance items. There is still no formal durable edit activation, retained schema activation, DOCX/PDF/bilingual/historical export, durable export-event history or cross-device recovery E2E.
+4. Canonical document/revision/checkpoint states exist as memory/domain contracts plus historical isolated schema/RPC evidence and a Production-unapplied mobile-sync migration draft that was clean-applied only on a deleted disposable branch. Communication Note now has a local result renderer, a synthetic-memory wording editor, real-local-PostgreSQL self-review/edit browser roundtrip, an uninstalled durable wording-edit candidate with real local concurrency tests, and a minimal current-reviewed-revision Copy/TXT/DOCX profile. Actual native paste/TXT/DOCX delivery, Microsoft Word compatibility and native discard-confirmation navigation remain pending acceptance items. There is still no formal durable edit activation, retained schema activation, PDF/bilingual/historical export, durable export-event history or cross-device recovery E2E.
 5. Points lots/rates/reservations remain shadow-only. Communication Note now has
    local PG16 proof for fixed 20-Point atomic admission/reservation and terminal
    commit/release, including retry, replay, cancellation and recovery

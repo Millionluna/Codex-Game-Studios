@@ -1,12 +1,17 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { copyCommunicationNoteRecord, downloadCommunicationNoteRecord } from "./communication-note-export-browser";
+import { copyCommunicationNoteRecord, downloadCommunicationNoteRecord, downloadCommunicationNoteDocx } from "./communication-note-export-browser";
 import { CommunicationNoteExportError, renderCommunicationNoteRecordCopy } from "./communication-note-export";
 import { exportDocument, EXPORT_NOW } from "./communication-note-export-test-fixture";
+
+const renderDocx = vi.hoisted(() => vi.fn());
+vi.mock("./communication-note-export-docx", () => ({ renderCommunicationNoteDocx: renderDocx }));
+const DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 
 let clicked: { href: string; filename: string }[];
 beforeEach(() => {
   clicked = []; vi.useFakeTimers();
+  renderDocx.mockReset().mockImplementation(async record => ({ bytes: new Uint8Array([80, 75, 3, 4]).buffer, filename: record.filename.replace(/\.txt$/, ".docx"), mimeType: DOCX_MIME }));
   vi.stubGlobal("ClipboardItem", undefined);
   vi.stubGlobal("navigator", { clipboard: { writeText: vi.fn(async () => {}) } });
   vi.stubGlobal("URL", { createObjectURL: vi.fn(() => "blob:owned-test"), revokeObjectURL: vi.fn() });
@@ -16,6 +21,37 @@ afterEach(() => { vi.clearAllTimers(); vi.useRealTimers(); vi.restoreAllMocks();
 const artifact = () => renderCommunicationNoteRecordCopy(exportDocument(), EXPORT_NOW);
 
 describe("record copy browser sinks", () => {
+  it("downloads DOCX bytes with correct MIME/extension and releases the URL", async () => {
+    vi.useRealTimers(); const controller = new AbortController();
+    const dispose = await downloadCommunicationNoteDocx(artifact(), controller.signal);
+    expect(clicked).toEqual([{ href: "blob:owned-test", filename: artifact().filename.replace(/\.txt$/, ".docx") }]);
+    const blob = vi.mocked(URL.createObjectURL).mock.calls[0][0] as Blob;
+    expect(blob.type).toBe(DOCX_MIME); expect(blob.size).toBe(4);
+    const reader = new FileReader(), pending = new Promise(r => { reader.onload = () => r(reader.result); }); reader.readAsArrayBuffer(blob);
+    expect([...new Uint8Array(await pending as ArrayBuffer)]).toEqual([80, 75, 3, 4]);
+    controller.abort(); dispose(); expect(URL.revokeObjectURL).toHaveBeenCalledTimes(1);
+  });
+  it("does not render an aborted DOCX or download bytes after rendering loses access", async () => {
+    const controller = new AbortController(); controller.abort();
+    await expect(downloadCommunicationNoteDocx(artifact(), controller.signal)).rejects.toThrow("UNAVAILABLE");
+    expect(renderDocx).not.toHaveBeenCalled();
+    const later = new AbortController();
+    renderDocx.mockImplementationOnce(async () => { later.abort(); return { bytes: new ArrayBuffer(0), filename: "unused.docx", mimeType: DOCX_MIME }; });
+    await expect(downloadCommunicationNoteDocx(artifact(), later.signal)).rejects.toThrow("UNAVAILABLE");
+    expect(URL.createObjectURL).not.toHaveBeenCalled(); expect(clicked).toHaveLength(0);
+  });
+  it("sanitizes a DOCX renderer failure and never falls back to TXT", async () => {
+    renderDocx.mockRejectedValueOnce(new Error("private detail"));
+    await expect(downloadCommunicationNoteDocx(artifact(), new AbortController().signal)).rejects.toThrow(/^DOWNLOAD_FAILED$/);
+    expect(URL.createObjectURL).not.toHaveBeenCalled(); expect(clicked).toHaveLength(0);
+  });
+  it("revokes a DOCX URL at sixty seconds and cleans up a failed DOCX click", async () => {
+    await downloadCommunicationNoteDocx(artifact(), new AbortController().signal);
+    vi.advanceTimersByTime(60_000); expect(URL.revokeObjectURL).toHaveBeenCalledTimes(1);
+    vi.mocked(HTMLAnchorElement.prototype.click).mockImplementationOnce(() => { throw new Error("private"); });
+    await expect(downloadCommunicationNoteDocx(artifact(), new AbortController().signal)).rejects.toThrow("DOWNLOAD_FAILED");
+    expect(URL.revokeObjectURL).toHaveBeenCalledTimes(2); expect(document.querySelector('a[download]')).toBeNull();
+  });
   it("writes only the shared plain text after fresh preparation", async () => {
     const prepare = vi.fn(async () => artifact());
     await copyCommunicationNoteRecord(prepare, new AbortController().signal);

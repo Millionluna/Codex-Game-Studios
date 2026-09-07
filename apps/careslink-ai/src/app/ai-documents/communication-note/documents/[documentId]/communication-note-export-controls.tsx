@@ -6,9 +6,9 @@ import { buildCommunicationNoteDocumentHref, type CommunicationNoteAvailableDocu
 import type { CommunicationNoteDocumentLocale } from "../../../../../lib/communication-note-document-i18n";
 import { getCommunicationNoteExportCopy } from "../../../../../lib/communication-note-export-i18n";
 import { CommunicationNoteExportError, prepareCommunicationNoteRecordCopy, type CommunicationNoteExportErrorCode } from "../../../../../lib/communication-note-export";
-import { copyCommunicationNoteRecord, downloadCommunicationNoteRecord } from "../../../../../lib/communication-note-export-browser";
+import { copyCommunicationNoteRecord, downloadCommunicationNoteRecord, downloadCommunicationNoteDocx } from "../../../../../lib/communication-note-export-browser";
 
-type State = "idle" | "checking" | "copied" | "downloaded" | Exclude<CommunicationNoteExportErrorCode, "AUTH_REQUIRED" | "NOT_FOUND">;
+type State = "idle" | "checking" | "copied" | "downloaded" | "docxDownloaded" | Exclude<CommunicationNoteExportErrorCode, "AUTH_REQUIRED" | "NOT_FOUND">;
 export function CommunicationNoteExportControls({ saved, locale, accessSignal, onAccessResult }: Readonly<{
   saved: CommunicationNoteAvailableDocument; locale: CommunicationNoteDocumentLocale; accessSignal: AbortSignal;
   onAccessResult: (status: "AUTH_REQUIRED" | "NOT_FOUND") => void;
@@ -26,7 +26,7 @@ export function CommunicationNoteExportControls({ saved, locale, accessSignal, o
     return () => { abort(); accessSignal.removeEventListener("abort", abort); };
   }, [accessSignal]);
 
-  async function exportRecord(format: "COPY" | "TXT") {
+  async function exportRecord(format: "COPY" | "TXT" | "DOCX") {
     const signal = lifetime.current?.signal;
     if (busy.current || !signal || signal.aborted || accessSignal.aborted ||
         !saved.isCurrentRevision || saved.selfReviewStatus !== "CONFIRMED" || state === "STALE_REVISION" || state === "REVIEW_REQUIRED") return;
@@ -34,8 +34,9 @@ export function CommunicationNoteExportControls({ saved, locale, accessSignal, o
     const prepare = () => prepareCommunicationNoteRecordCopy({ saved, signal });
     try {
       if (format === "COPY") await copyCommunicationNoteRecord(prepare, signal);
+      else if (format === "DOCX") disposal.current = await downloadCommunicationNoteDocx(await prepare(), signal);
       else disposal.current = downloadCommunicationNoteRecord(await prepare(), signal);
-      if (!signal.aborted) setState(format === "COPY" ? "copied" : "downloaded");
+      if (!signal.aborted) setState(format === "COPY" ? "copied" : format === "DOCX" ? "docxDownloaded" : "downloaded");
     } catch (error) {
       if (signal.aborted) return;
       const code = error instanceof CommunicationNoteExportError ? error.code : "UNAVAILABLE";
@@ -59,6 +60,9 @@ export function CommunicationNoteExportControls({ saved, locale, accessSignal, o
       </button>
       <button type="button" onClick={() => void exportRecord("TXT")} disabled={blocked} className="taito-secondary disabled:cursor-not-allowed disabled:opacity-60">
         <Download className="size-4" aria-hidden="true" />{copy.download}
+      </button>
+      <button type="button" onClick={() => void exportRecord("DOCX")} disabled={blocked} className="taito-secondary disabled:cursor-not-allowed disabled:opacity-60">
+        <Download className="size-4" aria-hidden="true" />{copy.downloadDocx}
       </button>
     </div>
     <p role="status" aria-live="polite" aria-atomic="true" className="mt-3 text-sm leading-6 text-foreground">{message}</p>

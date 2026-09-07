@@ -5,17 +5,19 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { CommunicationNoteAvailableDocument } from "../../../../../lib/communication-note-document-contract";
 import { createValidCaresLinkV1CleanedFacts } from "../../../../../lib/v1/cleaned-facts-test-fixtures";
+import { CommunicationNoteExportError } from "../../../../../lib/communication-note-export";
 
 const mocks = vi.hoisted(() => ({
   loadDocument: vi.fn(),
   replaceLocation: vi.fn(),
   confirmReview: vi.fn(),
   saveEdit: vi.fn(),
-  copyRecord: vi.fn(), downloadRecord: vi.fn(), disposeExport: vi.fn(),
+  copyRecord: vi.fn(), downloadRecord: vi.fn(), downloadDocx: vi.fn(), disposeExport: vi.fn(),
 }));
 
 vi.mock("../../../../../lib/communication-note-export-browser", () => ({
   copyCommunicationNoteRecord: mocks.copyRecord, downloadCommunicationNoteRecord: mocks.downloadRecord,
+  downloadCommunicationNoteDocx: mocks.downloadDocx,
 }));
 
 vi.mock("../../../../../lib/communication-note-self-review-client", () => ({
@@ -60,6 +62,7 @@ beforeEach(() => {
   mocks.saveEdit.mockReset();
   mocks.copyRecord.mockReset().mockImplementation(async prepare => { await prepare(); });
   mocks.downloadRecord.mockReset().mockReturnValue(mocks.disposeExport);
+  mocks.downloadDocx.mockReset().mockResolvedValue(mocks.disposeExport);
   container = document.createElement("div");
   document.body.append(container);
   root = createRoot(container);
@@ -75,11 +78,12 @@ describe("Communication Note private result loader", () => {
     mocks.loadDocument.mockResolvedValue(documentResult("Private draft")); await renderLoader();
     expect(exportButton("Copy record text").disabled).toBe(true);
     expect(exportButton("Download TXT").disabled).toBe(true);
+    expect(exportButton("Download DOCX").disabled).toBe(true);
     expect(container.textContent).toContain("Confirm your self-review for this saved version before exporting.");
     await openEditor(); expect(container.textContent).not.toContain("Export a record copy");
     expect(mocks.copyRecord).not.toHaveBeenCalled();
   });
-  it("rechecks access separately for Copy and TXT, with no review or document writes", async () => {
+  it("rechecks access separately for Copy, TXT and DOCX, with no review or document writes", async () => {
     const saved = reviewedDocument(); mocks.loadDocument.mockResolvedValue(saved); await renderLoader();
     await act(async () => exportButton("Copy record text").click());
     expect(container.textContent).toContain("Record text copied.");
@@ -89,6 +93,10 @@ describe("Communication Note private result loader", () => {
     expect(mocks.downloadRecord.mock.calls[0][0]).toMatchObject({ profile: "RECORD_COPY", filename: "communication-note_2026-09-07_10000000_v1.txt" });
     expect(mocks.downloadRecord.mock.calls[0][0].text).not.toContain("factsSummary");
     expect(container.textContent).toContain("TXT download started.");
+    await act(async () => exportButton("Download DOCX").click());
+    expect(mocks.loadDocument).toHaveBeenCalledTimes(4);
+    expect(mocks.downloadDocx.mock.calls[0][0]).toMatchObject({ profile: "RECORD_COPY", filename: "communication-note_2026-09-07_10000000_v1.txt" });
+    expect(container.textContent).toContain("DOCX download started.");
     expect(mocks.confirmReview).not.toHaveBeenCalled(); expect(mocks.saveEdit).not.toHaveBeenCalled();
     await openEditor(); expect(mocks.disposeExport).toHaveBeenCalled();
   });
@@ -123,7 +131,46 @@ describe("Communication Note private result loader", () => {
     mocks.loadDocument.mockResolvedValue(reviewedDocument());
     await act(async () => root.render(<CommunicationNoteDocumentLoader canonicalId={DOC} locale={locale} loginHref={LOGIN} revisionId={REV} unsupportedLocale={false} />));
     expect(container.textContent).toContain(locale === "en" ? "Export a record copy" : locale === "zh-Hans" ? "导出记录副本" : "匯出記錄副本");
-    expect(container.textContent).not.toMatch(/Download PDF|Download DOCX|下載 PDF|下载 PDF/);
+    expect(exportButton(locale === "en" ? "Download DOCX" : locale === "zh-Hans" ? "下载 DOCX" : "下載 DOCX").disabled).toBe(false);
+    expect(container.textContent).not.toMatch(/Download PDF|下載 PDF|下载 PDF/);
+  });
+  it.each(["AUTH_REQUIRED", "NOT_FOUND", "STALE_REVISION", "REVIEW_REQUIRED"] as const)("does not start DOCX after %s", async status => {
+    const fresh = status === "STALE_REVISION" ? { ...reviewedDocument(), isCurrentRevision: false }
+      : status === "REVIEW_REQUIRED" ? { ...reviewedDocument(), selfReviewStatus: "REQUIRED" } : { status };
+    mocks.loadDocument.mockResolvedValueOnce(reviewedDocument()).mockResolvedValueOnce(fresh); await renderLoader();
+    await act(async () => exportButton("Download DOCX").click());
+    expect(mocks.downloadDocx).not.toHaveBeenCalled();
+    expect(container.textContent).not.toContain("DOCX download started.");
+    if (status === "AUTH_REQUIRED") expect(mocks.replaceLocation).toHaveBeenCalledExactlyOnceWith(LOGIN);
+    if (status === "NOT_FOUND") expect(container.textContent).not.toContain("Synthetic export text");
+    if (status === "STALE_REVISION" || status === "REVIEW_REQUIRED") expect(exportButton("Download DOCX").disabled).toBe(true);
+  });
+  it("cancels a pending DOCX access check and suppresses duplicate clicks", async () => {
+    let resolve!: (value: CommunicationNoteAvailableDocument) => void;
+    mocks.loadDocument.mockResolvedValueOnce(reviewedDocument()).mockImplementationOnce(() => new Promise(r => { resolve = r; }))
+      .mockResolvedValueOnce(documentResult("Fresh private read")); await renderLoader();
+    await act(async () => { exportButton("Download DOCX").click(); exportButton("Download DOCX").click(); });
+    expect(mocks.loadDocument).toHaveBeenCalledTimes(2); expect(exportButton("Download TXT").disabled).toBe(true);
+    await act(async () => window.dispatchEvent(new Event("focus")));
+    await act(async () => resolve(reviewedDocument()));
+    expect(mocks.downloadDocx).not.toHaveBeenCalled();
+    expect(container.textContent).not.toContain("DOCX download started.");
+  });
+  it("allows a fresh explicit DOCX retry after a sanitized failure", async () => {
+    mocks.loadDocument.mockResolvedValue(reviewedDocument());
+    mocks.downloadDocx.mockRejectedValueOnce(new CommunicationNoteExportError("DOWNLOAD_FAILED")); await renderLoader();
+    await act(async () => exportButton("Download DOCX").click());
+    expect(container.textContent).toContain("The download could not start.");
+    expect(exportButton("Download DOCX").disabled).toBe(false);
+    await act(async () => exportButton("Download DOCX").click());
+    expect(mocks.loadDocument).toHaveBeenCalledTimes(3);
+    expect(container.textContent).toContain("DOCX download started.");
+  });
+  it("keeps historical DOCX disabled even if a snapshot carries confirmed review", async () => {
+    mocks.loadDocument.mockResolvedValue({ ...reviewedDocument(), isCurrentRevision: false }); await renderLoader();
+    expect(exportButton("Download DOCX").disabled).toBe(true);
+    expect(container.textContent).toContain("Historical export is not available yet");
+    expect(mocks.downloadDocx).not.toHaveBeenCalled();
   });
   it("loads only after mount, then clears and reauthorizes on focus", async () => {
     mocks.loadDocument.mockResolvedValueOnce(documentResult("First private draft"));

@@ -4,6 +4,7 @@ const copy = {
   en: {
     title: "Export a record copy", profile: "English Note only. Review translations and internal checks are not included.",
     version: (n: number) => `Saved version ${n} · Free`, copy: "Copy record text", download: "Download TXT",
+    downloadDocx: "Download DOCX", docxDownloaded: "DOCX download started. Check your browser's downloads; saving is not confirmed here.",
     checking: "Checking access and version…", copied: "Record text copied.", downloaded: "TXT download started. Check your browser's downloads; saving is not confirmed here.",
     boundary: "Draft: check it before use in your authorised record system. External copies stop syncing and cannot be recalled. Clipboard content may be available to other apps.",
     historical: "Historical export is not available yet because this page cannot verify that version's self-review.",
@@ -18,6 +19,7 @@ const copy = {
   "zh-Hans": {
     title: "导出记录副本", profile: "仅包含英文 Note，不包含复核译文或内部检查信息。",
     version: (n: number) => `已保存版本 ${n} · 免费`, copy: "复制记录文本", download: "下载 TXT",
+    downloadDocx: "下载 DOCX", docxDownloaded: "已发起 DOCX 下载。请查看浏览器下载列表；这里无法确认文件已保存。",
     checking: "正在检查访问权限与版本…", copied: "记录文本已复制。", downloaded: "已发起 TXT 下载。请查看浏览器下载列表；这里无法确认文件已保存。",
     boundary: "此文件仍是草稿，使用前请核对目标正式记录系统的要求。外部副本不会继续同步，也无法撤回；剪贴板内容可能被其他应用读取。",
     historical: "当前页面无法验证此历史版本的自审状态，因此暂不提供历史版本导出。",
@@ -32,6 +34,7 @@ const copy = {
   "zh-Hant": {
     title: "匯出記錄副本", profile: "僅包含英文 Note，不包含複核譯文或內部檢查資訊。",
     version: (n: number) => `已儲存版本 ${n} · 免費`, copy: "複製記錄文字", download: "下載 TXT",
+    downloadDocx: "下載 DOCX", docxDownloaded: "已啟動 DOCX 下載。請查看瀏覽器下載清單；這裡無法確認檔案已儲存。",
     checking: "正在檢查存取權限與版本…", copied: "記錄文字已複製。", downloaded: "已啟動 TXT 下載。請查看瀏覽器下載清單；這裡無法確認檔案已儲存。",
     boundary: "此檔案仍是草稿，使用前請核對目標正式記錄系統的要求。外部副本不會繼續同步，也無法撤回；剪貼簿內容可能被其他應用程式讀取。",
     historical: "目前頁面無法驗證此歷史版本的自審狀態，因此暫不提供歷史版本匯出。",

@@ -34,6 +34,24 @@ export async function copyCommunicationNoteRecord(
 
 /** Local, short-lived Blob URL only. "Started" is not a saved-file receipt. */
 export function downloadCommunicationNoteRecord(artifact: CommunicationNoteTextExport, signal: AbortSignal) {
+  return downloadRecordBlob(new Blob([artifact.text], { type: "text/plain;charset=utf-8" }), artifact.filename, signal);
+}
+
+export async function downloadCommunicationNoteDocx(artifact: CommunicationNoteTextExport, signal: AbortSignal) {
+  assertExportActive(signal);
+  try {
+    const { renderCommunicationNoteDocx } = await import("./communication-note-export-docx");
+    assertExportActive(signal);
+    const docx = await renderCommunicationNoteDocx(artifact);
+    assertExportActive(signal);
+    return downloadRecordBlob(new Blob([docx.bytes], { type: docx.mimeType }), docx.filename, signal);
+  } catch (error) {
+    if (error instanceof CommunicationNoteExportError) throw error;
+    throw new CommunicationNoteExportError("DOWNLOAD_FAILED");
+  }
+}
+
+function downloadRecordBlob(blob: Blob, filename: string, signal: AbortSignal) {
   assertExportActive(signal);
   let url: string | undefined, timer: ReturnType<typeof setTimeout> | undefined;
   const anchor = document.createElement("a");
@@ -43,9 +61,8 @@ export function downloadCommunicationNoteRecord(artifact: CommunicationNoteTextE
     anchor.remove(); signal.removeEventListener("abort", dispose);
   };
   try {
-    // UTF-8 text for both Copy and TXT; no hidden HTML or JSON representation.
-    url = URL.createObjectURL(new Blob([artifact.text], { type: "text/plain;charset=utf-8" }));
-    anchor.href = url; anchor.download = artifact.filename; anchor.hidden = true;
+    url = URL.createObjectURL(blob);
+    anchor.href = url; anchor.download = filename; anchor.hidden = true;
     document.body.append(anchor); signal.addEventListener("abort", dispose, { once: true });
     assertExportActive(signal); anchor.click(); anchor.remove();
     timer = setTimeout(dispose, 60_000);

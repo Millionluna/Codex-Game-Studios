@@ -34,7 +34,7 @@ export function renderCommunicationNoteRecordCopy(
   // Do not silently rewrite saved wording to remove formatting. Formatted or
   // control-bearing source must be edited and reviewed before this plain profile.
   if (typeof draft !== "string" || !draft.trim() || new TextEncoder().encode(draft).length > 64 * 1024 ||
-      /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f\u202a-\u202e\u2066-\u2069]/u.test(draft) ||
+      /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f\ud800-\udfff\ufffe\uffff\u202a-\u202e\u2066-\u2069]/u.test(draft) ||
       /`|~~|^\s{0,3}#{1,6}\s|\*\*|__|(^|\W)(?:\*[^*\n]+\*|_[^_\n]+_)(?=\W|$)|!?\[[^\]\n]*\]\([^\n]*\)|<\/?[a-z][^>]*>/imu.test(draft)) {
     throw new CommunicationNoteExportError("PLAIN_TEXT_REQUIRED");
   }
