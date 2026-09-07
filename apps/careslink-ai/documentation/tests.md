@@ -4223,6 +4223,33 @@ permission, AI, Points, cloud resource, deployment or push changed. Follow the
 [handoff checklist](communication-note-product-integration-m1y.md#non-hmr-browser-handoff-and-cancellation-diagnostics-2026-09-07)
 to verify same-page automatic recovery and then stop/remove the owned fixture.
 
+### Safari saved-draft/review surface — read-only result (2026-09-07)
+
+- In native Safari, followed the synthetic succeeded job's saved-draft link to
+  the exact document/revision, version 1; English draft, both Chinese review
+  versions, save acknowledgement and persistent draft/review requirement rendered.
+- Expanded source facts and switched English/Simplified/Traditional Chinese;
+  the selected document/revision did not change. The current history entry kept
+  version 1. No second/historical fixture revision was exercised.
+- The green page rendered without a visible error overlay. Native Safari
+  console/network capture was not available in this run; no all-console-clean
+  or document-HTTP-status claim is made.
+- **Not complete:** review submission/persistence. The existing page is read-only
+  and has no confirmation control; viewing it did not constitute human review.
+  Browser Offline/Online recovery remains deferred and unpassed after the owner
+  confirmed Safari-only availability. No browser installation or system-network
+  change was performed.
+- Focused view, loader/jsdom and navigation regression: **15/15 in 3 files**.
+  No application code changed; full regression/build/real-engine were not rerun.
+- The retained local built fixture was stopped and its owned temporary copy
+  removed, with `sourceUnchanged:true` and an independent absence check. User
+  tabs were left open; local reload requires restarting the fixture. No cloud,
+  Production, AI, Points, deployment or push occurred.
+
+Next: implement the revision-bound self-review confirmation interaction and its
+server-acknowledged success/failure states within the existing default-off
+boundaries. See the [Safari acceptance record](communication-note-product-integration-m1y.md#safari-saved-draft-review-surface--bounded-acceptance-2026-09-07).
+
 ### Current live/read-only evidence
 
 - Supabase migrations, tables, RLS flags, policies, grants, function grants and aggregate row counts were checked read-only.

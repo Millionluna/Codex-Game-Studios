@@ -859,3 +859,58 @@ HTTP reads before acceptance. Then stop only the validated owned runner PID and
 confirm its cleanup receipt. Offline/online acceptance remains **pending** until
 that evidence exists; a repeated instruction to execute is not evidence that
 the user performed the browser action.
+
+### Safari saved-draft review surface — bounded acceptance (2026-09-07)
+
+The owner confirmed that Safari is their only installed browser and approved
+continuing with the saved-draft/review flow. The Offline/Online test is deferred,
+not passed or waived for release. No browser was installed and no network,
+proxy, firewall or Safari preference was changed.
+
+Using native Safari through the supported computer-use interface, the agent
+followed the existing **Open saved draft** link from the synthetic succeeded
+job `33333333-3333-4333-8333-333333333333`. It opened document
+`44444444-4444-4444-8444-444444444444`, exact revision
+`55555555-5555-4555-8555-555555555555`, version 1. The English draft, independent
+Simplified/Traditional Chinese review texts, server-save acknowledgement and
+persistent draft/review-required boundary rendered. Expanding source facts
+displayed the synthetic event facts associated with the selected revision.
+Switching English → Simplified → Traditional Chinese preserved both IDs and
+version 1. Selecting the current version-history entry kept that same revision;
+the fixture contains no second/historical revision, so this is not multi-version
+history coverage. The final page was returned to Simplified Chinese.
+
+The Safari screenshot showed the approved green identity/Logo, readable draft,
+review and history panels, with no visible error overlay. Native Safari console
+and per-request network details were not captured, so no console-clean or
+document-HTTP-status claim is made. The existing content-free server diagnostics
+reported successful synthetic job reads; they do not attest real Auth or database
+persistence. No screenshot file containing unrelated user tab titles was added
+to the repository.
+
+**Important product boundary:** this page is the existing read-only review
+surface. It displays `Self-review required` / `需要人工复核` and exposes no control
+to submit a review confirmation. Opening/reading it did not record a human
+review, and the agent did not attest care facts on the user's behalf. This is
+not a complete review-confirmation/persistence flow. The existing result-page
+scope above already lists self-review mutation as a separate, outstanding slice.
+
+The view, loader (jsdom) and document-navigation suites passed **15/15 tests in
+3 files**. Application/fixture source did not change; full regression, build,
+real-engine and Hosted checks were not rerun. The owned built runner then stopped
+and removed `/private/tmp/cl-job-browser-F6PZx5`, reporting `stopped:true`,
+`removed:true`, `sourceUnchanged:true`; independent path absence was checked.
+The owner's Safari and in-app tabs were not closed. Their already-rendered local
+pages remain visible, but reloads require restarting the documented fixture.
+No Production, cloud resource, model call, Points mutation, deployment or push
+occurred.
+
+**Next local implementation slice:** add an explicit, revision-bound self-review
+confirmation interaction to the existing green Communication Note page, starting
+with the current domain/contract and its tests. Persist/display confirmation only
+after a server acknowledgement; keep the draft label, prevent historical/stale
+revision confirmation, and handle failure without claiming success. Existing
+Auth/default-off runtime boundaries stay in place; any required external
+activation or permission expansion needs separate authorization. Browser
+Offline/Online automatic recovery remains a release prerequisite to re-test in a
+supported environment, not a reason to repeat this read-only Safari check.
