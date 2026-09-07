@@ -1620,3 +1620,66 @@ clipboard paste and actual TXT/DOCX/PDF save/open. Microsoft Word compatibility,
 native discard-confirmation navigation and real Offline/Online remain unpassed.
 Durable export history, bilingual/historical/batch export, native sharing, other
 Note applications and Hosted activation remain separate remaining work.
+
+## Communication Note native Safari export acceptance (2026-09-08)
+
+The four-format browser delivery gate passed on source `609cb4f`, using native
+Safari and only the disposable PROCESS_MEMORY_ONLY fixture at
+`/private/tmp/cl-job-browser-80m9QR`. The synthetic revision was saved at
+`2026-09-07T16:01:24.311Z` (2026-09-08 in Melbourne). No application source or
+approved green visual identity changed in this acceptance batch.
+
+- Before self-review, Copy/TXT/DOCX/PDF were all disabled. The synthetic source
+  facts and English/review-language text were inspected; the three test
+  confirmations enabled the local review action. Its successful response
+  enabled all four exports while retaining **Draft – review required**.
+- Safari Copy was followed by a real Command-V into a new empty native TextEdit
+  document, not by injecting expected text. The complete English Record copy,
+  version, saved/export times and static-copy notices were present; private
+  source facts, review translations and internal metadata were absent. The
+  unsaved synthetic paste document was discarded afterward.
+- The localhost download permission prompt was allowed for this authorized
+  test. Safari's native download list and independent filesystem checks both
+  showed completed TXT/DOCX/PDF files. Two earlier DOCX files already existed
+  and were left untouched; Safari saved this batch's DOCX with a `-2` suffix.
+  The application still correctly reports download **started**, not a receipt
+  that a file was saved. The saved-file proof below is test evidence only.
+- The actual downloaded TXT and DOCX opened in native TextEdit with complete
+  readable body text and notices. The actual PDF opened in native macOS Preview
+  as one readable page. TextEdit opening is not Microsoft Word or Word-layout
+  compatibility evidence; native Word remains untested.
+- Independent UTF-8/OOXML/pypdf checks passed for all ten required text fields,
+  their order and seven excluded fixture/internal fields. The three formats
+  matched after accounting for distinct click timestamps, whitespace and the
+  PDF's separate repeated header. DOCX ZIP integrity/header and absence of
+  macros, embedded objects and external relationships passed. PDF embedded
+  fonts and absence of actions, forms, attachments and annotations passed.
+  The first ad-hoc order assertion counted the separate PDF header as the body
+  notice; correcting that check passed without changing the file or renderer.
+- Packaged LibreOffice rendered this downloaded DOCX and packaged Poppler
+  rendered this downloaded PDF. Both one-page outputs were visually inspected
+  in full: no clipped text, overlap or missing glyphs. This complements, rather
+  than substitutes for, the native opening evidence above. QA render copies
+  are not user deliverables or Microsoft Word evidence.
+
+The retained synthetic files in the local Downloads directory are:
+
+| File | Bytes | SHA-256 |
+| --- | ---: | --- |
+| `communication-note_2026-09-07_44444444_v1.txt` | 534 | `7aa77d92fa55ae844cf0d2d43578b752abcc0d207f544ebeeb3ccfe7c479b1ff` |
+| `communication-note_2026-09-07_44444444_v1-2.docx` | 10,076 | `63e8f2bdc249439f32ed86f2a74555c7b868b98a11c0e0857e7e54ad89924c3f` |
+| `communication-note_2026-09-07_44444444_v1.pdf` | 8,673 | `76b766306d30832b2aced50797bc1ab38540183665bf97df0aeab964a9ed850c` |
+
+Only the owned Safari test tab and native inspection windows were closed. The
+fixture reported stopped/removed/source-unchanged; independent checks confirmed
+its exact root absent and port 3395 closed. Other browser tabs and existing
+downloads were preserved. No real database, Hosted/Production, AI model, Points
+write, push or deployment was used. Browser/PDF/Documents skill guidance drove
+actual cross-app, saved-file and whole-page checks instead of toast-only proof.
+
+**Next local implementation slice:** revision-bound export history with minimal
+version/format/start-time metadata and honest initiated/failed semantics, not
+record bodies or a fabricated file-save receipt. Review the existing inactive
+event contract before implementing; database activation remains separately
+gated. Microsoft Word compatibility, native discard-confirmation navigation and
+real Offline/Online remain unpassed and must not be inferred from this gate.
