@@ -41,6 +41,7 @@ export type CommunicationNoteDocumentViewProps = Readonly<{
   result?: DisplayResult;
   revisionId?: string;
   unsupportedLocale?: boolean;
+  selfReviewControl?: ReactNode;
 }>;
 
 export function CommunicationNoteDocumentView({
@@ -50,6 +51,7 @@ export function CommunicationNoteDocumentView({
   result,
   revisionId,
   unsupportedLocale = false,
+  selfReviewControl,
 }: CommunicationNoteDocumentViewProps) {
   const copy = getCommunicationNoteDocumentCopy(locale);
   const selectedRevisionId =
@@ -131,7 +133,7 @@ export function CommunicationNoteDocumentView({
         {!result ? (
           <DocumentLoading copy={copy} />
         ) : result.status === "AVAILABLE" ? (
-          <AvailableDocument result={result} locale={locale} copy={copy} />
+          <AvailableDocument result={result} locale={locale} copy={copy} selfReviewControl={selfReviewControl} />
         ) : (
           <DocumentState
             status={result.status}
@@ -152,10 +154,12 @@ function AvailableDocument({
   result,
   locale,
   copy,
+  selfReviewControl,
 }: Readonly<{
   result: CommunicationNoteAvailableDocument;
   locale: CommunicationNoteDocumentLocale;
   copy: CommunicationNoteDocumentCopy;
+  selfReviewControl?: ReactNode;
 }>) {
   const composerCopy = getCommunicationNoteComposerCopy(locale);
   const selfReview = copy.selfReview[result.selfReviewStatus];
@@ -313,6 +317,8 @@ function AvailableDocument({
                 </div>
               </div>
             </div>
+
+            {result.isCurrentRevision && result.selfReviewStatus === "REQUIRED" ? selfReviewControl : null}
 
             <div className="grid gap-5 p-5">
               <ReviewList

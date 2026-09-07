@@ -19,7 +19,8 @@ const copy = async (source, target) => {
 };
 const emit = async (path, source) => { await mkdir(join(root, path, ".."), { recursive: true }); await writeFile(join(root, path), source); };
 const tracked = ["src/lib/supabase-server.ts", "src/app/ai-documents/communication-note/jobs/[jobId]/page.tsx",
-  "src/app/api/ai-documents/communication-note/jobs/[jobId]/route.ts", "src/app/api/ai-documents/communication-note/documents/[documentId]/route.ts"];
+  "src/app/api/ai-documents/communication-note/jobs/[jobId]/route.ts", "src/app/api/ai-documents/communication-note/documents/[documentId]/route.ts",
+  "src/app/api/ai-documents/communication-note/documents/[documentId]/self-review/route.ts"];
 
 async function cleanup() {
   if (stopped) return; stopped = true;
@@ -102,6 +103,12 @@ export async function GET(request: Request) {
   const result = NextResponse.redirect(new URL("/ai-documents/communication-note/jobs/"+JOB+"?lang=en","http://127.0.0.1:3395"));
   result.cookies.set("cl_browser_fixture", mode!, { httpOnly:true, sameSite:"strict", path:"/" });
   return result;
+}
+`);
+  await emit("src/app/api/ai-documents/communication-note/documents/[documentId]/self-review/route.ts", `import { confirmFixtureReview } from "@/lib/__browser-fixture";
+export const dynamic = "force-dynamic";
+export async function POST(request: Request, context: { params: Promise<{ documentId: string }> }) {
+  return confirmFixtureReview(request, (await context.params).documentId);
 }
 `);
   await emit("src/app/auth/login/page.tsx", `export default function LoginFixture() { return <main style={{padding:32}}>

@@ -914,3 +914,72 @@ Auth/default-off runtime boundaries stay in place; any required external
 activation or permission expansion needs separate authorization. Browser
 Offline/Online automatic recovery remains a release prerequisite to re-test in a
 supported environment, not a reason to repeat this read-only Safari check.
+
+### Revision-bound self-review interaction — local slice (2026-09-07)
+
+The approved green result page now has an English/Simplified/Traditional Chinese
+self-review form. All three domain confirmations (facts, wording/translation,
+missing facts/follow-up) start unchecked and are required. The form names the
+selected version, keeps the draft/non-professional-approval boundary, and offers
+no write control for a historical or already-confirmed version.
+
+Submission sends only the exact revision ID and three literal `true` values to
+`POST /api/ai-documents/communication-note/documents/{documentId}/self-review`.
+A random in-memory mutation UUID is reused for an explicit same-command retry;
+there is no automatic POST retry, browser storage, draft text or owner/session
+identity in the body. The client strictly binds the response to document,
+revision and mutation, matching HTTP status and exact receipt keys. A write ACK
+triggers the existing owner-scoped document re-read, not an optimistic status
+change. Auth/not-found responses clear private content; stale revision directs
+the user to the current version. A lost response explicitly leaves save status
+uncertain. Access recheck/pagehide aborts the write, suppresses late callbacks
+and discards checked confirmations even when the same document/revision returns.
+This last reset required a per-access-generation component key: React batching
+can otherwise preserve the old form despite an intermediate loading state.
+
+The new HTTP adapter requires exact path/body, bounded 1 KiB body bytes,
+JSON POST, same-origin Origin/Fetch Metadata, no Authorization header and a
+canonical mutation UUID. It returns only fixed content-free failure envelopes
+and private/no-store responses. Its writer contract requires one atomic active
+provider-session/owner/Communication-type/writable-current-revision check and
+idempotent confirmation. **The formal route installs no writer and always
+returns 503.** It does not reuse DOCUMENT_DETAIL to write, grant a database role,
+change a runtime flag, or fall back to a memory/service-role implementation.
+The existing Product API and database still have no wired self-review mutation.
+This is the UI/transport slice, not durable or release-ready review persistence.
+
+The guarded owned loopback fixture alone binds a synthetic writer, storing at
+most 64 receipts in that test server's process memory for the fixed test owner,
+document and current revision. It repeats synthetic revoked/foreign/stale checks
+before replay and exposes the confirmed status through the real document reader.
+These receipts disappear when the process stops; refresh survival proves server
+readback, not database persistence or cross-device durability.
+
+Safari verified unchecked/two-check disabled state, three-check enabled state,
+submission, `已确认人工复核` after readback, persistence across a page refresh
+within the same local server process, and the retained draft label. The first
+submission returned 400: content-free diagnostics showed correct browser Origin,
+Fetch Metadata and JSON but an internal Next request URL origin. Only the guarded
+fixture was corrected to normalize to its fixed loopback origin after exact Host
+validation; foreign-Origin/Host denial tests remain green. Formal origin checks
+were not relaxed. No native Safari console-clean claim is made.
+
+Verification: **83/83 focused tests**; full **4,223 passed / 12 skipped in 273
+files (272 passed / 1 skipped)**; TypeScript and zero-warning lint passed; formal
+webpack build generated 64/64 pages and the client-boundary scan passed 108
+chunks. The final no-HMR fixture built 6/6 pages. Next.js/Supabase guidance kept
+the write binding absent until its own authorization boundary exists; React
+review kept submission event-driven, abortable and scoped to an access generation.
+No package, migration, permission or runtime-flag change was needed.
+
+All three owned fixture runs stopped and removed their temporary directories,
+each with `sourceUnchanged:true`, followed by independent path-absence checks.
+No Hosted Preview, Production, real care data, AI model call, Points mutation,
+deployment or push occurred. No real human care-review attestation was made.
+
+**Next:** implement the durable, revision-bound self-review writer and readback
+integration locally, including owner/session denial, stale/edit races, replay
+after revocation, immutable audit events and draft lifecycle preservation. Real
+database permissions, resource creation and activation require their own review
+and authorization; do not enable the current route merely by wiring a fake
+writer. Browser Offline/Online recovery remains a separate unpassed release gate.

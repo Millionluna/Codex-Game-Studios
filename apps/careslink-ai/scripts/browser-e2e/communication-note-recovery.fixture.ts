@@ -14,6 +14,8 @@ import { handleCommunicationNoteDocumentRead } from "../../src/lib/communication
 import { createValidCaresLinkV1CleanedFacts } from "../../src/lib/v1/cleaned-facts-test-fixtures";
 import type { CaresLinkV1ProductApi } from "../../src/lib/v1/transport-contract";
 import { CaresLinkV1ProductApiError } from "../../src/lib/v1/product-api-memory";
+import { handleCommunicationNoteSelfReview } from "../../src/lib/communication-note-self-review.server";
+import type { CommunicationNoteSelfReviewResult } from "../../src/lib/communication-note-self-review-contract";
 
 export const JOB = "33333333-3333-4333-8333-333333333333";
 export const DOC = "44444444-4444-4444-8444-444444444444";
@@ -47,6 +49,51 @@ export function observeFixtureNetwork(request: Request) {
   return new Response(null, { status: 204, headers: { "Cache-Control": "no-store" } });
 }
 async function mode() { guard(); const value = (await cookies()).get("cl_browser_fixture")?.value; return MODES.find(m => m === value) ?? "succeeded"; }
+
+// Process-memory synthetic receipts, shared across only this owned server's
+// route bundles and erased on stop. This is NOT durable database persistence.
+const REVIEW_STATE = Symbol.for("careslink.synthetic.browser.review");
+function reviewState() {
+  guard();
+  const local = globalThis as typeof globalThis & { [REVIEW_STATE]?: Map<string, CommunicationNoteSelfReviewResult> };
+  return local[REVIEW_STATE] ??= new Map();
+}
+
+export async function confirmFixtureReview(request: Request, documentId: string) {
+  guard();
+  // Next's local server can construct request.url using its internal host.
+  // Normalize only this guarded fixture to its one fixed external origin,
+  // after checking Host. Never trust forwarded host/origin headers generally.
+  if (request.headers.get("host") !== "127.0.0.1:3395") return new Response(null, { status: 400 });
+  const incoming = new URL(request.url);
+  const localRequest = new Request(new URL(incoming.pathname + incoming.search, "http://127.0.0.1:3395"), request);
+  const response = await handleCommunicationNoteSelfReview(localRequest, documentId, {
+    localFixtureOrigin: "http://127.0.0.1:3395",
+    write: async ({ canonicalId, mutationId, confirmation }) => {
+      const current = await mode();
+      if (["anonymous", "revoked"].includes(current)) return { status: "AUTH_REQUIRED" };
+      if (current === "foreign" || canonicalId !== DOC) return { status: "NOT_FOUND" };
+      if (current === "unavailable") return { status: "UNAVAILABLE" };
+      if (confirmation.revisionId !== REV) return { status: "STALE_REVISION" };
+      const receipts = reviewState();
+      const existing = receipts.get(mutationId);
+      if (existing) return existing;
+      if (receipts.size >= 64) return { status: "UNAVAILABLE" };
+      const result = { status: "CONFIRMED", canonicalId: DOC, revisionId: REV, mutationId,
+        saveState: "SERVER_ACKNOWLEDGED", draftNotice: "Draft – review required" } as const;
+      receipts.set(mutationId, result);
+      console.log(JSON.stringify({ fixture: "self-review", status: "CONFIRMED", storage: "PROCESS_MEMORY_ONLY" }));
+      return result;
+    },
+  });
+  console.log(JSON.stringify({ fixture: "self-review-http", status: response.status,
+    urlLoopback: new URL(request.url).origin === "http://127.0.0.1:3395",
+    originLoopback: request.headers.get("origin") === "http://127.0.0.1:3395",
+    fetchSitePresent: request.headers.has("sec-fetch-site"),
+    fetchSiteSameOrigin: request.headers.get("sec-fetch-site") === "same-origin",
+    jsonContentType: request.headers.get("content-type") === "application/json" }));
+  return response;
+}
 function user() { return { id: USER, email: "synthetic@example.invalid", app_metadata: { role: "provider" } }; }
 export async function createFixtureAuthClient() {
   const current = await mode();
@@ -140,7 +187,8 @@ export async function readFixtureDocument(request: Request, documentId: string) 
       currentRevisionId: REV, currentRevisionNumber: 1, contractVersion: "1.0.0-shadow.1", schemaVersion: "2026-08-09.v1-shadow",
       createdAt: CREATED, updatedAt: CREATED, deletedAt: null }, revisions: [{ canonicalId: DOC, revisionId: REV, revisionNumber: 1,
       baseRevisionId: null, privacyReviewId: "66666666-6666-4666-8666-666666666666", content, contentHash: hash(content),
-      mutationId: "synthetic:browser:fixture", contractVersion: "1.0.0-shadow.1", schemaVersion: "2026-08-09.v1-shadow", createdAt: CREATED }], checkpoint: null, selfReviewStatus: "REQUIRED" };
+      mutationId: "synthetic:browser:fixture", contractVersion: "1.0.0-shadow.1", schemaVersion: "2026-08-09.v1-shadow", createdAt: CREATED }], checkpoint: null,
+      selfReviewStatus: reviewState().size > 0 ? "CONFIRMED" : "REQUIRED" };
   };
   return handleCommunicationNoteDocumentRead(request, documentId, {
     resolveAuth: async () => ["anonymous", "revoked"].includes(current)

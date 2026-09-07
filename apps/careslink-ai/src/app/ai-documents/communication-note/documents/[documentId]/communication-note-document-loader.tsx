@@ -6,6 +6,7 @@ import type { CommunicationNoteDocumentResult } from "../../../../../lib/communi
 import type { CommunicationNoteDocumentLocale } from "../../../../../lib/communication-note-document-i18n";
 import { replaceCommunicationNoteLocation } from "../../../../../lib/communication-note-document-navigation";
 import { CommunicationNoteDocumentView } from "./communication-note-document-view";
+import { CommunicationNoteSelfReviewForm } from "./communication-note-self-review-form";
 
 type VisibleResult = Exclude<
   CommunicationNoteDocumentResult,
@@ -26,6 +27,9 @@ export function CommunicationNoteDocumentLoader({
   unsupportedLocale: boolean;
 }>) {
   const [result, setResult] = useState<VisibleResult>();
+  const [accessSignal, setAccessSignal] = useState<AbortSignal>();
+  const [accessGeneration, setAccessGeneration] = useState(0);
+  const [refreshVersion, setRefreshVersion] = useState(0);
 
   useEffect(() => {
     let mounted = true;
@@ -58,6 +62,8 @@ export function CommunicationNoteDocumentLoader({
           return;
         }
         setResult(nextResult);
+        setAccessSignal(currentController.signal);
+        setAccessGeneration(value => value + 1);
       } catch (error) {
         if (
           !mounted ||
@@ -106,7 +112,21 @@ export function CommunicationNoteDocumentLoader({
       window.removeEventListener("pagehide", clearOnPageHide);
       document.removeEventListener("visibilitychange", refreshOnVisibility);
     };
-  }, [canonicalId, loginHref, revisionId]);
+  }, [canonicalId, loginHref, revisionId, refreshVersion]);
+
+  function onReviewResult(status: "CONFIRMED" | "AUTH_REQUIRED" | "NOT_FOUND") {
+    if (!accessSignal || accessSignal.aborted) return;
+    if (status === "AUTH_REQUIRED") {
+      setResult(undefined);
+      replaceCommunicationNoteLocation(loginHref);
+    } else if (status === "NOT_FOUND") {
+      setResult({ status: "NOT_FOUND" });
+    } else {
+      // Re-read through the owner/session gate; never optimistically confirm.
+      setResult(undefined);
+      setRefreshVersion(value => value + 1);
+    }
+  }
 
   return (
     <CommunicationNoteDocumentView
@@ -115,6 +135,12 @@ export function CommunicationNoteDocumentLoader({
       result={result}
       revisionId={revisionId}
       unsupportedLocale={unsupportedLocale}
+      selfReviewControl={result?.status === "AVAILABLE" && accessSignal ? (
+        <CommunicationNoteSelfReviewForm
+          key={`${result.canonicalId}:${result.revision.revisionId}:${accessGeneration}`}
+          document={result} locale={locale} accessSignal={accessSignal} onResult={onReviewResult}
+        />
+      ) : undefined}
     />
   );
 }

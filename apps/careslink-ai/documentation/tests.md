@@ -4250,6 +4250,35 @@ Next: implement the revision-bound self-review confirmation interaction and its
 server-acknowledged success/failure states within the existing default-off
 boundaries. See the [Safari acceptance record](communication-note-product-integration-m1y.md#safari-saved-draft-review-surface--bounded-acceptance-2026-09-07).
 
+### Self-review form and transport — local synthetic only (2026-09-07)
+
+- Added three required, initially unchecked review confirmations in all three UI
+  languages, exact-version binding, duplicate-click suppression, manual-only
+  idempotent retry and fixed error states. No body text or principal IDs leave
+  the form; there is no browser storage or automatic review submission.
+- Client ACK validation and a fresh document read control success. The form is
+  removed for historical/confirmed revisions, auth/not-found clears private text,
+  and access-generation changes reset checkboxes and ignore late writes. A test
+  caught React preserving checks across a batched re-read; the generation key
+  fixes this without weakening the existing reauthorization behavior.
+- The HTTP route has no installed durable writer and remains fixed 503. Injected
+  adapter tests cover body/transport/receipt validation; the guarded loopback
+  writer only uses synthetic process memory, with no permission or flag changes.
+- Real Safari: two checks remained disabled, three enabled submission; the final
+  POST returned 200 and the reader showed confirmed status, still Draft. Refresh
+  retained the test server's status. An initial 400 from Next's internal fixture
+  URL was diagnosed and fixed only under exact loopback Host/Origin guards.
+- Focused: **83/83**. Full: **4,223 passed, 12 skipped, 273 files**. TypeScript,
+  zero-warning lint, 64/64-page formal webpack build, 108-chunk client boundary,
+  6/6-page built fixture and 73-file adapter sync passed.
+- All three owned temporary services/copies were removed with source-isolation
+  receipts and independent absence checks. No Production, real data, cloud, AI,
+  Points, deployment or push occurred.
+
+Remaining: durable review writer/permissions and same-revision integration proof;
+real Auth/database persistence; browser Offline/Online automatic recovery. See
+the [self-review slice record](communication-note-product-integration-m1y.md#revision-bound-self-review-interaction--local-slice-2026-09-07).
+
 ### Current live/read-only evidence
 
 - Supabase migrations, tables, RLS flags, policies, grants, function grants and aggregate row counts were checked read-only.

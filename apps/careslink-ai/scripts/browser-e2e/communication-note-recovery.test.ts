@@ -3,12 +3,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const state = vi.hoisted(() => ({ mode: "succeeded" }));
 vi.mock("server-only", () => ({}));
 vi.mock("next/headers", () => ({ cookies: async () => ({ get: () => ({ value: state.mode }) }) }));
-import { DOC, JOB, REV, readFixtureJob, readFixtureDocument, observeFixtureNetwork } from "./communication-note-recovery.fixture";
+import { DOC, JOB, REV, readFixtureJob, readFixtureDocument, observeFixtureNetwork, confirmFixtureReview } from "./communication-note-recovery.fixture";
 
 const runner = readFileSync(new URL("./communication-note-recovery.mjs", import.meta.url), "utf8");
 const request = (id = JOB) => new Request(`http://127.0.0.1:3395/api/ai-documents/communication-note/jobs/${id}`);
 beforeEach(() => {
   state.mode = "succeeded";
+  delete (globalThis as Record<symbol, unknown>)[Symbol.for("careslink.synthetic.browser.review")];
   vi.spyOn(process, "cwd").mockReturnValue("/private/tmp/cl-job-browser-abc123");
   vi.stubEnv("CARESLINK_LOCAL_BROWSER_FIXTURE", "SYNTHETIC_LOOPBACK_ONLY"); vi.stubEnv("VERCEL", "");
   vi.spyOn(console, "log").mockImplementation(() => {});
@@ -16,6 +17,36 @@ beforeEach(() => {
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); });
 
 describe("isolated real-browser fixture preflight", () => {
+  const KEY = "11111111-1111-4111-8111-111111111111";
+  const confirm = (revisionId = REV) => confirmFixtureReview(new Request(`http://127.0.0.1:3395/api/ai-documents/communication-note/documents/${DOC}/self-review`, {
+    method: "POST", headers: { host: "127.0.0.1:3395", origin: "http://127.0.0.1:3395", "sec-fetch-site": "same-origin", "content-type": "application/json", "idempotency-key": KEY },
+    body: JSON.stringify({ revisionId, factsConfirmed: true, wordingConfirmed: true, missingFactsReviewed: true }),
+  }), DOC);
+  it("records only one synthetic process-memory confirmation and exposes it to the reader", async () => {
+    const first = await confirm(), replay = await confirm();
+    expect(first.status).toBe(200); expect(await replay.json()).toEqual(await first.json());
+    const read = await readFixtureDocument(new Request(`http://127.0.0.1:3395/api/ai-documents/communication-note/documents/${DOC}?revisionId=${REV}`), DOC);
+    expect(await read.json()).toMatchObject({ selfReviewStatus: "CONFIRMED", draftNotice: "Draft – review required" });
+    expect(vi.mocked(console.log).mock.calls.filter(([line]) => JSON.parse(line).fixture === "self-review")).toHaveLength(1);
+  });
+  it.each([["anonymous", 401], ["revoked", 401], ["foreign", 404], ["unavailable", 503]] as const)("does not acknowledge a %s review", async (mode, status) => {
+    state.mode = mode; expect((await confirm()).status).toBe(status);
+  });
+  it("rejects another revision even after an acknowledged command with the same key", async () => {
+    expect((await confirm()).status).toBe(200);
+    expect((await confirm(KEY)).status).toBe(409);
+    state.mode = "revoked";
+    expect((await confirm()).status).toBe(401);
+  });
+  it("normalizes only the owned fixture's fixed Host, without accepting a foreign Origin", async () => {
+    const wire = (host: string, origin: string) => new Request(`http://localhost:3395/api/ai-documents/communication-note/documents/${DOC}/self-review`, {
+      method: "POST", headers: { host, origin, "sec-fetch-site": "same-origin", "content-type": "application/json", "idempotency-key": KEY },
+      body: JSON.stringify({ revisionId: REV, factsConfirmed: true, wordingConfirmed: true, missingFactsReviewed: true }),
+    });
+    expect((await confirmFixtureReview(wire("127.0.0.1:3395", "http://127.0.0.1:3395"), DOC)).status).toBe(200);
+    expect((await confirmFixtureReview(wire("other.invalid", "http://127.0.0.1:3395"), DOC)).status).toBe(400);
+    expect((await confirmFixtureReview(wire("127.0.0.1:3395", "https://other.invalid"), DOC)).status).toBe(400);
+  });
   it.each(["queued", "running", "succeeded", "failed", "cancelled"])("feeds %s through the real HTTP composition and repository", async mode => {
     state.mode = mode; const response = await readFixtureJob(request(), JOB);
     expect(response.status).toBe(200); expect(response.headers.get("cache-control")).toContain("no-store");
