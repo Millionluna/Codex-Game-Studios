@@ -10,8 +10,12 @@ export function DocumentLanguageSync() {
   useEffect(() => {
     // The root layout persists across client navigation; its bootstrap runs only
     // on a full document load. Keep this allowlist aligned with that bootstrap.
+    const normalizedPath = pathname.replace(/\/+$/, "");
     const supportedLocales = new Set(
-      pathname.replace(/\/+$/, "") === "/ai-documents/communication-note"
+      normalizedPath === "/ai-documents/communication-note"
+        || (normalizedPath.split("/").length === 5 &&
+          ["/ai-documents/communication-note/jobs/", "/ai-documents/communication-note/documents/"]
+            .some(prefix => normalizedPath.startsWith(prefix)))
         ? ["en", "zh-Hans", "zh-Hant"]
         : ["en", "zh-Hans"],
     );

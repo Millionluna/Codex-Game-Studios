@@ -4146,6 +4146,39 @@ formal GET still returns fixed 503. The next local browser/recovery scenario
 matrix and separate Hosted requirements are recorded in the
 [prepared integration gate](communication-note-product-integration-m1y.md#exact-next-recovery-integration-gate-prepared-not-executed).
 
+### Green Communication Note recovery — real local browser (2026-09-07)
+
+The local runner `scripts/browser-e2e/communication-note-recovery.mjs` stages
+the actual green job/document UI and recovery composition in its own loopback
+Next copy, using synthetic Auth, credential receipts and SQL ports. Its 13
+fixture preflight tests passed. The browser was driven separately through the
+in-app browser; this is not an automated GoTrue/Hosted end-to-end suite.
+
+- Real browser: same-job reload and close/reopen; queued/running/succeeded
+  polling without reload; exact saved-document/revision navigation and reload;
+  failed/cancelled/unavailable/foreign-owner views; revoked/anonymous login
+  redirects and second-tab reload; English and both Chinese task views.
+- The saved draft displayed synthetic English content, both Chinese review
+  versions, version 1 and the human-review requirement. See the
+  [actual screenshot](evidence/communication-note-recovery-2026-09-07.png).
+- Browser checks discovered and verified the fix for `html lang` on Traditional
+  Chinese job/document pages. Seven new regression cases compare the real
+  initial bootstrap against the React synchronizer and preserve other-route
+  fallback. No green UI/Logo redesign or new client dependency was introduced.
+- Full regression: **4,158 passed, 12 skipped, 272 files**. The 12 separately
+  selected real-engine cases were not rerun this batch. TypeScript, zero-warning
+  lint, 64/64-page webpack build, 107-chunk client scan, adapter sync and
+  whitespace checks passed. The Hosted check-only manifest remains exactly
+  47 migrations with `hostedExecuted:false`.
+- The owned test process stopped and its temporary copy was removed with
+  `sourceUnchanged:true`; only this batch's browser tabs were closed.
+
+The 503 fixture is not real network-offline evidence. Offline/restored-network
+browser behavior and real GoTrue/custody/Hosted PG17/TLS remain open. Formal GET
+activation remains off; no Production, AI, Points, cloud-resource creation,
+deployment or push occurred. Details and reproducible runner instructions are
+in the [local browser record](communication-note-product-integration-m1y.md#green-recovery-flow--local-real-browser-evidence-2026-09-07).
+
 ### Current live/read-only evidence
 
 - Supabase migrations, tables, RLS flags, policies, grants, function grants and aggregate row counts were checked read-only.

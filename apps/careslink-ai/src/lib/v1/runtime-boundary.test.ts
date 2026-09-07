@@ -1357,6 +1357,7 @@ describe("V1 shadow runtime boundary", () => {
       file !== compositionPath && file !== boundaryPath &&
       readFileSync(file, "utf8").includes("communication-note-job-recovery-composition"),
     )).toEqual([
+      join(process.cwd(), "scripts/browser-e2e/communication-note-recovery.fixture.ts"),
       compositionTestPath,
       join(process.cwd(), "src/lib/v1/communication-note-job-status-custody.server.ts"),
       join(process.cwd(), "src/lib/v1/communication-note-job-status-postgres.local.test.ts"),

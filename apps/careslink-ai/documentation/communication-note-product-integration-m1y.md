@@ -695,3 +695,70 @@ Logo, Points, AI generation and Production are unchanged.
    `8e737fa2eade9b3a20a1f55d9eda90c25a7192db05cfda426e9e1059057b85a5`.
    Review a new explicit manifest before promotion; no new gate is authorized
    merely by this checklist.
+
+## Green recovery flow — local real-browser evidence (2026-09-07)
+
+The core local gate above now has actual in-app-browser evidence. The existing
+green job/document pages, client loaders, HTTP recovery composition, purpose
+adapter/repository and document projection ran in an owned temporary Next app.
+Auth, credential receipts and SQL results were synthetic injected ports, not
+real GoTrue, GCP custody or a physical database. This does not activate the
+formal GET, which remains fixed 503 outside the temporary test copy.
+
+Observed browser cases:
+
+- Reload and close/reopen of the same successful job URL retained the saved
+  result locator. Opening it selected the exact document and revision; reloading
+  the document retained its synthetic English draft, both Chinese review
+  versions, version 1 and the required human-review/draft notices.
+- A second control tab changed queued to running to succeeded. The original
+  task page advanced through polling without reload or another generation.
+- Failed, cancelled, unavailable (503) and foreign-owner (404) states rendered
+  their expected recovery/error views. Revoked (401) and anonymous sessions
+  reached the synthetic login boundary with the encoded same-job return URL;
+  reloading the other tab after logout did not expose the job view.
+- English, Simplified Chinese and Traditional Chinese task views rendered.
+  Browser inspection found an actual accessibility defect: the Traditional
+  Chinese job/document routes kept `html lang="en"`. The initial bootstrap and
+  client-navigation synchronizer now allow `zh-Hant` on precisely those route
+  shapes. Browser reload and job-to-document navigation both reported
+  `zh-Hant`; seven additional tests cover parity, fallback and route boundaries.
+  The React review retained primitive effect dependencies and added no fetch,
+  client dependency or visual redesign.
+
+The [saved-draft screenshot](evidence/communication-note-recovery-2026-09-07.png)
+is an actual browser capture of **synthetic data**, not a design mockup or a
+live/Hosted account. Browser warning/error log inspections returned no entries
+on the successful views. Next's development terminal did report a Fast Refresh
+full reload during the test-login transition; no production-build error remained.
+
+Reproduce from the app directory with:
+
+```sh
+node scripts/browser-e2e/communication-note-recovery.mjs
+```
+
+The runner binds only `127.0.0.1:3395`, refuses an occupied port, stages its own
+`/private/tmp/cl-job-browser-*` copy, installs no dependency, copies no `.env`
+and does not inherit ambient cloud credentials. Its test-only control routes,
+fake login and GET wrappers exist only in that copy. An instrumentation guard
+rejects outgoing server fetches; there is no generation route. Open the emitted
+local URL to choose synthetic states. Use SIGINT/SIGTERM on this runner to stop
+its child and remove only its owned copy. The completed run confirmed
+`cleanup:{stopped:true,removed:true,sourceUnchanged:true}`; its test tabs closed,
+and the user's original browser tab was left untouched. The fixture's 13 unit
+preflight tests are separate from, and not a replacement for, browser evidence.
+
+Regression: **4,158 passed, 12 skipped, 272 files (271 passed / 1 skipped)**.
+The 12 independent real-engine tests were not rerun in this browser-only batch.
+TypeScript, zero-warning lint, webpack (64/64 pages), client-boundary scan
+(107 chunks), adapter sync and whitespace checks passed. The unchanged Hosted
+check-only gate still covers 47 migrations with `hostedExecuted:false`.
+
+Remaining: real browser offline/network-restoration behavior was not exercised;
+the synthetic 503 is not offline evidence. Real GoTrue Cookie verification,
+live custody, Hosted PG17/TLS and read-only advisors remain separate gates. No
+Preview/cloud resource, Production data, AI model call, Points mutation, formal
+runtime activation, deployment or push occurred. Next complete the bounded
+offline recovery browser case, then prepare the exact no-data Hosted auth and
+database integration gate for owner approval before creating resources.
