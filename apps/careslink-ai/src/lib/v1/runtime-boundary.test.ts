@@ -1376,8 +1376,19 @@ describe("V1 shadow runtime boundary", () => {
     )).toEqual([
       join(process.cwd(), "src/lib/v1/communication-note-job-status-postgres.local.test.ts"),
       join(process.cwd(), "src/lib/v1/communication-note-job-status-postgres.server.test.ts"),
+      join(process.cwd(), "src/lib/v1/communication-note-job-status-preview-issuer.server.test.ts"),
+      join(process.cwd(), "src/lib/v1/communication-note-job-status-preview-issuer.server.ts"),
       // The other boundary audit names this module in its exact pg-import list.
       join(process.cwd(), "src/lib/v1/communication-note-preview-product-runtime-composition.server.test.ts"),
+    ]);
+    const issuerPath=join(process.cwd(), "src/lib/v1/communication-note-job-status-preview-issuer.server.ts");
+    const issuerSource=readFileSync(issuerPath,"utf8");
+    expect(issuerSource).toMatch(/^import "server-only";/);
+    expect(issuerSource).toContain("JOB_STATUS_PREVIEW_ISSUER_READY = false");
+    expect(issuerSource).not.toContain("process.env");
+    expect(walkControlledScriptFiles().filter(file=>file!==issuerPath && file!==boundaryPath &&
+      readFileSync(file,"utf8").includes("communication-note-job-status-preview-issuer.server"))).toEqual([
+      join(process.cwd(), "src/lib/v1/communication-note-job-status-preview-issuer.server.test.ts"),
     ]);
   });
 

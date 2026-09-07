@@ -561,3 +561,68 @@ populated synthetic-flow integration gate with real browser Cookie checks and
 the corrected read-only advisors. Cloud creation and formal activation remain
 separately authorized. No cleanup-only Preview repetition, new visual design,
 Production change, Points operation or model call is included in this batch.
+
+## Dedicated issuer candidate and bound Preview service — 2026-09-07
+
+`communication-note-job-status-preview-issuer.server.ts` now supplies a working
+server-owned dependency factory. It authenticates one fixed, read-only Supabase
+branch-list request with an `environment:read` OAuth token, requires exactly one
+matching non-default/non-persistent/no-data branch with a healthy Preview project
+and no scheduled deletion, and derives a short-lived target descriptor from that
+response. Duplicate, missing, stale, unhealthy or mismatched targets fail closed.
+The request is bounded to five seconds and 128 KiB, without redirects or retries.
+The endpoint/scope and response fields were checked against the official
+[branch-list reference](https://supabase.com/docs/reference/api/v1-list-all-branches).
+
+The selected project ref and one pinned CA are used to construct **both** the
+management connection and exclusive runtime read connection. Real HMAC-SHA256
+binds project refs to a server-owned key; only selected content-free metadata is
+hashed. Database custody is not consulted until branch validation succeeds, and
+must return a credential for that exact project. There is no ambient PG/DSN
+fallback, generic SQL, shared pool or product/API role-management grant.
+Each control operation opens a new direct PG17/TLS-verified `postgres` connection,
+checks the existing non-superuser management posture and permits one fixed
+autocommit issuer RPC. Abort hard-closes the socket. This keeps the existing
+management operator's privileges; it does not create another privileged LOGIN.
+
+The CLI-generated migration
+`20260907083608_add_communication_note_job_status_issuer.sql` is retained under
+`supabase/migration-candidates/`, **outside automatic deployment**. It replaces
+the duplicated local broker fixture with invoker-only durable lifecycle SQL,
+forced RLS, exact operation fields, replay tombstones, committed fencing,
+role/OID identity checks and zero-residue finalization. Unknown inherited ACLs
+abort installation. The previous 47-migration Hosted manifest is unchanged.
+The exact candidate is now applied by the owned local test runner, not a copied
+or rewritten test implementation. The remaining local SQL file is only a guard
+for the private PG16/Unix fixture.
+
+Real local proof: all 18 scenario groups passed with **12/12 source-issuer tests**,
+including candidate installation by a non-superuser, no added usage of the
+product schema, extra-field denial and three acquire/cancellation races across
+independent connections. The result reported `hostedVerified:false` and
+`cleanup:{stopped:true,removed:true}`. Initial setup failures exposed an
+unnecessary schema-name resolution privilege and a PL/pgSQL CASE-parenthesis
+error; both were fixed without expanding privileges. The reporter now emits only
+fixed setup SQLSTATE/position classifications when Vitest omits hook failures.
+
+Additional unit proof: 25 target-service tests use synthetic HTTPS/custody ports;
+10 control-connection tests use a mocked `pg.Client`; three tests guard migration
+placement and safety. Together with the earlier 19 issuer tests, these are source
+checks, **not live OAuth, TLS, secret custody or Hosted PG17 proof**. The complete
+suite passed 4,116 tests with the 12 real-engine tests separately selected.
+TypeScript, zero-warning lint, the 64-page webpack build, 107-chunk client scan,
+adapter sync and unchanged check-only Hosted manifest also passed.
+
+Deployment/activation remains unapproved and unperformed. Both issuer readiness
+constants remain false; only the new server component and tests reference the
+physical connectors, and no formal route imports the service. The actual GET is
+still fixed 503. The green UI/Logo, Production, Points and model operations are
+unchanged. This is a local service component and migration candidate, not a
+deployed management service or browser-to-database end-to-end pass.
+
+Next: wire the existing credential-custody interfaces to this bounded issuer
+dependency locally and prepare the exact populated Communication Note recovery
+integration gate. Review and promote the candidate into an explicit new manifest
+only as part of that gate; do not silently extend the previous 47-migration
+approval. Real GoTrue/browser Cookie checks, Hosted PG17/TLS, read-only security
+advisors, resource creation and formal activation remain separately bounded.

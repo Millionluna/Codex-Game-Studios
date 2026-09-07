@@ -202,17 +202,30 @@ async function main() {
       // Retain only fixed test names and our own fixed issuer error codes.
       const text=(String(error.stdout??"")+String(error.stderr??"")).replace(/\u001b\[[0-9;]*m/g,"");
       let failedNames=[];
-      try { failedNames=JSON.parse(String(error.stdout)).testResults.flatMap(file=>
-        file.assertionResults.filter(test=>test.status==="failed").map(test=>test.fullName)); } catch { /* Setup/report failure. */ }
+      let reportShape;
+      try { const parsed=JSON.parse(String(error.stdout)); failedNames=parsed.testResults.flatMap(file=>
+        file.assertionResults.filter(test=>test.status==="failed").map(test=>test.fullName));
+        reportShape={success:parsed.success,total:parsed.numTotalTests,failed:parsed.numFailedTests,
+          pending:parsed.numPendingTests,files:parsed.testResults.map(file=>({status:file.status,
+            messageBytes:Buffer.byteLength(file.message??""),statuses:file.assertionResults.map(test=>test.status)}))};
+      } catch { reportShape={parseFailed:true}; }
       scenario=failedNames.join(" | ").slice(0,1800)+
-        ":"+(text.match(/(?:ISSUER|LOCAL_ISSUER)_[A-Z0-9_]+/g)??[]).slice(0,10).join(",");
+        ":"+(text.match(/(?:ISSUER|LOCAL_ISSUER)_[A-Z0-9_]+/g)??[]).slice(0,10).join(",")+
+        ":"+JSON.stringify({ childCode: typeof error.code === "number" ? error.code :
+          ["ENOENT","EMFILE","ENOBUFS","ERR_CHILD_PROCESS_STDIO_MAXBUFFER","EACCES"].includes(error.code) ? error.code : "UNKNOWN",
+          signal:["SIGTERM","SIGKILL","SIGABRT"].includes(error.signal) ? error.signal : null,
+          killed:error.killed===true,stdoutBytes:Buffer.byteLength(String(error.stdout??"")),
+          stderrBytes:Buffer.byteLength(String(error.stderr??"")),
+          reportShape,
+          diagnosticFlags:["Cannot find module","Transform failed","EPERM","EMFILE","ENOMEM","EAGAIN","EADDRINUSE","No test files found"]
+            .filter(flag=>text.includes(flag)) });
       throw new Error("LOCAL_SOURCE_GATE_FAILED");
     }
     const sourceReport=JSON.parse(sourceGate.stdout);
     assert.equal(sourceReport.success,true);
     assert.equal(sourceReport.numFailedTests,0);
     assert.equal(sourceReport.numPendingTests,0);
-    assert.ok(sourceReport.numTotalTests>=9);
+    assert.equal(sourceReport.numTotalTests,12);
     assert.equal(sourceReport.numPassedTests,sourceReport.numTotalTests);
     sourceIssuerTests=sourceReport.numPassedTests;
     scenarios.push("actual-source-issuer-physical-connection-and-durable-revocation");

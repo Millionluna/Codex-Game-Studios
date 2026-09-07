@@ -44,6 +44,8 @@ const forbiddenMarkers = [
   "Job recovery composition unavailable",
   "Job status PostgreSQL dependency unavailable",
   "careslink-job-status-single-use",
+  "careslink-job-status-control-only",
+  "Job status Preview issuer unavailable",
 ];
 
 if (!existsSync(buildIdPath) || !existsSync(chunksRoot)) {

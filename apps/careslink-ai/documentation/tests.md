@@ -4081,6 +4081,42 @@ engine/TLS proof. Actual browser Cookie and GoTrue integration also remain open.
 No cloud resource, Production SQL, deployment, model/Points operation, UI/Logo
 change or formal reader activation occurred.
 
+### Dedicated Preview issuer candidate — local proof (2026-09-07)
+
+The new server dependency factory has **25 tests** for authenticated fixed
+branch-list transport, same-project/pinned-CA connection construction, target
+HMAC, wrong-parent/default/persistent/copied-data/unhealthy/deletion denial,
+duplicate/missing rows, bounded responses, no redirects/retries, cancellation and
+fresh observation per request. These tests mock HTTPS and credential custody;
+they do not claim live OAuth or Hosted identity proof.
+
+The exclusive control connector has **10 tests** with a mocked PG client for
+fresh project-bound custody, direct PG17/TLS/operator checks, one fixed
+autocommit RPC per physical connection, rejection of generic SQL and hard close
+on cancellation. Three source tests guard the CLI-generated candidate's placement
+outside automatic migrations, its invoker-only authority and durable fencing.
+
+The actual owned PG16 runner now applies the exact migration candidate and
+passed **12/12 physical issuer tests**, including three real two-connection
+acquire/cancellation races, non-superuser installation, no product-schema usage
+grant and extra-field denial. All 18 scenario groups passed; runtime roles,
+sessions and memberships were removed, and the cluster reported stopped/removed.
+Its Auth and PG17/TLS descriptor fixtures are still synthetic, with an explicit
+TestOnly PG16/Unix runtime connector. The new PG17 control connector has unit,
+not real-engine, proof. No cloud resource was created or retained.
+
+Full regression: **4,116 passed, 12 skipped across 270 files (269 passed / 1
+skipped)**. The 12 skips are intentionally run only by the owned real-engine
+runner and passed separately. TypeScript, zero-warning ESLint, webpack build
+(64/64 pages), client-boundary scan (107 chunks), adapter sync and whitespace
+checks passed. The existing Preview check-only gate still covers exactly 47
+migrations with `hostedExecuted:false`; the candidate is not silently included.
+
+Readiness remains false and the formal GET remains fixed 503. Real secret-custody
+wiring, Hosted PG17/TLS, browser/GoTrue and security-advisor checks remain open;
+no Production action, deployment, Points/model operation or UI/Logo change was
+performed. See the [implementation record](communication-note-product-integration-m1y.md#dedicated-issuer-candidate-and-bound-preview-service--2026-09-07).
+
 ### Current live/read-only evidence
 
 - Supabase migrations, tables, RLS flags, policies, grants, function grants and aggregate row counts were checked read-only.

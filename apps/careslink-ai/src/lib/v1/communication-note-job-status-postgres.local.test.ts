@@ -59,6 +59,7 @@ describe.skipIf(!socket)("actual PostgreSQL job status issuer and source composi
       const bootstrap=await connect("status_test_bootstrap");
       try { await bootstrap.query(await readFile("scripts/preview-e2e/communication-note-job-status-issuer-local.sql","utf8")); }
       finally { await bootstrap.end(); }
+      await admin.query(await readFile("supabase/migration-candidates/20260907083608_add_communication_note_job_status_issuer.sql","utf8"));
       stage="SESSION";
       await admin.query("update auth.sessions set not_after=null where id=$1",[SESSION]);
     } catch(error) {
@@ -69,7 +70,11 @@ describe.skipIf(!socket)("actual PostgreSQL job status issuer and source composi
       const knownSetting=deniedSetting && ["unix_socket_directories","unix_socket_permissions","cluster_name","listen_addresses"].includes(deniedSetting)
         ? deniedSetting.toUpperCase():"NONE";
       const deniedDatabase=e.message==="permission denied for database postgres"?"DATABASE":"NONE";
-      throw new Error(`LOCAL_ISSUER_SETUP_${stage}_${code}_AT_${position}_SETTING_${knownSetting}_${deniedDatabase}`);
+      const diagnostic=`LOCAL_ISSUER_SETUP_${stage}_${code}_AT_${position}_SETTING_${knownSetting}_${deniedDatabase}`;
+      // Vitest's JSON reporter omits beforeAll hook errors when all tests skip.
+      // Emit ONLY this fixed classification; never emit the original SQL/error.
+      process.stderr.write(`${diagnostic}\n`);
+      throw new Error(diagnostic);
     }
   });
   afterAll(async()=>{ await Promise.allSettled(clients.map(c=>c.end())); });
@@ -142,5 +147,33 @@ describe.skipIf(!socket)("actual PostgreSQL job status issuer and source composi
     }
     expect((await admin.query("select column_name from information_schema.columns where table_schema='careslink_job_status_issuer'")).rows.map(r=>r.column_name).join(","))
       .not.toMatch(/password|verifier|secret/);
+  });
+  it("installs the candidate as non-superuser without granting product-schema usage",async()=>{
+    expect((await admin.query("select rolsuper from pg_roles where rolname=current_user")).rows[0].rolsuper).toBe(false);
+    expect((await admin.query("select has_schema_privilege('postgres','careslink_v1_generation','usage') as ok")).rows[0].ok).toBe(false);
+    expect((await admin.query("select p.prosecdef,p.proconfig from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='careslink_job_status_issuer'")).rows)
+      .toEqual([{prosecdef:false,proconfig:['search_path=""']}]);
+    expect((await admin.query("select c.relrowsecurity,c.relforcerowsecurity from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname='careslink_job_status_issuer' and c.relkind='r'")).rows)
+      .toEqual([{relrowsecurity:true,relforcerowsecurity:true}]);
+  });
+  it("rejects extra broker fields without creating a tombstone or role",async()=>{
+    const h=setup();await expect(h.actualBroker.call("fence",{digest:hash("extra-key"),targetDigest:hash("target"),unexpected:true},
+      {signal:new AbortController().signal})).rejects.toMatchObject({message:"ISSUER_REQUEST_DENIED"});await noResidue();
+  });
+  it("serializes a real acquire/cancellation race across independent database connections",async()=>{
+    for(let attempt=0;attempt<3;attempt++){
+      let raced=false;
+      const h=setup(b=>({async call(op,data,ctx){
+        if(op!=="acquire" || raced)return b.call(op,data,ctx);
+        raced=true;
+        const cancellation={digest:data.digest,targetDigest:data.targetDigest};
+        const [issued,fenced]=await Promise.allSettled([b.call(op,data,ctx),b.call("fence",cancellation,ctx)]);
+        if(fenced.status==="rejected")throw fenced.reason;
+        await b.call("finalize",cancellation,ctx);
+        if(issued.status==="rejected")throw issued.reason;
+        return issued.value;
+      }}));
+      await expect(h.read()).rejects.toThrow();expect(raced).toBe(true);await noResidue();
+    }
   });
 });
