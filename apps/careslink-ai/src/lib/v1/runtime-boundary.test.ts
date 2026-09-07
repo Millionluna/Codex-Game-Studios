@@ -1310,6 +1310,10 @@ describe("V1 shadow runtime boundary", () => {
           process.cwd(),
           "src/lib/communication-note-job-recovery-composition.server.ts",
         ),
+        join(
+          process.cwd(),
+          "src/lib/communication-note-self-review-durable.server.ts",
+        ),
       ].sort(),
     );
     expect(principalCompositionSource).toMatch(/^import "server-only";/);

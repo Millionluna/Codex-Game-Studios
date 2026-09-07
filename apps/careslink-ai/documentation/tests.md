@@ -4279,6 +4279,36 @@ Remaining: durable review writer/permissions and same-revision integration proof
 real Auth/database persistence; browser Offline/Online automatic recovery. See
 the [self-review slice record](communication-note-product-integration-m1y.md#revision-bound-self-review-interaction--local-slice-2026-09-07).
 
+### Self-review durable writer and database — local candidate (2026-09-07)
+
+- `communication-note-self-review-durable.server.test.ts`: 27 new cases; with
+  the existing transport/client suite, 67/67 focused tests. Gates reject missing
+  self-review permission, Production/mismatched targets and read/write flag
+  substitution before clients; one Cookie client verifies the principal/current
+  session and sends only six RPC arguments. Wrong-principal, malformed response,
+  fixed database errors, abort/lost ACK and no-retry boundaries remain closed.
+- `scripts/preview-e2e/communication-note-self-review-local-pg16.mjs`: 14 real
+  PG16 scenario groups pass. Eight dependency migrations plus the CLI-generated
+  candidate are applied by non-superuser `postgres`. Real RLS/FK/CHECK constraints,
+  valid synthetic privacy proofs and independent database connections test
+  persisted readback, immutable event shape, rollback, owner/type/lifecycle
+  rejection, stale versions, concurrent first/repeated submissions and same-key
+  collisions. Edit/revocation lock winners and session/JWT expiry while waiting
+  are tested, with no document completion, job or ledger mutation.
+- Every run uses its own `/private/tmp/cl-self-review-*` private Unix socket
+  cluster, no TCP/external target or environment URL. All runs reported
+  `cleanup:{stopped:true,removed:true}`, including earlier failed test-seed and
+  ACL iterations. No database constraint was disabled to obtain the result.
+- Final full suite: 4,250 passed / 12 skipped, 274 files (273 passed / 1 skipped).
+  TypeScript and zero-warning lint pass; webpack build is 64/64 pages and the
+  client-boundary scan is 108 chunks.
+
+The formal route remains unbound/503 and no runtime flag is enabled. The new SQL
+is in `supabase/migration-candidates/`, not the approved 47-migration directory.
+This is not complete-chain Hosted, GoTrue/PostgREST, PG17/TLS, security-advisor or
+browser-to-database evidence. Next is a local browser/database roundtrip using
+this real writer. Offline/Online and all Hosted activation gates remain pending.
+
 ### Current live/read-only evidence
 
 - Supabase migrations, tables, RLS flags, policies, grants, function grants and aggregate row counts were checked read-only.

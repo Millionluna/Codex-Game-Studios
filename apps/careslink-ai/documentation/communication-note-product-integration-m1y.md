@@ -983,3 +983,67 @@ after revocation, immutable audit events and draft lifecycle preservation. Real
 database permissions, resource creation and activation require their own review
 and authorization; do not enable the current route merely by wiring a fake
 writer. Browser Offline/Online recovery remains a separate unpassed release gate.
+
+### Self-review database persistence — local candidate (2026-09-07)
+
+The revision-bound self-review now has a durable server writer candidate and
+an actual PostgreSQL transaction, separate from the earlier process-memory
+browser fixture. The formal POST route still installs no writer and returns
+503; the green design, three-language copy, browser storage policy and permanent
+draft label are unchanged.
+
+`createCommunicationNoteDurableSelfReviewWriter` requires its dedicated
+`CARESLINK_COMMUNICATION_NOTE_SELF_REVIEW_ENABLED` flag, the master/durable
+Product API gates, and an exact allowed non-Production Preview target. No flag
+was enabled. It verifies claims, the zero-argument current-session RPC and Auth
+user with the same Cookie client used to write; no service-role writer or
+DOCUMENT_DETAIL/DOCUMENT_WRITE permission fallback exists. It transmits only
+document/revision/mutation UUIDs and the three confirmations, strictly validates
+the receipt and treats abort/lost ACK as uncertain without automatic retries.
+
+The CLI-generated SQL is deliberately retained at
+`supabase/migration-candidates/20260907114955_add_communication_note_self_review_shadow.sql`,
+outside the unchanged, approved 47-migration manifest. It defines one
+authenticated-only RPC with a least-privilege NOLOGIN/NOBYPASSRLS owner. New
+owner RLS protects event SELECT/INSERT; it has no event UPDATE/DELETE, direct
+Auth table, Points or generation capability. Column-level UPDATE grants are
+needed for locks, with RLS update checks denying actual document/switch updates.
+The only Auth helper grant reuses the existing user-before-session lock order.
+Supabase/PostgreSQL guidance shaped these minimum grants, the empty search path
+and transaction-level checks ([official function guidance](https://supabase.com/docs/guides/database/functions)).
+
+The transaction checks a current verified Provider/session, both database
+switches, owner, Communication type, IN_PROGRESS/shadow lifecycle and exact
+current revision. It locks Auth user/session, switches, document, then the
+owner/mutation advisory key. It rechecks real-time session/JWT expiry after
+waiting before either replay or insert. Same-key retries produce one immutable
+event; reusing a key for another document/revision is rejected. Current-version
+changes and revocation are rechecked before old receipts can be returned.
+The existing document reader derives CONFIRMED from the stored event; no draft
+content, completion state, job or Points ledger is mutated.
+
+Local PG16 passed **14 scenario groups**, applying eight exact dependencies and
+this candidate as non-superuser `postgres` in an owned Unix-socket-only cluster.
+Valid synthetic facts/privacy proofs were seeded with FK/CHECK/RLS constraints
+enabled. Tests covered commit + independent-connection readback, rollback,
+same-key replay and concurrent first submission, cross-document key collision,
+foreign owner, wrong type/lifecycle, three required confirmations, stale/edit
+races, provider role vs editable metadata, revoked/mismatched sessions, JWT and
+session expiry during lock waits, and edit/revocation blocking until commit.
+All temporary cluster runs stopped and removed their owned directories.
+
+Verification: **67/67 focused transport/writer tests**, full **4,250 passed /
+12 skipped in 274 files (273 passed / 1 skipped)**, TypeScript, zero-warning lint,
+64/64-page webpack build, and 108-chunk client-boundary scan passed. The skipped
+Hosted/real-engine gates were not converted into passes. No hosted database,
+browser DB roundtrip, real care review, AI model, Points write, deployment or
+push was involved. This does not prove the whole 47+candidate Hosted chain,
+GoTrue/PostgREST/TLS, candidate security-advisor checks or release readiness.
+
+**Next:** connect this real database writer/readback to the guarded local result
+page fixture and verify checkbox → one saved review event → refreshed confirmed
+state through the browser, including stale/revoked rejection. Keep the formal
+route and Hosted/Production activation off. Candidate promotion, new external
+ACLs and Data API write exposure require a separately reviewed authorization;
+the database can verify a JWT, not attest how it reached the Cookie-only server
+boundary. Offline/Online recovery remains a separate unpassed release gate.

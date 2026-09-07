@@ -26,7 +26,7 @@ const OTHER_SESSION = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
 const JOB = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee";
 const args = (owner = OWNER, session = SESSION, job = JOB) =>
   [owner, session, job, "1.0.0-shadow.1", "2026-08-09.v1-shadow"];
-const BOOTSTRAP = `begin;
+export const BOOTSTRAP = `begin;
 create role postgres
   login inherit nosuperuser createdb createrole noreplication bypassrls
   password null;
