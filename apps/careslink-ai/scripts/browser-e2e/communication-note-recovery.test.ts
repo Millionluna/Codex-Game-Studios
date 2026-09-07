@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const state = vi.hoisted(() => ({ mode: "succeeded" }));
 vi.mock("server-only", () => ({}));
 vi.mock("next/headers", () => ({ cookies: async () => ({ get: () => ({ value: state.mode }) }) }));
-import { DOC, JOB, REV, readFixtureJob, readFixtureDocument } from "./communication-note-recovery.fixture";
+import { DOC, JOB, REV, readFixtureJob, readFixtureDocument, observeFixtureNetwork } from "./communication-note-recovery.fixture";
 
 const runner = readFileSync(new URL("./communication-note-recovery.mjs", import.meta.url), "utf8");
 const request = (id = JOB) => new Request(`http://127.0.0.1:3395/api/ai-documents/communication-note/jobs/${id}`);
@@ -39,6 +39,38 @@ describe("isolated real-browser fixture preflight", () => {
     vi.mocked(process.cwd).mockReturnValue("/private/tmp/careslink-ai-points-ui-v1/apps/careslink-ai");
     await expect(readFixtureJob(request(), JOB)).rejects.toThrow("Local browser fixture unavailable");
   });
+  it("classifies a cancelled request without calling the synthetic database", async () => {
+    const controller = new AbortController(); controller.abort();
+    const response = await readFixtureJob(new Request(request(), { signal: controller.signal }), JOB);
+    expect(response.status).toBe(503);
+    expect(JSON.parse(vi.mocked(console.log).mock.calls.at(-1)![0])).toMatchObject({
+      failure: "CLIENT_ABORTED", requestAborted: true, acquired: false, queried: false,
+    });
+  });
+  it("keeps repeated concurrent successful reads out of the unclassified 503 bucket", async () => {
+    for (let batch = 0; batch < 10; batch += 1) {
+      const responses = await Promise.all(Array.from({ length: 30 }, () => readFixtureJob(request(), JOB)));
+      expect(responses.map(response => response.status)).toEqual(Array(30).fill(200));
+    }
+  });
+  const observation = (change: Record<string, string> = {}, headers = { host: "127.0.0.1:3395", "sec-fetch-site": "same-origin" }) =>
+    new Request("http://127.0.0.1:3395/fixture-control/observation?" + new URLSearchParams({
+      page: "11111111-1111-4111-8111-111111111111", sequence: "1", kind: "OFFLINE", online: "false", trusted: "true", ...change,
+    }), { headers });
+  it("records only bounded content-free browser observations", () => {
+    expect(observeFixtureNetwork(observation()).status).toBe(204);
+    expect(JSON.parse(vi.mocked(console.log).mock.calls.at(-1)![0])).toEqual({ fixture: "browser-network",
+      page: "11111111-1111-4111-8111-111111111111", sequence: 1, kind: "OFFLINE", online: false, trusted: true });
+  });
+  it.each<Record<string, string>>([{ kind: "SECRET" }, { sequence: "65" }, { online: "maybe" }, { trusted: "1" },
+    { page: "not-a-page-id" }, { body: "not accepted" }])("rejects malformed observer input %j", change => {
+    expect(observeFixtureNetwork(observation(change)).status).toBe(400);
+    expect(console.log).not.toHaveBeenCalled();
+  });
+  it("denies cross-site and non-loopback observations", () => {
+    expect(observeFixtureNetwork(observation({}, { host: "127.0.0.1:3395", "sec-fetch-site": "cross-site" })).status).toBe(400);
+    expect(observeFixtureNetwork(observation({}, { host: "example.com", "sec-fetch-site": "same-origin" })).status).toBe(400);
+  });
   it("stages only an owned copy with fixed loopback binding, no ambient env and exit-checked cleanup", () => {
     expect(runner).toContain('const port = 3395, host = "127.0.0.1"');
     expect(runner).toContain('root = await mkdtemp(prefix)');
@@ -47,5 +79,12 @@ describe("isolated real-browser fixture preflight", () => {
     expect(runner).not.toMatch(/\.\.\.process\.env|copy\(["']\.env|spawn\(["'](?:npm|npx)|0\.0\.0\.0/);
     expect(runner).toContain('Browser fixture denies outbound fetch');
     expect(runner).toContain('sourceUnchanged: true');
+    expect(runner).toContain('launch(["build", "--webpack"])');
+    expect(runner).toContain('built ? ["start"] : ["dev", "--webpack"]');
+    expect(runner).not.toContain("ignoreBuildErrors");
+    const observer = readFileSync(new URL("./communication-note-network-observer.js", import.meta.url), "utf8");
+    expect(observer).toContain('event.isTrusted');
+    expect(observer).toContain('sequence >= 64');
+    expect(observer).not.toMatch(/dispatchEvent|localStorage|sessionStorage|document\.cookie|innerHTML|globalThis\.fetch\s*=/);
   });
 });

@@ -4200,6 +4200,29 @@ Production, cloud creation, AI, Points or deployment occurred. See the
 [attempt record and screenshots](communication-note-product-integration-m1y.md#connection-interruption-attempt--partial-evidence-2026-09-07)
 for exact limitations and the required supported-browser/non-HMR rerun.
 
+### Offline/online handoff preparation — acceptance pending (2026-09-07)
+
+The synthetic browser runner's `--built` mode now serves a strictly checked
+local `next build`/`next start` copy, excluding HMR reloads from the observation.
+Its content-free observer records bounded network/UI event codes and page-instance
+identity only; it never simulates offline, alters app state, or captures private
+text. It and its loopback report route are absent from the formal app.
+
+Fixture/diagnostic preflight passed **23/23**, including 300 concurrent successful
+reads, cancelled-request classification and malformed/cross-site report denial.
+Full regression passed **4,168 tests, 12 skipped, 272 files**. TypeScript, lint,
+64/64-page formal build, 107-chunk client scan and adapter sync passed. The
+separate built fixture produced 6/6 pages and loaded the queued UI and test panel
+in the real browser without a dev overlay or console error. The historical
+unclassified 503 cannot be conclusively explained from the older logs.
+
+The owner agreed to the manual browser Offline/Online step. The test service is
+retained locally for that immediate handoff, not yet cleaned up or accepted as
+a successful network-recovery gate. No application code, Production, auth/DB
+permission, AI, Points, cloud resource, deployment or push changed. Follow the
+[handoff checklist](communication-note-product-integration-m1y.md#non-hmr-browser-handoff-and-cancellation-diagnostics-2026-09-07)
+to verify same-page automatic recovery and then stop/remove the owned fixture.
+
 ### Current live/read-only evidence
 
 - Supabase migrations, tables, RLS flags, policies, grants, function grants and aggregate row counts were checked read-only.

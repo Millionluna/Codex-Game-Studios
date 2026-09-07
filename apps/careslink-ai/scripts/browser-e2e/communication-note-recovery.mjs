@@ -7,6 +7,9 @@ import { join } from "node:path";
 const app = fileURLToPath(new URL("../../", import.meta.url));
 const port = 3395, host = "127.0.0.1";
 const prefix = "/private/tmp/cl-job-browser-";
+const args = process.argv.slice(2);
+if (args.length > 1 || (args.length === 1 && args[0] !== "--built")) throw new Error("Use no argument or --built for this local fixture");
+const built = args[0] === "--built";
 let root, child, stopped = false;
 const sourceHashes = new Map();
 const copy = async (source, target) => {
@@ -35,6 +38,11 @@ async function cleanup() {
     console.log(JSON.stringify({ stage: "browser-fixture-cleanup", stopped: true, removed: true, sourceUnchanged: true }));
   }
 }
+async function stopAndExit() {
+  try { await cleanup(); process.exit(0); } catch { process.exit(1); }
+}
+process.once("SIGTERM", () => { void stopAndExit(); });
+process.once("SIGINT", () => { void stopAndExit(); });
 try {
   // Fail on an occupied port; never reuse or terminate another local service.
   const probe = createServer();
@@ -46,14 +54,28 @@ try {
   await copy("src/app/ai-documents/communication-note/jobs", "src/app/ai-documents/communication-note/jobs");
   await copy("src/app/ai-documents/communication-note/documents", "src/app/ai-documents/communication-note/documents");
   for (const path of ["src/app/globals.css", "src/app/layout.tsx", "next.config.ts", "tsconfig.json", "postcss.config.mjs"]) await copy(path, path);
+  const tsconfig = JSON.parse(await readFile(join(root, "tsconfig.json"), "utf8"));
+  // Type-check every fixture route and all of its transitive imports, not
+  // unrelated copied components whose app routes intentionally do not exist.
+  tsconfig.include = ["next-env.d.ts", "src/app/**/*.ts", "src/app/**/*.tsx", "src/instrumentation.ts", ".next/types/**/*.ts"];
+  await emit("tsconfig.json", JSON.stringify(tsconfig));
   await copy("public/careslink-ai-logo-reverse.svg", "public/careslink-ai-logo-reverse.svg");
+  if (built) {
+    await copy("scripts/browser-e2e/communication-note-network-observer.js", "public/fixture-network-observer.js");
+    const layout = await readFile(join(root, "src/app/layout.tsx"), "utf8");
+    await emit("src/app/layout.tsx", layout.replace("</body>", '<script src="/fixture-network-observer.js" defer /></body>'));
+    await emit("src/app/fixture-control/observation/route.ts", `export { observeFixtureNetwork as GET } from "@/lib/__browser-fixture";\n`);
+  }
   await emit("src/lib/__browser-fixture.ts", (await readFile(join(app, "scripts/browser-e2e/communication-note-recovery.fixture.ts"), "utf8"))
     .replaceAll('"../../src/lib/', '"./'));
   await symlink(join(app, "node_modules"), join(root, "node_modules"), "dir");
   await emit("package.json", JSON.stringify({ name: "careslink-local-browser-fixture", private: true,
     dependencies: (JSON.parse(await readFile(join(app, "package.json"), "utf8"))).dependencies }));
   await emit("src/lib/supabase-server.ts", `// TEST ONLY, no real Supabase client or credentials.
-export { createFixtureAuthClient as createCareslinkServerSupabaseClient } from "./__browser-fixture";
+import { createFixtureAuthClient } from "./__browser-fixture";
+export async function createCareslinkServerSupabaseClient(options?: unknown) {
+  void options; return createFixtureAuthClient();
+}
 export { getSupabasePublicAuthConfig } from "./supabase-public-auth-config";
 export type CareslinkServerSupabaseClient = Awaited<ReturnType<typeof import("./__browser-fixture").createFixtureAuthClient>>;
 `);
@@ -91,15 +113,20 @@ export async function GET(request: Request) {
   if (process.env.NEXT_RUNTIME === "nodejs") globalThis.fetch = async () => { throw new Error("Browser fixture denies outbound fetch"); };
 }
 `);
-  const env = { PATH: process.env.PATH, TMPDIR: process.env.TMPDIR, NODE_ENV: "development",
+  const env = { PATH: process.env.PATH, TMPDIR: process.env.TMPDIR, NODE_ENV: built ? "production" : "development",
     NEXT_TELEMETRY_DISABLED: "1", CARESLINK_LOCAL_BROWSER_FIXTURE: "SYNTHETIC_LOOPBACK_ONLY" };
-  child = spawn(process.execPath, [join(app, "node_modules/next/dist/bin/next"), "dev", "--webpack", "--hostname", host, "--port", String(port)],
-    { cwd: root, env, stdio: ["ignore", "pipe", "pipe"] });
-  child.stdout.on("data", data => process.stdout.write(data));
-  child.stderr.on("data", data => process.stderr.write(data));
-  console.log(JSON.stringify({ stage: "browser-fixture-start", root, url: `http://${host}:${port}`, syntheticOnly: true, hostedVerified: false }));
-  process.once("SIGTERM", () => { void cleanup().then(() => process.exit(0)).catch(() => process.exit(1)); });
-  process.once("SIGINT", () => { void cleanup().then(() => process.exit(0)).catch(() => process.exit(1)); });
-  await new Promise((resolve, reject) => { child.once("error", reject); child.once("exit", resolve); });
+  const launch = (arguments_) => {
+    child = spawn(process.execPath, [join(app, "node_modules/next/dist/bin/next"), ...arguments_],
+      { cwd: root, env, stdio: ["ignore", "pipe", "pipe"] });
+    child.stdout.on("data", data => process.stdout.write(data));
+    child.stderr.on("data", data => process.stderr.write(data));
+    return new Promise((resolve, reject) => { child.once("error", reject); child.once("exit", resolve); });
+  };
+  if (built && await launch(["build", "--webpack"]) !== 0) throw new Error("Local fixture build failed");
+  if (stopped) process.exit(0);
+  const completion = launch([...(built ? ["start"] : ["dev", "--webpack"]), "--hostname", host, "--port", String(port)]);
+  console.log(JSON.stringify({ stage: "browser-fixture-start", root, url: `http://${host}:${port}`, built,
+    syntheticOnly: true, hostedVerified: false }));
+  await completion;
   await cleanup();
 } catch { await cleanup(); throw new Error("Local browser fixture failed"); }

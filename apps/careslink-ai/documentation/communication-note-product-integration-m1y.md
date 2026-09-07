@@ -806,3 +806,56 @@ repeat against a local non-HMR build so development reconnect reloads cannot
 confound the result. Keep automatic online-event recovery and the unclassified
 fixture response open until that run; do not silently substitute this partial
 connection-refusal evidence or activate the Hosted gate.
+
+### Non-HMR browser handoff and cancellation diagnostics (2026-09-07)
+
+The runner now accepts `--built`: it strictly type-checks/builds the owned
+synthetic app and serves it with `next start`, without development HMR. This
+is a **local release-mode test build**, not a Production deployment. The initial
+attempt failed because the broad copied component set included unrelated pages'
+imports. The fixture tsconfig now starts from every fixture route/layout and
+checks all transitive imports; no `ignoreBuildErrors` setting is used. The
+failed build cleaned up its copy. The corrected fixture built 6/6 static pages
+and loaded the real green queued-job page without a console error or dev overlay.
+
+The built copy alone includes a small network observer and a loopback-only
+observation route. The observer does not synthesize network events, replace
+fetch, mutate app state, read cookies/storage or record text/credentials. It
+buffers at most 64 fixed event/UI codes, online/trusted booleans and a random
+page-instance ID in memory; the server validates the exact bounded query and
+same-origin/loopback headers before logging those fields. The visible diagnostic
+panel is test-only and is absent from the formal build. These browser-reported
+fields are test observations, not authorization or cryptographic attestations.
+
+Job-read diagnostics now distinguish an aborted request from the intentionally
+unavailable fixture and an unclassified 503, with acquire/query/cleanup booleans
+only. A cancelled-request test proved fixed 503 with no synthetic database
+acquisition. A 300-read concurrent stress case returned only 200s. These facts
+do **not** retrospectively classify the previous uninstrumented 503; its exact
+historical cause remains unproved.
+
+Verification: fixture/diagnostic preflight **23/23**; full regression **4,168
+passed, 12 skipped, 272 files**; TypeScript, zero-warning lint, formal webpack
+build (64/64 pages), 107-chunk client scan and adapter sync passed. No application
+source, auth/database permission, migration or formal runtime flag changed.
+No cloud creation, Production data, AI, Points, deployment or push occurred.
+
+At this handoff the owner agreed to operate Chrome/Edge's Offline/Online control.
+The owned built service is intentionally still running on `127.0.0.1:3395` for
+that immediate manual step; its final cleanup has **not** been performed yet.
+The agent's smoke-test tab closed. See the
+[ready-page capture](evidence/communication-note-built-network-ready-2026-09-07.png).
+
+Reproduce/start: `node scripts/browser-e2e/communication-note-recovery.mjs --built`.
+Open `http://127.0.0.1:3395/fixture-control/set?mode=queued` in the test browser,
+wait for queued, switch Network throttling to Offline for about five seconds,
+then No throttling for about five seconds. Keep the page open and do not refresh
+or click Check status. If setup exceeds the bounded automatic-poll window,
+reload while online before beginning the offline/online sequence. The expected
+evidence is one unchanged page-instance ID, trusted OFFLINE/ONLINE events with
+matching navigator state, UNAVAILABLE followed by CHECKING/QUEUED, and no
+MANUAL_CHECK. Confirm the owner's visible result and reconcile the instrumented
+HTTP reads before acceptance. Then stop only the validated owned runner PID and
+confirm its cleanup receipt. Offline/online acceptance remains **pending** until
+that evidence exists; a repeated instruction to execute is not evidence that
+the user performed the browser action.

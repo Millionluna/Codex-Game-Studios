@@ -27,6 +27,25 @@ function guard() {
   if (!/^\/private\/tmp\/cl-job-browser-[a-zA-Z0-9]{6}$/.test(process.cwd()) ||
       process.env.CARESLINK_LOCAL_BROWSER_FIXTURE !== "SYNTHETIC_LOOPBACK_ONLY" || process.env.VERCEL) throw new Error("Local browser fixture unavailable");
 }
+export function observeFixtureNetwork(request: Request) {
+  guard();
+  const query = new URL(request.url).searchParams;
+  const expected = ["kind", "online", "page", "sequence", "trusted"];
+  const kinds = ["LOAD", "OFFLINE", "ONLINE", "MANUAL_CHECK", "CHECKING", "QUEUED", "RUNNING", "SUCCEEDED", "UNAVAILABLE"];
+  if (request.method !== "GET" || request.headers.get("host") !== "127.0.0.1:3395" ||
+      request.headers.get("sec-fetch-site") !== "same-origin" || query.size !== expected.length ||
+      !expected.every(key => query.has(key)) || !kinds.includes(query.get("kind")!) ||
+      !/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/.test(query.get("page")!) ||
+      !/^(?:[1-9]|[1-5][0-9]|6[0-4])$/.test(query.get("sequence")!) ||
+      !["true", "false"].includes(query.get("online")!) || !["true", "false"].includes(query.get("trusted")!)) {
+    return new Response(null, { status: 400 });
+  }
+  // Test observation, not authorization evidence. Only fixed codes/booleans,
+  // a random page-instance ID and bounded sequence; never a URL or body.
+  console.log(JSON.stringify({ fixture: "browser-network", page: query.get("page"), sequence: Number(query.get("sequence")),
+    kind: query.get("kind"), online: query.get("online") === "true", trusted: query.get("trusted") === "true" }));
+  return new Response(null, { status: 204, headers: { "Cache-Control": "no-store" } });
+}
 async function mode() { guard(); const value = (await cookies()).get("cl_browser_fixture")?.value; return MODES.find(m => m === value) ?? "succeeded"; }
 function user() { return { id: USER, email: "synthetic@example.invalid", app_metadata: { role: "provider" } }; }
 export async function createFixtureAuthClient() {
@@ -42,6 +61,7 @@ export async function createFixtureAuthClient() {
 
 export async function readFixtureJob(request: Request, jobId: string) {
   guard(); const current = await mode(), now = new Date().toISOString();
+  const diagnostics = { acquired: false, queried: false, destroyed: false, revoked: false };
   const expiry = new Date(Date.now() + 60000).toISOString();
   const databaseTarget = target({ status: "VALIDATED_DISPOSABLE_PREVIEW_TARGET_NOT_APPROVED", deploymentEnvironment: "PREVIEW",
     targetClass: "DISPOSABLE_NO_DATA_NON_PRODUCTION_PREVIEW", targetProjectRefHmac: hash("target"), productionProjectRefHmac: hash("parent"),
@@ -68,6 +88,7 @@ export async function readFixtureJob(request: Request, jobId: string) {
     resolveDatabase: async () => ({ projectRef: REF, databaseTarget, clock: { now: () => new Date().toISOString() },
       credentialResolver: resolver({ capability: "INJECTED_JOB_STATUS_CREDENTIAL_RESOLVER",
         acquire: async (value: unknown) => {
+          diagnostics.acquired = true;
           const r = value as Record<string, unknown>;
           const keys = ["requestDigest", "deploymentEnvironment", "targetClass", "purpose", "callerRole", "rpcNames", "rpcParameterCount",
             "databaseTargetDigest", "targetProjectRefHmac", "productionProjectRefHmac", "controlPlaneEvidenceSha256", "databaseName",
@@ -80,14 +101,16 @@ export async function readFixtureJob(request: Request, jobId: string) {
             issuedAt: new Date().toISOString(), expiresAt: expiry, revokeBy: expiry, reuseAllowed: false, concurrentUseAllowed: false, rawCredentialMaterialPresent: false };
           return lease({ capability: "INJECTED_JOB_STATUS_EXCLUSIVE_SESSION", descriptor,
             query: async (sql: string, values: readonly unknown[]) => {
+              diagnostics.queried = true;
               if (sql !== SQL || values.length !== 5 || values[0] !== USER || values[1] !== SESSION) throw new Error("Fixture query denied");
               if (current === "unavailable") throw new Error("SYNTHETIC_READ_FAILURE");
               if (current === "foreign" || values[2] !== JOB) throw Object.assign(new Error("NOT_FOUND"), { code: "P0001" });
               return { rows: [{ data: { job } }] };
-            }, destroy: async () => receipt({ status: "DESTROYED_NOT_APPROVED", leaseReferenceSha256: descriptor.leaseReferenceSha256,
+            }, destroy: async () => { diagnostics.destroyed = true; return receipt({ status: "DESTROYED_NOT_APPROVED", leaseReferenceSha256: descriptor.leaseReferenceSha256,
               sessionBindingSha256: descriptor.sessionBindingSha256, runtimeRole: descriptor.runtimeRole, reportedAt: new Date().toISOString(),
-              sessionTerminated: true, activeStatementCount: 0, inFlightStatementDisposition: "SETTLED_OR_CANCELLED", reusable: false, rawCredentialMaterialPresent: false }) });
+              sessionTerminated: true, activeStatementCount: 0, inFlightStatementDisposition: "SETTLED_OR_CANCELLED", reusable: false, rawCredentialMaterialPresent: false }); } });
         }, revoke: async (value: unknown) => {
+          diagnostics.revoked = true;
           const r = value as Record<string, unknown>;
           return receipt({ status: "REVOKED_AND_TOMBSTONED_NOT_APPROVED", requestDigest: r.requestDigest,
             acquisitionRequestDigest: r.acquisitionRequestDigest, leaseReferenceSha256: r.leaseReferenceSha256,
@@ -99,7 +122,10 @@ export async function readFixtureJob(request: Request, jobId: string) {
   });
   if (!handle) throw new Error("Fixture composition disabled");
   const response = await handle(request, jobId);
-  console.log(JSON.stringify({ fixture: "job-read", method: request.method, status: response.status, mode: current }));
+  console.log(JSON.stringify({ fixture: "job-read", method: request.method, status: response.status, mode: current,
+    requestAborted: request.signal.aborted, ...diagnostics,
+    failure: response.status !== 503 ? null : request.signal.aborted ? "CLIENT_ABORTED"
+      : current === "unavailable" ? "SYNTHETIC_UNAVAILABLE" : "UNCLASSIFIED" }));
   return response;
 }
 
