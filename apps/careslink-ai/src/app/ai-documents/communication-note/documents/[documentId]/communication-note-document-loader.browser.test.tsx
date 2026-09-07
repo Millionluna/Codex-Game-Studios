@@ -11,6 +11,11 @@ const mocks = vi.hoisted(() => ({
   replaceLocation: vi.fn(),
   confirmReview: vi.fn(),
   saveEdit: vi.fn(),
+  copyRecord: vi.fn(), downloadRecord: vi.fn(), disposeExport: vi.fn(),
+}));
+
+vi.mock("../../../../../lib/communication-note-export-browser", () => ({
+  copyCommunicationNoteRecord: mocks.copyRecord, downloadCommunicationNoteRecord: mocks.downloadRecord,
 }));
 
 vi.mock("../../../../../lib/communication-note-self-review-client", () => ({
@@ -53,6 +58,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.confirmReview.mockReset();
   mocks.saveEdit.mockReset();
+  mocks.copyRecord.mockReset().mockImplementation(async prepare => { await prepare(); });
+  mocks.downloadRecord.mockReset().mockReturnValue(mocks.disposeExport);
   container = document.createElement("div");
   document.body.append(container);
   root = createRoot(container);
@@ -64,6 +71,60 @@ afterEach(async () => {
 });
 
 describe("Communication Note private result loader", () => {
+  it("requires a saved self-review and hides export while editing", async () => {
+    mocks.loadDocument.mockResolvedValue(documentResult("Private draft")); await renderLoader();
+    expect(exportButton("Copy record text").disabled).toBe(true);
+    expect(exportButton("Download TXT").disabled).toBe(true);
+    expect(container.textContent).toContain("Confirm your self-review for this saved version before exporting.");
+    await openEditor(); expect(container.textContent).not.toContain("Export a record copy");
+    expect(mocks.copyRecord).not.toHaveBeenCalled();
+  });
+  it("rechecks access separately for Copy and TXT, with no review or document writes", async () => {
+    const saved = reviewedDocument(); mocks.loadDocument.mockResolvedValue(saved); await renderLoader();
+    await act(async () => exportButton("Copy record text").click());
+    expect(container.textContent).toContain("Record text copied.");
+    await act(async () => exportButton("Download TXT").click());
+    expect(mocks.loadDocument).toHaveBeenCalledTimes(3);
+    expect(mocks.loadDocument.mock.calls[2][0]).toMatchObject({ canonicalId: DOC, revisionId: REV });
+    expect(mocks.downloadRecord.mock.calls[0][0]).toMatchObject({ profile: "RECORD_COPY", filename: "communication-note_2026-09-07_10000000_v1.txt" });
+    expect(mocks.downloadRecord.mock.calls[0][0].text).not.toContain("factsSummary");
+    expect(container.textContent).toContain("TXT download started.");
+    expect(mocks.confirmReview).not.toHaveBeenCalled(); expect(mocks.saveEdit).not.toHaveBeenCalled();
+    await openEditor(); expect(mocks.disposeExport).toHaveBeenCalled();
+  });
+  it.each(["AUTH_REQUIRED", "NOT_FOUND"] as const)("clears the private page after export recheck returns %s", async status => {
+    mocks.loadDocument.mockResolvedValueOnce(reviewedDocument()).mockResolvedValueOnce({ status }); await renderLoader();
+    await act(async () => exportButton("Download TXT").click());
+    expect(mocks.downloadRecord).not.toHaveBeenCalled();
+    expect(container.textContent).not.toContain("Synthetic export text");
+    if (status === "AUTH_REQUIRED") expect(mocks.replaceLocation).toHaveBeenCalledExactlyOnceWith(LOGIN);
+    else expect(container.textContent).not.toContain("Download TXT");
+  });
+  it("freezes stale export without substituting the latest revision or changing self-review", async () => {
+    const stale = { ...reviewedDocument(), isCurrentRevision: false, selfReviewStatus: "UNKNOWN" };
+    mocks.loadDocument.mockResolvedValueOnce(reviewedDocument()).mockResolvedValueOnce(stale); await renderLoader();
+    await act(async () => exportButton("Download TXT").click());
+    expect(exportButton("Download TXT").disabled).toBe(true); expect(container.textContent).toContain("A newer version exists.");
+    expect(mocks.downloadRecord).not.toHaveBeenCalled(); expect(mocks.confirmReview).not.toHaveBeenCalled();
+  });
+  it("prevents duplicate actions and cancels a pending export when page access is refreshed", async () => {
+    let resolve!: (value: CommunicationNoteAvailableDocument) => void;
+    mocks.loadDocument.mockResolvedValueOnce(reviewedDocument()).mockImplementationOnce(() => new Promise(r => { resolve = r; }))
+      .mockResolvedValueOnce(documentResult("Fresh private read"));
+    await renderLoader();
+    await act(async () => { exportButton("Download TXT").click(); exportButton("Download TXT").click(); });
+    expect(mocks.loadDocument).toHaveBeenCalledTimes(2); expect(exportButton("Copy record text").disabled).toBe(true);
+    await act(async () => window.dispatchEvent(new Event("focus")));
+    await act(async () => resolve(reviewedDocument()));
+    expect(mocks.downloadRecord).not.toHaveBeenCalled(); expect(container.textContent).not.toContain("TXT download started.");
+    expect(container.textContent).toContain("Fresh private read");
+  });
+  it.each(["en", "zh-Hans", "zh-Hant"] as const)("shows explicit %s export copy and no unavailable format controls", async locale => {
+    mocks.loadDocument.mockResolvedValue(reviewedDocument());
+    await act(async () => root.render(<CommunicationNoteDocumentLoader canonicalId={DOC} locale={locale} loginHref={LOGIN} revisionId={REV} unsupportedLocale={false} />));
+    expect(container.textContent).toContain(locale === "en" ? "Export a record copy" : locale === "zh-Hans" ? "导出记录副本" : "匯出記錄副本");
+    expect(container.textContent).not.toMatch(/Download PDF|Download DOCX|下載 PDF|下载 PDF/);
+  });
   it("loads only after mount, then clears and reauthorizes on focus", async () => {
     mocks.loadDocument.mockResolvedValueOnce(documentResult("First private draft"));
     await renderLoader();
@@ -316,6 +377,13 @@ async function renderLoader() {
     root.render(loaderElement());
     await Promise.resolve();
   });
+}
+
+function exportButton(label: string) {
+  return Array.from(container.querySelectorAll<HTMLButtonElement>("button")).find(button => button.textContent === label)!;
+}
+function reviewedDocument(): CommunicationNoteAvailableDocument {
+  return { ...documentResult("Synthetic export text"), isCurrentRevision: true, selfReviewStatus: "CONFIRMED" };
 }
 
 function loaderElement() {

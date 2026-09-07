@@ -1375,3 +1375,99 @@ specific saved revision, preserving the draft notice and required human-review
 boundary. Keep the native discard-confirmation interaction as an explicit
 pending browser acceptance item. Formal binding, candidate promotion, Hosted
 activation and the other four Note-type application flows remain separate work.
+
+### Communication Note Copy / TXT Record copy (2026-09-08)
+
+The first export product slice is implemented locally. It follows the approved
+2026-08-09 baseline's `AI-DOC-007/015/016/017`, `APP-NOTE-025/026` and
+`APP-DOC-006/008/009` requirements, not the old legacy copy/telemetry path. This
+is **not the complete GA-0 export service or a native file-delivery pass**.
+
+The approved green result page now has an inline export section with explicit
+English, Simplified Chinese and Traditional Chinese UI copy. Existing fonts,
+Logo, tokens and button vocabulary are preserved. The default `RECORD_COPY`
+profile includes only the English Note plus document type, numeric version,
+saved timestamp, explicitly labelled device export time, English language,
+persistent draft notice and static-copy/human-review warnings. It excludes
+Chinese review translations, cleaned facts, privacy findings, missing-fact
+prompts, internal disclaimer fields, hashes, full IDs, Points and model metadata.
+The filename uses Note type, date, short canonical ID and revision, never a
+participant name or draft text.
+
+`communication-note-export.ts` provides the shared plain-text profile with
+template version `communication-record-text.2026-09-08.1`. Copy and UTF-8 TXT
+consume the same renderer; with the same explicit export time they produce
+identical text. Unicode and saved wording are preserved, not paraphrased or
+silently reformatted. Empty, oversized, control-bearing and recognizably
+formatted Markdown/HTML inputs fail the conservative plain-text guard and ask
+for editing/review. This is not a general Markdown conversion engine.
+
+Each action reuses the existing no-store Cookie document GET with the exact
+document/revision locator. It requires a current, SERVER_ACKNOWLEDGED revision
+with CONFIRMED self-review, then checks the fresh ID, number, hash and English
+wording against the displayed version. Stale, revoked, missing, unavailable,
+reset-review and misbound responses produce no export artifact. Auth/not-found
+results clear the private page. Historical export remains explicitly unavailable
+because the current read projection does not expose historical self-review
+evidence. Unsaved editing hides export controls; focus/access-generation changes
+abort pending preparation. The existing Auth/RLS reader remains the server-side
+access boundary; the client renderer does not establish a new authorization
+service or an irrevocable guarantee after data has left the page.
+
+Clipboard writing is requested within the user click, with promise-backed
+`ClipboardItem` data for browsers supporting it. The data promise completes only
+after fresh authorization; no clipboard read or legacy `execCommand` fallback
+exists. This follows the documented asynchronous ClipboardItem representation
+and WebKit user-activation requirement
+([MDN ClipboardItem](https://developer.mozilla.org/en-US/docs/Web/API/ClipboardItem/ClipboardItem),
+[WebKit clipboard API](https://webkit.org/blog/10855/async-clipboard-api/)).
+TXT uses a local Blob URL and revokes it after 60 seconds, on access loss,
+unmount, failure or replacement. The UI says download **started**, never that a
+file was saved. There is no public URL, upload, persistent file-byte cache,
+browser storage, analytics payload, new export API, database mutation, Points
+charge or model invocation. Successful exports do not change document lifecycle
+or self-review; this slice does not yet record durable export events.
+
+Verification:
+
+- **88/88 focused tests** cover rendering/minimization, Unicode, filenames,
+  exact-version fresh reads, status/receipt rejection, copy denial, synchronous
+  ClipboardItem invocation, aborted/lost access, duplicate clicks, TXT byte
+  parity, failed download cleanup, Blob TTL, all three locales and edit/review
+  integration. A test-only FileReader timeout was corrected by using real timers
+  for that asynchronous browser API; the initial failed run is not a pass.
+- Final full regression: **4,446 passed / 12 skipped in 279 files (278 passed /
+  1 skipped)**. TypeScript, zero-warning lint, 64/64-page webpack build,
+  109-chunk client-boundary scan and 73-file adapter sync passed.
+- One built 6/6-page `--edit` fixture at `/private/tmp/cl-job-browser-QX92oH`
+  used synthetic identity and PROCESS_MEMORY_ONLY storage. The dedicated in-app
+  tab proved disabled export before review, review confirmation, clipboard API
+  success feedback and TXT-start feedback. Mobile 390×844, tablet 768×1024 and
+  desktop 1280×900 had equal client/scroll widths; screenshots were inspected,
+  buttons were 44 pixels high and keyboard focus was visible. All three locale
+  labels appeared correctly and scoped warning/error logs were empty. A final
+  inline-format rejection expansion was then verified by the full suite/build;
+  it did not change the visually tested layout or synthetic plain-text case.
+- **Unpassed:** the in-app host did not emit a download event or supply a file;
+  the exact expected filename was not found in the local Downloads folder. Its
+  separate virtual clipboard reported no data when attempting to paste the
+  webpage-written copy into the test-only field. Native Safari cross-app paste
+  and actual TXT file save/open therefore remain acceptance items. API success,
+  Blob byte tests and a started message are not substitutes for those outcomes.
+- The temporary viewport was reset, owned tab closed and fixture stopped.
+  Cleanup reported source hashes unchanged/root removed; independent checks
+  confirmed the exact root absent and port 3395 closed. Only disposable synthetic
+  state was removed, with no retained recovery copy.
+
+Next.js, React and Impeccable guidance kept the action/state boundary scoped and
+the existing visual identity intact. Supabase security guidance was used to
+review the reused request-scoped, private/no-store Cookie boundary
+([SSR guidance](https://supabase.com/docs/guides/auth/server-side/advanced-guide));
+no Auth code, package, migration, grant, flag, Hosted/Production setting, push or
+deployment changed. No new real PostgreSQL/Hosted claim is made by this batch.
+
+**Next:** add the DOCX export renderer using the same minimal saved-revision
+profile. Keep native Safari copy/TXT acceptance, native discard-confirmation
+navigation and real Offline/Online checks explicitly pending. PDF, bilingual
+review export, historical review evidence, batch export, durable export history,
+native sharing and Hosted activation are separate remaining work.

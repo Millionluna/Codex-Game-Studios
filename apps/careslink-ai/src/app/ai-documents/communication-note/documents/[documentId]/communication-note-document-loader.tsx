@@ -8,6 +8,7 @@ import { replaceCommunicationNoteLocation } from "../../../../../lib/communicati
 import { CommunicationNoteDocumentView } from "./communication-note-document-view";
 import { CommunicationNoteSelfReviewForm } from "./communication-note-self-review-form";
 import { CommunicationNoteEditForm } from "./communication-note-edit-form";
+import { CommunicationNoteExportControls } from "./communication-note-export-controls";
 import { buildCommunicationNoteDocumentHref } from "../../../../../lib/communication-note-document-contract";
 import type { CommunicationNoteEditResult } from "../../../../../lib/communication-note-edit-contract";
 import { getCommunicationNoteEditCopy } from "../../../../../lib/communication-note-edit-i18n";
@@ -158,6 +159,10 @@ export function CommunicationNoteDocumentLoader({
       unsupportedLocale={unsupportedLocale}
       editing={editing}
       editorNotice={editorCleared ? getCommunicationNoteEditCopy(locale).cleared : undefined}
+      exportControl={!editing && result?.status === "AVAILABLE" && accessSignal ? <CommunicationNoteExportControls
+        key={`export:${result.canonicalId}:${result.revision.revisionId}:${accessGeneration}`}
+        saved={result} locale={locale} accessSignal={accessSignal} onAccessResult={onReviewResult}
+      /> : undefined}
       editorControl={result?.status === "AVAILABLE" && accessSignal ? <CommunicationNoteEditForm
         key={`edit:${result.canonicalId}:${result.revision.revisionId}:${accessGeneration}`}
         saved={result} locale={locale} accessSignal={accessSignal} editing={editing}

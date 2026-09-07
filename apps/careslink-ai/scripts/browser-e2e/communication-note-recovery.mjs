@@ -120,7 +120,11 @@ export default function FixtureControls() { return <main style={{padding:32}}>
   if (edit) {
     await emit("src/app/page.tsx", `export default function EditFixture() { return <main style={{padding:32}}><h1>Local edit test</h1>
 <p>Synthetic identity and PROCESS MEMORY ONLY. Not database persistence. No AI, Points or Hosted writes.</p>
-<a href="/ai-documents/communication-note/documents/44444444-4444-4444-8444-444444444444?lang=zh-Hans">打开编辑测试草稿</a></main>; }`);
+<a href="/ai-documents/communication-note/documents/44444444-4444-4444-8444-444444444444?lang=zh-Hans">打开编辑测试草稿</a>
+<p><label htmlFor="fixture-export-paste">Paste the copied synthetic record for verification</label></p>
+<textarea id="fixture-export-paste" rows={12} style={{width:"100%"}} autoComplete="off" spellCheck={false} />
+<p>This local-only field is not submitted or persisted. Paste only the synthetic record just copied in this test.</p>
+</main>; }`);
     await emit("src/app/api/ai-documents/communication-note/documents/[documentId]/route.ts", `import { readEditFixtureDocument } from "@/lib/__edit-fixture";
 export const dynamic = "force-dynamic";
 export async function GET(request: Request, context: { params: Promise<{ documentId: string }> }) { return readEditFixtureDocument(request, (await context.params).documentId); }`);

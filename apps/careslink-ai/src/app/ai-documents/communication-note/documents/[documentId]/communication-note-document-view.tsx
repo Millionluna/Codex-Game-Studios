@@ -44,6 +44,7 @@ export type CommunicationNoteDocumentViewProps = Readonly<{
   unsupportedLocale?: boolean;
   selfReviewControl?: ReactNode;
   editorControl?: ReactNode;
+  exportControl?: ReactNode;
   editing?: boolean;
   editorNotice?: string;
 }>;
@@ -56,7 +57,7 @@ export function CommunicationNoteDocumentView({
   revisionId,
   unsupportedLocale = false,
   selfReviewControl,
-  editorControl, editing = false, editorNotice,
+  editorControl, exportControl, editing = false, editorNotice,
 }: CommunicationNoteDocumentViewProps) {
   const copy = getCommunicationNoteDocumentCopy(locale);
   const selectedRevisionId =
@@ -139,7 +140,7 @@ export function CommunicationNoteDocumentView({
         {!result ? (
           <DocumentLoading copy={copy} />
         ) : result.status === "AVAILABLE" ? (
-          <AvailableDocument result={result} locale={locale} copy={copy} selfReviewControl={selfReviewControl} editorControl={editorControl} editing={editing} />
+          <AvailableDocument result={result} locale={locale} copy={copy} selfReviewControl={selfReviewControl} editorControl={editorControl} exportControl={exportControl} editing={editing} />
         ) : (
           <DocumentState
             status={result.status}
@@ -161,13 +162,14 @@ function AvailableDocument({
   locale,
   copy,
   selfReviewControl,
-  editorControl, editing,
+  editorControl, exportControl, editing,
 }: Readonly<{
   result: CommunicationNoteAvailableDocument;
   locale: CommunicationNoteDocumentLocale;
   copy: CommunicationNoteDocumentCopy;
   selfReviewControl?: ReactNode;
   editorControl?: ReactNode;
+  exportControl?: ReactNode;
   editing: boolean;
 }>) {
   const composerCopy = getCommunicationNoteComposerCopy(locale);
@@ -273,6 +275,7 @@ function AvailableDocument({
             copy={copy}
           />
           </> : null}
+          {!editing ? exportControl : null}
           <footer className="flex gap-3 border-t border-line bg-[#f5f4ed] p-5 text-xs leading-5 text-[#455d55] sm:p-6">
             <LockKeyhole
               className="mt-0.5 size-4 shrink-0 text-brand"
