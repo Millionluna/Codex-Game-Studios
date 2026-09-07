@@ -1546,3 +1546,77 @@ Keep native Safari Copy/TXT/DOCX save/open, actual Microsoft Word compatibility,
 native discard-confirmation navigation and real Offline/Online acceptance pending.
 Bilingual/historical review export, batch export, durable export history, native
 sharing, other Note applications and Hosted activation remain separate work.
+
+## Communication Note PDF Record copy (2026-09-08)
+
+The current self-reviewed revision now offers **Download PDF**, alongside
+Copy/TXT/DOCX, in all three existing UI languages. The approved green identity,
+logo and fonts are unchanged. PDF reuses the same minimal English Record copy,
+template/profile, field order, safe filename and fresh exact-revision Cookie
+read. Editing hides exports; unreviewed/historical versions remain disabled.
+Denied access, stale revisions, review reset, duplicate clicks and cancellation
+cannot download the displayed stale copy or silently substitute another format.
+
+The lazy browser renderer uses `pdf-lib@1.17.1` and `fontkit@2.0.4` to create
+selectable text on Letter pages with one-inch horizontal margins. It wraps long
+words at grapheme boundaries, represents tabs with half-inch stops, preserves
+logical paragraphs and repeats **Draft – review required** on every page.
+The 200-page cap and unsupported-grapheme check fail explicitly before a Blob is
+created; DOCX/TXT remain available by a separate user action. No screenshots,
+review translations, internal checks, source facts, Points/model metadata,
+owner author identity, links, attachments, scripts or forms are added to files.
+
+The two pinned, unmodified Noto font assets and OFL licenses live in
+`public/export-fonts`; the UI does not use them. They are fetched only on PDF
+export from fixed same-origin public paths with no credentials/referrer/query
+or redirects, then checked for exact size and SHA-256. Text font first load is
+8,331,336 bytes; the 1,982,596-byte emoji font is loaded only when the text font
+does not cover the record. Only used glyphs enter the PDF. Public font caching
+contains no document content. This is not universal Unicode/emoji-sequence,
+PDF/A, tagged-PDF, archival-standard or native-reader compatibility certification.
+
+Initial real rendering exposed invalid/missing CJK glyphs with the older
+`@pdf-lib/fontkit@1.1.1` fork; those failed files are not acceptance evidence.
+The final code uses maintained Fontkit 2 and a small, tested bridge from its
+[documented subset encode API](https://github.com/foliojs/fontkit#subsets)
+to pdf-lib's older stream serialization interface. No experimental converted
+fonts or font-build Python dependencies were added to the application.
+
+Verification:
+
+- **141 focused tests**; final full regression **4,499 passed / 12 skipped**,
+  283 files (282 passed / 1 skipped). Coverage includes actual PDF bytes/font
+  structures, shared text/order, Unicode, long words/pages, unsupported glyphs,
+  page cap, font integrity/failure, serialization bridge, exact revision/access
+  denial, duplicate/cancel/retry, MIME/filename and 60-second Blob URL cleanup.
+- TypeScript, zero-warning lint, 64/64-page webpack build, 115-chunk private-client
+  boundary scan and 73-file adapter check passed. The last stream-test type
+  correction changed no production source; final regression passed afterward.
+- The actual bundled product renderer produced a one-page synthetic Unicode
+  file (51,349 bytes) and a three-page long record (11,183 bytes). Independent
+  pypdf checks confirmed complete non-whitespace text/order, repeated notices,
+  embedded fonts, no active content and no author identity. Packaged Poppler
+  rendered all **four final pages**, which were visually inspected. A task-local
+  Fontconfig configuration exposed **no system font directories**, preventing
+  installed fonts from disguising missing embedded font content.
+- A 6/6-page built PROCESS_MEMORY_ONLY fixture at
+  `/private/tmp/cl-job-browser-hTKmpQ` passed unreviewed disablement → confirmed
+  synthetic review → actual client PDF generation/start feedback. Three locale
+  controls, 390/768/1280 widths, 44-pixel targets, visible keyboard focus and
+  inspected mobile/tablet/desktop layouts passed; console warnings/errors and
+  framework overlays were absent. This is not native download delivery proof.
+- Owned tab closed, viewport reset and fixture stopped/removed with unchanged
+  source hashes. Independent checks confirmed the exact root absent and port
+  3395 closed. Only disposable synthetic fixture state was removed.
+
+PDF guidance required actual-file text and full-page visual checks; Next.js,
+React and Impeccable guidance kept lazy loading and existing button conventions.
+No export endpoint, persistent document-byte cache, export-history write,
+lifecycle/review mutation, Points charge, AI call, database operation,
+Hosted/Production change, push or deployment occurred.
+
+**Next:** consolidate four-format export acceptance, including native Safari
+clipboard paste and actual TXT/DOCX/PDF save/open. Microsoft Word compatibility,
+native discard-confirmation navigation and real Offline/Online remain unpassed.
+Durable export history, bilingual/historical/batch export, native sharing, other
+Note applications and Hosted activation remain separate remaining work.

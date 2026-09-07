@@ -73,6 +73,7 @@ try {
   tsconfig.include = ["next-env.d.ts", "src/app/**/*.ts", "src/app/**/*.tsx", "src/instrumentation.ts", ".next/types/**/*.ts"];
   await emit("tsconfig.json", JSON.stringify(tsconfig));
   await copy("public/careslink-ai-logo-reverse.svg", "public/careslink-ai-logo-reverse.svg");
+  await copy("public/export-fonts", "public/export-fonts");
   if (built) {
     await copy("scripts/browser-e2e/communication-note-network-observer.js", "public/fixture-network-observer.js");
     const layout = await readFile(join(root, "src/app/layout.tsx"), "utf8");

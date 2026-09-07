@@ -51,6 +51,20 @@ export async function downloadCommunicationNoteDocx(artifact: CommunicationNoteT
   }
 }
 
+export async function downloadCommunicationNotePdf(artifact: CommunicationNoteTextExport, signal: AbortSignal) {
+  assertExportActive(signal);
+  try {
+    const { renderCommunicationNotePdf } = await import("./communication-note-export-pdf");
+    assertExportActive(signal);
+    const pdf = await renderCommunicationNotePdf(artifact, signal);
+    assertExportActive(signal);
+    return downloadRecordBlob(new Blob([new Uint8Array(pdf.bytes)], { type: pdf.mimeType }), pdf.filename, signal);
+  } catch (error) {
+    if (error instanceof CommunicationNoteExportError) throw error;
+    throw new CommunicationNoteExportError("DOWNLOAD_FAILED");
+  }
+}
+
 function downloadRecordBlob(blob: Blob, filename: string, signal: AbortSignal) {
   assertExportActive(signal);
   let url: string | undefined, timer: ReturnType<typeof setTimeout> | undefined;

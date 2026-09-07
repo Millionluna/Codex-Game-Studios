@@ -12,12 +12,13 @@ const mocks = vi.hoisted(() => ({
   replaceLocation: vi.fn(),
   confirmReview: vi.fn(),
   saveEdit: vi.fn(),
-  copyRecord: vi.fn(), downloadRecord: vi.fn(), downloadDocx: vi.fn(), disposeExport: vi.fn(),
+  copyRecord: vi.fn(), downloadRecord: vi.fn(), downloadDocx: vi.fn(), downloadPdf: vi.fn(), disposeExport: vi.fn(),
 }));
 
 vi.mock("../../../../../lib/communication-note-export-browser", () => ({
   copyCommunicationNoteRecord: mocks.copyRecord, downloadCommunicationNoteRecord: mocks.downloadRecord,
   downloadCommunicationNoteDocx: mocks.downloadDocx,
+  downloadCommunicationNotePdf: mocks.downloadPdf,
 }));
 
 vi.mock("../../../../../lib/communication-note-self-review-client", () => ({
@@ -63,6 +64,7 @@ beforeEach(() => {
   mocks.copyRecord.mockReset().mockImplementation(async prepare => { await prepare(); });
   mocks.downloadRecord.mockReset().mockReturnValue(mocks.disposeExport);
   mocks.downloadDocx.mockReset().mockResolvedValue(mocks.disposeExport);
+  mocks.downloadPdf.mockReset().mockResolvedValue(mocks.disposeExport);
   container = document.createElement("div");
   document.body.append(container);
   root = createRoot(container);
@@ -79,11 +81,12 @@ describe("Communication Note private result loader", () => {
     expect(exportButton("Copy record text").disabled).toBe(true);
     expect(exportButton("Download TXT").disabled).toBe(true);
     expect(exportButton("Download DOCX").disabled).toBe(true);
+    expect(exportButton("Download PDF").disabled).toBe(true);
     expect(container.textContent).toContain("Confirm your self-review for this saved version before exporting.");
     await openEditor(); expect(container.textContent).not.toContain("Export a record copy");
     expect(mocks.copyRecord).not.toHaveBeenCalled();
   });
-  it("rechecks access separately for Copy, TXT and DOCX, with no review or document writes", async () => {
+  it("rechecks access separately for Copy, TXT, DOCX and PDF, with no review or document writes", async () => {
     const saved = reviewedDocument(); mocks.loadDocument.mockResolvedValue(saved); await renderLoader();
     await act(async () => exportButton("Copy record text").click());
     expect(container.textContent).toContain("Record text copied.");
@@ -97,6 +100,10 @@ describe("Communication Note private result loader", () => {
     expect(mocks.loadDocument).toHaveBeenCalledTimes(4);
     expect(mocks.downloadDocx.mock.calls[0][0]).toMatchObject({ profile: "RECORD_COPY", filename: "communication-note_2026-09-07_10000000_v1.txt" });
     expect(container.textContent).toContain("DOCX download started.");
+    await act(async () => exportButton("Download PDF").click());
+    expect(mocks.loadDocument).toHaveBeenCalledTimes(5);
+    expect(mocks.downloadPdf.mock.calls[0][0]).toMatchObject({ profile: "RECORD_COPY", filename: "communication-note_2026-09-07_10000000_v1.txt" });
+    expect(container.textContent).toContain("PDF download started.");
     expect(mocks.confirmReview).not.toHaveBeenCalled(); expect(mocks.saveEdit).not.toHaveBeenCalled();
     await openEditor(); expect(mocks.disposeExport).toHaveBeenCalled();
   });
@@ -132,7 +139,40 @@ describe("Communication Note private result loader", () => {
     await act(async () => root.render(<CommunicationNoteDocumentLoader canonicalId={DOC} locale={locale} loginHref={LOGIN} revisionId={REV} unsupportedLocale={false} />));
     expect(container.textContent).toContain(locale === "en" ? "Export a record copy" : locale === "zh-Hans" ? "导出记录副本" : "匯出記錄副本");
     expect(exportButton(locale === "en" ? "Download DOCX" : locale === "zh-Hans" ? "下载 DOCX" : "下載 DOCX").disabled).toBe(false);
-    expect(container.textContent).not.toMatch(/Download PDF|下載 PDF|下载 PDF/);
+    expect(exportButton(locale === "en" ? "Download PDF" : locale === "zh-Hans" ? "下载 PDF" : "下載 PDF").disabled).toBe(false);
+  });
+  it.each(["AUTH_REQUIRED", "NOT_FOUND", "STALE_REVISION", "REVIEW_REQUIRED"] as const)("does not start PDF after %s", async status => {
+    const fresh = status === "STALE_REVISION" ? { ...reviewedDocument(), isCurrentRevision: false }
+      : status === "REVIEW_REQUIRED" ? { ...reviewedDocument(), selfReviewStatus: "REQUIRED" } : { status };
+    mocks.loadDocument.mockResolvedValueOnce(reviewedDocument()).mockResolvedValueOnce(fresh); await renderLoader();
+    await act(async () => exportButton("Download PDF").click());
+    expect(mocks.downloadPdf).not.toHaveBeenCalled(); expect(container.textContent).not.toContain("PDF download started.");
+    if (status === "AUTH_REQUIRED") expect(mocks.replaceLocation).toHaveBeenCalledExactlyOnceWith(LOGIN);
+    if (status === "NOT_FOUND") expect(container.textContent).not.toContain("Synthetic export text");
+    if (status === "STALE_REVISION" || status === "REVIEW_REQUIRED") expect(exportButton("Download PDF").disabled).toBe(true);
+  });
+  it("cancels a pending PDF access check and suppresses duplicate clicks", async () => {
+    let resolve!: (value: CommunicationNoteAvailableDocument) => void;
+    mocks.loadDocument.mockResolvedValueOnce(reviewedDocument()).mockImplementationOnce(() => new Promise(r => { resolve = r; }))
+      .mockResolvedValueOnce(documentResult("Fresh private read")); await renderLoader();
+    await act(async () => { exportButton("Download PDF").click(); exportButton("Download PDF").click(); });
+    expect(mocks.loadDocument).toHaveBeenCalledTimes(2); expect(exportButton("Download TXT").disabled).toBe(true);
+    await act(async () => window.dispatchEvent(new Event("focus")));
+    await act(async () => resolve(reviewedDocument()));
+    expect(mocks.downloadPdf).not.toHaveBeenCalled(); expect(container.textContent).not.toContain("PDF download started.");
+  });
+  it("allows a fresh explicit PDF retry after an unsupported glyph refusal", async () => {
+    mocks.loadDocument.mockResolvedValue(reviewedDocument());
+    mocks.downloadPdf.mockRejectedValueOnce(new CommunicationNoteExportError("PDF_UNSUPPORTED_TEXT")); await renderLoader();
+    await act(async () => exportButton("Download PDF").click());
+    expect(container.textContent).toContain("Some characters cannot be safely rendered in PDF.");
+    expect(exportButton("Download PDF").disabled).toBe(false);
+    await act(async () => exportButton("Download PDF").click());
+    expect(mocks.loadDocument).toHaveBeenCalledTimes(3); expect(container.textContent).toContain("PDF download started.");
+  });
+  it("keeps historical PDF disabled even if a snapshot carries confirmed review", async () => {
+    mocks.loadDocument.mockResolvedValue({ ...reviewedDocument(), isCurrentRevision: false }); await renderLoader();
+    expect(exportButton("Download PDF").disabled).toBe(true); expect(mocks.downloadPdf).not.toHaveBeenCalled();
   });
   it.each(["AUTH_REQUIRED", "NOT_FOUND", "STALE_REVISION", "REVIEW_REQUIRED"] as const)("does not start DOCX after %s", async status => {
     const fresh = status === "STALE_REVISION" ? { ...reviewedDocument(), isCurrentRevision: false }

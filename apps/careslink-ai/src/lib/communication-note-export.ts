@@ -8,7 +8,7 @@ export type CommunicationNoteTextExport = Readonly<{
 }>;
 export type CommunicationNoteExportErrorCode =
   | "AUTH_REQUIRED" | "NOT_FOUND" | "STALE_REVISION" | "REVIEW_REQUIRED"
-  | "UNAVAILABLE" | "PLAIN_TEXT_REQUIRED" | "COPY_FAILED" | "DOWNLOAD_FAILED";
+  | "UNAVAILABLE" | "PLAIN_TEXT_REQUIRED" | "COPY_FAILED" | "DOWNLOAD_FAILED" | "PDF_UNSUPPORTED_TEXT" | "PDF_TOO_LARGE";
 export class CommunicationNoteExportError extends Error {
   constructor(readonly code: CommunicationNoteExportErrorCode) {
     super(code); this.name = "CommunicationNoteExportError";

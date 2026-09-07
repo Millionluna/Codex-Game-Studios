@@ -1,17 +1,20 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { copyCommunicationNoteRecord, downloadCommunicationNoteRecord, downloadCommunicationNoteDocx } from "./communication-note-export-browser";
+import { copyCommunicationNoteRecord, downloadCommunicationNoteRecord, downloadCommunicationNoteDocx, downloadCommunicationNotePdf } from "./communication-note-export-browser";
 import { CommunicationNoteExportError, renderCommunicationNoteRecordCopy } from "./communication-note-export";
 import { exportDocument, EXPORT_NOW } from "./communication-note-export-test-fixture";
 
 const renderDocx = vi.hoisted(() => vi.fn());
+const renderPdf = vi.hoisted(() => vi.fn());
 vi.mock("./communication-note-export-docx", () => ({ renderCommunicationNoteDocx: renderDocx }));
+vi.mock("./communication-note-export-pdf", () => ({ renderCommunicationNotePdf: renderPdf }));
 const DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 
 let clicked: { href: string; filename: string }[];
 beforeEach(() => {
   clicked = []; vi.useFakeTimers();
   renderDocx.mockReset().mockImplementation(async record => ({ bytes: new Uint8Array([80, 75, 3, 4]).buffer, filename: record.filename.replace(/\.txt$/, ".docx"), mimeType: DOCX_MIME }));
+  renderPdf.mockReset().mockImplementation(async record => ({ bytes: new Uint8Array([37, 80, 68, 70]), filename: record.filename.replace(/\.txt$/, ".pdf"), mimeType: "application/pdf" }));
   vi.stubGlobal("ClipboardItem", undefined);
   vi.stubGlobal("navigator", { clipboard: { writeText: vi.fn(async () => {}) } });
   vi.stubGlobal("URL", { createObjectURL: vi.fn(() => "blob:owned-test"), revokeObjectURL: vi.fn() });
@@ -21,6 +24,40 @@ afterEach(() => { vi.clearAllTimers(); vi.useRealTimers(); vi.restoreAllMocks();
 const artifact = () => renderCommunicationNoteRecordCopy(exportDocument(), EXPORT_NOW);
 
 describe("record copy browser sinks", () => {
+  it("downloads actual PDF bytes/MIME/extension and cleans up on access abort", async () => {
+    vi.useRealTimers(); const controller = new AbortController();
+    const dispose = await downloadCommunicationNotePdf(artifact(), controller.signal);
+    expect(renderPdf).toHaveBeenCalledExactlyOnceWith(artifact(), controller.signal);
+    expect(clicked).toEqual([{ href: "blob:owned-test", filename: artifact().filename.replace(/\.txt$/, ".pdf") }]);
+    const blob = vi.mocked(URL.createObjectURL).mock.calls[0][0] as Blob;
+    expect(blob.type).toBe("application/pdf"); expect(blob.size).toBe(4);
+    const reader = new FileReader(), pending = new Promise(r => { reader.onload = () => r(reader.result); }); reader.readAsArrayBuffer(blob);
+    expect([...new Uint8Array(await pending as ArrayBuffer)]).toEqual([37, 80, 68, 70]);
+    controller.abort(); dispose(); expect(URL.revokeObjectURL).toHaveBeenCalledTimes(1);
+  });
+  it("does not render an aborted PDF or download after rendering loses access", async () => {
+    const controller = new AbortController(); controller.abort();
+    await expect(downloadCommunicationNotePdf(artifact(), controller.signal)).rejects.toThrow("UNAVAILABLE");
+    expect(renderPdf).not.toHaveBeenCalled();
+    const later = new AbortController();
+    renderPdf.mockImplementationOnce(async () => { later.abort(); return { bytes: new Uint8Array(), filename: "unused.pdf", mimeType: "application/pdf" }; });
+    await expect(downloadCommunicationNotePdf(artifact(), later.signal)).rejects.toThrow("UNAVAILABLE");
+    expect(URL.createObjectURL).not.toHaveBeenCalled(); expect(clicked).toHaveLength(0);
+  });
+  it("sanitizes PDF failures, preserves explicit glyph refusal and never downloads another format", async () => {
+    renderPdf.mockRejectedValueOnce(new Error("private detail"));
+    await expect(downloadCommunicationNotePdf(artifact(), new AbortController().signal)).rejects.toThrow(/^DOWNLOAD_FAILED$/);
+    renderPdf.mockRejectedValueOnce(new CommunicationNoteExportError("PDF_UNSUPPORTED_TEXT"));
+    await expect(downloadCommunicationNotePdf(artifact(), new AbortController().signal)).rejects.toThrow("PDF_UNSUPPORTED_TEXT");
+    expect(URL.createObjectURL).not.toHaveBeenCalled(); expect(renderDocx).not.toHaveBeenCalled(); expect(clicked).toHaveLength(0);
+  });
+  it("expires a PDF URL after sixty seconds and cleans up a failed click", async () => {
+    await downloadCommunicationNotePdf(artifact(), new AbortController().signal);
+    vi.advanceTimersByTime(60_000); expect(URL.revokeObjectURL).toHaveBeenCalledTimes(1);
+    vi.mocked(HTMLAnchorElement.prototype.click).mockImplementationOnce(() => { throw new Error("private"); });
+    await expect(downloadCommunicationNotePdf(artifact(), new AbortController().signal)).rejects.toThrow("DOWNLOAD_FAILED");
+    expect(URL.revokeObjectURL).toHaveBeenCalledTimes(2); expect(document.querySelector('a[download]')).toBeNull();
+  });
   it("downloads DOCX bytes with correct MIME/extension and releases the URL", async () => {
     vi.useRealTimers(); const controller = new AbortController();
     const dispose = await downloadCommunicationNoteDocx(artifact(), controller.signal);
