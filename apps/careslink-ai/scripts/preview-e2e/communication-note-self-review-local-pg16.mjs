@@ -8,11 +8,13 @@ import { promisify } from "node:util";
 import pg from "pg";
 
 import { verifySelfReviewScenarios as verifyScenarios } from "./communication-note-self-review-local-scenarios.mjs";
+import { verifyWordingEditScenarios } from "./communication-note-edit-local-scenarios.mjs";
 
 // This fixture cannot accept an existing database, URL, role or filesystem target.
 // It tests PostgreSQL lock semantics, not hosted Supabase ownership/ACLs or TLS.
-const TEMP_PREFIX = "/private/tmp/cl-self-review-";
-const CLUSTER_NAME = "careslink-self-review-local-pg16";
+const edit = process.argv.length === 3 && process.argv[2] === "--edit";
+const TEMP_PREFIX = edit ? "/private/tmp/cl-wording-edit-" : "/private/tmp/cl-self-review-";
+const CLUSTER_NAME = edit ? "careslink-wording-edit-local-pg16" : "careslink-self-review-local-pg16";
 const PORT = 15437; // Private per-run Unix socket only; no TCP listener.
 const execFileAsync = promisify(execFile);
 const childEnv = { PATH: "/usr/bin:/bin", LANG: "C", LC_ALL: "C" };
@@ -60,12 +62,13 @@ async function main() {
   let stopped = false;
   let removed = false;
   const scenarios = [];
+  let advisors;
   let scenario;
   const interrupt = () => { interrupted = true; server?.kill("SIGINT"); };
   process.once("SIGINT", interrupt);
   process.once("SIGTERM", interrupt);
   try {
-    assert.equal(process.argv.length, 2);
+    assert.ok(process.argv.length === 2 || edit);
     const bin = await findPg16();
     root = await mkdtemp(TEMP_PREFIX);
     assert.equal(await realpath(root), root);
@@ -134,11 +137,31 @@ async function main() {
     stage = "self-review-regressions";
     await verifyScenarios(owner, await connect(), await connect(), scenarios,
       (name) => { scenario = name; });
+    if (edit) {
+      stage = "wording-edit-regressions";
+      await verifyWordingEditScenarios(owner, await connect(), await connect(), scenarios,
+        (name) => { scenario = name; });
+      stage = "local-security-advisors";
+      // Fixed local target only. No --linked, project ref or external URL.
+      try {
+        const url = `postgresql://review_test_bootstrap@localhost:${PORT}/postgres?host=${encodeURIComponent(socket)}`;
+        const result = await execFileAsync("/opt/homebrew/bin/supabase", ["db", "advisors", "--db-url", url,
+          "--type", "security", "--fail-on", "none", "--output-format", "json"],
+        { env: childEnv, timeout: 30000, maxBuffer: 512 * 1024 });
+        try { advisors = { attempted: true, available: true, result: JSON.parse(result.stdout) }; }
+        catch { advisors = { attempted: true, available: false, code: "NON_JSON_OUTPUT", diagnostic: result.stdout.slice(0,1200) }; }
+      } catch (error) {
+        advisors = { attempted: true, available: false, code: error.code ?? error.name,
+          // CLI diagnostics concern only this owned synthetic cluster.
+          diagnostic: String(error.stderr ?? "").slice(0,600) };
+      }
+    }
     assert.equal(interrupted, false);
   } catch (error) {
     failure = true;
     // Fixed synthetic fixture only. Never include SQL, params or backend details.
-    process.stderr.write(JSON.stringify({ failureCode: error.code ?? error.name, failedScenario: scenario }) + "\n");
+    process.stderr.write(JSON.stringify({ failureCode: error.code ?? error.name, failedScenario: scenario,
+      diagnostic: /^permission denied for (schema|table|function|sequence) [a-z0-9_]+$|^[A-Z_]+$/.test(error.message ?? "") ? error.message : "UNEXPECTED" }) + "\n");
   } finally {
     await Promise.allSettled(clients.map((client) => bounded(client.end(), 7000)));
     try {
@@ -153,7 +176,7 @@ async function main() {
         stopped = !bootstrapMayBeRunning;
       }
       if (root && stopped) {
-        assert.match(root, /^\/private\/tmp\/cl-self-review-[a-zA-Z0-9]{6}$/u);
+        assert.match(root, /^\/private\/tmp\/cl-(?:self-review|wording-edit)-[a-zA-Z0-9]{6}$/u);
         assert.equal(await realpath(root), root);
         assert.equal((await lstat(root)).isDirectory(), true);
         await rm(root, { recursive: true }); // Only this run's mkdtemp directory, after exit proof.
@@ -168,10 +191,12 @@ async function main() {
   }
   const ok = !failure && stopped && removed;
   process.stdout.write(`${JSON.stringify({
-    stage: ok ? "local-self-review-verification" : stage,
+    stage: ok ? edit ? "local-wording-edit-verification" : "local-self-review-verification" : stage,
     ok, postgresMajor: 16, syntheticOnly: true, hostedVerified: false,
     scenarios, ...(ok ? {} : { failedScenario: scenario }),
+    ...(advisors ? { advisors } : {}),
     cleanup: { stopped, removed },
+    ...(root && removed ? { removedLocalDirectory: root } : {}),
     ...(root && !removed ? { retainedLocalDirectory: root } : {}),
   })}\n`);
   process.exitCode = ok ? 0 : 1;

@@ -4380,6 +4380,43 @@ Next is an independently scoped durable edit writer with real local PostgreSQL
 concurrency/security tests, not activation of the existing generic append RPC.
 See the [wording-editor record](communication-note-product-integration-m1y.md#wording-editor--new-revision--fresh-review-2026-09-07).
 
+### Durable Communication Note wording edit / PostgreSQL (2026-09-07)
+
+- `communication-note-edit-durable.server.test.ts` adds 42 cases; together with
+  the existing edit contract/handler tests, **86/86** pass. Dedicated edit/write
+  gates, exact Preview target, same Cookie principal, current-session rejection,
+  three-text privacy scanning, strict receipts, uncertain/aborted responses and
+  no retries are covered. The formal route still has no binding and returns 503
+  without reading its body. The candidate stays outside the migration manifest.
+- `node scripts/preview-e2e/communication-note-self-review-local-pg16.mjs --edit`
+  passes **33 real PG16 groups (14 existing + 19 edit)**. Eight exact dependency
+  migrations plus the two candidates apply as non-superuser `postgres` on an
+  owned Unix-only cluster. No external connection arguments are accepted.
+- Database checks cover no default caller grants, private RLS-constrained
+  definer/invoker facade, default-off flags, exact bounded text, unchanged source
+  facts/history, committed revision + pointer + sync + receipt, independent read
+  and review reset, transaction rollback, same-key replay/first-submit races,
+  stale base, cross-document key races, owner/type/lifecycle/current Provider
+  checks, revoked sessions and proof binding. Session/JWT/privacy expiry and
+  revocation/disable lock-winner tests use observed real database blocking;
+  successful transactions retain relevant locks until commit.
+- Initial harness errors (migration-entry schema USAGE, an unused synthetic
+  next revision, and the exact 30-minute proof constraint) were fixed without
+  turning off FK/CHECK/RLS or elevating the runtime executor. All runs stopped
+  and removed their owned roots. The last exact root was checked absent.
+- Local CLI security advisors returned an empty `results` list using
+  `--db-url` pinned to the same Unix socket and `--output-format json`; the
+  earlier non-JSON parse failure is not a pass. This is not a Hosted advisor
+  claim or full-chain deployment approval.
+- Full regression: **4,361 passed / 12 skipped**, 277 files (276 passed / 1
+  skipped). TypeScript, zero-warning lint, 64/64-page webpack build, 109-chunk
+  client-boundary scan and 73-file adapter check passed.
+
+No product route installation, browser/database edit roundtrip, Hosted ACL,
+Production, real care data, AI call, Points mutation, push or deployment was
+performed. Next is the guarded local browser/database editor roundtrip. See the
+[durable edit record](communication-note-product-integration-m1y.md#durable-wording-edit-writer--local-postgresql-2026-09-07).
+
 ### Current live/read-only evidence
 
 - Supabase migrations, tables, RLS flags, policies, grants, function grants and aggregate row counts were checked read-only.
@@ -4452,7 +4489,7 @@ The following suites are required before the corresponding V1 slice can be calle
 1. The native App exists in a separate repository and is outside this task; this AI repository does not execute or attest its iOS/Android, offline, purchase or store gates.
 2. The OpenAPI/TypeScript contract and default-off durable `/v1` route adapter now exist, but there is no Preview- or Production-served Product API, generated client package, schema registry or previous-version compatibility fixture.
 3. The registration-retention source worktree passed its historical 1,381 tests across 125 files and all three focused migration contracts 39/39, with the `r21` 1,377-test / 124-file result, the `r9` 1,337-test / 122-file result and earlier baselines retained. The strict-local harness batch subsequently passed 1,400 tests across the same 125 files. All five Note types share a Production-unapplied private metadata/RPC layer with nine worker RPC identities, three newer owner RPC identities and one separately owned graceful-retirement control identity, but no caller execute grant. Deleted PostgreSQL 17.6 disposable `r9` proved the exact 14-migration, seven-suite and independent postcheck gate; deleted `r20` closed the PostgreSQL 17.6 true two-session claim/session/privacy race gate; deleted `r21` closed Attempt 1 historical replay across Attempt 2 success and post-purge state; deleted `r22` closed the hosted registration historical-retention gate with the exact 15/15 manifest, 7/7 suites and independent postcheck. The earlier disposable local PostgreSQL 16.15 gate closed its recorded engine, serial and true-two-session path with 27/27 repository migrations, exact V1 15/15, 7/7 suites and 3/3 races. The later owner-runtime PG16.15 run passed the new owner, additive-aware worker and durable rollback suites, independent posture postcheck and auth-session lock-wait race; #1-#24 and #26-#28 applied non-super, including fresh exact final #28, while #25 remained an explicit bootstrap-superuser transition. Migration #29 supplies graceful retirement with 14 forced-RLS tables. Its local strict rollback assertion passed inside the final clean 29/29 migration, 9/9 aggregate, independent posture and two-ordering retirement/claim race gate. Deleted Hosted r5 subsequently passed the exact 30/30 migration manifest, all 11 rollback suites and the independent owner/role/RLS/ACL/hard-off/zero-fixture postcheck. No worker/owner Preview or local cluster is retained. The five types still lack emergency revocation, attempt listing, a deployed worker, nested exact-key database vectors, account-delete/purge and orphan recovery, provider-start binding, safe sequential numeric parsing, real vault/KMS/retention, caller credentials/grants/routes, hosted GoTrue/PostgREST, real provider/model/STT integration and complete per-type golden sets; runtime activation remains open.
-4. Canonical document/revision/checkpoint states exist as memory/domain contracts plus historical isolated schema/RPC evidence and a Production-unapplied mobile-sync migration draft that was clean-applied only on a deleted disposable branch. Communication Note now has a local result renderer, a synthetic-memory wording editor/new-revision flow, and separate real-local-PostgreSQL self-review evidence. There is still no durable edit integration, retained schema activation, complete export renderer or cross-device recovery E2E.
+4. Canonical document/revision/checkpoint states exist as memory/domain contracts plus historical isolated schema/RPC evidence and a Production-unapplied mobile-sync migration draft that was clean-applied only on a deleted disposable branch. Communication Note now has a local result renderer, a synthetic-memory wording editor, real-local-PostgreSQL self-review evidence and an uninstalled durable wording-edit candidate with real local concurrency tests. There is still no browser/database edit roundtrip, formal durable edit activation, retained schema activation, complete export renderer or cross-device recovery E2E.
 5. Points lots/rates/reservations remain shadow-only. Communication Note now has
    local PG16 proof for fixed 20-Point atomic admission/reservation and terminal
    commit/release, including retry, replay, cancellation and recovery

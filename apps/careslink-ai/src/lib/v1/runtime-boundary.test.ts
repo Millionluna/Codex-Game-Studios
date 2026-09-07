@@ -1292,6 +1292,8 @@ describe("V1 shadow runtime boundary", () => {
     expect(privilegedClientFactoryImporters).toEqual([]);
     expect(currentSessionImporters).toEqual(
       [
+        // Dedicated, default-off writer candidate; no formal route importer.
+        join(process.cwd(), "src/lib/communication-note-edit-durable.server.ts"),
         // Fixed, server-only loopback fixture; no additional product importer.
         join(
           process.cwd(),

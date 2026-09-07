@@ -45,8 +45,29 @@ the Data API JWT and cannot itself distinguish Cookie vs Bearer transport.
 Review that Data API exposure and the exact new ACLs before any Hosted use.
 Prior reader/Preview authorizations do not authorize this write surface.
 
-The local proof applies eight exact dependency migrations plus this candidate,
-not the complete hosted migration chain. It uses synthetic Auth metadata and
-valid privacy-reviewed saved draft fixtures with all FK/CHECK/RLS constraints
-enabled. Real GoTrue/PostgREST, PG17/TLS, security advisors, browser-to-database
-integration and separately approved candidate promotion remain outstanding.
+The self-review local proof applies eight exact dependency migrations plus its
+candidate, not the complete hosted migration chain. It uses synthetic Auth
+metadata and valid privacy-reviewed saved drafts with all FK/CHECK/RLS
+constraints enabled. Real GoTrue/PostgREST, PG17/TLS, Hosted security advisors
+and separately approved candidate promotion remain outstanding.
+
+## Communication wording edit persistence (2026-09-07)
+
+`20260907132707_add_communication_note_wording_edit_shadow.sql` is CLI-generated
+and unpromoted. It gives **no API caller** function EXECUTE/private schema USAGE.
+An invoker-only public facade reaches a private definer owned by a dedicated
+NOLOGIN/NOBYPASSRLS executor with owner RLS and narrow column/write grants. Its
+edit flag defaults off; the formal route is unbound and the server writer is
+uninstalled. No generic append RPC grant is reused.
+
+```sh
+node scripts/preview-e2e/communication-note-self-review-local-pg16.mjs --edit
+```
+
+This fixed disposable runner passes 14 self-review plus 19 edit groups with
+real locking, atomic revision/sync/receipt writes, immutable facts, fresh review,
+command idempotency, stale base, session revocation and privacy expiry checks.
+Only the local test operator temporarily supplies and then removes the caller
+capability. Its local CLI security scan returned an empty result list. No
+Hosted/PostgREST/TLS, full migration chain or browser edit integration is proved.
+Those gates and separately approved external permissions remain required.

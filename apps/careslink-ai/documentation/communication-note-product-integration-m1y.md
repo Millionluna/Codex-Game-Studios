@@ -1202,3 +1202,97 @@ waits, immutable source facts and revision-bound review reset. Keep the formal
 route unbound and Hosted switches off; database permission exposure requires
 its own review/authorization. Export and the other Note application flows remain
 separate outstanding product work.
+
+### Durable wording-edit writer / local PostgreSQL (2026-09-07)
+
+The next local slice above now has an independent Cookie-authenticated writer
+candidate and real PostgreSQL transaction evidence. It is **not installed in
+the formal HTTP route** and is not yet connected to the browser fixture. The
+existing memory editor and green visual identity are unchanged. No runtime
+flag, Hosted permission, approved migration pin or deployed surface changed.
+
+`createCommunicationNoteDurableEditWriter` uses one request-scoped Cookie client
+for verified user, current session and the narrow `save_communication_note_wording`
+RPC. Its dedicated edit switch, DOCUMENT_WRITE switch, durable/Product API
+switches and exact non-Production Preview target must all pass. No self-review
+or read-only capability substitutes for edit authority. It scans all three
+wording fields, sends only the exact edit command/document/mutation identifiers,
+validates the acknowledgement against the expected revision and treats abort,
+unknown errors or lost acknowledgement as uncertain without retries. Source
+facts, owner/session arguments, schema, proof and content hashes are not caller
+overrides.
+
+Supabase CLI 2.115.0 generated
+`supabase/migration-candidates/20260907132707_add_communication_note_wording_edit_shadow.sql`.
+It remains outside the approved 47-migration directory. The public facade is
+SECURITY INVOKER; the SECURITY DEFINER implementation lives in a private schema
+and runs as a NOLOGIN/NOINHERIT/NOBYPASSRLS executor. No API role receives schema
+USAGE or either function's EXECUTE in the candidate. The local fixture alone
+grants an authenticated test path, then revokes it before cleanup. This follows
+the skill's least-privilege and fixed-search-path guidance
+([Supabase function security](https://supabase.com/docs/guides/database/functions)).
+
+The executor has owner-scoped RLS and only the columns/tables required for
+revision insertion, current-pointer update, sync-change insertion and mutation
+receipt insertion. It cannot directly read Auth tables, write review events,
+complete/delete documents or mutate Points/jobs. Lock-only column grants on
+privacy proofs, base revisions and switches have denying UPDATE checks.
+The independent edit database flag defaults false.
+
+The transaction locks current Provider user/session, switches, document,
+owner/mutation key, base revision and privacy proof. It derives all immutable
+fields from the saved base and checks type/lifecycle, version/hash/facts schema,
+privacy owner/hash/schema/status/expiry and exact three-text command shape.
+Real time is rechecked after locks and after potential write waits; failures
+roll back the revision, pointer, sync entry and receipt together. Same-key
+replays compare the full-command fingerprint and require the saved revision to
+remain current plus live Auth/privacy; advanced versions return stale. Cross-
+document key races admit one command. Old review events remain immutable, while
+the existing read projection derives REQUIRED for the new revision.
+
+The SQL additionally applies conservative identifier patterns for direct local
+callers. This is defense in depth, not exact parity with the TypeScript scanner,
+and neither scanner guarantees complete de-identification. External Data API
+exposure remains unapproved: JWT database checks do not prove Cookie transport.
+
+Reproduce from the app directory:
+
+```sh
+node scripts/preview-e2e/communication-note-self-review-local-pg16.mjs --edit
+```
+
+The fixed runner creates a private Unix-socket-only PG16 cluster, applies eight
+dependencies plus the self-review and edit candidates as non-superuser
+`postgres`, and passes **33 scenario groups (14 self-review + 19 edit)**. Its
+bootstrap operator temporarily grants only the migration entry's prerequisite
+schema USAGE and revokes it afterward; the application executor is not elevated.
+All FK/CHECK/RLS constraints stay enabled. The matrix covers independent commit
+readback, original facts/history preservation, review reset, rollback, duplicate
+and concurrent commands, stale-base and cross-document conflicts, owner/type/
+lifecycle denial, current Provider metadata, revoked sessions, malformed and
+privacy-bearing input, proof binding, session/JWT/privacy expiry during waits,
+revocation/disable lock winners and locks held through commit. Points/jobs and
+review-event writes remain absent for editing.
+
+Initial attempts exposed the missing migration-entry schema permission, a
+leftover synthetic revision from the preceding review race, and an invalid
+expiry test seed that violated the existing exact 30-minute constraint. These
+fixtures were corrected without disabling constraints or expanding application
+privileges. Every owned run reported stopped/removed. The final exact root was
+independently checked absent. CLI `db advisors --db-url` targeted only that local
+socket and returned `results: []` with JSON output; an earlier legacy output
+parse failure was not counted as a pass. This is a local candidate catalog
+check, not a complete Hosted security-advisor or GoTrue/PostgREST/TLS gate.
+
+Verification: **86/86 focused edit tests**, full **4,361 passed / 12 skipped in
+277 files (276 passed / 1 skipped)**, TypeScript, zero-warning lint, 64/64-page
+webpack build, 109-chunk client scan and 73-file adapter sync passed. The exact
+runtime-importer allowlist adds only this server-side writer candidate. No
+Hosted/Production operation, browser/database edit test, real care data, AI
+generation, Points mutation, push or deployment occurred.
+
+**Next:** connect this durable writer and independent database readback to the
+owned local editor browser fixture. Verify edit → one persisted new revision →
+fresh review → reload, plus stale/revoked save rejection, then clean up. Keep
+formal binding, candidate promotion and Hosted activation off. Export and the
+remaining Note-type application flows are still separate outstanding work.
