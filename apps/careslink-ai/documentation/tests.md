@@ -3915,6 +3915,29 @@ and credential checks, control-plane deletion, populated Hosted owner RLS,
 Cookie composition and the source adapter's real issuer/transport remain
 separate evidence requirements. All formal activation flags stay false.
 
+### Job-status Hosted r1 — partial checks passed, overall failed (2026-09-07)
+
+The subsequent execution at `5e365b1` created exactly one authorized no-data
+PG17 Preview. All 47 pinned migrations passed in one transaction through the
+existing-history lock path. Exact reader ACLs, real Auth claims/session/user,
+active missing-job and mismatched-owner denial, three physical credential
+issuance/revocation/role-removal paths and actual session revocation with old-JWT
+read rejection completed. Before execution, the two focused suites passed
+81/81 tests. No application source changed during this run.
+
+The probe's final account-cleanup block returned `authCleanup:false`, hence
+`ok:false`, despite `credentialCleanup:true` and `databaseClosed:true`. Its
+coarse final stage cannot identify the failed Auth-cleanup substep. Per-account
+deletion/absence is **not** a pass. The exact Preview was deleted on failure;
+three consecutive CLI absence checks, an independent MCP listing and a NotFound
+project lookup confirmed removal. No second branch was created. See the
+[complete r1 record](communication-note-job-status-preview-batch.md#r1-hosted-execution--2026-09-07).
+
+Local cleanup diagnostics/regressions and a new authorized full replay remain
+required. Source-adapter transport, populated Hosted job RLS, browser Cookie
+composition, Hosted advisors and formal activation are still unproved. No
+Production SQL, deployment, real care data, model or Points operation occurred.
+
 ### Current live/read-only evidence
 
 - Supabase migrations, tables, RLS flags, policies, grants, function grants and aggregate row counts were checked read-only.

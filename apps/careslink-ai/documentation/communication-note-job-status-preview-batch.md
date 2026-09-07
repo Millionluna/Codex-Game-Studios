@@ -1,7 +1,9 @@
 # Communication Note job-status Preview batch
 
 Batch: `2026-09-07.job-status-read-preview.1`. Prepared on 2026-09-07.
-This document is an execution contract, **not Hosted execution evidence**.
+The contract below was prepared without Hosted execution. The separate r1
+execution record at the end is the latest evidence; its overall result is
+**failed Auth-cleanup verification, Preview deleted**, not a full pass.
 
 ## Boundary
 
@@ -146,3 +148,105 @@ Next after the approved remote batch: review its actual evidence and deletion,
 then implement and verify the real source-adapter/Cookie read composition and
 populated synthetic job flow before connecting the existing green task page.
 Do not enable the formal route solely because this negative-read probe passed.
+
+## r1 Hosted execution — 2026-09-07
+
+The user confirmed Millionluna's Org (`dupupgakxfikiqeqseej`), the quoted Micro
+rate and one no-data Preview with fixed migrations, synthetic Auth/read-role
+checks and deletion. The organization's `get_cost` returned US$0.01344/hour,
+matching the confirmed rate; actual accrued charges are not inferred here.
+
+- Gate source: `5e365b174f89e3931a7125d014aaa96a8866c922` (clean worktree).
+- Batch: `2026-09-07.job-status-read-preview.1`.
+- Branch: `careslink-job-status-r1-20260907`.
+- Branch ID: `803b55e6-02f0-4159-9c06-49714359ccdc`.
+- Project ref: `tfhpagvaufcduuyerzzv`.
+- Parent ref: `adocsnwnslxhxcjgbyee` (control-plane binding only).
+- Created: `2026-09-07T03:53:36.038502+00:00`.
+- Creation and CLI re-attestation: no data, nondefault, nonpersistent.
+- CLI: pinned 2.115.0; no upgrade during the batch.
+- CA SHA-256:
+  `700723581420dd1ac98fd7e9ac529f0ef210eadcaf87fc868a3ad7d114c2f3b7`.
+- Credential-free temporary lifecycle script SHA-256:
+  `b3a528cc9b7bacc9bd1a0297ebea585f5d5b63d1aa9c71a185afcbecd52a43ec`.
+
+Before create, the check-only runner and 81 tests across the read-probe and
+versioned migration-invocation suites passed. The lifecycle used the committed
+transactional invocation, then re-read branch credentials into memory, validated
+the canonical branch envelope and passed the Auth/read input through anonymous
+stdin to the unchanged committed probe. No raw credentials were printed or
+written to local files.
+
+### What passed on Hosted
+
+The PG17 migration runner passed the existing 19-row baseline/history lock and
+applied all **47 migrations in a single transaction**, removing 26 outer
+transaction wrappers in memory. It reported `migrationHistoryInitialized=false`,
+18 application roles, 26 protected application ACL grants, empty ledgers and no
+temporary-role residue. Its manifest SHA-256 was
+`90650837b534ceaecf4a88df4bc4d5fc734b8ed799c12bb29ccf18e625d47187`;
+all fixed baseline catalog/member/dependency/publication/event-trigger/default
+ACL/non-application ACL checks passed. This does not prove missing-history
+initialization.
+
+The read probe's completed scenario labels establish:
+
+1. PG17 exact migration history, actual wrapper body, dedicated-role ACLs and
+   pinned-CA TLS connection passed.
+2. A real confirmed synthetic Auth user signed in; claims, current-session RPC,
+   user identity and the real Auth session row matched.
+3. Three distinct short-lived physical logins each proved SET-only caller
+   membership, denied executor/table/generic-reader/cancellation access, and
+   completed credential disable, new-login denial, backend/role cleanup.
+4. Active-session missing-job reads returned `NOT_FOUND`; mismatched owner/session
+   reads returned `SESSION_REVOKED`.
+5. Actual Auth sign-out removed the session row. The old JWT's current-session
+   RPC returned `REVOKED`, and a new dedicated read login using that revoked
+   owner/session received `SESSION_REVOKED`.
+
+### What failed and what was cleaned up
+
+Despite all those scenario labels completing, the unchanged probe returned:
+
+```json
+{
+  "ok": false,
+  "stage": "actual-session-revocation",
+  "authCleanup": false,
+  "credentialCleanup": true,
+  "databaseClosed": true,
+  "interrupted": false,
+  "previewDeletionRequired": true,
+  "previewDeleted": false,
+  "productRouteActivated": false,
+  "sourceAdapterTransportVerified": false,
+  "populatedJobAndOwnerRlsVerified": false,
+  "browserCookieCompositionVerified": false
+}
+```
+
+`authCleanup:false` is a failure of the final Auth-account cleanup block. Its
+catch does not identify which substep failed: exact-account lookup, repeated
+sign-out, zero-session assertion, account deletion or absence verification.
+The `stage` field remains the last main test stage; it does **not** mean the
+already-recorded session-revocation test failed. Do not infer a confirmed root
+cause, successful account deletion or an account still present from this flag.
+
+As authorized, the first failed probe stopped the batch. The lifecycle's
+`finally` deleted **that exact Preview**, then three consecutive branch listings
+proved the name/ID/ref absent and only healthy default Production remained.
+An independent MCP branch listing confirmed the same; a project lookup returned
+NotFound. There was **one create, no retry and no replacement branch**. Branch
+deletion is the final containment boundary for the synthetic account and static
+branch credentials, not retroactive evidence that per-account cleanup passed.
+The temporary credential-free lifecycle file/directory were also removed.
+
+No Production SQL or data access, real care data, Points mutation, model call,
+deployment, product flag change or green UI change occurred. Hosted advisors
+were not collected after the failed probe; no advisor pass is claimed.
+
+Next: locally separate and test the Auth-cleanup substeps, add safe fixed
+checkpoints and investigate repeated sign-out/idempotency without weakening the
+zero-session/account-absence assertions. No source fix or new remote run was
+performed in this execution-only batch. A fresh one-Preview authorization and
+full cleanup pass are required before any adapter/Cookie/UI activation work.

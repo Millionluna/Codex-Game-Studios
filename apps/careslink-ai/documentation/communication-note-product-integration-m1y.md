@@ -375,3 +375,25 @@ Next: obtain fresh one-batch authorization, run the fixed no-data Preview gate
 and verify deletion. After reviewing that evidence, install and verify the real
 read transport/Cookie composition and populated synthetic job flow before
 connecting the existing job route. The probe alone is not a release gate pass.
+
+## Job-status Hosted r1 — stopped at Auth cleanup (2026-09-07)
+
+At clean source `5e365b1`, the authorized single no-data Preview applied all
+47 migrations atomically on PG17. Actual login/current-session identity, exact
+read-role ACLs, missing/mismatched reads, three dedicated physical credential
+lifecycles and old-JWT rejection after real session revocation passed. The
+probe nevertheless returned `ok:false` because `authCleanup:false` in its final
+account-cleanup block; credential cleanup and database close were true. The
+coarse checkpoint does not establish the exact failed cleanup substep.
+
+The batch stopped without a retry. The exact Preview was deleted, three CLI
+absence checks plus an independent MCP listing confirmed only healthy default
+Production, and no runtime/UI flag was activated. See the
+[r1 execution record](communication-note-job-status-preview-batch.md#r1-hosted-execution--2026-09-07)
+for exact identity, pins, result and evidence limits. This is not a full gate pass.
+
+Next: isolate the Auth-cleanup branch and add safe per-step regression/evidence
+locally. Do not create another Preview or install the green-page read composition
+until a fresh authorized replay proves the complete cleanup path. No source
+repair, provider/model call, Points operation, deployment or Production SQL was
+part of r1.
