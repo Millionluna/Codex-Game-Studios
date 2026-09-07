@@ -10,9 +10,10 @@ const app = fileURLToPath(new URL("../../", import.meta.url));
 const port = 3395, host = "127.0.0.1";
 const prefix = "/private/tmp/cl-job-browser-";
 const args = process.argv.slice(2);
-if (args.length > 1 || (args.length === 1 && !["--built", "--database-review"].includes(args[0]))) throw new Error("Use no argument, --built or --database-review for this local fixture");
+if (args.length > 1 || (args.length === 1 && !["--built", "--database-review", "--edit"].includes(args[0]))) throw new Error("Use no argument, --built, --database-review or --edit for this local fixture");
 const databaseReview = args[0] === "--database-review";
-const built = args[0] === "--built" || databaseReview;
+const built = args[0] === "--built" || databaseReview || args[0] === "--edit";
+const edit = args[0] === "--edit";
 let root, child, reviewDatabase, controls, stopped = false;
 const sourceHashes = new Map();
 const copy = async (source, target) => {
@@ -23,7 +24,8 @@ const copy = async (source, target) => {
 const emit = async (path, source) => { await mkdir(join(root, path, ".."), { recursive: true }); await writeFile(join(root, path), source); };
 const tracked = ["src/lib/supabase-server.ts", "src/app/ai-documents/communication-note/jobs/[jobId]/page.tsx",
   "src/app/api/ai-documents/communication-note/jobs/[jobId]/route.ts", "src/app/api/ai-documents/communication-note/documents/[documentId]/route.ts",
-  "src/app/api/ai-documents/communication-note/documents/[documentId]/self-review/route.ts"];
+  "src/app/api/ai-documents/communication-note/documents/[documentId]/self-review/route.ts",
+  "src/app/api/ai-documents/communication-note/documents/[documentId]/revisions/route.ts"];
 
 async function cleanup() {
   if (stopped) return; stopped = true;
@@ -80,6 +82,7 @@ try {
     .replaceAll('"../../src/lib/', '"./'));
   if (databaseReview) await emit("src/lib/__review-database-fixture.ts",
     (await readFile(join(app, "scripts/browser-e2e/communication-note-self-review.fixture.ts"), "utf8")).replaceAll('"../../src/lib/', '"./'));
+  if (edit) await emit("src/lib/__edit-fixture.ts", (await readFile(join(app, "scripts/browser-e2e/communication-note-edit.fixture.ts"), "utf8")).replaceAll('"../../src/lib/', '"./'));
   await symlink(join(app, "node_modules"), join(root, "node_modules"), "dir");
   await emit("package.json", JSON.stringify({ name: "careslink-local-browser-fixture", private: true,
     dependencies: (JSON.parse(await readFile(join(app, "package.json"), "utf8"))).dependencies }));
@@ -113,6 +116,14 @@ export default function FixtureControls() { return <main style={{padding:32}}>
 <p><a href="/ai-documents/communication-note/documents/${REVIEW_DOC}?lang=en">Open English review</a></p>
 <p><a href="/ai-documents/communication-note/documents/${REVIEW_DOC}?lang=zh-Hant">開啟繁體中文複核頁</a></p>
 </main>; }\n`);
+  if (edit) {
+    await emit("src/app/page.tsx", `export default function EditFixture() { return <main style={{padding:32}}><h1>Local edit test</h1>
+<p>Synthetic identity and PROCESS MEMORY ONLY. Not database persistence. No AI, Points or Hosted writes.</p>
+<a href="/ai-documents/communication-note/documents/44444444-4444-4444-8444-444444444444?lang=zh-Hans">打开编辑测试草稿</a></main>; }`);
+    await emit("src/app/api/ai-documents/communication-note/documents/[documentId]/route.ts", `import { readEditFixtureDocument } from "@/lib/__edit-fixture";
+export const dynamic = "force-dynamic";
+export async function GET(request: Request, context: { params: Promise<{ documentId: string }> }) { return readEditFixtureDocument(request, (await context.params).documentId); }`);
+  }
   await emit("src/app/fixture-control/set/route.ts", `import { NextResponse } from "next/server";
 import { JOB, MODES } from "@/lib/__browser-fixture";
 export async function GET(request: Request) {
@@ -123,12 +134,15 @@ export async function GET(request: Request) {
   return result;
 }
 `);
-  await emit("src/app/api/ai-documents/communication-note/documents/[documentId]/self-review/route.ts", `import { ${databaseReview ? "confirmReviewDatabaseDocument as confirmFixtureReview" : "confirmFixtureReview"} } from "@/lib/${databaseReview ? "__review-database-fixture" : "__browser-fixture"}";
+  await emit("src/app/api/ai-documents/communication-note/documents/[documentId]/self-review/route.ts", `import { ${edit ? "confirmEditFixtureReview as confirmFixtureReview" : databaseReview ? "confirmReviewDatabaseDocument as confirmFixtureReview" : "confirmFixtureReview"} } from "@/lib/${edit ? "__edit-fixture" : databaseReview ? "__review-database-fixture" : "__browser-fixture"}";
 export const dynamic = "force-dynamic";
 export async function POST(request: Request, context: { params: Promise<{ documentId: string }> }) {
   return confirmFixtureReview(request, (await context.params).documentId);
 }
 `);
+  if (edit) await emit("src/app/api/ai-documents/communication-note/documents/[documentId]/revisions/route.ts", `import { saveEditFixtureDocument } from "@/lib/__edit-fixture";
+export const dynamic = "force-dynamic";
+export async function POST(request: Request, context: { params: Promise<{ documentId: string }> }) { return saveEditFixtureDocument(request, (await context.params).documentId); }`);
   await emit("src/app/auth/login/page.tsx", `export default function LoginFixture() { return <main style={{padding:32}}>
 <h1>Sign-in required</h1><p>Local synthetic login boundary. No real credentials are accepted.</p><a href="/">Test controls</a></main>; }
 `);
@@ -139,7 +153,8 @@ export async function POST(request: Request, context: { params: Promise<{ docume
 }
 `);
   const env = { PATH: process.env.PATH, TMPDIR: process.env.TMPDIR, NODE_ENV: built ? "production" : "development",
-    NEXT_TELEMETRY_DISABLED: "1", CARESLINK_LOCAL_BROWSER_FIXTURE: "SYNTHETIC_LOOPBACK_ONLY", ...reviewDatabase?.env };
+    NEXT_TELEMETRY_DISABLED: "1", CARESLINK_LOCAL_BROWSER_FIXTURE: "SYNTHETIC_LOOPBACK_ONLY", ...reviewDatabase?.env,
+    ...(edit ? { CARESLINK_LOCAL_EDIT_FIXTURE: "PROCESS_MEMORY_ONLY" } : {}) };
   const launch = (arguments_) => {
     child = spawn(process.execPath, [join(app, "node_modules/next/dist/bin/next"), ...arguments_],
       { cwd: root, env, stdio: ["ignore", "pipe", "pipe"] });

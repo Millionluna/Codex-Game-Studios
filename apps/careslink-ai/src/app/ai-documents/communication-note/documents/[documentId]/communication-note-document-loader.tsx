@@ -1,12 +1,16 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { loadCommunicationNoteDocument } from "../../../../../lib/communication-note-document-client";
 import type { CommunicationNoteDocumentResult } from "../../../../../lib/communication-note-document-contract";
 import type { CommunicationNoteDocumentLocale } from "../../../../../lib/communication-note-document-i18n";
 import { replaceCommunicationNoteLocation } from "../../../../../lib/communication-note-document-navigation";
 import { CommunicationNoteDocumentView } from "./communication-note-document-view";
 import { CommunicationNoteSelfReviewForm } from "./communication-note-self-review-form";
+import { CommunicationNoteEditForm } from "./communication-note-edit-form";
+import { buildCommunicationNoteDocumentHref } from "../../../../../lib/communication-note-document-contract";
+import type { CommunicationNoteEditResult } from "../../../../../lib/communication-note-edit-contract";
+import { getCommunicationNoteEditCopy } from "../../../../../lib/communication-note-edit-i18n";
 
 type VisibleResult = Exclude<
   CommunicationNoteDocumentResult,
@@ -30,6 +34,9 @@ export function CommunicationNoteDocumentLoader({
   const [accessSignal, setAccessSignal] = useState<AbortSignal>();
   const [accessGeneration, setAccessGeneration] = useState(0);
   const [refreshVersion, setRefreshVersion] = useState(0);
+  const [editing, setEditing] = useState(false);
+  const editingRef = useRef(false);
+  const [editorCleared, setEditorCleared] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -43,6 +50,9 @@ export function CommunicationNoteDocumentLoader({
       const currentController = new AbortController();
       controller = currentController;
       setResult(undefined);
+      if (editingRef.current) setEditorCleared(true);
+      editingRef.current = false;
+      setEditing(false);
 
       try {
         const nextResult = await loadCommunicationNoteDocument({
@@ -128,6 +138,17 @@ export function CommunicationNoteDocumentLoader({
     }
   }
 
+  function onEditResult(next: CommunicationNoteEditResult) {
+    if (!accessSignal || accessSignal.aborted) return;
+    if (next.status === "SAVED") {
+      editingRef.current = false;
+      setEditing(false);
+      setResult(undefined);
+      // Follow the exact acknowledged revision through a new authenticated read.
+      replaceCommunicationNoteLocation(buildCommunicationNoteDocumentHref({ canonicalId, revisionId: next.revisionId, locale }));
+    } else if (next.status === "AUTH_REQUIRED" || next.status === "NOT_FOUND") onReviewResult(next.status);
+  }
+
   return (
     <CommunicationNoteDocumentView
       canonicalId={canonicalId}
@@ -135,7 +156,14 @@ export function CommunicationNoteDocumentLoader({
       result={result}
       revisionId={revisionId}
       unsupportedLocale={unsupportedLocale}
-      selfReviewControl={result?.status === "AVAILABLE" && accessSignal ? (
+      editing={editing}
+      editorNotice={editorCleared ? getCommunicationNoteEditCopy(locale).cleared : undefined}
+      editorControl={result?.status === "AVAILABLE" && accessSignal ? <CommunicationNoteEditForm
+        key={`edit:${result.canonicalId}:${result.revision.revisionId}:${accessGeneration}`}
+        saved={result} locale={locale} accessSignal={accessSignal} editing={editing}
+        onEditingChange={value => { editingRef.current = value; setEditing(value); setEditorCleared(false); }} onResult={onEditResult}
+      /> : undefined}
+      selfReviewControl={!editing && result?.status === "AVAILABLE" && accessSignal ? (
         <CommunicationNoteSelfReviewForm
           key={`${result.canonicalId}:${result.revision.revisionId}:${accessGeneration}`}
           document={result} locale={locale} accessSignal={accessSignal} onResult={onReviewResult}

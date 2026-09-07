@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 import type { ReactNode } from "react";
+import { getCommunicationNoteEditCopy } from "../../../../../lib/communication-note-edit-i18n";
 import {
   COMMUNICATION_NOTE_COMPOSER_FIELDS,
   getCommunicationNoteComposerCopy,
@@ -42,6 +43,9 @@ export type CommunicationNoteDocumentViewProps = Readonly<{
   revisionId?: string;
   unsupportedLocale?: boolean;
   selfReviewControl?: ReactNode;
+  editorControl?: ReactNode;
+  editing?: boolean;
+  editorNotice?: string;
 }>;
 
 export function CommunicationNoteDocumentView({
@@ -52,6 +56,7 @@ export function CommunicationNoteDocumentView({
   revisionId,
   unsupportedLocale = false,
   selfReviewControl,
+  editorControl, editing = false, editorNotice,
 }: CommunicationNoteDocumentViewProps) {
   const copy = getCommunicationNoteDocumentCopy(locale);
   const selectedRevisionId =
@@ -121,6 +126,7 @@ export function CommunicationNoteDocumentView({
       </header>
 
       <div className="mx-auto max-w-[1480px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+        {editorNotice ? <p role="status" className="mb-5 border border-[#e2c891] bg-[#fff8e6] px-4 py-3 text-sm leading-6 text-[#705318]">{editorNotice}</p> : null}
         {unsupportedLocale ? (
           <div
             role="status"
@@ -133,7 +139,7 @@ export function CommunicationNoteDocumentView({
         {!result ? (
           <DocumentLoading copy={copy} />
         ) : result.status === "AVAILABLE" ? (
-          <AvailableDocument result={result} locale={locale} copy={copy} selfReviewControl={selfReviewControl} />
+          <AvailableDocument result={result} locale={locale} copy={copy} selfReviewControl={selfReviewControl} editorControl={editorControl} editing={editing} />
         ) : (
           <DocumentState
             status={result.status}
@@ -155,14 +161,18 @@ function AvailableDocument({
   locale,
   copy,
   selfReviewControl,
+  editorControl, editing,
 }: Readonly<{
   result: CommunicationNoteAvailableDocument;
   locale: CommunicationNoteDocumentLocale;
   copy: CommunicationNoteDocumentCopy;
   selfReviewControl?: ReactNode;
+  editorControl?: ReactNode;
+  editing: boolean;
 }>) {
   const composerCopy = getCommunicationNoteComposerCopy(locale);
   const selfReview = copy.selfReview[result.selfReviewStatus];
+  const editCopy = getCommunicationNoteEditCopy(locale);
 
   return (
     <>
@@ -228,19 +238,20 @@ function AvailableDocument({
                 </p>
               </div>
             </div>
-            <div className="flex max-w-full items-start gap-2 border border-[#aad4c2] bg-[#e2f2ea] px-3 py-2 text-xs leading-5 text-brand">
-              <CheckCircle2
+            <div className={`flex max-w-full items-start gap-2 border px-3 py-2 text-xs leading-5 ${editing ? "border-[#e2c891] bg-[#fff8e6] text-[#705318]" : "border-[#aad4c2] bg-[#e2f2ea] text-brand"}`}>
+              {editing ? <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden="true" /> : <CheckCircle2
                 className="mt-0.5 size-4 shrink-0"
                 aria-hidden="true"
-              />
+              />}
               <span>
-                <strong className="block">{copy.savedTitle}</strong>
-                <span>{copy.savedDetail}</span>
+                <strong className="block">{editing ? editCopy.local : copy.savedTitle}</strong>
+                <span>{editing ? editCopy.reviewDetail : copy.savedDetail}</span>
               </span>
             </div>
           </header>
 
-          <DraftLanguageSection
+          {editorControl}
+          {!editing ? <><DraftLanguageSection
             title={copy.englishDraft}
             text={result.revision.content.englishDraft}
             contentLocale="en"
@@ -261,7 +272,7 @@ function AvailableDocument({
             sourceLocale={result.sourceLocale}
             copy={copy}
           />
-
+          </> : null}
           <footer className="flex gap-3 border-t border-line bg-[#f5f4ed] p-5 text-xs leading-5 text-[#455d55] sm:p-6">
             <LockKeyhole
               className="mt-0.5 size-4 shrink-0 text-brand"
@@ -296,7 +307,7 @@ function AvailableDocument({
                 {copy.selfReviewTitle}
               </p>
               <div className="mt-3 flex gap-3">
-                {result.selfReviewStatus === "CONFIRMED" ? (
+                {!editing && result.selfReviewStatus === "CONFIRMED" ? (
                   <CheckCircle2
                     className="mt-0.5 size-5 shrink-0 text-brand"
                     aria-hidden="true"
@@ -309,10 +320,10 @@ function AvailableDocument({
                 )}
                 <div>
                   <h3 className="text-sm font-semibold text-foreground">
-                    {selfReview.label}
+                    {editing ? editCopy.review : selfReview.label}
                   </h3>
                   <p className="mt-1 text-sm leading-6 text-muted">
-                    {selfReview.detail}
+                    {editing ? editCopy.reviewDetail : selfReview.detail}
                   </p>
                 </div>
               </div>

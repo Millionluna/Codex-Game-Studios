@@ -1121,3 +1121,84 @@ review reset. Preserve the green design, source facts, permanent draft status
 and explicit save acknowledgement. Begin with local synthetic fixtures; do not
 enable Hosted writes, AI calls or Points. Export and the remaining Note-type
 application flows remain separate work, not completed by this roundtrip.
+
+### Wording editor → new revision → fresh review (2026-09-07)
+
+The local result page now supports explicit editing of English, Simplified
+Chinese and Traditional Chinese wording. It retains the approved green visual
+identity, Logo and typography. No automatic translation or new design direction
+was introduced. Current revisions alone expose the editor; source facts, safety
+lists, disclaimer, schema and privacy binding remain server-owned and unchanged.
+Each text change clears the explicit wording confirmation. Saving creates a new
+revision, never overwrites history, and requires a new revision-bound human
+review. Both reviewed and unreviewed documents remain drafts.
+
+The new Cookie-only POST contract accepts only the base revision and three
+wording fields plus confirmation. The server authenticates with DOCUMENT_WRITE
+before reading the bounded body, checks same-origin transport, validates exact
+keys and text limits, rejects a stale base and scans all three fields for obvious
+identifiers. This pattern scan is not a guarantee of de-identification. Only a
+strictly validated server acknowledgement can navigate to the new revision;
+that navigation performs a fresh authenticated read. Duplicate/concurrent
+commands create one revision in the tested memory Product API. A late retry
+after the current revision has advanced may return 409 rather than replay 200.
+Lost acknowledgements do not trigger automatic retries or optimistic success.
+
+Unsaved text exists only in mounted React memory, without autosave, offline
+buffer or browser-storage backup. Navigation/discard warns before losing edits.
+Access rechecks abort pending saves, clear the editor and explain the reset;
+late responses cannot repopulate private content. Stale or uncertain saves lock
+the editor and offer a fresh read. Successful/auth-terminal navigation bypasses
+the unload warning before React cleanup, covered by a regression test and the
+final built-browser run.
+
+The implementation intentionally has **no default edit runtime binding**: the
+formal `/revisions` route returns 503 without touching Auth or the request body.
+Existing self-review permission does not grant editing. No database ACL,
+migration, runtime switch or approved migration manifest changed. The existing
+generic append RPC is not exposed or granted as a shortcut.
+
+Reproduce the local synthetic browser flow from the app directory:
+
+```sh
+node scripts/browser-e2e/communication-note-recovery.mjs --edit
+```
+
+This guarded built-only mode uses the existing **memory Product API**, marked
+`PROCESS_MEMORY_ONLY`, plus synthetic identity. It is mutually exclusive with
+`--database-review`; no database edit roundtrip is claimed. The copied fixture
+exists only in an owned loopback test root, with external fetch blocked and no
+environment credentials copied.
+
+Final built-browser checks proved: confirm revision 1 → edit all three texts →
+save acknowledgement → exact revision 2 URL without an unload dialog → three
+unchecked review confirmations → confirm revision 2 → refresh still confirmed.
+Opening revision 1 then showed its unchanged original wording and no edit or
+review controls. Viewport screenshots were inspected at 390×844, 768×1024 and
+1280×900, with no horizontal overflow; the edit status uses an amber warning,
+not a saved checkmark. Dedicated-tab warning/error logs were empty.
+
+Safari initially submitted an edit successfully. After the user changed its
+active page, a full-window accessibility read was denied; verification stopped
+there and continued only in an isolated in-app local tab. The successful final
+sequence above belongs to that dedicated tab, not a complete Safari gate.
+Unrelated tabs were not inspected. The in-app viewport was reset and the owned
+tab closed; the old Safari test tab was left untouched. Both owned fixture roots
+were stopped and removed, their exact paths checked absent, and port 3395 was
+verified free. The run's synthetic drafts/reviews were discarded with memory.
+
+Verification: **65/65 focused tests**, full **4,319 passed / 12 skipped in 276
+files (275 passed / 1 skipped)**, TypeScript, zero-warning lint, 64/64-page full
+webpack build, 109-chunk client-boundary scan and 73-file adapter sync passed.
+Both browser fixtures built 6/6 pages. Skipped release gates remain skipped.
+This is local product interaction and contract evidence, not durable editing,
+Hosted Auth/PostgREST, complete-chain migrations, Offline/Online, Production,
+AI generation, Points or deployment evidence. Nothing was pushed or deployed.
+
+**Next:** implement a separately scoped durable wording-edit writer and test it
+on disposable local PostgreSQL, including atomic owner/current-base checks,
+full-command idempotency, session revocation and privacy expiry across lock
+waits, immutable source facts and revision-bound review reset. Keep the formal
+route unbound and Hosted switches off; database permission exposure requires
+its own review/authorization. Export and the other Note application flows remain
+separate outstanding product work.

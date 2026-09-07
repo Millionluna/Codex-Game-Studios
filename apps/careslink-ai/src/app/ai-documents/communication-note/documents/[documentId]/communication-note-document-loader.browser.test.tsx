@@ -10,11 +10,13 @@ const mocks = vi.hoisted(() => ({
   loadDocument: vi.fn(),
   replaceLocation: vi.fn(),
   confirmReview: vi.fn(),
+  saveEdit: vi.fn(),
 }));
 
 vi.mock("../../../../../lib/communication-note-self-review-client", () => ({
   confirmCommunicationNoteSelfReview: mocks.confirmReview,
 }));
+vi.mock("../../../../../lib/communication-note-edit-client", () => ({ saveCommunicationNoteEdit: mocks.saveEdit }));
 
 vi.mock("../../../../../lib/communication-note-document-client", () => ({
   loadCommunicationNoteDocument: mocks.loadDocument,
@@ -50,6 +52,7 @@ beforeEach(() => {
   ).IS_REACT_ACT_ENVIRONMENT = true;
   vi.clearAllMocks();
   mocks.confirmReview.mockReset();
+  mocks.saveEdit.mockReset();
   container = document.createElement("div");
   document.body.append(container);
   root = createRoot(container);
@@ -233,6 +236,73 @@ describe("revision-bound human self-review interaction", () => {
   });
 });
 
+describe("wording editor", () => {
+  it("hides old confirmation during editing, requires a change/check, and resets the check after typing", async () => {
+    mocks.loadDocument.mockResolvedValue({ ...documentResult("Original"), selfReviewStatus: "CONFIRMED" });
+    await renderLoader(); await openEditor();
+    expect(container.textContent).toContain("Edits are not saved"); expect(container.textContent).not.toContain("Self-review confirmed");
+    expect(container.querySelectorAll("textarea")).toHaveLength(3); expect(reviewButton().disabled).toBe(true);
+    await fillEdits(); await checkAll(); expect(reviewButton().disabled).toBe(false);
+    await typeEdit(0, "Another wording"); expect(reviewButton().disabled).toBe(true); expect(mocks.saveEdit).not.toHaveBeenCalled();
+  });
+  it("prevents duplicate submits and follows only the acknowledged new revision", async () => {
+    mocks.loadDocument.mockResolvedValue(documentResult("Original")); let finish!: (value: unknown) => void;
+    mocks.saveEdit.mockImplementation(() => new Promise(resolve => { finish = resolve; }));
+    await renderLoader(); await openEditor(); await fillEdits(); await checkAll(); await submitReview(); await submitReview();
+    expect(mocks.saveEdit).toHaveBeenCalledTimes(1); expect(mocks.replaceLocation).not.toHaveBeenCalled();
+    const command = mocks.saveEdit.mock.calls[0][0]; expect(command.request).toEqual({ baseRevisionId: REV, englishDraft: "Changed synthetic wording",
+      reviewVersions: { "zh-Hans": "合成修改", "zh-Hant": "合成修改" }, wordingConfirmed: true });
+    const next = "90000000-0000-4000-8000-000000000001";
+    mocks.replaceLocation.mockImplementationOnce(() => {
+      const unload = new Event("beforeunload", { cancelable: true });
+      window.dispatchEvent(unload); expect(unload.defaultPrevented).toBe(false);
+    });
+    await act(async () => finish({ status: "SAVED", revisionId: next }));
+    expect(mocks.replaceLocation).toHaveBeenCalledWith(`/ai-documents/communication-note/documents/${DOC}?lang=en&revisionId=${next}`);
+    expect(container.querySelector("textarea")).toBeNull(); expect(container.textContent).not.toContain("Self-review confirmed");
+  });
+  it.each(["STALE_REVISION", "UNAVAILABLE"])("freezes %s without retries or discarding edited text", async status => {
+    mocks.loadDocument.mockResolvedValue(documentResult("Original")); mocks.saveEdit.mockResolvedValue({ status });
+    await renderLoader(); await openEditor(); await fillEdits(); await checkAll(); await submitReview(); await submitReview();
+    expect(mocks.saveEdit).toHaveBeenCalledTimes(1); expect(reviewButton().disabled).toBe(true);
+    expect(container.querySelector<HTMLTextAreaElement>("textarea")?.value).toBe("Changed synthetic wording");
+    expect(container.textContent).toContain("Open current version to check"); expect(mocks.replaceLocation).not.toHaveBeenCalled();
+  });
+  it("aborts pending edits and clears their text when access is rechecked", async () => {
+    mocks.loadDocument.mockResolvedValue(documentResult("Original")); let finish!: (value: unknown) => void;
+    mocks.saveEdit.mockImplementation(() => new Promise(resolve => { finish = resolve; }));
+    await renderLoader(); await openEditor(); await fillEdits(); await checkAll(); await submitReview();
+    const signal = mocks.saveEdit.mock.calls[0][0].signal as AbortSignal;
+    await act(async () => window.dispatchEvent(new StorageEvent("storage")));
+    expect(signal.aborted).toBe(true); expect(container.querySelector("textarea")).toBeNull();
+    expect(container.textContent).toContain("The editor was cleared");
+    await act(async () => finish({ status: "SAVED", revisionId: DOC })); expect(mocks.replaceLocation).not.toHaveBeenCalled();
+  });
+  it("warns before losing edits and discards them only on explicit confirmation", async () => {
+    mocks.loadDocument.mockResolvedValue(documentResult("Original"));
+    await renderLoader(); await openEditor(); await fillEdits();
+    const unload = new Event("beforeunload", { cancelable: true }); window.dispatchEvent(unload); expect(unload.defaultPrevented).toBe(true);
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
+    const cancel = [...container.querySelectorAll("button")].find(b => b.textContent === "Discard edits")!;
+    await act(async () => cancel.click()); expect(container.querySelector("textarea")).not.toBeNull();
+    confirm.mockReturnValue(true); await act(async () => cancel.click()); expect(container.querySelector("textarea")).toBeNull(); confirm.mockRestore();
+    expect(mocks.saveEdit).not.toHaveBeenCalled();
+  });
+  it.each(["AUTH_REQUIRED", "NOT_FOUND"])("removes edit content on %s", async status => {
+    mocks.loadDocument.mockResolvedValue(documentResult("Original")); mocks.saveEdit.mockResolvedValue({ status });
+    await renderLoader(); await openEditor(); await fillEdits(); await checkAll(); await submitReview();
+    expect(container.querySelector("textarea")).toBeNull(); expect(container.textContent).not.toContain("Changed synthetic wording");
+    if (status === "AUTH_REQUIRED") expect(mocks.replaceLocation).toHaveBeenCalledWith(LOGIN);
+  });
+});
+async function openEditor() {
+  await act(async () => [...container.querySelectorAll("button")].find(b => b.textContent === "Edit draft wording")!.click());
+}
+async function typeEdit(index: number, value: string) {
+  const area = container.querySelectorAll("textarea")[index];
+  await act(async () => { Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!.call(area, value); area.dispatchEvent(new Event("input", { bubbles: true })); });
+}
+async function fillEdits() { await typeEdit(0, "Changed synthetic wording"); await typeEdit(1, "合成修改"); await typeEdit(2, "合成修改"); }
 function reviewButton() { return container.querySelector<HTMLButtonElement>('button[type="submit"]')!; }
 async function checkAll() {
   await act(async () => { container.querySelectorAll<HTMLInputElement>('input[type="checkbox"]').forEach(check => check.click()); });
