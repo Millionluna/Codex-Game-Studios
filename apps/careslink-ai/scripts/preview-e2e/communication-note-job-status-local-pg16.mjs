@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFile, spawn } from "node:child_process";
-import { lstat, mkdir, mkdtemp, realpath, rm } from "node:fs/promises";
+import { lstat, mkdir, mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { promisify } from "node:util";
@@ -12,8 +12,8 @@ import { STATUS_SQL, statusParameters, verifyPreviewSources } from "./communicat
 import { verifyAuthCleanupLocalScenarios } from "./communication-note-job-status-auth-cleanup-local-scenarios.mjs";
 
 // This fixture cannot accept an existing database, URL, role or filesystem target.
-// It tests local PostgreSQL migrations, ACLs and session-lock semantics;
-// hosted Supabase, TLS and credential issuance remain separate evidence.
+// It tests local PostgreSQL migrations, ACLs, session locks and source issuance;
+// hosted Supabase, TLS and hosted credential issuance remain separate evidence.
 const TEMP_PREFIX = "/private/tmp/cl-job-status-";
 const CLUSTER_NAME = "careslink-job-status-local-pg16";
 const PORT = 15437; // Private per-run Unix socket only; no TCP listener.
@@ -63,6 +63,7 @@ async function main() {
   let stopped = false;
   let removed = false;
   const scenarios = [];
+  let sourceIssuerTests = 0;
   let scenario;
   const interrupt = () => { interrupted = true; server?.kill("SIGINT"); };
   process.once("SIGINT", interrupt);
@@ -86,9 +87,16 @@ async function main() {
       // A killed initdb might leave a bootstrap child. Retain its directory
       // unless initialization exited normally; never infer child exit from a timeout.
       bootstrapMayBeRunning = error.killed === true || Boolean(error.signal);
+      scenario = String(error.stderr ?? "").split("\n")
+        .filter(line => /initdb: error:|FATAL:|could not|Operation not permitted|Permission denied/.test(line))
+        .join(" | ").replaceAll(root, "<owned-local-cluster>").slice(0,1200);
       throw error;
     }
     assert.equal(interrupted, false);
+    // Owned cluster fixture only: runtime LOGINs must prove real SCRAM password
+    // authentication, while the two local bootstrap/operator identities use trust.
+    await writeFile(join(data, "pg_hba.conf"),
+      "local all status_test_bootstrap trust\nlocal all postgres trust\nlocal all all scram-sha-256\n", { mode: 0o600 });
     stage = "start-private-cluster";
     server = spawn(join(bin, "postgres"), [
       "-D", data, "-h", "", "-k", socket, "-p", String(PORT),
@@ -183,6 +191,31 @@ async function main() {
     scenarios.push(scenario);
     stage = "auth-cleanup-local-rehearsal";
     await verifyAuthCleanupLocalScenarios(migrationActor, scenarios, name => { scenario = name; });
+    stage = "source-issuer-physical-connection";
+    scenario = "actual-source-issuer-local-pg16";
+    let sourceGate;
+    try { sourceGate = await execFileAsync(process.execPath, [
+      "node_modules/vitest/vitest.mjs", "run", "--reporter=json", "src/lib/v1/communication-note-job-status-postgres.local.test.ts",
+    ], { env: { ...childEnv, CARESLINK_JOB_STATUS_LOCAL_SOCKET: socket },
+      timeout: 60000, maxBuffer: 128 * 1024 }); }
+    catch(error) {
+      // Retain only fixed test names and our own fixed issuer error codes.
+      const text=(String(error.stdout??"")+String(error.stderr??"")).replace(/\u001b\[[0-9;]*m/g,"");
+      let failedNames=[];
+      try { failedNames=JSON.parse(String(error.stdout)).testResults.flatMap(file=>
+        file.assertionResults.filter(test=>test.status==="failed").map(test=>test.fullName)); } catch { /* Setup/report failure. */ }
+      scenario=failedNames.join(" | ").slice(0,1800)+
+        ":"+(text.match(/(?:ISSUER|LOCAL_ISSUER)_[A-Z0-9_]+/g)??[]).slice(0,10).join(",");
+      throw new Error("LOCAL_SOURCE_GATE_FAILED");
+    }
+    const sourceReport=JSON.parse(sourceGate.stdout);
+    assert.equal(sourceReport.success,true);
+    assert.equal(sourceReport.numFailedTests,0);
+    assert.equal(sourceReport.numPendingTests,0);
+    assert.ok(sourceReport.numTotalTests>=9);
+    assert.equal(sourceReport.numPassedTests,sourceReport.numTotalTests);
+    sourceIssuerTests=sourceReport.numPassedTests;
+    scenarios.push("actual-source-issuer-physical-connection-and-durable-revocation");
     assert.equal(interrupted, false);
   } catch (error) {
     failure = true;
@@ -219,7 +252,7 @@ async function main() {
   process.stdout.write(`${JSON.stringify({
     stage: ok ? "local-job-status-verification" : stage,
     ok, postgresMajor: 16, syntheticOnly: true, hostedVerified: false,
-    scenarios, ...(ok ? {} : { failedScenario: scenario }),
+    scenarios, sourceIssuerTests, ...(ok ? {} : { failedScenario: scenario }),
     cleanup: { stopped, removed },
     ...(root && !removed ? { retainedLocalDirectory: root } : {}),
   })}\n`);

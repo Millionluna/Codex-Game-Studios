@@ -4036,6 +4036,51 @@ No Preview, database role, Production mutation, deployment, Points or model call
 was created/performed during this local batch. Physical issuer/connection work
 is the next implementation step, not completed evidence.
 
+### Job-status physical issuer — local engine passed (2026-09-07)
+
+This batch adds 19 passing source tests for dedicated read issuance,
+exclusive fixed-query execution, TLS/version/config rejection, malformed requests,
+abort, cleanup failure and unsafe local paths. They use mocked pg/broker ports;
+they are not physical connection or durable SQL proof. Full Vitest:
+**4,078 passed, 9 skipped, 268 files (267 passed / 1 skipped)**. TypeScript,
+zero-warning ESLint and the webpack build (64/64 static pages) passed.
+The post-build client-boundary scan passed all 107 static chunks, including the
+new issuer markers; the runtime source audit limits references to tests only.
+The unchanged 47-migration Preview check-only gate also passed, with no Hosted
+execution. Adapter sync and whitespace checks passed.
+
+The nine new physical tests are only selected by the owned local cluster runner
+and passed **9/9** separately; they remain intentionally skipped by plain Vitest.
+The runner was changed to require SCRAM for generated runtime LOGINs while
+retaining trust only for the two local bootstrap/operator identities. The gate
+exercises the actual source issuer, exclusive physical client, SQL reader,
+durable revocation and composition; Auth and PG17/TLS target metadata remain
+synthetic fixtures, with an explicitly TestOnly PG16/Unix connector.
+
+The real gate passed **18 scenario groups**, including the earlier exact
+non-superuser migration/ACL/status/owner/session/cleanup checks and the added
+source-issuer suite. It reported `sourceIssuerTests:9`, `hostedVerified:false`,
+and `cleanup:{stopped:true,removed:true}`. Replay and no-lease cancellation
+tombstones, a separately committed login fence, real SCRAM authentication,
+privilege denial and authoritative zero-residue cleanup were verified locally.
+
+Initial `initdb` attempts were blocked by all 32 local shared-memory slots being
+occupied. Following explicit authorization and an exact identity/owner/zero-use/
+absent-creator recheck, only old segments `3866624` and `3932161` were removed.
+The setup's restricted-setting attestation was moved to the existing bootstrap
+identity, with DDL still executed as the non-superuser operator and no added
+privilege. Test-result parsing now requires structured Vitest JSON rather than
+ANSI display text. All failed runs reported their owned temporary directories
+removed. See the [local proof record](communication-note-product-integration-m1y.md#job-status-physical-issuer-local-proof--2026-09-07).
+
+The new SQL broker is a guarded local fixture, not a migration. The batch is
+locally verified; a deployable broker migration, dedicated management connection
+and independent trusted binding to the Preview project/control-plane evidence
+remain open. The strict real PG17/TLS opener has source tests only, not Hosted
+engine/TLS proof. Actual browser Cookie and GoTrue integration also remain open.
+No cloud resource, Production SQL, deployment, model/Points operation, UI/Logo
+change or formal reader activation occurred.
+
 ### Current live/read-only evidence
 
 - Supabase migrations, tables, RLS flags, policies, grants, function grants and aggregate row counts were checked read-only.

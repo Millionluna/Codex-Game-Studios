@@ -42,6 +42,8 @@ const forbiddenMarkers = [
   "CARESLINK_COMMUNICATION_NOTE_JOB_RECOVERY_EXPECTED_SUPABASE_REF",
   "CARESLINK_COMMUNICATION_NOTE_JOB_RECOVERY_EXPECTED_VERCEL_PROJECT_ID",
   "Job recovery composition unavailable",
+  "Job status PostgreSQL dependency unavailable",
+  "careslink-job-status-single-use",
 ];
 
 if (!existsSync(buildIdPath) || !existsSync(chunksRoot)) {

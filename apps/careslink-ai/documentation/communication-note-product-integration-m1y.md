@@ -503,3 +503,61 @@ synthetic-flow integration gate with browser Cookie checks and the corrected
 read-only advisors; resource creation and formal activation remain separately
 bounded by authorization. Do not repeat a cleanup-only Preview or start visual
 redesign.
+
+## Job-status physical issuer local proof — 2026-09-07
+
+The local implementation now contains a dedicated PostgreSQL read-credential resolver,
+an exclusive `pg.Client` opener and a LOCAL-only SQL broker fixture. The opener
+uses explicit connection settings, direct PG17 with pinned-CA verified TLS,
+one fixed parameterized query, monotonic/wall-clock expiry checks and hard close.
+The issuer code performs acquire → backend bind → committed login fence, then
+fence/finalize with authoritative residue checks before reporting cleanup.
+No default reader or route imports this new module; readiness is still false.
+
+This is **local implementation and real PG16 proof**, not a working Hosted
+issuer. The broker SQL is guarded to the owned Unix-only PG16 test cluster,
+uses an invoker-only operator function and is **not a Supabase migration or a
+deployable management service**. A reviewed deployment migration and dedicated
+management-authority/control-plane connection are still required separately.
+The trusted server composition must independently bind the selected project ref,
+target evidence and broker connection; the resolver does not establish that
+external authority by accepting their injected ports.
+There is no generic credential lookup or grant to product/API/read roles.
+The existing 47-migration Hosted probe remains unchanged.
+
+The real-engine gate contains nine tests, including the actual source
+resolver/adapter/repository, owner/session denial, durable replay/cancellation
+fences, committed-fence requirement, privilege checks and HTTP composition.
+All nine passed through the actual local database. Its Auth and PG17/TLS metadata
+remain explicit synthetic fixtures around a TestOnly LOCAL PG16/Unix opener;
+this does not prove Hosted PG17, verified TLS, browser Cookie handling or a real
+GoTrue session. Runtime credentials authenticate with SCRAM, not local trust.
+The complete local runner passed all 18 recorded scenario groups with
+`sourceIssuerTests:9`, `hostedVerified:false` and
+`cleanup:{stopped:true,removed:true}`. Durable revocation was checked using
+fresh broker connections, with zero remaining runtime roles/sessions/memberships.
+
+Initial local `initdb` attempts failed before SQL with `could not create shared memory segment:
+No space left on device`. Read-only inspection found all 32 kernel slots in use
+(`kern.sysv.shmmni:32`). Segments `3866624` (key `0x00830d6f`, creator PID 1037)
+and `3932161` (key `0x00830e6b`, creator PID 1413) had zero attachments; both
+creator processes were absent at the check. After explicit owner authorization,
+both exact ids, keys, ownership, creation times, zero attachment counts and absent
+creator processes were rechecked. Only those two segments were removed and their
+absence verified; this IPC removal is irreversible. No unrelated process was
+stopped, kernel setting changed or project/database file deleted. Failed runs
+reported their owned directories removed.
+
+The first real-engine setup exposed a restricted-setting permission check. The
+existing local bootstrap identity now attests the private cluster settings, then
+switches to the non-superuser operator for fixture DDL; no new privilege grant was
+added. A second runner issue incorrectly parsed ANSI-colored test summaries;
+the gate now requires Vitest's structured JSON success and exact passed/total
+counts rather than matching display text.
+
+Next: prepare the reviewed, deployable dedicated issuer migration and trusted
+Preview target/control-plane binding locally. Only then prepare one necessary
+populated synthetic-flow integration gate with real browser Cookie checks and
+the corrected read-only advisors. Cloud creation and formal activation remain
+separately authorized. No cleanup-only Preview repetition, new visual design,
+Production change, Points operation or model call is included in this batch.

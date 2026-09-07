@@ -897,7 +897,10 @@ describe("V1 shadow runtime boundary", () => {
             readFileSync(file, "utf8"),
           ),
       ),
-    ).toEqual([modulePath]);
+    ).toEqual([
+      join(process.cwd(), "src/lib/v1/communication-note-job-status-postgres.server.ts"),
+      modulePath,
+    ]);
     expect(source).toMatch(/^import "server-only";/);
     expect(source).toContain('import { Client as PgClient } from "pg";');
     expect(source).not.toMatch(
@@ -1352,13 +1355,30 @@ describe("V1 shadow runtime boundary", () => {
     expect(walkControlledScriptFiles().filter(file =>
       file !== compositionPath && file !== boundaryPath &&
       readFileSync(file, "utf8").includes("communication-note-job-recovery-composition"),
-    )).toEqual([compositionTestPath]);
+    )).toEqual([
+      compositionTestPath,
+      join(process.cwd(), "src/lib/v1/communication-note-job-status-postgres.local.test.ts"),
+    ]);
     expect(walkControlledScriptFiles().filter(file =>
       file !== readerPath && file !== boundaryPath &&
       /createCommunicationNoteGenerationJobRecovery(?:Reader|Handler)/.test(readFileSync(file, "utf8")),
     )).toEqual([compositionPath]);
     const route = readFileSync(join(process.cwd(), "src/app/api/ai-documents/communication-note/jobs/[jobId]/route.ts"), "utf8");
     expect(route).not.toContain("communication-note-job-recovery-composition");
+    const postgresPath = join(process.cwd(), "src/lib/v1/communication-note-job-status-postgres.server.ts");
+    const postgresSource = readFileSync(postgresPath, "utf8");
+    expect(postgresSource).toMatch(/^import "server-only";/);
+    expect(postgresSource).toContain("COMMUNICATION_NOTE_JOB_STATUS_POSTGRES_READY = false");
+    expect(postgresSource).not.toContain("process.env");
+    expect(walkControlledScriptFiles().filter(file =>
+      file !== postgresPath && file !== boundaryPath &&
+      readFileSync(file, "utf8").includes("communication-note-job-status-postgres.server"),
+    )).toEqual([
+      join(process.cwd(), "src/lib/v1/communication-note-job-status-postgres.local.test.ts"),
+      join(process.cwd(), "src/lib/v1/communication-note-job-status-postgres.server.test.ts"),
+      // The other boundary audit names this module in its exact pg-import list.
+      join(process.cwd(), "src/lib/v1/communication-note-preview-product-runtime-composition.server.test.ts"),
+    ]);
   });
 
   it("keeps service-role repositories outside the client component tree", () => {

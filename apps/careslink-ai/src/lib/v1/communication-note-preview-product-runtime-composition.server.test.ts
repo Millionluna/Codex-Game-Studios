@@ -355,7 +355,10 @@ describe("Communication Note M1r product runtime composition", () => {
           readFileSync(file, "utf8"),
         ),
     );
-    expect(pgImporters).toEqual([modulePath]);
+    expect(pgImporters).toEqual([
+      join(process.cwd(), "src/lib/v1/communication-note-job-status-postgres.server.ts"),
+      modulePath,
+    ]);
   });
 
   it("rejects Proxy constructors and accessor methods without invoking traps", async () => {
