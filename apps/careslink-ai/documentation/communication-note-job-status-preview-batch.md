@@ -1,9 +1,9 @@
 # Communication Note job-status Preview batch
 
-Batch: `2026-09-07.job-status-read-preview.1`. Prepared on 2026-09-07.
-The contract below was prepared without Hosted execution. The separate r1
-execution record at the end is the latest evidence; its overall result is
-**failed Auth-cleanup verification, Preview deleted**, not a full pass.
+Batch: `2026-09-07.job-status-read-preview.2`. Locally corrected on 2026-09-07.
+This revision has not run on Hosted. The separate historical r1 execution below
+remains the latest Hosted evidence: **failed Auth-cleanup verification, Preview
+deleted**, not a full pass. The local correction record follows it.
 
 ## Boundary
 
@@ -32,6 +32,7 @@ From `apps/careslink-ai`:
 ```sh
 node scripts/preview-e2e/communication-note-job-status-preview.mjs --check
 npx vitest run scripts/preview-e2e/communication-note-job-status-preview.test.mjs
+npx vitest run scripts/preview-e2e/communication-note-job-status-preview-auth-cleanup.test.mjs
 node scripts/preview-e2e/communication-note-job-status-local-pg16.mjs
 ```
 
@@ -46,6 +47,10 @@ successful read cleanup, read failure cleanup, connection failure cleanup, and
 rejection of a network error as proof of credential revocation. The role remains
 removed even when the last denial assertion fails. Local HBA uses `trust`:
 this proves NOLOGIN and membership, **not password authentication or TLS**.
+Three additional cleanup scenarios check an already-revoked session, an active
+owned session and a real database foreign-key denial. Their Auth API ports are
+explicitly simulated with local SQL inside rolled-back transactions; they do
+not prove Hosted GoTrue deletion. All 17 local scenarios must pass.
 The cluster is stopped and its exact owned temporary directory is removed.
 
 ## Authorized input and invocation
@@ -113,10 +118,16 @@ not cryptographically attested by this standalone script.
    a new connection, terminate any exact-role residual backends, revoke its
    caller edge, drop only that run-owned role and verify absence. Network errors
    do not count as denied-login evidence. No broad `DROP OWNED` is used.
-7. Revoke any remaining known test session, require zero sessions for the exact
-   generated account, delete only that account, and check absence. Verify zero
-   job-status runtime roles and close the admin connection (releasing the lock).
-   SIGINT/SIGTERM stops subsequent test actions and still enters cleanup.
+7. Bind the exact generated email and any known user ID, then inspect that
+   account's current sessions. If already empty, do not repeat sign-out with a
+   revoked JWT. Otherwise require exactly one session, bound to that user's
+   token, and successfully revoke it through Auth with scope `local`. Require
+   fresh zero sessions before account deletion, delete only that account via
+   Auth, verify its absence by both email and ID, and recheck zero sessions.
+   Each cleanup operation has a 10-second evidence deadline; timeout is failure,
+   not cancellation proof. Do not retry or treat generic 401/403/404 as success.
+   Verify zero job-status runtime roles and close the admin connection (releasing
+   the lock). SIGINT/SIGTERM stops subsequent test actions and still enters cleanup.
 8. **Operator deletes the exact approved disposable Preview on either success
    or failure**, then verifies its absence with the control plane. If creation,
    sign-in, cleanup or process completion was ambiguous, deletion is the final
@@ -127,6 +138,13 @@ credential, user ID, session ID, role name or SQL result is printed. Keep the
 approved branch ref in the operator's separate cleanup record. If the process is
 force-killed or loses its admin connection, it cannot promise resource cleanup:
 complete step 8, and report any deletion failure before doing more work.
+
+An Auth cleanup failure sets top-level `stage: "auth-cleanup"`; `probeStage`
+preserves the last main test stage. `authCleanupEvidence` separately records the
+fixed cleanup stage, allowlisted failure category and revocation/account/session
+booleans. It never includes arbitrary backend error text or codes. A lost create
+acknowledgement is recoverable only when the exact generated email finds one
+account; an absent lookup with no known user ID is not proof of cleanup.
 
 ## Evidence interpretation and remaining work
 
@@ -250,3 +268,38 @@ checkpoints and investigate repeated sign-out/idempotency without weakening the
 zero-session/account-absence assertions. No source fix or new remote run was
 performed in this execution-only batch. A fresh one-Preview authorization and
 full cleanup pass are required before any adapter/Cookie/UI activation work.
+
+## Local Auth-cleanup correction — 2026-09-07
+
+The pinned `@supabase/auth-js` 2.108.2 admin `signOut` returns Auth errors to its
+caller. An offline test through the actual pinned Supabase client, with every
+HTTP response intercepted, reproduces a `401 session_expired` response: r1's
+repeated-sign-out assertion rejects it and never reaches account deletion.
+This establishes a reproducible failure path, **not the confirmed cause of r1**;
+the historical catch discarded the actual failing checkpoint and error code.
+
+The new dedicated helper removes the unnecessary repeat when fresh SQL already
+proves zero sessions. It keeps independent revocation and deletion evidence,
+consistent with [Supabase session guidance](https://supabase.com/docs/guides/auth/sessions).
+Active-session cleanup still requires exact owner/session binding and a successful
+Auth response. No raw Auth SQL mutation, broad error suppression, retry, grants,
+migration change or production readiness change was added to the Hosted runner.
+Batch `.2` rejects the old `.1` authorization envelope; it does not reuse the
+consumed r1 approval. The source pins and 47-migration manifest are unchanged.
+
+Verification on this revision:
+
+- Full suite: 264 files / 3,998 tests, including 36 new cleanup cases and one
+  old-batch rejection vector. The real SDK test is synthetic HTTP, not Hosted.
+- Local PG16: 17/17 scenarios passed and owned-cluster stop/removal confirmed.
+  The first local run rejected a temporary-table-to-permanent-table foreign key
+  (`42P16`); the fixture now creates its dependency inside the rolled-back
+  transaction. The repeat then proved the intended real `23503` cleanup denial.
+- Check-only: `.2`, exact 47 migrations, `hostedExecuted:false`.
+- TypeScript, full zero-warning ESLint, 73-file adapter sync and diff checks passed.
+
+No new Preview, Production access, deployment, UI/Logo change, real care data,
+Points mutation or model call occurred. No new browser/build evidence is claimed.
+Next: obtain fresh authorization for one no-data Preview and replay the fixed
+`.2` batch, stopping on failure and deleting the exact branch on either outcome.
+Only that complete Hosted cleanup evidence can close the failed r1 gate.

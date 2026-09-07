@@ -9,6 +9,7 @@ import { verifyJobStatusScenarios as verifyScenarios } from "./communication-not
 import { withPreviewJobStatusLogin } from "./communication-note-job-status-preview-login.mjs";
 import { assertJobStatusPreviewAcl } from "./communication-note-job-status-preview.mjs";
 import { STATUS_SQL, statusParameters, verifyPreviewSources } from "./communication-note-job-status-preview-policy.mjs";
+import { verifyAuthCleanupLocalScenarios } from "./communication-note-job-status-auth-cleanup-local-scenarios.mjs";
 
 // This fixture cannot accept an existing database, URL, role or filesystem target.
 // It tests local PostgreSQL migrations, ACLs and session-lock semantics;
@@ -180,6 +181,8 @@ async function main() {
       }, run: async () => {} }), { message: "JOB_STATUS_PREVIEW_CREDENTIAL_CLEANUP_FAILED" });
     assert.equal((await migrationActor.query("select count(*)::int as n from pg_roles where rolname like 'careslink_v1_job_status_runtime_%'")).rows[0].n, 0);
     scenarios.push(scenario);
+    stage = "auth-cleanup-local-rehearsal";
+    await verifyAuthCleanupLocalScenarios(migrationActor, scenarios, name => { scenario = name; });
     assert.equal(interrupted, false);
   } catch (error) {
     failure = true;

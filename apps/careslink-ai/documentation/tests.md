@@ -3933,10 +3933,38 @@ three consecutive CLI absence checks, an independent MCP listing and a NotFound
 project lookup confirmed removal. No second branch was created. See the
 [complete r1 record](communication-note-job-status-preview-batch.md#r1-hosted-execution--2026-09-07).
 
-Local cleanup diagnostics/regressions and a new authorized full replay remain
-required. Source-adapter transport, populated Hosted job RLS, browser Cookie
+At r1 completion, local cleanup diagnostics/regressions and a new authorized
+full replay remained required. Source-adapter transport, populated Hosted job RLS, browser Cookie
 composition, Hosted advisors and formal activation are still unproved. No
 Production SQL, deployment, real care data, model or Points operation occurred.
+
+### Job-status Auth cleanup — local correction evidence (2026-09-07)
+
+Batch `2026-09-07.job-status-read-preview.2` adds 36 cleanup tests and an old
+`.1` input-rejection vector. The full 264-file / 3,998-test suite passes. Tests
+cover exact fixture target binding, already-absent and active sessions, every
+cleanup I/O failure checkpoint, fixed safe error categories, no error-body
+leaks, account/session persistence, foreign sessions, timeout/late completion
+and refusal to claim cleanup from a lost create with no known account ID.
+
+An actual pinned Supabase SDK test uses only intercepted synthetic HTTP. It
+reproduces old cleanup rejecting a repeated logout's `401 session_expired`,
+then proves the corrected helper deletes the account without repeating logout
+when fresh SQL proves no sessions. The historical r1 error was not retained;
+this test does not establish its exact root cause or retroactively pass r1.
+
+The local PG16 gate passes 17/17 scenarios and confirms owned-cluster cleanup.
+Its three new cleanup scenarios use real local tables with explicitly simulated
+Auth ports: already revoked, active session and real `23503` foreign-key denial.
+The initial foreign-key fixture hit `42P16` because a temporary table cannot
+reference a permanent table; its rolled-back ordinary-table replacement passed.
+Neither local SQL nor synthetic HTTP is evidence of Hosted GoTrue cleanup.
+
+Check-only verifies `.2`, unchanged 47 migrations and no Hosted execution.
+TypeScript, full zero-warning lint, 73-file adapter sync and diff checks passed.
+No new Preview, browser/build run, Production action, Points/model call or
+runtime/UI activation occurred. A fresh authorized `.2` Hosted replay with
+complete account/session cleanup and verified branch deletion remains required.
 
 ### Current live/read-only evidence
 

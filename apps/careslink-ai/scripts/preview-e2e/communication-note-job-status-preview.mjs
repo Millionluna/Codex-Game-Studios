@@ -10,6 +10,7 @@ import {
   parsePreviewArguments, parsePreviewInput, statusParameters, verifyPreviewSources,
 } from "./communication-note-job-status-preview-policy.mjs";
 import { withPreviewJobStatusLogin } from "./communication-note-job-status-preview-login.mjs";
+import { cleanupJobStatusPreviewAuth } from "./communication-note-job-status-preview-auth-cleanup.mjs";
 
 export async function assertJobStatusPreviewAcl(admin) {
   const name = "get_v1_communication_note_job_status";
@@ -78,7 +79,7 @@ async function connect(candidate, certificate, user, password) {
   catch (error) { await client.end(); throw error; }
 }
 
-function authClient(url, key, token) {
+export function createJobStatusPreviewAuthClient(url, key, token) {
   return createClient(url, key, {
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
     global: {
@@ -104,6 +105,8 @@ export async function runJobStatusPreview(settings, input, sources) {
   let accountAttempted = false;
   let ok = false;
   let authCleanup = true;
+  let authCleanupEvidence = { ok: true, stage: "not-required" };
+  let probeStage;
   let databaseClosed = true;
   let credentialCleanup = true;
   let interrupted = false;
@@ -146,8 +149,8 @@ export async function runJobStatusPreview(settings, input, sources) {
     record("pg17-pinned-history-and-exact-reader-acls");
     assert.ok(Date.now() < Date.parse(input.descriptor.expiresAt));
     const apiUrl = `https://${settings.expectedBranchRef}.supabase.co`;
-    authAdmin = authClient(apiUrl, secrets.auth.secretKey);
-    const login = authClient(apiUrl, secrets.auth.publishableKey);
+    authAdmin = createJobStatusPreviewAuthClient(apiUrl, secrets.auth.secretKey);
+    const login = createJobStatusPreviewAuthClient(apiUrl, secrets.auth.publishableKey);
     stage = "synthetic-hosted-auth";
     checkpoint();
     accountAttempted = true;
@@ -160,7 +163,7 @@ export async function runJobStatusPreview(settings, input, sources) {
     assert.equal(signedIn.error, null);
     token = signedIn.data.session.access_token;
     checkpoint();
-    const authenticated = authClient(apiUrl, secrets.auth.publishableKey, token);
+    const authenticated = createJobStatusPreviewAuthClient(apiUrl, secrets.auth.publishableKey, token);
     const verified = await authenticated.auth.getClaims(token);
     assert.equal(verified.error, null);
     const claims = verified.data.claims;
@@ -213,23 +216,11 @@ export async function runJobStatusPreview(settings, input, sources) {
     // Only fixed stage names are returned; never raw SQL, Auth bodies or tokens.
   }
   finally {
+    probeStage = stage;
     if (accountAttempted) {
-      try {
-        // Exact run-owned email also covers a create response lost after server commit.
-        const users = (await admin.query("select id::text from auth.users where email=$1", [email])).rows;
-        assert.ok(users.length <= 1);
-        for (const user of users) {
-          if (token) {
-            const revoked = await authAdmin.auth.admin.signOut(token, "local");
-            // Supabase may return session_not_found on the already-revoked JWT.
-            assert.ok(revoked.error === null || ["session_not_found", "user_not_found"].includes(revoked.error.code));
-          }
-          assert.equal((await admin.query("select count(*)::int as n from auth.sessions where user_id=$1", [user.id])).rows[0].n, 0);
-          const removed = await authAdmin.auth.admin.deleteUser(user.id);
-          assert.equal(removed.error, null);
-        }
-        assert.equal((await admin.query("select count(*)::int as n from auth.users where email=$1", [email])).rows[0].n, 0);
-      } catch { authCleanup = false; }
+      authCleanupEvidence = await cleanupJobStatusPreviewAuth({ admin, authAdmin, email, userId, token });
+      authCleanup = authCleanupEvidence.ok;
+      if (!authCleanup) stage = "auth-cleanup";
     }
     if (admin) {
       try {
@@ -242,7 +233,7 @@ export async function runJobStatusPreview(settings, input, sources) {
     process.removeListener("SIGTERM", interrupt);
   }
   return { batch: JOB_STATUS_PREVIEW_BATCH, ok: ok && authCleanup && credentialCleanup && databaseClosed && !interrupted,
-    stage, passed, authCleanup, credentialCleanup, databaseClosed, interrupted, previewDeletionRequired: true,
+    stage, probeStage, passed, authCleanup, authCleanupEvidence, credentialCleanup, databaseClosed, interrupted, previewDeletionRequired: true,
     previewDeleted: false, productRouteActivated: false, sourceAdapterTransportVerified: false,
     populatedJobAndOwnerRlsVerified: false, browserCookieCompositionVerified: false };
 }

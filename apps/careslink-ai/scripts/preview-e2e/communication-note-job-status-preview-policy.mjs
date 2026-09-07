@@ -7,7 +7,7 @@ import {
 } from "./communication-note-preview-runner-terminal-identity-policy.mjs";
 import { loadPinnedCommunicationNotePreviewMigrations } from "./communication-note-preview-transactional-migrations-policy.mjs";
 
-export const JOB_STATUS_PREVIEW_BATCH = "2026-09-07.job-status-read-preview.1";
+export const JOB_STATUS_PREVIEW_BATCH = "2026-09-07.job-status-read-preview.2";
 export const CALLER = "careslink_v1_generation_job_status_caller";
 export const EXECUTOR = "careslink_v1_generation_job_status_executor";
 export const STATUS_SQL = `select careslink_v1_generation.get_v1_communication_note_job_status(

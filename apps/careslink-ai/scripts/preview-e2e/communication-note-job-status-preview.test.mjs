@@ -66,6 +66,7 @@ describe("fixed Communication Note read-only Preview batch", () => {
     ["stale metadata", v => { v.observedAt = new Date(NOW - 60001).toISOString(); }],
     ["future metadata", v => { v.observedAt = new Date(NOW + 1).toISOString(); }],
     ["wrong scope", v => { v.scope = "OTHER_PURPOSE"; }],
+    ["old pre-fix batch", v => { v.scope = "2026-09-07.job-status-read-preview.1"; }],
     ["extra instruction", v => { v.executeSql = "drop table anything"; }],
     ["extra auth field", v => { v.auth.apiUrl = "https://attacker.invalid"; }],
     ["empty key", v => { v.auth.secretKey = ""; }],
@@ -88,6 +89,9 @@ describe("fixed Communication Note read-only Preview batch", () => {
     expect(runner).toContain("sourceAdapterTransportVerified: false");
     expect(runner).toContain("populatedJobAndOwnerRlsVerified: false");
     expect(runner).toContain("browserCookieCompositionVerified: false");
+    expect(runner).toContain("authCleanup = authCleanupEvidence.ok");
+    expect(runner).toContain('if (!authCleanup) stage = "auth-cleanup"');
+    expect(runner).toContain("probeStage = stage");
     expect(runner).not.toMatch(/session_replication_role|console\.|process\.env|insert into|delete from|create_branch|drop schema/i);
   });
   it("invalid CLI input produces only a fixed safe failure envelope", async () => {

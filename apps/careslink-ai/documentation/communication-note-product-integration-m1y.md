@@ -397,3 +397,29 @@ locally. Do not create another Preview or install the green-page read compositio
 until a fresh authorized replay proves the complete cleanup path. No source
 repair, provider/model call, Points operation, deployment or Production SQL was
 part of r1.
+
+## Job-status Auth cleanup corrected locally (2026-09-07)
+
+The fixed Preview batch is now `2026-09-07.job-status-read-preview.2`. A new
+cleanup helper binds the exact synthetic email/user, checks current sessions,
+skips redundant sign-out only when none remain, and requires independently
+verified zero sessions before and after Auth account deletion. Active sessions
+still require exact token/owner/session binding and successful Auth sign-out.
+Per-step bounded, redacted evidence distinguishes the main probe stage from the
+cleanup checkpoint; failure remains fail-closed without retries or broad HTTP
+error acceptance. The old `.1` authorization envelope is rejected.
+
+The actual pinned SDK with synthetic HTTP reproduces a repeated-sign-out
+`session_expired` failure that prevented the old cleanup from reaching deletion.
+This is a proved local weakness, not proof of r1's exact historical cause.
+The [local correction record](communication-note-job-status-preview-batch.md#local-auth-cleanup-correction--2026-09-07)
+records the evidence and limitations. All 3,998 tests across 264 files and all
+17 local PG16 scenarios passed, including real local foreign-key denial with
+simulated Auth ports. TypeScript, zero-warning lint, offline pins and adapter
+sync passed; the local cluster was removed.
+
+No cloud resources were created, no migrations changed and no UI/Logo, runtime
+flags, Production, Points or model integration was touched. Next: obtain fresh
+one-Preview authorization and replay `.2` through complete Auth cleanup and
+verified branch deletion. The real source-adapter/Cookie composition and green
+job-page connection remain subsequent work, not already-completed functionality.
