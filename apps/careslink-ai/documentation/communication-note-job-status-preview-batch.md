@@ -376,10 +376,11 @@ does not establish r1's historical root cause or retroactively pass revision `.1
 After the successful probe, the temporary lifecycle attempted the additional
 CLI security-advisor collection. It failed at `security-advisors` with fixed
 `FIXED_PREVIEW_EXECUTION_FAILED`, before usable advisory evidence was emitted.
-The wrapper discarded raw CLI output/errors; the checkpoint alone does not
-distinguish a command, JSON parsing or report-shape validation failure. No zero-
-finding result, specific vulnerability, or confirmed collection root cause is
-claimed. This failure did not come from the committed Auth/read probe.
+The wrapper discarded raw CLI output/errors; the checkpoint alone did not
+distinguish a command, JSON parsing or report-shape validation failure. The
+subsequent local diagnosis below identifies a deterministic command error; no
+zero-finding result or specific vulnerability is claimed. This failure did not
+come from the committed Auth/read probe.
 
 The first failure immediately entered deletion. The exact branch was deleted;
 three consecutive CLI absence checks and an independent MCP listing showed only
@@ -401,3 +402,45 @@ evidence in the next necessary integration Preview; do not create a standalone
 replacement merely to repeat this already-passed Auth cleanup probe. Populated
 synthetic flow, advisors and explicit activation approval remain required before
 formal route activation or deployment.
+
+## Local advisor collection correction — 2026-09-07
+
+Inspection of the pinned CLI 2.115.0
+[command handler](https://github.com/supabase/cli/blob/v2.115.0/apps/cli/src/legacy/commands/db/advisors/advisors.handler.ts)
+and a local replay of the retained r2 arguments confirmed that the missing
+`--linked` flag is rejected before database configuration or project API access.
+The replay used the already-deleted r2 reference and recorded only
+`exitCode:1, missingLinkedRejected:true`; it did not recreate a resource or run
+an advisory query. This is subsequent source/reproduction evidence, not recovered
+historical stderr. The original r2 lifecycle remains failed and has no report.
+
+Do **not** simply add `--linked`: the same handler resolves database configuration
+and may mint a CLI login role before requesting the report. The
+[formatter](https://github.com/supabase/cli/blob/v2.115.0/apps/cli/src/legacy/commands/db/advisors/advisors.format.ts)
+also has CLI-specific output modes (including empty stdout for no text-mode
+findings), so neither empty stdout nor a CLI array proves a valid `{lints:[]}`
+Management API response.
+
+The new local `communication-note-preview-security-advisors.mjs` collector
+accepts injected read-only branch-list and Management API / MCP `get_advisors`
+ports. It checks the locked no-data child id/ref, parent, non-default,
+non-persistent identity and healthy pipeline before and after one security
+report request. Each step has a 30-second limit, no retry, and a fixed redacted
+failure stage; no CLI, credential acquisition or mutation port exists in it.
+The enclosing lifecycle remains responsible for deleting the exact Preview on
+success or failure; this collector neither creates nor deletes resources.
+
+The parser accepts the exact `{lints:[...]}` body or a single-text MCP envelope,
+rejecting absent, malformed, CLI-shaped and error responses. Findings are reduced
+to lint name, severity and an allowlisted official remediation link; backend
+details, object names and arbitrary URL parameters are not retained. Currently
+only official database-linter remediation URLs with one validated `lint` parameter
+are supported; an unfamiliar shape/link fails closed and requires a local parser
+update, never a zero-finding conclusion. Successful collection with any findings
+is explicitly **not** a security review pass.
+
+The collector's 23 local tests cover valid empty/finding reports, unsafe links,
+malformed output, target drift, fixed failure checkpoints and late completion.
+It has not yet collected a Hosted report or been installed into a new lifecycle.
+Include it in the next necessary populated-flow integration gate, with cleanup
+still mandatory; do not create a standalone replacement for the passed r2 probe.

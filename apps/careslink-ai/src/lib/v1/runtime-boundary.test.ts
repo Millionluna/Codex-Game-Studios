@@ -1302,6 +1302,10 @@ describe("V1 shadow runtime boundary", () => {
           process.cwd(),
           "src/lib/communication-note-generation-principal.server.test.ts",
         ),
+        join(
+          process.cwd(),
+          "src/lib/communication-note-job-recovery-composition.server.ts",
+        ),
       ].sort(),
     );
     expect(principalCompositionSource).toMatch(/^import "server-only";/);
@@ -1334,6 +1338,27 @@ describe("V1 shadow runtime boundary", () => {
     expect(envExampleSource).not.toContain(
       "CARESLINK_COMMUNICATION_NOTE_SESSION_STATUS_PREVIEW_SECRET_KEY",
     );
+  });
+
+  it("keeps the independent job recovery composition server-only and uninstalled", () => {
+    const compositionPath = join(process.cwd(), "src/lib/communication-note-job-recovery-composition.server.ts");
+    const compositionTestPath = join(process.cwd(), "src/lib/communication-note-job-recovery-composition.server.test.ts");
+    const boundaryPath = join(process.cwd(), "src/lib/v1/runtime-boundary.test.ts");
+    const readerPath = join(process.cwd(), "src/lib/communication-note-generation-job-recovery.server.ts");
+    const source = readFileSync(compositionPath, "utf8");
+    expect(source).toMatch(/^import "server-only";/);
+    expect(source).toContain("COMMUNICATION_NOTE_JOB_RECOVERY_COMPOSITION_READY = false");
+    expect(source).not.toMatch(/process\.env|service_role|sb_secret_|from ["']pg["']|openai-communication-note-provider|createTestOnly|GENERATION_API_ENABLED|POINTS_UI_ENABLED/);
+    expect(walkControlledScriptFiles().filter(file =>
+      file !== compositionPath && file !== boundaryPath &&
+      readFileSync(file, "utf8").includes("communication-note-job-recovery-composition"),
+    )).toEqual([compositionTestPath]);
+    expect(walkControlledScriptFiles().filter(file =>
+      file !== readerPath && file !== boundaryPath &&
+      /createCommunicationNoteGenerationJobRecovery(?:Reader|Handler)/.test(readFileSync(file, "utf8")),
+    )).toEqual([compositionPath]);
+    const route = readFileSync(join(process.cwd(), "src/app/api/ai-documents/communication-note/jobs/[jobId]/route.ts"), "utf8");
+    expect(route).not.toContain("communication-note-job-recovery-composition");
   });
 
   it("keeps service-role repositories outside the client component tree", () => {

@@ -3980,8 +3980,10 @@ session revocation and old-JWT rejection all verified.
 acknowledged, account absent and sessions absent, all true; credential cleanup
 and database close were true. This is Hosted proof for the corrected cleanup,
 not a reconstructed cause of r1. The subsequent CLI security-advisor collection
-failed before usable evidence was emitted; command-versus-parser failure remains
-undetermined. No advisor pass or specific finding is claimed. The enclosing
+failed before usable evidence was emitted; raw error detail was not retained.
+The subsequent local correction below confirms the missing-`--linked` command
+error without reconstructing report contents. No advisor pass or specific finding
+is claimed. The enclosing
 lifecycle returned `ok:false` for that distinct step.
 
 The exact Preview was deleted after that failure. Three CLI absence checks,
@@ -3993,6 +3995,46 @@ real care data, Points/model operation, UI/flag change or new source fix occurre
 Real read transport/Cookie composition and populated Hosted status flow remain
 unproved. Advisor evidence must be included in the next integration gate; this
 partial lifecycle result is not an application release or all-five-Note pass.
+
+### Independent job recovery composition and advisor correction — local source evidence (2026-09-07)
+
+The new default-off server composition connects the real Cookie principal,
+job-status purpose adapter and fixed repository implementation. It requires
+server-owned injected database dependencies, independent read gating and exact
+Preview identity; it does not borrow the generation/Points gate or privileged
+generic credentials. The default Cookie factory uses the existing Next.js SSR
+client. Each request checks claims, actual current-session status and user
+identity before resolving the read-only database port.
+
+The 37 composition tests use synthetic Auth, credential issuance, SQL transport
+and cleanup receipts. They verify all five job status envelopes, fixed owner /
+session / job / contract / schema SQL parameters, strict transport and auth
+ordering, invalid config/target/query, revoked sessions, per-request freshness,
+safe failures, cleanup gating, 30-second timeout, abort, config drift and private
+cache headers. They execute the actual principal/adapter/repository code, not
+mocked versions of those modules. They do **not** prove a physical connection,
+actual issuer, Hosted populated owner-RLS flow or browser Cookie transport.
+
+The 23 advisor collector tests verify bounded read-only before/after target
+checks, exact report/MCP shapes, redacted lint/remediation output, no retry, no
+empty-output false pass and no resume after timeout. Pinned CLI 2.115.0 source
+inspection plus a local argument-validation replay confirmed that r2 omitted
+required `--linked`; merely adding it may mint a login role. The new collector
+therefore uses injected Management API / MCP read ports, not CLI connection
+initialization. No new Hosted report is claimed; r2 remains a failed enclosing
+lifecycle with a passed core probe and verified deletion.
+
+The focused reader/composition/advisor/runtime-boundary gate passed **110/110**.
+The full suite passed **4,059/4,059 across 266 files**; TypeScript, ESLint with
+zero warnings, the webpack production build (64/64 static pages), the post-build
+client-boundary scan (107 chunks, including new read-composition markers), adapter
+sync and whitespace checks passed.
+The fixed Preview check-only command passed the unchanged 47-migration manifest
+with `hostedExecuted:false`. Formal reader/composition readiness remains false,
+the actual GET remains fixed 503, and the approved green UI/Logo was untouched.
+No Preview, database role, Production mutation, deployment, Points or model call
+was created/performed during this local batch. Physical issuer/connection work
+is the next implementation step, not completed evidence.
 
 ### Current live/read-only evidence
 

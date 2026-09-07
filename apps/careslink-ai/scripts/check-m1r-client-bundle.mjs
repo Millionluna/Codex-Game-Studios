@@ -38,6 +38,10 @@ const forbiddenMarkers = [
   "SOURCE_TRANSPORT_NOT_COMPOSED",
   "google-cloud-provider-trust.communication-note.2026-09-03.m2b.v1",
   "SOURCE_PROVIDER_TRUST_NOT_COMPOSED",
+  // Independent Cookie/session job recovery composition must remain server-only.
+  "CARESLINK_COMMUNICATION_NOTE_JOB_RECOVERY_EXPECTED_SUPABASE_REF",
+  "CARESLINK_COMMUNICATION_NOTE_JOB_RECOVERY_EXPECTED_VERCEL_PROJECT_ID",
+  "Job recovery composition unavailable",
 ];
 
 if (!existsSync(buildIdPath) || !existsSync(chunksRoot)) {

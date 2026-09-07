@@ -434,8 +434,9 @@ independent zero-session checks passed. This closes the corrected probe's Hosted
 cleanup gap, not the historical diagnosis of r1.
 
 The subsequent temporary lifecycle's security-advisor collection failed without
-usable report evidence. Its exact command-versus-parser cause is not retained;
-no advisor pass or specific vulnerability is inferred. The lifecycle stopped,
+usable report evidence. Raw errors were not retained; the subsequent local
+diagnosis below confirms a missing-`--linked` argument error in the pinned CLI.
+No advisor pass or specific vulnerability is inferred. The lifecycle stopped,
 deleted the exact Preview and verified absence three times plus independently by
 MCP and a NotFound child-project lookup. Thus the probe passed, branch cleanup
 passed, but the enclosing lifecycle reported `ok:false` for advisor collection.
@@ -448,3 +449,57 @@ collect it during the next necessary populated-flow integration Preview, not a
 standalone repeat of the passed cleanup probe. Real adapter transport, populated
 Hosted flow, browser composition, advisors and activation approval are still
 open; no deployment, Production access, Points or model call was performed.
+
+## Independent job recovery source composition — 2026-09-07
+
+`communication-note-job-recovery-composition.server.ts` now composes the actual
+Cookie principal resolver, purpose-scoped job-status adapter and fixed owner
+repository code. The shared recovery reader accepts asynchronous dependency
+resolution; its TestOnly wrapper retains its original capability validation.
+
+The read composition has an independent default-off
+`CARESLINK_COMMUNICATION_NOTE_JOB_RECOVERY_ENABLED` flag, expected Supabase ref
+and expected Vercel project id, documented as false/blank in `.env.example`.
+It also requires the Product API gate and exact Preview platform identity,
+canonical matching URLs and matching publishable keys. It excludes Production
+and does not depend on the generation or Points UI flags. Environment values
+alone cannot install the formal reader.
+
+Each request gets a fresh Cookie client and checks `getClaims` → zero-argument
+current-session RPC → `getUser` before resolving any database dependency.
+Only the verified owner/session reaches the fixed five-parameter status query;
+bearer transport is rejected before client creation. Disabled/drifting config,
+wrong target, revoked sessions, timeout, abort and cleanup failure withhold job
+data. The whole request is bounded to 30 seconds, including dependency resolution;
+the existing adapter still owns its acquire/query/destroy/revoke limits and cleanup.
+Responses retain fixed private/no-store headers and never echo arbitrary SSR
+header values. No UI, Logo, generation, Points or export code was changed.
+
+Evidence: 37 composition tests exercise the real principal/adapter/repository
+modules using **synthetic Auth, issuer, query and cleanup ports**. They cover all
+five Communication Note job states, call ordering, fixed SQL/owner binding,
+revocation, errors, independent gates, per-request freshness, late completion,
+cleanup and cache headers. Together with recovery-reader, advisor and runtime
+boundary tests, the focused gate passed 110/110. Runtime import auditing allows
+only this additional server composition, not a client or formal route importer.
+
+This is **source composition, not a live connection implementation**. The
+`resolveDatabase` port must still be backed by a real short-lived credential
+issuer and exclusive physical connection; synthetic receipts are not Hosted
+cleanup evidence. `COMMUNICATION_NOTE_JOB_RECOVERY_COMPOSITION_READY` remains
+`false`, and `COMMUNICATION_NOTE_GENERATION_FORMAL_JOB_RECOVERY_READER` remains
+`undefined`; the actual GET still returns fixed 503 without reading auth/job data.
+No new Preview, deployment, Production action or model call was performed.
+
+The security report failure was also diagnosed locally and a bounded read-only
+Management API / MCP collector with strict report parsing was added. See the
+[advisor correction](communication-note-job-status-preview-batch.md#local-advisor-collection-correction--2026-09-07).
+This does not turn r2 into a security-review pass.
+
+Next: implement the server-owned short-lived job-status credential issuer and
+exclusive physical read-connection dependency locally, then prove that dependency
+through this composition. After local proof, prepare one necessary populated
+synthetic-flow integration gate with browser Cookie checks and the corrected
+read-only advisors; resource creation and formal activation remain separately
+bounded by authorization. Do not repeat a cleanup-only Preview or start visual
+redesign.

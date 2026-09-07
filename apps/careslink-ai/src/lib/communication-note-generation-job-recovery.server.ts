@@ -39,7 +39,8 @@ export type CommunicationNoteGenerationJobRecoveryRepositoryFactory = (
     principal: CommunicationNoteGenerationProviderPrincipal;
     signal: AbortSignal;
   }>,
-) => CommunicationNoteGenerationJobRecoveryRepository | undefined;
+) => CommunicationNoteGenerationJobRecoveryRepository | undefined |
+  PromiseLike<CommunicationNoteGenerationJobRecoveryRepository | undefined>;
 
 export type CommunicationNoteGenerationJobRecoveryReader = (
   request: Request,
@@ -79,6 +80,21 @@ export function createTestOnlyCommunicationNoteGenerationJobRecoveryReader(
     typeof options.resolvePrincipal !== "function" ||
     typeof options.createRepository !== "function"
   ) {
+    throw unavailableError();
+  }
+
+  return createCommunicationNoteGenerationJobRecoveryReader({
+    resolvePrincipal: options.resolvePrincipal as CommunicationNoteGenerationPrincipalResolver,
+    createRepository: options.createRepository as CommunicationNoteGenerationJobRecoveryRepositoryFactory,
+  });
+}
+
+/** Shared server composition core; it does not install a formal reader. */
+export function createCommunicationNoteGenerationJobRecoveryReader(
+  value: Omit<TestOnlyReaderOptions, "capability">,
+): CommunicationNoteGenerationJobRecoveryReader {
+  const options = exactDataRecord(value, ["resolvePrincipal", "createRepository"]);
+  if (typeof options.resolvePrincipal !== "function" || typeof options.createRepository !== "function") {
     throw unavailableError();
   }
 
@@ -130,13 +146,14 @@ export function createTestOnlyCommunicationNoteGenerationJobRecoveryReader(
     let repository: CommunicationNoteGenerationJobRecoveryRepository;
     try {
       repository = parseRepository(
-        createRepository(
+        await createRepository(
           Object.freeze({
             principal: resolution.principal,
             signal,
           }),
         ),
       );
+      if (signal.aborted) return UNAVAILABLE;
     } catch {
       return UNAVAILABLE;
     }
@@ -145,10 +162,12 @@ export function createTestOnlyCommunicationNoteGenerationJobRecoveryReader(
     try {
       rawJob = await repository.get(Object.freeze({ jobId }));
     } catch (error) {
+      if (signal.aborted) return UNAVAILABLE;
       return repositoryFailure(error);
     }
 
     try {
+      if (signal.aborted) return UNAVAILABLE;
       // A Communication-only route must hide an otherwise valid owner job for
       // another Note type instead of turning it into a 503 contract oracle.
       const noteType = ownEnumerableDataProperty(rawJob, "noteType");
@@ -189,6 +208,13 @@ export function createTestOnlyCommunicationNoteGenerationJobRecoveryHandler(
   );
   return (request: Request, jobId: string) =>
     handleWithReader(request, jobId, reader);
+}
+
+export function createCommunicationNoteGenerationJobRecoveryHandler(
+  options: Omit<TestOnlyReaderOptions, "capability">,
+) {
+  const reader = createCommunicationNoteGenerationJobRecoveryReader(options);
+  return (request: Request, jobId: string) => handleWithReader(request, jobId, reader);
 }
 
 async function handleWithReader(
