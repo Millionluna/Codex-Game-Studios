@@ -423,3 +423,28 @@ flags, Production, Points or model integration was touched. Next: obtain fresh
 one-Preview authorization and replay `.2` through complete Auth cleanup and
 verified branch deletion. The real source-adapter/Cookie composition and green
 job-page connection remain subsequent work, not already-completed functionality.
+
+## Job-status Hosted r2 — cleanup passed, advisor evidence open (2026-09-07)
+
+The fresh authorized no-data Preview ran clean source `b8dcb40` and batch `.2`.
+All 47 migrations applied atomically on PG17; the actual Auth/read-role probe
+returned `ok:true`. Real session revocation, old-JWT denial, all three physical
+read-role cleanups, Auth account-delete acknowledgement, account absence and
+independent zero-session checks passed. This closes the corrected probe's Hosted
+cleanup gap, not the historical diagnosis of r1.
+
+The subsequent temporary lifecycle's security-advisor collection failed without
+usable report evidence. Its exact command-versus-parser cause is not retained;
+no advisor pass or specific vulnerability is inferred. The lifecycle stopped,
+deleted the exact Preview and verified absence three times plus independently by
+MCP and a NotFound child-project lookup. Thus the probe passed, branch cleanup
+passed, but the enclosing lifecycle reported `ok:false` for advisor collection.
+See the [r2 record](communication-note-job-status-preview-batch.md#r2-hosted-execution--2026-09-07).
+
+Next: local application-integration development for the real independent read
+transport and Cookie/current-session principal, with default-off flags and the
+approved green UI unchanged. Correct the advisor collection contract locally and
+collect it during the next necessary populated-flow integration Preview, not a
+standalone repeat of the passed cleanup probe. Real adapter transport, populated
+Hosted flow, browser composition, advisors and activation approval are still
+open; no deployment, Production access, Points or model call was performed.

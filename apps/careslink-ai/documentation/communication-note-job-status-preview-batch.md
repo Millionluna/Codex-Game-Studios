@@ -1,9 +1,10 @@
 # Communication Note job-status Preview batch
 
 Batch: `2026-09-07.job-status-read-preview.2`. Locally corrected on 2026-09-07.
-This revision has not run on Hosted. The separate historical r1 execution below
-remains the latest Hosted evidence: **failed Auth-cleanup verification, Preview
-deleted**, not a full pass. The local correction record follows it.
+Latest Hosted evidence is r2 below: **the fixed migration/Auth/read/cleanup probe
+passed and the Preview was deleted**. The subsequent security-advisor collection
+failed, so the enclosing lifecycle returned `ok:false`; there is no advisor or
+release-gate pass. Historical r1 and local correction records remain distinct.
 
 ## Boundary
 
@@ -303,3 +304,100 @@ Points mutation or model call occurred. No new browser/build evidence is claimed
 Next: obtain fresh authorization for one no-data Preview and replay the fixed
 `.2` batch, stopping on failure and deleting the exact branch on either outcome.
 Only that complete Hosted cleanup evidence can close the failed r1 gate.
+
+## r2 Hosted execution — 2026-09-07
+
+The user confirmed the organization and current quoted US$0.01344/hour Micro
+compute rate (other usage/taxes billed as incurred), then authorized execution.
+One no-data, nondefault, nonpersistent Preview was created; no replacement or
+test retry occurred. No actual accrued bill is inferred from the quoted rate.
+
+- Organization: Millionluna's Org, `dupupgakxfikiqeqseej`.
+- Clean gate source: `b8dcb40a2e051ddcff532b9ef4abb08ba84724da`.
+- Probe batch: `2026-09-07.job-status-read-preview.2`.
+- Branch: `careslink-job-status-r2-20260907`.
+- Branch ID: `baf9e2df-bee7-4aa1-aeb3-9f92f9f01d90`.
+- Child ref: `zhbxpmuorjaxajfbgqux`.
+- Parent ref: `adocsnwnslxhxcjgbyee`, control-plane binding only.
+- Created: `2026-09-07T04:52:08.935813+00:00`.
+- CLI: 2.115.0, unchanged during execution.
+- CA SHA-256: `700723581420dd1ac98fd7e9ac529f0ef210eadcaf87fc868a3ad7d114c2f3b7`.
+- Credential-free temporary lifecycle script SHA-256:
+  `a37ce443d845770e42b9e94cd54af97fe2645853a5e1cc4a4283533d1688d00d`.
+
+Before creation, check-only/source/CA/CLI/baseline checks and the three focused
+suites (118 tests) passed. The lifecycle used the committed transactional
+invocation and the existing canonical branch-envelope converter. Credentials
+were transferred through anonymous in-memory stdin, not command arguments,
+environment exports, files or output. Only the child database/Auth endpoint
+received test operations; no Production SQL/data access occurred.
+
+### Passed fixed probe and cleanup
+
+The PG17 invocation under migration policy `.19` passed the exact existing
+19-row history/baseline checks and applied all 47 migrations in one transaction.
+It reported 26 outer wrappers removed in memory, 18 application roles, 26
+protected ACL grants, empty ledgers and no temporary-role residue. The manifest
+remained `90650837b534ceaecf4a88df4bc4d5fc734b8ed799c12bb29ccf18e625d47187`.
+`migrationHistoryInitialized:false`: missing-history initialization was not tested.
+
+The actual committed `.2` probe returned `ok:true`. Exact wrapper/ACL/TLS checks,
+real synthetic Auth sign-in/claims/user/current-session identity, missing-job
+`NOT_FOUND`, mismatched-owner/session `SESSION_REVOKED`, three separate physical
+read-credential issue/disable/new-login-denial/drop lifecycles, actual sign-out,
+and old-JWT current-session/reader rejection all passed. Final evidence:
+
+```json
+{
+  "ok": true,
+  "authCleanup": true,
+  "authCleanupEvidence": {
+    "ok": true,
+    "stage": "complete",
+    "failure": null,
+    "revocation": "already-absent",
+    "accountAbsent": true,
+    "sessionsAbsent": true,
+    "deletionAcknowledged": true
+  },
+  "credentialCleanup": true,
+  "databaseClosed": true,
+  "interrupted": false
+}
+```
+
+This proves the corrected already-revoked cleanup path on Hosted, including Auth
+account-delete acknowledgement, account absence and independently zero sessions.
+It closes the specific missing cleanup evidence from r1 for revision `.2`; it
+does not establish r1's historical root cause or retroactively pass revision `.1`.
+
+### Advisor collection failed; exact Preview deletion verified
+
+After the successful probe, the temporary lifecycle attempted the additional
+CLI security-advisor collection. It failed at `security-advisors` with fixed
+`FIXED_PREVIEW_EXECUTION_FAILED`, before usable advisory evidence was emitted.
+The wrapper discarded raw CLI output/errors; the checkpoint alone does not
+distinguish a command, JSON parsing or report-shape validation failure. No zero-
+finding result, specific vulnerability, or confirmed collection root cause is
+claimed. This failure did not come from the committed Auth/read probe.
+
+The first failure immediately entered deletion. The exact branch was deleted;
+three consecutive CLI absence checks and an independent MCP listing showed only
+healthy default Production. The child project lookup returned NotFound. Those
+observations were completed by `2026-09-07T04:54:27Z`. The enclosing lifecycle
+therefore returned `ok:false, previewDeleted:true, interrupted:false`: deletion
+passed, but the optional report step did not. The temporary credential-free
+lifecycle file and its owned directory were removed after evidence capture.
+
+No source repair, deployment, product flag/route/UI/Logo change, real care data,
+job/payload/Points mutation or model call occurred. Source-adapter transport,
+populated Hosted owner-RLS/status envelopes and browser Cookie composition remain
+explicitly false; this is not a production readiness or all-five-Note pass.
+
+Next: locally implement and test the real job-status read transport and strict
+Cookie-principal composition, retaining default-off flags and the existing green
+UI. Resolve the advisor collection contract locally and include valid advisor
+evidence in the next necessary integration Preview; do not create a standalone
+replacement merely to repeat this already-passed Auth cleanup probe. Populated
+synthetic flow, advisors and explicit activation approval remain required before
+formal route activation or deployment.

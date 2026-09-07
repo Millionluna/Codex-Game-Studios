@@ -3966,6 +3966,34 @@ No new Preview, browser/build run, Production action, Points/model call or
 runtime/UI activation occurred. A fresh authorized `.2` Hosted replay with
 complete account/session cleanup and verified branch deletion remains required.
 
+### Job-status Hosted r2 — probe/cleanup pass, advisor collection failure (2026-09-07)
+
+The authorized single no-data Preview ran clean source `b8dcb40`, fixed batch
+`.2`, CLI 2.115.0 and PG17. Precreate check-only and 118 focused tests passed.
+The exact 47-migration transaction, 19-row baseline/history locks, manifest and
+postchecks passed; history initialization was not needed. The actual read/Auth
+probe returned `ok:true`, with exact wrapper/TLS/ACL checks, real synthetic Auth
+identity, missing/mismatched read denial, three short-lived read-role lifecycles,
+session revocation and old-JWT rejection all verified.
+
+`authCleanupEvidence` reported `complete`, `already-absent`, account deletion
+acknowledged, account absent and sessions absent, all true; credential cleanup
+and database close were true. This is Hosted proof for the corrected cleanup,
+not a reconstructed cause of r1. The subsequent CLI security-advisor collection
+failed before usable evidence was emitted; command-versus-parser failure remains
+undetermined. No advisor pass or specific finding is claimed. The enclosing
+lifecycle returned `ok:false` for that distinct step.
+
+The exact Preview was deleted after that failure. Three CLI absence checks,
+independent MCP listing and a NotFound project lookup confirmed removal; one
+create, no retry, no replacement. The
+[r2 record](communication-note-job-status-preview-batch.md#r2-hosted-execution--2026-09-07)
+contains its identity, timestamps and pins. No Production SQL, deployment,
+real care data, Points/model operation, UI/flag change or new source fix occurred.
+Real read transport/Cookie composition and populated Hosted status flow remain
+unproved. Advisor evidence must be included in the next integration gate; this
+partial lifecycle result is not an application release or all-five-Note pass.
+
 ### Current live/read-only evidence
 
 - Supabase migrations, tables, RLS flags, policies, grants, function grants and aggregate row counts were checked read-only.
