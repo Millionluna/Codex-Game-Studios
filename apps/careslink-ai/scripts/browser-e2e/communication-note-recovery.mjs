@@ -3,14 +3,17 @@ import { createServer } from "node:net";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { join } from "node:path";
+import { createInterface } from "node:readline";
+import { createReviewBrowserDatabase, REVIEW_DOC } from "./communication-note-self-review.database.mjs";
 
 const app = fileURLToPath(new URL("../../", import.meta.url));
 const port = 3395, host = "127.0.0.1";
 const prefix = "/private/tmp/cl-job-browser-";
 const args = process.argv.slice(2);
-if (args.length > 1 || (args.length === 1 && args[0] !== "--built")) throw new Error("Use no argument or --built for this local fixture");
-const built = args[0] === "--built";
-let root, child, stopped = false;
+if (args.length > 1 || (args.length === 1 && !["--built", "--database-review"].includes(args[0]))) throw new Error("Use no argument, --built or --database-review for this local fixture");
+const databaseReview = args[0] === "--database-review";
+const built = args[0] === "--built" || databaseReview;
+let root, child, reviewDatabase, controls, stopped = false;
 const sourceHashes = new Map();
 const copy = async (source, target) => {
   await mkdir(join(root, target, ".."), { recursive: true });
@@ -31,6 +34,8 @@ async function cleanup() {
       child.kill("SIGKILL"); await new Promise(resolve => child.once("exit", resolve));
     }
   }
+  controls?.close();
+  await reviewDatabase?.stop(); // Never remove a live database directory.
   for (const [path, contents] of sourceHashes) {
     if ((await readFile(join(app, path), "utf8")) !== contents) throw new Error("Source isolation verification failed");
   }
@@ -51,6 +56,10 @@ try {
   await new Promise(resolve => probe.close(resolve));
   for (const path of tracked) sourceHashes.set(path, await readFile(join(app, path), "utf8"));
   root = await mkdtemp(prefix);
+  if (databaseReview) {
+    reviewDatabase = createReviewBrowserDatabase(root);
+    await reviewDatabase.start();
+  }
   await copy("src/lib", "src/lib"); await copy("src/components", "src/components");
   await copy("src/app/ai-documents/communication-note/jobs", "src/app/ai-documents/communication-note/jobs");
   await copy("src/app/ai-documents/communication-note/documents", "src/app/ai-documents/communication-note/documents");
@@ -69,20 +78,23 @@ try {
   }
   await emit("src/lib/__browser-fixture.ts", (await readFile(join(app, "scripts/browser-e2e/communication-note-recovery.fixture.ts"), "utf8"))
     .replaceAll('"../../src/lib/', '"./'));
+  if (databaseReview) await emit("src/lib/__review-database-fixture.ts",
+    (await readFile(join(app, "scripts/browser-e2e/communication-note-self-review.fixture.ts"), "utf8")).replaceAll('"../../src/lib/', '"./'));
   await symlink(join(app, "node_modules"), join(root, "node_modules"), "dir");
   await emit("package.json", JSON.stringify({ name: "careslink-local-browser-fixture", private: true,
     dependencies: (JSON.parse(await readFile(join(app, "package.json"), "utf8"))).dependencies }));
   await emit("src/lib/supabase-server.ts", `// TEST ONLY, no real Supabase client or credentials.
-import { createFixtureAuthClient } from "./__browser-fixture";
+import { ${databaseReview ? "createReviewDatabaseAuthClient as createFixtureAuthClient" : "createFixtureAuthClient"} } from "./${databaseReview ? "__review-database-fixture" : "__browser-fixture"}";
 export async function createCareslinkServerSupabaseClient(options?: unknown) {
   void options; return createFixtureAuthClient();
 }
 export { getSupabasePublicAuthConfig } from "./supabase-public-auth-config";
-export type CareslinkServerSupabaseClient = Awaited<ReturnType<typeof import("./__browser-fixture").createFixtureAuthClient>>;
+export type CareslinkServerSupabaseClient = Awaited<ReturnType<typeof createFixtureAuthClient>>;
 `);
   await emit("src/components/safe-vercel-analytics.tsx", "export function SafeVercelAnalytics() { return null; }\n");
   for (const [segment, param, handler] of [["jobs", "jobId", "readFixtureJob"], ["documents", "documentId", "readFixtureDocument"]]) {
-    await emit(`src/app/api/ai-documents/communication-note/${segment}/[${param}]/route.ts`, `import { ${handler} } from "@/lib/__browser-fixture";
+    const databaseRead = databaseReview && segment === "documents";
+    await emit(`src/app/api/ai-documents/communication-note/${segment}/[${param}]/route.ts`, `import { ${databaseRead ? "readReviewDatabaseDocument as " + handler : handler} } from "@/lib/${databaseRead ? "__review-database-fixture" : "__browser-fixture"}";
 export const dynamic = "force-dynamic";
 export async function GET(request: Request, context: { params: Promise<{ ${param}: string }> }) {
   return ${handler}(request, (await context.params).${param});
@@ -95,6 +107,12 @@ export default function FixtureControls() { return <main style={{padding:32}}>
 <nav>{MODES.map(mode => <p key={mode}><a href={"/fixture-control/set?mode="+mode}>{mode}</a></p>)}</nav>
 <a href={"/ai-documents/communication-note/jobs/"+JOB+"?lang=en"}>Open current job</a></main>; }
 `);
+  if (databaseReview) await emit("src/app/page.tsx", `export default function ReviewDatabaseFixture() { return <main style={{padding:32}}>
+<h1>Local database review test</h1><p>Real local PostgreSQL storage; synthetic identity and draft only. No Hosted Auth, AI or Points.</p>
+<p><a href="/ai-documents/communication-note/documents/${REVIEW_DOC}?lang=zh-Hans">打开简体中文复核页</a></p>
+<p><a href="/ai-documents/communication-note/documents/${REVIEW_DOC}?lang=en">Open English review</a></p>
+<p><a href="/ai-documents/communication-note/documents/${REVIEW_DOC}?lang=zh-Hant">開啟繁體中文複核頁</a></p>
+</main>; }\n`);
   await emit("src/app/fixture-control/set/route.ts", `import { NextResponse } from "next/server";
 import { JOB, MODES } from "@/lib/__browser-fixture";
 export async function GET(request: Request) {
@@ -105,7 +123,7 @@ export async function GET(request: Request) {
   return result;
 }
 `);
-  await emit("src/app/api/ai-documents/communication-note/documents/[documentId]/self-review/route.ts", `import { confirmFixtureReview } from "@/lib/__browser-fixture";
+  await emit("src/app/api/ai-documents/communication-note/documents/[documentId]/self-review/route.ts", `import { ${databaseReview ? "confirmReviewDatabaseDocument as confirmFixtureReview" : "confirmFixtureReview"} } from "@/lib/${databaseReview ? "__review-database-fixture" : "__browser-fixture"}";
 export const dynamic = "force-dynamic";
 export async function POST(request: Request, context: { params: Promise<{ documentId: string }> }) {
   return confirmFixtureReview(request, (await context.params).documentId);
@@ -121,7 +139,7 @@ export async function POST(request: Request, context: { params: Promise<{ docume
 }
 `);
   const env = { PATH: process.env.PATH, TMPDIR: process.env.TMPDIR, NODE_ENV: built ? "production" : "development",
-    NEXT_TELEMETRY_DISABLED: "1", CARESLINK_LOCAL_BROWSER_FIXTURE: "SYNTHETIC_LOOPBACK_ONLY" };
+    NEXT_TELEMETRY_DISABLED: "1", CARESLINK_LOCAL_BROWSER_FIXTURE: "SYNTHETIC_LOOPBACK_ONLY", ...reviewDatabase?.env };
   const launch = (arguments_) => {
     child = spawn(process.execPath, [join(app, "node_modules/next/dist/bin/next"), ...arguments_],
       { cwd: root, env, stdio: ["ignore", "pipe", "pipe"] });
@@ -133,7 +151,15 @@ export async function POST(request: Request, context: { params: Promise<{ docume
   if (stopped) process.exit(0);
   const completion = launch([...(built ? ["start"] : ["dev", "--webpack"]), "--hostname", host, "--port", String(port)]);
   console.log(JSON.stringify({ stage: "browser-fixture-start", root, url: `http://${host}:${port}`, built,
-    syntheticOnly: true, hostedVerified: false }));
+    syntheticOnly: true, hostedVerified: false, databaseReview }));
+  if (reviewDatabase) {
+    controls = createInterface({ input: process.stdin, crlfDelay: Infinity });
+    let queue = Promise.resolve();
+    controls.on("line", line => { queue = queue.then(() => reviewDatabase.command(line.trim())).catch(async () => {
+      console.error("Fixed local database control failed"); await stopAndExit();
+    }); });
+    console.log("Local database controls: status | advance | revoke | restore (stdin only)");
+  }
   await completion;
   await cleanup();
 } catch { await cleanup(); throw new Error("Local browser fixture failed"); }

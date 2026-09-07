@@ -1047,3 +1047,77 @@ route and Hosted/Production activation off. Candidate promotion, new external
 ACLs and Data API write exposure require a separately reviewed authorization;
 the database can verify a JWT, not attest how it reached the Cookie-only server
 boundary. Offline/Online recovery remains a separate unpassed release gate.
+
+### Self-review page → local database roundtrip (2026-09-07)
+
+The existing green result page now has a reproducible, opt-in **local test
+composition** that connects its real self-review HTTP handler, durable writer
+and Product API readback to PostgreSQL 16. No product UI, formal route,
+environment flag or migration manifest was changed. This completes the local
+browser/database next step above, not Hosted activation.
+
+Run from the app directory:
+
+```sh
+node scripts/browser-e2e/communication-note-recovery.mjs --database-review
+```
+
+The runner builds a no-HMR Next app in its own `/private/tmp/cl-job-browser-*`
+directory and starts PG16 beneath that same root. It first reruns the 14 SQL
+scenario groups with eight dependency migrations plus the unapplied candidate,
+then resets only its synthetic fixtures. Startup verifies that the real document
+projection has one current, unreviewed revision; the fixed `advance` operator
+command inserts a valid second revision before moving the current pointer.
+FK, CHECK and RLS constraints stay enabled.
+
+The page uses a random-password, NOINHERIT/NOBYPASSRLS LOGIN without admin
+privileges. Each of its three allowlisted RPCs gets a fresh private Unix-socket
+connection and transaction-local `authenticated` role/claims. Document,
+revision and confirmation arguments are parameterized; socket, role, claims,
+operation names and credentials are never browser inputs. Auth issuance is
+synthetic, while database provider/session checks, RLS, transactions and stored
+readback are real. No Supabase service credential or external connection is used.
+The fixed operator controls (`status`, `advance`, `revoke`, `restore`) exist only
+on the runner's stdin, not as database-administration HTTP endpoints.
+
+Native Safari verification passed on the final built fixture:
+
+| Browser action | Real database / visible outcome |
+| --- | --- |
+| Load Simplified Chinese revision 1; check all three confirmations; advance the database while leaving the form open; submit | HTTP 409 `STALE_REVISION`; page asks to open the current version; zero review events |
+| Open current revision 2 | All checkboxes reset; revision 2 requires its own review |
+| Check all three and confirm revision 2 | HTTP 200; one immutable review event; a separate Product API read returns `CONFIRMED`; form is removed |
+| Reload the browser page | A new database read still returns `CONFIRMED`; visible “已确认人工复核”; document remains a draft |
+| Open a second synthetic document in English, check all three, delete the exact test session using stdin `revoke`, then submit | Current-session RPC returns `REVOKED`; HTTP 401; private draft disappears and browser reaches the synthetic sign-in boundary; event count stays at one |
+
+Points ledger and generation-job counts remained zero. Screenshots and native
+accessibility state were inspected for the green unreviewed and confirmed
+views; native Safari console output was unavailable, so no console-clean or
+automated browser-suite claim is made. Existing user tabs were preserved and
+only the owned test tab was closed.
+
+The first two browser attempts correctly failed closed because the fixture
+asked the restricted role to inspect `unix_socket_directories` (42501). The fix
+retained least privilege: the bootstrap operator attests that directory, and
+runtime checks the already pinned/realpath-verified socket, actual role,
+Unix-only connection and cluster identity. No `pg_read_all_settings` grant was
+added. A subsequent build was stopped before browser testing to correct the
+synthetic revision reset; only the final build supplies the successful evidence
+above. All four owned runs reported database stop and directory removal; their
+exact paths were checked absent and port 3395 had no listener after cleanup.
+
+Verification: 74/74 focused tests, full **4,267 passed / 12 skipped in 275 files
+(274 passed / 1 skipped)**, TypeScript, zero-warning lint, 64/64-page webpack
+build, 108-chunk client-boundary scan and 73-file adapter sync passed. The exact
+runtime-importer allowlist includes only the new server-only test fixture; no
+product importer was added. This is not GoTrue/PostgREST, TLS, real Cookie/JWT
+issuance, whole-chain Hosted, security-advisor or Offline/Online evidence. The
+formal POST remains unbound/503; candidate promotion and external Data API
+exposure still require separate review/authorization.
+
+**Next local product slice:** implement editing saved Communication Note wording
+and saving a new revision, with stale-base conflict handling and revision-bound
+review reset. Preserve the green design, source facts, permanent draft status
+and explicit save acknowledgement. Begin with local synthetic fixtures; do not
+enable Hosted writes, AI calls or Points. Export and the remaining Note-type
+application flows remain separate work, not completed by this roundtrip.

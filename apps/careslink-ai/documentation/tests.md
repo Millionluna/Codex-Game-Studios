@@ -4309,6 +4309,40 @@ This is not complete-chain Hosted, GoTrue/PostgREST, PG17/TLS, security-advisor 
 browser-to-database evidence. Next is a local browser/database roundtrip using
 this real writer. Offline/Online and all Hosted activation gates remain pending.
 
+### Self-review browser / real local database roundtrip (2026-09-07)
+
+- Opt-in command: `node scripts/browser-e2e/communication-note-recovery.mjs --database-review`.
+  It owns one built, no-HMR loopback app and one private Unix-socket PG16 cluster;
+  no external URL, credentials, data or installation is accepted.
+- `communication-note-self-review.test.ts`: 17 new adapter/guard tests; together
+  with recovery and durable-writer suites, 74/74 pass. Fixed RPC names/keys,
+  parameterized SQL, owned-root/env gates, unprivileged LOGIN, fresh transactions,
+  rollback, sanitized failures, writer binding and the closed formal route are
+  checked. The runtime importer test allows this exact test-only file.
+- Startup reruns 14 real SQL scenario groups and validates the reset synthetic
+  document using the real read RPC. Safari then proves stale form → 409/no event,
+  latest form → 200/one event → independent readback, refresh → still confirmed,
+  and actual test-session deletion → 401/login/no extra event. The draft label
+  remains; Points and generation-job aggregate counts stay zero.
+- Two initial browser attempts failed closed on a restricted setting read
+  (42501); the fixture was corrected without granting elevated settings access.
+  One further build was stopped before browser testing to fix the seed's current
+  revision consistency. The final build passed the browser sequence. All four
+  owned fixture roots were removed after both children stopped; port 3395 was
+  released and only the dedicated Safari tab was closed.
+- Full regression: **4,267 passed / 12 skipped**, 275 files (274 passed / 1
+  skipped); TypeScript and zero-warning lint pass. The final local fixture build
+  generated 6/6 pages; full webpack build generated 64/64 pages, the client-boundary
+  scan passed 108 chunks and adapter sync checked 73 files. Skipped gates were
+  not counted as passes.
+
+Identity issuance remains synthetic; database identity/session metadata, RLS,
+transactions and persisted readback are real. This is not Hosted Auth,
+PostgREST/TLS, whole-chain migration, security-advisor, native console-clean or
+Offline/Online evidence. No formal write binding or runtime activation occurred.
+See the [roundtrip record](communication-note-product-integration-m1y.md#self-review-page--local-database-roundtrip-2026-09-07)
+for reproduction and the next local edit/save-revision slice.
+
 ### Current live/read-only evidence
 
 - Supabase migrations, tables, RLS flags, policies, grants, function grants and aggregate row counts were checked read-only.

@@ -1292,6 +1292,11 @@ describe("V1 shadow runtime boundary", () => {
     expect(privilegedClientFactoryImporters).toEqual([]);
     expect(currentSessionImporters).toEqual(
       [
+        // Fixed, server-only loopback fixture; no additional product importer.
+        join(
+          process.cwd(),
+          "scripts/browser-e2e/communication-note-self-review.fixture.ts",
+        ),
         join(
           process.cwd(),
           "src/lib/communication-note-generation-current-session.server.test.ts",
