@@ -4179,6 +4179,27 @@ activation remains off; no Production, AI, Points, cloud-resource creation,
 deployment or push occurred. Details and reproducible runner instructions are
 in the [local browser record](communication-note-product-integration-m1y.md#green-recovery-flow--local-real-browser-evidence-2026-09-07).
 
+### Connection interruption — partial local browser result (2026-09-07)
+
+Stopping only the owned synthetic server produced real connection refusal while
+the job page was polling. The actual browser displayed the unavailable view,
+hid the prior job result and kept a retry button. Retrying before restoration
+stayed unavailable. After the server was restored, a new tab at the same job URL
+read queued/succeeded states and opened the exact synthetic saved revision.
+
+**Not passed:** browser Offline/Online and same-document automatic recovery.
+The available browser has no network-emulation API; its development page reached
+an error document during interruption, so the successful reopen is not evidence
+of an `online` event. One concurrent fixture request also reported an
+unclassified 503. The gate remains partial, with no runtime activation.
+
+Focused loader/jsdom, client and fixture regression: **40/40 passed**. Source
+files were unchanged; full-suite/build/real-engine checks were not rerun. Both
+owned temporary services/copies were cleaned up. No system-network changes,
+Production, cloud creation, AI, Points or deployment occurred. See the
+[attempt record and screenshots](communication-note-product-integration-m1y.md#connection-interruption-attempt--partial-evidence-2026-09-07)
+for exact limitations and the required supported-browser/non-HMR rerun.
+
 ### Current live/read-only evidence
 
 - Supabase migrations, tables, RLS flags, policies, grants, function grants and aggregate row counts were checked read-only.

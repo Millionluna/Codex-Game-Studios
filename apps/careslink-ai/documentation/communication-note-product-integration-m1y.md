@@ -762,3 +762,47 @@ Preview/cloud resource, Production data, AI model call, Points mutation, formal
 runtime activation, deployment or push occurred. Next complete the bounded
 offline recovery browser case, then prepare the exact no-data Hosted auth and
 database integration gate for owner approval before creating resources.
+
+### Connection interruption attempt — partial evidence (2026-09-07)
+
+The next browser gate was attempted against the unchanged local synthetic
+runner. It is **not an offline/online browser acceptance pass**. The connected
+in-app browser advertises no network-emulation capability, the browser CLI is
+not installed, and native access to the app's developer tools is unavailable.
+No operating-system network setting, proxy, firewall or browser security
+protection was changed to work around that limitation.
+
+The bounded alternative stopped only the owned fixture process while a queued
+job was polling. The port genuinely stopped accepting connections (the local
+HTTP probe failed with connection refused), rather than returning a synthetic
+503. The page replaced its job result with the unavailable view and Check status
+button; clicking while the service was absent stayed unavailable. See the
+[connection-interrupted capture](evidence/communication-note-connection-interrupted-2026-09-07.png).
+
+Restoring the same loopback service did not provide a valid same-document
+automatic-recovery observation: the development page had navigated to a browser
+connection-error document, which the browser API could not inspect or navigate.
+A newly opened tab at the original job URL loaded queued state, polled the
+synthetic success transition, and opened the same document/revision 1 with the
+review requirement. See the
+[restored-service capture](evidence/communication-note-connection-restored-2026-09-07.png).
+This proves re-opening after service restoration, not browser `online` event
+delivery, uninterrupted component recovery or real database persistence. One
+concurrent synthetic success-mode request reported 503 during this transition;
+its cause was not classified, so the run is not recorded as an all-green matrix.
+
+The focused loader (jsdom), client and fixture suites passed **40/40 tests**.
+No application code or fixture source changed; no new full-suite/build or
+real-engine result is claimed. Both owned local processes stopped and both
+copies were removed with `sourceUnchanged:true`. The restored/control browser
+tabs closed; the error-document tab could not be manually closed through the
+API and was left unmarked for the browser tool's normal end-of-turn cleanup.
+The user's original cloud-console tab was untouched. No cloud resource,
+Production operation, model call, Points mutation, deployment or push occurred.
+
+Next prerequisite: connect a browser/test environment with a documented,
+tab-scoped Offline/Online control (with owner assistance if necessary), and
+repeat against a local non-HMR build so development reconnect reloads cannot
+confound the result. Keep automatic online-event recovery and the unclassified
+fixture response open until that run; do not silently substitute this partial
+connection-refusal evidence or activate the Hosted gate.
