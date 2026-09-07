@@ -352,3 +352,26 @@ the related source/manifest gate passed 151 tests across 7 files; the full suite
 passed 3,941 tests across 262 files. TypeScript, full zero-warning lint,
 64-page Webpack build and 107-static-chunk client-boundary scan passed. The
 fixed local PostgreSQL runner passed all 9 scenarios and confirmed cleanup.
+
+## Fixed no-data job-status Preview gate prepared (2026-09-07)
+
+The [fixed batch contract](communication-note-job-status-preview-batch.md) and
+`scripts/preview-e2e/communication-note-job-status-preview.mjs` are now runnable.
+Default execution is offline check-only; live execution needs a fresh approved
+disposable target and memory-only credentials. No Preview was created or tested
+as part of this preparation slice. The new gate uses actual Auth sessions and
+short-lived job-status-only logins, but only missing-job reads: it creates no
+job/payload or Points mutation. After actual session revocation it requires both
+the current-session RPC and the dedicated reader to reject the old session.
+
+The probe is deliberately separate from the production credential issuer. It
+does not fabricate issuer tombstone/destroy receipts for the source adapter;
+source-adapter transport, populated Hosted RLS and browser Cookie composition
+remain unverified and explicitly false in evidence. The operator must delete
+the approved Preview and verify absence even after a failed/ambiguous run.
+The formal recovery route, green visual identity and readiness flags are unchanged.
+
+Next: obtain fresh one-batch authorization, run the fixed no-data Preview gate
+and verify deletion. After reviewing that evidence, install and verify the real
+read transport/Cookie composition and populated synthetic job flow before
+connecting the existing job route. The probe alone is not a release gate pass.

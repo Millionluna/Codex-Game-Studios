@@ -6,6 +6,9 @@ import { setTimeout as delay } from "node:timers/promises";
 import { promisify } from "node:util";
 import pg from "pg";
 import { verifyJobStatusScenarios as verifyScenarios } from "./communication-note-job-status-local-scenarios.mjs";
+import { withPreviewJobStatusLogin } from "./communication-note-job-status-preview-login.mjs";
+import { assertJobStatusPreviewAcl } from "./communication-note-job-status-preview.mjs";
+import { STATUS_SQL, statusParameters, verifyPreviewSources } from "./communication-note-job-status-preview-policy.mjs";
 
 // This fixture cannot accept an existing database, URL, role or filesystem target.
 // It tests local PostgreSQL migrations, ACLs and session-lock semantics;
@@ -94,9 +97,9 @@ async function main() {
       server.once("exit", resolve);
       server.once("error", resolve);
     });
-    const connect = async () => {
+    const connect = async (user = "status_test_bootstrap", password = "") => {
       const client = new pg.Client({
-        host: socket, port: PORT, user: "status_test_bootstrap", database: "postgres", password: "",
+        host: socket, port: PORT, user, database: "postgres", password,
         ssl: false, application_name: CLUSTER_NAME, connectionTimeoutMillis: 400,
         query_timeout: 6000,
         options: "-c statement_timeout=5000 -c lock_timeout=1000 -c idle_in_transaction_session_timeout=10000",
@@ -133,6 +136,50 @@ async function main() {
     stage = "job-status-regressions";
     await verifyScenarios(owner, await connect(), await connect(), scenarios,
       (name) => { scenario = name; });
+    stage = "preview-login-local-rehearsal";
+    scenario = "preview-source-and-exact-acl-gate";
+    await verifyPreviewSources();
+    const migrationActor = await connect("postgres");
+    await assertJobStatusPreviewAcl(migrationActor);
+    scenarios.push("preview-reader-exact-acl-gate");
+    const loginEvents = [];
+    scenario = "preview-physical-login-and-revocation";
+    await withPreviewJobStatusLogin({ admin: migrationActor, openRuntime: connect,
+      record: name => loginEvents.push(name), run: async runtime => {
+        await assert.rejects(runtime.query(STATUS_SQL, statusParameters(
+          "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+          "ffffffff-ffff-4fff-8fff-ffffffffffff")), { code: "P0001", message: "NOT_FOUND" });
+      } });
+    assert.deepEqual(loginEvents, ["dedicated-login-and-set-only-membership",
+      "credential-disabled-new-login-denied-and-role-removed"]);
+    scenarios.push("preview-physical-login-and-revocation");
+    const failureEvents = [];
+    scenario = "preview-credential-cleanup-after-read-failure";
+    await assert.rejects(withPreviewJobStatusLogin({ admin: migrationActor, openRuntime: connect,
+      record: name => failureEvents.push(name), run: async () => { throw new Error("INJECTED_READ_FAILURE"); } }),
+    { message: "INJECTED_READ_FAILURE" });
+    assert.deepEqual(failureEvents, loginEvents);
+    scenarios.push("preview-credential-cleanup-after-read-failure");
+    scenario = "preview-credential-cleanup-after-connect-failure";
+    let connectionCalls = 0;
+    const connectFailureEvents = [];
+    await assert.rejects(withPreviewJobStatusLogin({ admin: migrationActor,
+      openRuntime: async (role, password) => {
+        if (++connectionCalls === 1) throw Object.assign(new Error("INJECTED_CONNECT_FAILURE"), { code: "ECONNREFUSED" });
+        return connect(role, password);
+      }, record: name => connectFailureEvents.push(name), run: async () => { assert.fail("must not run"); } }),
+    { message: "INJECTED_CONNECT_FAILURE" });
+    assert.deepEqual(connectFailureEvents, ["credential-disabled-new-login-denied-and-role-removed"]);
+    scenarios.push(scenario);
+    scenario = "preview-network-error-is-not-revocation-proof";
+    connectionCalls = 0;
+    await assert.rejects(withPreviewJobStatusLogin({ admin: migrationActor,
+      openRuntime: async (role, password) => {
+        if (++connectionCalls === 2) throw Object.assign(new Error("INJECTED_DENIAL_NETWORK_FAILURE"), { code: "ECONNREFUSED" });
+        return connect(role, password);
+      }, run: async () => {} }), { message: "JOB_STATUS_PREVIEW_CREDENTIAL_CLEANUP_FAILED" });
+    assert.equal((await migrationActor.query("select count(*)::int as n from pg_roles where rolname like 'careslink_v1_job_status_runtime_%'")).rows[0].n, 0);
+    scenarios.push(scenario);
     assert.equal(interrupted, false);
   } catch (error) {
     failure = true;

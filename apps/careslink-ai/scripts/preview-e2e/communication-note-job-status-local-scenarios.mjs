@@ -281,4 +281,6 @@ export async function verifyJobStatusScenarios(owner, actor, peer, passed, onSce
     assert.equal(result.code, "P0001");
     assert.equal(result.message, "SESSION_REVOKED");
   });
+  await actor.query("reset session authorization");
+  await owner.query(`revoke ${CALLER} from status_test_login; drop role status_test_login`);
 }

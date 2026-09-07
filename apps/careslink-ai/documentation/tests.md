@@ -3888,6 +3888,33 @@ mutation or model call was involved. Next is a same-revision no-data Preview
 gate for the exact reader and its dedicated runtime credentials, followed by
 independent read composition in the existing job route.
 
+### Fixed job-status Preview gate — preparation evidence (2026-09-07)
+
+The new [batch contract](communication-note-job-status-preview-batch.md) has a
+runnable check-only/live-separated harness, strict disposable target/CA/source
+pins and a probe-only physical credential lifecycle. Its **20 offline tests**
+verify exact source/SQL parity, one-consumer memory input, Production/default/
+copied-data/persistent/mismatched/stale/future target rejection, scope/argument
+closure and safe output. The full suite passed **3,961 tests across 263 files**;
+TypeScript and full zero-warning lint passed. Codex adapters remain in sync
+(73 files). No application component or route was changed; a new UI/build
+claim is not made for this script-only slice.
+
+The fixed local PG16 runner now passes **14 real database scenarios**: the prior
+nine reader tests plus the exact Preview ACL gate, real per-read LOGIN/SET-role
+and NOLOGIN revocation, cleanup after read failure, cleanup after connection
+failure and rejection of a network error as successful revocation evidence.
+The final role is removed even when the denial proof fails. Every local run
+confirmed its owned cluster stopped and its temporary directory removed.
+Local trust authentication does not prove SCRAM authentication, Hosted Auth or
+TLS. The original synthetic FK-bypassing setup stays local and is not used by
+the Hosted script.
+
+**No remote Preview was created or run in this slice.** Live missing-job/session
+and credential checks, control-plane deletion, populated Hosted owner RLS,
+Cookie composition and the source adapter's real issuer/transport remain
+separate evidence requirements. All formal activation flags stay false.
+
 ### Current live/read-only evidence
 
 - Supabase migrations, tables, RLS flags, policies, grants, function grants and aggregate row counts were checked read-only.
