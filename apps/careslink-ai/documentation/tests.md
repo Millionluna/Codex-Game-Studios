@@ -4698,6 +4698,23 @@ See [the complete local scope and cleanup evidence](communication-note-product-i
 
 See [full-flow scope and remaining real-admission gate](communication-note-product-integration-m1y.md#communication-note-fixed-synthetic-full-flow-integration-2026-09-08).
 
+### Communication Note real local admission / Points gate (2026-09-08)
+
+- `node scripts/browser-e2e/communication-note-recovery.mjs --admission`
+  creates an owned Unix-only PG16 and production-built local fixture. Only the
+  fixed synthetic facts are accepted; no worker/model/KMS runs.
+- Real database: 14 existing review scenarios plus 8 admission scenarios;
+  admission is the existing policy-bound 19-parameter RPC, not a table insert.
+- Browser: first successful response deliberately hidden, original exact retry
+  returns the same queued job. Independent before/after counts remain 1 job,
+  1 admission, 1 reservation event, 20 reserved / 10 available from 30 seeded.
+  Refresh reads without resubmission; balance insufficiency and revoked-session
+  sign-in boundary are verified. No terminal settlement is claimed here.
+- 23 new tests; full **4,690 passed / 12 skipped**, 288 files. Typecheck, lint,
+  production build, client-bundle boundary and adapter checks passed. Local
+  security Advisors returned no findings; all owned roots/port were cleaned.
+- [Detailed scope, synthetic receipts and cleanup evidence](communication-note-product-integration-m1y.md#communication-note-real-local-admission-and-points-browser-gate-2026-09-08).
+
 ### Current live/read-only evidence
 
 - Supabase migrations, tables, RLS flags, policies, grants, function grants and aggregate row counts were checked read-only.

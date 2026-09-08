@@ -40,6 +40,10 @@ export function reviewFixtureRpcCommand(name: string, args?: Readonly<Record<str
     confirm_communication_note_self_review: { sql: "select public.confirm_communication_note_self_review($1,$2,$3,$4,$5,$6) as data",
       keys: ["p_document_id", "p_revision_id", "p_mutation_id", "p_facts_confirmed", "p_wording_confirmed", "p_missing_facts_reviewed"] },
   };
+  if (process.env.CARESLINK_LOCAL_ADMISSION_DATABASE === "OWNED_UNIX_SOCKET_ONLY") {
+    assertReviewDatabaseFixture();
+    definitions.get_v1_communication_note_points_preview = { sql: "select public.get_v1_communication_note_points_preview() as data", keys: [] };
+  }
   if (process.env.CARESLINK_LOCAL_EDIT_DATABASE === "OWNED_UNIX_SOCKET_ONLY") {
     assertReviewDatabaseFixture();
     definitions.save_communication_note_wording = { sql: "select public.save_communication_note_wording($1,$2,$3::jsonb) as data",

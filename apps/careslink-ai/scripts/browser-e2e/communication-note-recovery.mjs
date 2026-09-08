@@ -10,11 +10,12 @@ const app = fileURLToPath(new URL("../../", import.meta.url));
 const port = 3395, host = "127.0.0.1";
 const prefix = "/private/tmp/cl-job-browser-";
 const args = process.argv.slice(2);
-if (args.length > 1 || (args.length === 1 && !["--built", "--database-review", "--edit", "--database-edit", "--database-history", "--flow"].includes(args[0]))) throw new Error("Use no argument, --built, --database-review, --edit, --database-edit, --database-history or --flow for this local fixture");
+if (args.length > 1 || (args.length === 1 && !["--built", "--database-review", "--edit", "--database-edit", "--database-history", "--flow", "--admission"].includes(args[0]))) throw new Error("Use a fixed local fixture mode only");
+const admission = args[0] === "--admission";
 const flow = args[0] === "--flow";
 const databaseHistory = args[0] === "--database-history" || flow;
 const databaseEdit = args[0] === "--database-edit" || databaseHistory;
-const databaseReview = args[0] === "--database-review" || databaseEdit;
+const databaseReview = args[0] === "--database-review" || databaseEdit || admission;
 const built = args[0] === "--built" || databaseReview || args[0] === "--edit";
 const edit = args[0] === "--edit";
 let root, child, reviewDatabase, controls, stopped = false;
@@ -66,13 +67,13 @@ try {
   root = await mkdtemp(prefix);
   console.log(JSON.stringify({ stage: "browser-fixture-owned-root", root }));
   if (databaseReview) {
-    reviewDatabase = createReviewBrowserDatabase(root, databaseHistory ? "HISTORY" : databaseEdit ? "EDIT" : "REVIEW");
+    reviewDatabase = createReviewBrowserDatabase(root, admission ? "ADMISSION" : databaseHistory ? "HISTORY" : databaseEdit ? "EDIT" : "REVIEW");
     await reviewDatabase.start();
   }
   await copy("src/lib", "src/lib"); await copy("src/components", "src/components");
   await copy("src/app/ai-documents/communication-note/jobs", "src/app/ai-documents/communication-note/jobs");
   await copy("src/app/ai-documents/communication-note/documents", "src/app/ai-documents/communication-note/documents");
-  if (flow) await copy("src/app/ai-documents/communication-note/communication-note-composer.tsx", "src/app/ai-documents/communication-note/communication-note-composer.tsx");
+  if (flow || admission) await copy("src/app/ai-documents/communication-note/communication-note-composer.tsx", "src/app/ai-documents/communication-note/communication-note-composer.tsx");
   for (const path of ["src/app/globals.css", "src/app/layout.tsx", "next.config.ts", "tsconfig.json", "postcss.config.mjs"]) await copy(path, path);
   const tsconfig = JSON.parse(await readFile(join(root, "tsconfig.json"), "utf8"));
   // Type-check every fixture route and all of its transitive imports, not
@@ -92,6 +93,8 @@ try {
   if (databaseReview) await emit("src/lib/__review-database-fixture.ts",
     (await readFile(join(app, "scripts/browser-e2e/communication-note-self-review.fixture.ts"), "utf8")).replaceAll('"../../src/lib/', '"./'));
   if (flow) await emit("src/lib/__flow-fixture.ts", (await readFile(join(app, "scripts/browser-e2e/communication-note-flow.fixture.ts"), "utf8"))
+    .replaceAll('"../../src/lib/', '"./').replace('"./communication-note-self-review.fixture"', '"./__review-database-fixture"'));
+  if (admission) await emit("src/lib/__admission-fixture.ts", (await readFile(join(app, "scripts/browser-e2e/communication-note-admission.fixture.ts"), "utf8"))
     .replaceAll('"../../src/lib/', '"./').replace('"./communication-note-self-review.fixture"', '"./__review-database-fixture"'));
   if (edit) await emit("src/lib/__edit-fixture.ts", (await readFile(join(app, "scripts/browser-e2e/communication-note-edit.fixture.ts"), "utf8")).replaceAll('"../../src/lib/', '"./'));
   await symlink(join(app, "node_modules"), join(root, "node_modules"), "dir");
@@ -209,6 +212,42 @@ ${methods.map(method => `export async function ${method}(request:Request,context
 }`).join("\n")}`);
     }
   }
+  if (admission) {
+    const layout = await readFile(join(root, "src/app/layout.tsx"), "utf8");
+    await emit("src/app/layout.tsx", layout.replace("{children}", `<aside role="note" style={{padding:12,borderBottom:"1px solid #bacbc3"}}>
+Local synthetic test / 本地合成测试：Real local queue and Points reservation. No AI, real money, payload vault or KMS. Jobs remain queued; no result is generated. <a href="/">Test balance and instructions</a>
+</aside>{children}`));
+    await emit("src/app/page.tsx", `import { assertAdmissionFixture, ADMISSION_FACTS, readAdmissionPoints } from "@/lib/__admission-fixture";
+export const dynamic="force-dynamic";
+export default async function AdmissionInstructions() { assertAdmissionFixture(); const points=await readAdmissionPoints(); return <main style={{padding:32}}>
+<h1>Communication Note — local queue and Points test</h1>
+<p>Only fixed synthetic facts. Starts with 30 synthetic Points; admission reserves 20. No welcome grant, purchase or actual charge.</p>
+<p>The first successful database admission deliberately returns an unavailable response. Use Retry on the composer: the same key must recover the same queued task without a second reservation.</p>
+<p>Jobs stay queued: no worker, AI, payload encryption or result is exercised. All local test data is deleted on shutdown.</p>
+<p role="status">{points.status==="AVAILABLE" ? "Available: "+points.availablePoints+" Points · Reserved: "+points.reservedPoints+" Points" : "Points unavailable"}</p>
+<dl>{Object.entries(ADMISSION_FACTS).map(([key,value])=><div key={key}><dt>{key}</dt><dd>{Array.isArray(value)?value.join("; "):value}</dd></div>)}</dl>
+<a href="/ai-documents/communication-note?lang=en">Start fixed English admission</a></main>; }`);
+    await emit("src/app/ai-documents/communication-note/page.tsx", `import { CommunicationNoteComposer } from "./communication-note-composer";
+import { assertAdmissionFixture, readAdmissionPoints } from "@/lib/__admission-fixture";
+import { parseCommunicationNoteComposerLocale } from "@/lib/communication-note-composer";
+export const dynamic="force-dynamic";
+export default async function AdmissionComposerPage({searchParams}:{searchParams:Promise<Record<string,string|string[]|undefined>>}) {
+  assertAdmissionFixture(); const params=await searchParams; let locale:"en"|"zh-Hans"|"zh-Hant"="en";
+  try {locale=parseCommunicationNoteComposerLocale(params.lang);} catch {}
+  return <CommunicationNoteComposer locale={locale} pointsPreview={await readAdmissionPoints()} generationAvailable={locale==="en"} />;
+}`);
+    await emit("src/app/api/ai-documents/communication-note/generate/route.ts", `export { submitAdmissionTask as POST } from "@/lib/__admission-fixture";
+export const dynamic="force-dynamic"; export const runtime="nodejs";`);
+    await emit("src/app/api/ai-documents/communication-note/jobs/[jobId]/route.ts", `import { readAdmissionTask } from "@/lib/__admission-fixture";
+export const dynamic="force-dynamic"; export const runtime="nodejs";
+export async function GET(request:Request,context:{params:Promise<{jobId:string}>}) {return readAdmissionTask(request,(await context.params).jobId);}`);
+    // This batch has no generated result. Never expose the unrelated seed draft.
+    for (const suffix of ["", "/self-review", "/revisions", "/export-history"])
+      await emit(`src/app/api/ai-documents/communication-note/documents/[documentId]${suffix}/route.ts`, `import { assertAdmissionFixture } from "@/lib/__admission-fixture";
+export const dynamic="force-dynamic";
+export async function GET(){assertAdmissionFixture();return Response.json({status:"NOT_FOUND"},{status:404,headers:{"Cache-Control":"private, no-store"}});}
+export { GET as POST };`);
+  }
   await emit("src/app/auth/login/page.tsx", `export default function LoginFixture() { return <main style={{padding:32}}>
 <h1>Sign-in required</h1><p>Local synthetic login boundary. No real credentials are accepted.</p><a href="/">Test controls</a></main>; }
 `);
@@ -233,7 +272,7 @@ ${methods.map(method => `export async function ${method}(request:Request,context
   if (stopped) process.exit(0);
   const completion = launch([...(built ? ["start"] : ["dev", "--webpack"]), "--hostname", host, "--port", String(port)]);
   console.log(JSON.stringify({ stage: "browser-fixture-start", root, url: `http://${host}:${port}`, built,
-    syntheticOnly: true, hostedVerified: false, databaseReview, databaseEdit, databaseHistory, flow }));
+    syntheticOnly: true, hostedVerified: false, databaseReview, databaseEdit, databaseHistory, flow, admission }));
   if (reviewDatabase) {
     controls = createInterface({ input: process.stdin, crlfDelay: Infinity });
     let queue = Promise.resolve();
@@ -248,7 +287,7 @@ ${methods.map(method => `export async function ${method}(request:Request,context
   // Metadata-only diagnostics: never echo SQL, connection strings or payloads.
   console.error(JSON.stringify({ stage: "browser-fixture-failed",
     code: /^[A-Z0-9_]{1,30}$/.test(error?.code ?? "") ? error.code : "UNCLASSIFIED",
-    diagnostic: /^[A-Z_]+$|^permission denied for (schema|table|function) [a-z_]+$/.test(error?.message ?? "") ? error.message : "UNAVAILABLE",
+    diagnostic: /^[A-Z_]+$|^permission denied for (schema|table|function) [a-z_]+$|^role "[a-z_]+" does not exist$/.test(error?.message ?? "") ? error.message : "UNAVAILABLE",
     source: String(error?.stack ?? "").split("\n").find(line => /at .*communication-note-self-review\.database\.mjs:\d+:\d+\)?$/.test(line))?.trim() }));
   await cleanup(); throw new Error("Local browser fixture failed");
 }

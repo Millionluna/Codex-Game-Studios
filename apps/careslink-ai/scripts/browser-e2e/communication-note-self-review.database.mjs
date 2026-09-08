@@ -9,6 +9,7 @@ import pg from "pg";
 import { verifySelfReviewScenarios } from "../preview-e2e/communication-note-self-review-local-scenarios.mjs";
 import { verifyWordingEditScenarios } from "../preview-e2e/communication-note-edit-local-scenarios.mjs";
 import { verifyExportHistoryScenarios } from "../preview-e2e/communication-note-export-history-local-scenarios.mjs";
+import { installAdmissionBrowserDatabase, verifyAdmissionBrowserDatabase } from "./communication-note-admission.database.mjs";
 
 const exec = promisify(execFile), childEnv = { PATH: "/usr/bin:/bin", LANG: "C", LC_ALL: "C" };
 const OWNER = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", SESSION = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
@@ -29,7 +30,8 @@ async function bounded(promise, milliseconds) {
  * and removes it only after stop() proves this child exited. */
 export function createReviewBrowserDatabase(root, mode = "REVIEW") {
   assert.match(root, /^\/private\/tmp\/cl-job-browser-[a-zA-Z0-9]{6}$/u);
-  assert.ok(mode === "REVIEW" || mode === "EDIT" || mode === "HISTORY");
+  assert.ok(mode === "REVIEW" || mode === "EDIT" || mode === "HISTORY" || mode === "ADMISSION");
+  const admission = mode === "ADMISSION", admissionPassword = randomBytes(32).toString("hex");
   const history = mode === "HISTORY", edit = mode === "EDIT" || history;
   const base = join(root, "pg"), data = join(base, "data"), socket = join(base, "socket");
   let server, exited, owner, bootstrapMayBeRunning = false, closing = false;
@@ -44,6 +46,7 @@ export function createReviewBrowserDatabase(root, mode = "REVIEW") {
   };
   return {
     env: { CARESLINK_LOCAL_REVIEW_DATABASE: "OWNED_UNIX_SOCKET_ONLY", CARESLINK_LOCAL_REVIEW_PASSWORD: password,
+      ...(admission ? { CARESLINK_LOCAL_ADMISSION_DATABASE: "OWNED_UNIX_SOCKET_ONLY", CARESLINK_LOCAL_ADMISSION_PASSWORD: admissionPassword } : {}),
       ...(edit ? { CARESLINK_LOCAL_EDIT_DATABASE: "OWNED_UNIX_SOCKET_ONLY" } : {}),
       ...(history ? { CARESLINK_LOCAL_HISTORY_DATABASE: "OWNED_UNIX_SOCKET_ONLY" } : {}) },
     async start() {
@@ -105,6 +108,12 @@ export function createReviewBrowserDatabase(root, mode = "REVIEW") {
       }
       await owner.query("update public.ai_documents set current_revision_id=$2,current_revision_number=1 where id=$1", [REVIEW_DOC, REV]);
       await owner.query("delete from public.ai_document_revisions where id=$1 and document_id=$2", [REV2, REVIEW_DOC]);
+      if (admission) {
+        await installAdmissionBrowserDatabase(owner, await open(), root, admissionPassword);
+        const admissionRuntime = await open("cl_admission_browser_runtime", admissionPassword);
+        await verifyAdmissionBrowserDatabase(owner, admissionRuntime);
+        await admissionRuntime.end();
+      }
       if (history) {
         // Only this owned, disposable database receives the opt-in capability.
         checkpoint("browser:install-temporary-history-capability");
@@ -176,6 +185,13 @@ export function createReviewBrowserDatabase(root, mode = "REVIEW") {
       const reports = history ? (await owner.query(`select revision_number,format,outcome,count(*)::int as count
         from careslink_communication_history.reports group by revision_number,format,outcome order by revision_number,format,outcome`)).rows : undefined;
       console.log(JSON.stringify({ stage: "review-database-observation", command, ...state, reports }));
+      if (admission) console.log(JSON.stringify({ stage: "admission-database-observation", ...(await owner.query(`select
+        (select coalesce(sum(remaining_points),0)::int from public.point_lots) as available_points,
+        (select coalesce(sum(points),0)::int from public.point_reservations where status='RESERVED') as reserved_points,
+        (select count(*)::int from public.point_ledger_entries where event='RESERVE') as reserve_events,
+        (select count(*)::int from public.point_ledger_entries where event in ('COMMIT','RELEASE')) as terminal_events,
+        (select count(*)::int from careslink_v1_generation.jobs where status='QUEUED' and attempt_count=0) as queued_jobs,
+        (select count(*)::int from careslink_v1_generation.communication_note_point_admissions) as admissions`)).rows[0] }));
     },
     async stop() {
       closing = true;

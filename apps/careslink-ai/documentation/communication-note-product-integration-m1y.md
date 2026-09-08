@@ -2041,3 +2041,77 @@ existing real local database enqueue / 20-Point reservation path, and verify
 exact retry does not reserve twice. Keep synthetic data, model calls off and
 formal/Hosted activation closed. Terminal settlement, real worker/model output,
 Hosted identity/TLS and the five-Note launch gates remain separate evidence.
+
+## Communication Note real local admission and Points browser gate (2026-09-08)
+
+The next local slice is complete via explicit `--admission`; the earlier
+`--flow` remains a separately labelled simulated-progress fixture. Formal
+routes, readiness latches, components and green Logo are unchanged.
+
+### Implemented boundary
+
+- The unchanged composer uses the real zero-argument Points preview RPC. One
+  fixed synthetic owner starts with **30 adjustment Points**, not a welcome
+  entitlement, purchased credit or legacy-credit conversion.
+- The route retains actual body/privacy validation and fresh owner/session
+  checks, accepts only the pinned English synthetic facts, and injects the
+  existing 19-parameter policy-bound admission repository. PostgreSQL atomically
+  creates the queued job and reserves 20 Points. Only hashes and metadata reach
+  the admission SQL; no facts/key are logged or stored by this adapter.
+- A separate SCRAM runtime LOGIN can SET only the admission caller and job
+  status caller. It has no table, worker/executor, authenticated or service-role
+  membership. Each request attests the owned Unix socket/cluster, uses exact
+  parameterized SQL, bounds statement/lock time and closes its connection.
+- The owner-controlled setup adds 12 existing migrations after the review
+  fixture's minimal chain, including their required Preview isolation roles.
+  Migrations run as non-superuser `postgres`. Only this attested fresh local
+  database relaxes the generation default-off constraint and seeds synthetic
+  policy receipts. All document, ledger, FK, RLS and deferred binding constraints
+  remain enabled. No new migration/candidate or Hosted permission is added.
+- Payload/KMS/provider receipts are explicitly synthetic: there is **no payload
+  vault, real encryption attestation, worker, model call or generated result**.
+  Jobs stay genuinely `QUEUED`, attempt 0. The unrelated seed document's read,
+  review, edit and export-history endpoints return not-found in this mode.
+
+### Verification and limits
+
+The fixed lost-ack probe suppresses the first successful admission response.
+The actual browser showed the original composer's locked fields and “Retry exact
+request”; retry returned the same PostgreSQL job with `created: false`. Before
+and after retry, independent operator observations showed **1 job, 1 admission,
+1 RESERVE event, 20 reserved and 10 available**, with zero terminal ledger events.
+The two ledger rows were the synthetic GRANT and the single RESERVE.
+
+Whole-page task reload recovered the same queued job without POST. The balance
+page and composer reloaded **10 available / 20 reserved**, with the insufficient
+balance message and disabled new-submit control. Revoking the synthetic session
+removed private task state and showed sign-in; it did not release or charge
+Points. Browser warning/error logs were empty on the verified loaded pages.
+One test-instruction link click did not navigate during the browser check;
+explicitly loading its observed URL succeeded. This is not claimed as a new
+product-navigation acceptance result.
+
+Eight additional real PostgreSQL rollback scenarios cover purpose-only rights,
+atomic admission, same-key/new-candidate replay, changed-request conflict,
+insufficient balance, session mismatch, the real purpose status reader and
+restoration of the fresh browser balance. The existing 14 review scenarios also
+passed. New bridge tests: **23**; full suite **4,690 passed / 12 skipped** across
+288 files (287 passed / 1 skipped). TypeScript, zero-warning lint, 64/64-page
+webpack build, 116-chunk client-boundary scan and 73-file adapter check passed.
+Local security Advisors returned no issues.
+
+Two initial dependency-preflight failures were cleaned before retry; inspection
+identified the required existing custody and signed-terminal caller migrations.
+The successful owned root `/private/tmp/cl-job-browser-hVaEor` and failed roots
+`/private/tmp/cl-job-browser-234BaY`, `/private/tmp/cl-job-browser-7Zwx4g` were all
+stopped/removed and independently checked absent; port 3395 was closed. Only the
+owned browser tab was closed. No Hosted/Production mutation, real payment, model
+call, push or deployment occurred. Supabase/Postgres guidance kept fresh sessions
+and purpose-only privileges; Next/browser guidance required server-only seams
+and actual replay/refresh evidence.
+
+**Next bounded slice:** connect real local task terminal settlement to the
+browser fixture: success commits the reservation, failure/cancellation releases
+it, and terminal replay must not settle twice. Use fixed synthetic outcomes only;
+real payload/KMS, worker/model execution, Hosted activation and the five-Note
+launch gates remain separate. This admission gate is not a launch approval.

@@ -1274,7 +1274,13 @@ describe("V1 shadow runtime boundary", () => {
       "communication-note-generation-principal-composition",
     );
     const flowFixturePath = join(process.cwd(), "scripts/browser-e2e/communication-note-flow.fixture.ts");
-    expect(testOnlyFactoryImporters).toEqual([handlerTestPath, flowFixturePath].sort());
+    const admissionFixturePath = join(process.cwd(), "scripts/browser-e2e/communication-note-admission.fixture.ts");
+    expect(testOnlyFactoryImporters).toEqual([handlerTestPath, flowFixturePath, admissionFixturePath].sort());
+    const admissionFixtureSource = readFileSync(admissionFixturePath, "utf8");
+    expect(admissionFixtureSource).toContain('import "server-only"');
+    expect(admissionFixtureSource).toContain("assertReviewDatabaseFixture()");
+    expect(admissionFixtureSource).toContain('CARESLINK_LOCAL_ADMISSION_DATABASE !== "OWNED_UNIX_SOCKET_ONLY"');
+    expect(admissionFixtureSource).not.toMatch(/openai-communication-note-provider|service_role|globalThis\.fetch/);
     const flowFixtureSource = readFileSync(flowFixturePath, "utf8");
     expect(flowFixtureSource).toMatch(/^\/\*\*[\s\S]*?import "server-only";/);
     expect(flowFixtureSource).toContain("assertReviewDatabaseFixture()");

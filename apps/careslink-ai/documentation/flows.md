@@ -62,6 +62,18 @@ Only fixed English synthetic facts are accepted, matched against the existing
 local result. Refresh does not resubmit, and active-session checks protect task
 and result reads. The formal generation gates remain off.
 See [the bounded full-flow evidence](communication-note-product-integration-m1y.md#communication-note-fixed-synthetic-full-flow-integration-2026-09-08).
+
+### Communication Note real local admission fixture (2026-09-08)
+
+The separate `--admission` mode connects the unchanged composer to the existing
+real PostgreSQL policy-bound admission and Points preview RPCs. Fixed synthetic
+facts → current-session/privacy validation → atomic queued job + 20-Point
+reservation → deliberate lost acknowledgement → exact same-request retry → same
+queued job. Refresh never submits; the actual balance changes 30/0 → 10/20 and
+stays unchanged on retry. No worker runs, so no result route is available and no
+terminal charge/release is claimed. Synthetic policy receipts are not vault/KMS
+evidence. The owned database is removed on shutdown; formal runtime remains off.
+See [local admission evidence and next terminal-settlement slice](communication-note-product-integration-m1y.md#communication-note-real-local-admission-and-points-browser-gate-2026-09-08).
 Real task admission/reservation, worker output and Hosted activation are not
 proved by this fixture.
 
