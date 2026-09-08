@@ -4849,6 +4849,29 @@ See [full-flow scope and remaining real-admission gate](communication-note-produ
   were cleaned. No Hosted/real-AI/native-offline/cross-device claims.
 - [Implementation boundaries and next saved-draft catalog](communication-note-product-integration-m1y.md#communication-note-owner-isolated-multi-task-workspace-2026-09-08).
 
+### Communication Note current-owner saved-draft catalog gate (2026-09-08)
+
+- The owned workspace now reads the current owner's Communication Note catalog
+  through the existing Product API/RPC, with 20-row keyset pages and no new
+  migration or permission. Task/draft positions are independent, and an empty
+  filtered page keeps its continuation. Current-version links reauthorize.
+- Full **4,979 passed / 12 skipped**, 297 files; 37 new contract, bridge and DOM
+  cases. TypeScript, zero-warning lint, 64-page build, 32-chunk client boundary
+  and 73-file adapter check passed.
+- `--workspace-task-check`: **118 local SQL scenarios**, with eight new cases
+  covering 25 drafts across 20/5 pages, minimal metadata, other types/deletion,
+  current-version changes, owner/session/cursor boundaries and no table SELECT.
+  All added SQL probe rows roll back; existing settlement/review/edit tests pass.
+- Browser: two separate current-version entries, English/Traditional document
+  reads, same-language returns, all three workspace locales, revoked-session
+  refresh → empty surface/sign-in. No warnings/errors, no self-review/export,
+  zero generation jobs or reservations, unchanged synthetic 30/0 Points.
+  SQL/DOM tests cover >20-row paging; no claim of browser paging or real AI.
+- Exact owned-socket Security Advisors found no issues. Both temporary roots
+  and owned tab 31 were cleaned. Formal app bindings and all external state
+  remain unchanged; non-settled fixture document writes remain denied.
+- [Catalog implementation, evidence and next default-off app binding](communication-note-product-integration-m1y.md#communication-note-current-owner-saved-draft-catalog-2026-09-08).
+
 ### Current live/read-only evidence
 
 - Supabase migrations, tables, RLS flags, policies, grants, function grants and aggregate row counts were checked read-only.

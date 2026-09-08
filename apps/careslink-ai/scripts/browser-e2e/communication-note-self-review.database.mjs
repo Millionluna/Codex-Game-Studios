@@ -13,6 +13,7 @@ import { installAdmissionBrowserDatabase, verifyAdmissionBrowserDatabase } from 
 import { installSettlementBrowserController, verifySettlementBrowserController } from "./communication-note-settlement.database.mjs";
 import { verifySettledReviewScenarios } from "./communication-note-settled-review.database.mjs";
 import { verifyCommunicationNoteJobList } from "./communication-note-job-list.database.mjs";
+import { verifyCommunicationNoteDraftCatalog } from "./communication-note-draft-catalog.database.mjs";
 
 const exec = promisify(execFile), childEnv = { PATH: "/usr/bin:/bin", LANG: "C", LC_ALL: "C" };
 const OWNER = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", SESSION = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
@@ -154,6 +155,7 @@ export function createReviewBrowserDatabase(root, mode = "REVIEW") {
       }
       await runtime.query("commit");
       await runtime.end();
+      if (mode === "WORKSPACE_TASK") await verifyCommunicationNoteDraftCatalog(owner);
       console.log(JSON.stringify({ stage: "review-database-ready", postgresMajor: 16, matrixPassed: passed.length,
         unixOnly: true, runtimePrivileged: false, authSynthetic: true, hostedVerified: false, edit, history }));
     },

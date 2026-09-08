@@ -53,13 +53,21 @@ const PAGE_COPY = {
   "zh-Hans": { heading: "生成任务", created: "创建时间", next: "更早的任务", latest: "最新任务", description: "按创建时间倒序，每页最多 20 条。再次生成前，请先打开任务查看处理结果。" },
   "zh-Hant": { heading: "生成任務", created: "建立時間", next: "較早的任務", latest: "最新任務", description: "按建立時間倒序，每頁最多 20 筆。再次生成前，請先開啟任務查看處理結果。" },
 } as const;
+const DRAFT_PAGE_COPY = {
+  en: { next: "Next saved drafts", first: "First draft page", description: "Up to 20 drafts per page in stable document order, not update order.",
+    empty: "No saved Communication Notes on this page. Continue if another page is available, or refresh to start again." },
+  "zh-Hans": { next: "下一页草稿", first: "草稿首页", description: "每页最多 20 份草稿，按文档固定顺序排列，并非更新时间顺序。",
+    empty: "本页没有已保存的 Communication Note。如有下一页，可继续查看；也可刷新返回首页。" },
+  "zh-Hant": { next: "下一頁草稿", first: "草稿首頁", description: "每頁最多 20 份草稿，按文件固定順序排列，並非更新時間順序。",
+    empty: "本頁沒有已儲存的 Communication Note。如有下一頁，可繼續查看；也可重新整理返回首頁。" },
+} as const;
 
 /** Reusable surface; this slice connects it only in the owned local fixture. */
 export function CommunicationNoteSavedDrafts({ locale, loginHref, unsupportedLocale = false, includeTask = false }: Readonly<{
   locale: CommunicationNoteDocumentLocale; loginHref: string; unsupportedLocale?: boolean; includeTask?: boolean | "MULTI";
 }>) {
-  const [state, setState] = useState<{ loginHref: string; includeTask: boolean | "MULTI"; result?: VisibleResult; before?: CommunicationNoteTaskCursor | null }>();
-  const refreshRef = useRef<(before?: CommunicationNoteTaskCursor | null) => void>(() => undefined);
+  const [state, setState] = useState<{ loginHref: string; includeTask: boolean | "MULTI"; result?: VisibleResult; before?: CommunicationNoteTaskCursor | null; draftAfter?: string | null }>();
+  const refreshRef = useRef<(before?: CommunicationNoteTaskCursor | null, draftAfter?: string | null) => void>(() => undefined);
   useEffect(() => {
     let mounted = true, sequence = 0;
     let controller: AbortController | undefined;
@@ -69,7 +77,7 @@ export function CommunicationNoteSavedDrafts({ locale, loginHref, unsupportedLoc
       if (timeout !== undefined) clearTimeout(timeout);
       timeout = undefined; setState({ loginHref, includeTask });
     }
-    async function refresh(before: CommunicationNoteTaskCursor | null = null) {
+    async function refresh(before: CommunicationNoteTaskCursor | null = null, draftAfter: string | null = null) {
       clear();
       const ticket = sequence, current = new AbortController(); controller = current;
       timeout = setTimeout(() => {
@@ -78,12 +86,12 @@ export function CommunicationNoteSavedDrafts({ locale, loginHref, unsupportedLoc
         }
       }, 8_000);
       try {
-        const result = includeTask === "MULTI" ? await loadCommunicationNoteSavedDrafts(current.signal, undefined, "MULTI", before)
+        const result = includeTask === "MULTI" ? await loadCommunicationNoteSavedDrafts(current.signal, undefined, "MULTI", before, draftAfter)
           : includeTask ? await loadCommunicationNoteSavedDrafts(current.signal, undefined, true)
           : await loadCommunicationNoteSavedDrafts(current.signal);
         if (!mounted || current.signal.aborted || ticket !== sequence) return;
         if (result.status === "AUTH_REQUIRED") { clear(); replaceCommunicationNoteLocation(loginHref); return; }
-        setState({ loginHref, includeTask, result, before });
+        setState({ loginHref, includeTask, result, before, draftAfter });
       } catch {
         if (mounted && !current.signal.aborted && ticket === sequence)
           setState({ loginHref, includeTask, result: { status: "UNAVAILABLE" } });
@@ -95,7 +103,7 @@ export function CommunicationNoteSavedDrafts({ locale, loginHref, unsupportedLoc
     const offline = () => { clear(); setState({ loginHref, includeTask, result: { status: "UNAVAILABLE" } }); };
     const visibility = () => { if (document.visibilityState === "visible") recheck(); else clear(); };
     const pageShow = (event: PageTransitionEvent) => { if (event.persisted) recheck(); };
-    refreshRef.current = before => { void refresh(before); }; recheck();
+    refreshRef.current = (before, draftAfter) => { void refresh(before, draftAfter); }; recheck();
     window.addEventListener("focus", recheck); window.addEventListener("storage", recheck);
     window.addEventListener("online", recheck); window.addEventListener("offline", offline);
     window.addEventListener("pagehide", clear); window.addEventListener("pageshow", pageShow);
@@ -109,21 +117,25 @@ export function CommunicationNoteSavedDrafts({ locale, loginHref, unsupportedLoc
       document.removeEventListener("visibilitychange", visibility);
     };
   }, [loginHref, includeTask]);
+  const current = state?.loginHref === loginHref && state.includeTask === includeTask ? state : undefined;
   return <CommunicationNoteSavedDraftsView locale={locale} unsupportedLocale={unsupportedLocale} includeTask={includeTask}
-    olderPage={state?.loginHref === loginHref && state.includeTask === includeTask && !!state.before}
-    onPage={cursor => refreshRef.current(cursor)}
-    result={state?.loginHref === loginHref && state.includeTask === includeTask ? state.result : undefined} onRefresh={() => refreshRef.current()} />;
+    olderPage={!!current?.before} laterDraftPage={!!current?.draftAfter}
+    onPage={cursor => refreshRef.current(cursor, current?.draftAfter)}
+    onDraftPage={cursor => refreshRef.current(current?.before, cursor)}
+    result={current?.result} onRefresh={() => refreshRef.current()} />;
 }
 
-export function CommunicationNoteSavedDraftsView({ locale, result, onRefresh, unsupportedLocale = false, includeTask = false, olderPage = false, onPage }: Readonly<{
+export function CommunicationNoteSavedDraftsView({ locale, result, onRefresh, unsupportedLocale = false, includeTask = false, olderPage = false, onPage, laterDraftPage = false, onDraftPage }: Readonly<{
   locale: CommunicationNoteDocumentLocale; result?: VisibleResult; onRefresh: () => void; unsupportedLocale?: boolean; includeTask?: boolean | "MULTI";
   olderPage?: boolean; onPage?: (cursor: CommunicationNoteTaskCursor | null) => void;
+  laterDraftPage?: boolean; onDraftPage?: (cursor: string | null) => void;
 }>) {
   const copy = COPY[locale], documentCopy = getCommunicationNoteDocumentCopy(locale);
   const taskCopy = TASK_COPY[locale], surfaceCopy = includeTask ? taskCopy : copy;
   const task = includeTask && result?.status === "AVAILABLE" ? result.task : null;
   const taskPage = includeTask === "MULTI" && result?.status === "AVAILABLE" ? result.taskPage : undefined;
   const pageCopy = PAGE_COPY[locale];
+  const draftPageCopy = DRAFT_PAGE_COPY[locale];
   const DraftHeading = includeTask ? "h3" : "h2";
   return <main className="case-note-page">
     <header className="case-note-brandbar">
@@ -170,7 +182,7 @@ export function CommunicationNoteSavedDraftsView({ locale, result, onRefresh, un
                 </li>)}
               </ul>}
             <nav aria-label={pageCopy.heading} className="mt-4 flex flex-wrap gap-3">
-              {olderPage ? <button className="jade-action" type="button" onClick={onRefresh}>{pageCopy.latest}</button> : null}
+              {olderPage ? <button className="jade-action" type="button" onClick={() => onPage ? onPage(null) : onRefresh()}>{pageCopy.latest}</button> : null}
               {taskPage.nextCursor && onPage ? <button className="jade-action" type="button" onClick={() => onPage(taskPage.nextCursor)}>{pageCopy.next}</button> : null}
             </nav>
           </> : task ? <div className="mt-4 flex flex-wrap items-center justify-between gap-5">
@@ -180,19 +192,25 @@ export function CommunicationNoteSavedDraftsView({ locale, result, onRefresh, un
           </div> : <p className="mt-3 text-sm">{taskCopy.empty}</p>}
         </section>
         <h2 className="mt-7 text-xl font-semibold">{copy.title}</h2>
-        {result.documents.length === 0 ? <p className="mt-3 text-sm leading-6">{task || taskPage?.tasks.length ? taskCopy.noDraft : copy.empty}</p> : null}
+        {includeTask === "MULTI" ? <p className="mt-3 text-sm leading-6">{draftPageCopy.description}</p> : null}
+        {result.documents.length === 0 ? <p className="mt-3 text-sm leading-6">{includeTask === "MULTI" ? draftPageCopy.empty : task ? taskCopy.noDraft : copy.empty}</p> : null}
       </> : null}
       {result?.status === "AVAILABLE" && result.documents.length > 0 ?
         <ul aria-label={copy.title} className="mt-4 divide-y divide-line">
           {result.documents.map(d => <li key={d.canonicalId} className="flex flex-wrap items-center justify-between gap-5 py-6">
-            <div><DraftHeading className="text-lg font-semibold">Communication Note</DraftHeading>
+            <div><DraftHeading id={`draft-${d.canonicalId}`} className="text-lg font-semibold">Communication Note</DraftHeading>
               <p className="mt-2 text-sm">{documentCopy.versionLabel(d.revisionNumber)} · {documentCopy.sourceLanguageNames[d.sourceLocale]}</p>
               <p className="mt-2 text-sm">{copy.updated}: <time dateTime={d.updatedAt}>{formatCommunicationNoteDocumentDate(d.updatedAt, locale)}</time></p>
               <p className="mt-2 text-sm font-medium">{copy.draft}</p></div>
             <a href={buildCommunicationNoteDocumentHref({ canonicalId: d.canonicalId, locale })}
-              className="jade-action">{copy.open}</a>
+              aria-describedby={`draft-${d.canonicalId}`} className="jade-action">{copy.open}</a>
           </li>)}
         </ul> : null}
+      {includeTask === "MULTI" && result?.status === "AVAILABLE" && onDraftPage ?
+        <nav aria-label={copy.title} className="mt-4 flex flex-wrap gap-3">
+          {laterDraftPage ? <button className="jade-action" type="button" onClick={() => onDraftPage(null)}>{draftPageCopy.first}</button> : null}
+          {result.documentsCursor ? <button className="jade-action" type="button" onClick={() => onDraftPage(result.documentsCursor!)}>{draftPageCopy.next}</button> : null}
+        </nav> : null}
     </section>
   </main>;
 }

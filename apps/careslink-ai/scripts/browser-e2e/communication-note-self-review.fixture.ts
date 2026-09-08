@@ -15,6 +15,7 @@ import { handleCommunicationNoteEdit } from "../../src/lib/communication-note-ed
 import { createCommunicationNoteDurableExportHistory } from "../../src/lib/communication-note-export-history-durable.server";
 import { handleExportHistory } from "../../src/lib/communication-note-export-history.server";
 import { CaresLinkV1ContractError } from "../../src/lib/v1/shared-contracts";
+import type { CaresLinkV1ListDocumentsRequest } from "../../src/lib/v1/transport-contract";
 
 export const REVIEW_DOC = "11111111-1111-4111-8111-111111111111";
 const OWNER = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", SESSION = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
@@ -129,9 +130,10 @@ export async function readReviewDatabaseDocument(request: Request, documentId: s
   });
 }
 
-export async function readReviewDatabaseList(request: Request) {
+export async function readReviewDatabaseList(request: Request, page?: CaresLinkV1ListDocumentsRequest) {
   assertReviewDatabaseFixture();
   if (process.env.CARESLINK_LOCAL_SETTLED_LIST !== "EXACT_SETTLED_DOCUMENT_ONLY") throw new Error("Local list unavailable");
+  if (page && process.env.CARESLINK_LOCAL_TASK_ENTRY !== "OWNER_TASK_LIST") throw new Error("Local catalog unavailable");
   const client = await createReviewDatabaseAuthClient();
   const auth = await resolveCaresLinkV1ProductApiAuth(new Request("https://careslink.internal/v1/documents", {
     headers: request.headers, signal: request.signal,
@@ -146,7 +148,7 @@ export async function readReviewDatabaseList(request: Request) {
   const api = createSupabaseCaresLinkV1ProductApi({ client, principal: {
     userId: auth.identity.userId, sessionId: auth.identity.sessionId, transport: "COOKIE",
   } });
-  return api.listDocuments({ limit: 100 });
+  return api.listDocuments(page ?? { limit: 100 });
 }
 
 export async function confirmReviewDatabaseDocument(request: Request, documentId: string) {

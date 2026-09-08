@@ -15,6 +15,7 @@ beforeEach(()=>{
   vi.clearAllMocks();vi.stubEnv("CARESLINK_LOCAL_SETTLEMENT_DATABASE","OWNED_UNIX_SOCKET_ONLY");
   vi.stubEnv("CARESLINK_LOCAL_HISTORY_DATABASE","OWNED_UNIX_SOCKET_ONLY");vi.stubEnv("CARESLINK_LOCAL_SETTLED_REVIEW","EXACT_SETTLED_RESULT_ONLY");
   state.binding.mockResolvedValue({canonicalId:DOC,revisionId:REV});
+  vi.stubEnv("CARESLINK_LOCAL_TASK_ENTRY",undefined);vi.stubEnv("CARESLINK_LOCAL_TASK_ENTRY_JOB_ID",undefined);
   vi.stubEnv("CARESLINK_LOCAL_SETTLED_EDIT","");vi.stubEnv("CARESLINK_LOCAL_EDIT_DATABASE","");
   for(const fn of [state.read,state.review,state.history,state.edit]) fn.mockImplementation(async()=>Response.json({status:"AVAILABLE"}));
 });
@@ -41,6 +42,19 @@ describe("exact settled result review/history bridge",()=>{
   it("fails closed before settlement or when metadata cannot be verified",async()=>{
     state.binding.mockRejectedValue(new Error("No safe binding"));expect((await handleSettledReview(request("/self-review","POST"),DOC)).status).toBe(404);
     expect(state.review).not.toHaveBeenCalled();
+  });
+  it("allows catalog GET through the owner/session reader without widening any write",async()=>{
+    vi.stubEnv("CARESLINK_LOCAL_TASK_ENTRY","OWNER_TASK_LIST");
+    vi.stubEnv("CARESLINK_LOCAL_SETTLED_EDIT","EXACT_SETTLED_DOCUMENT_ONLY");vi.stubEnv("CARESLINK_LOCAL_EDIT_DATABASE","OWNED_UNIX_SOCKET_ONLY");
+    state.binding.mockRejectedValue(new Error("No binding"));
+    expect((await handleSettledReview(request(),DOC)).status).toBe(200);expect(state.binding).not.toHaveBeenCalled();
+    state.read.mockResolvedValue(Response.json({status:"AUTH_REQUIRED"},{status:401}));
+    expect((await handleSettledReview(request(),DOC)).status).toBe(401);
+    for(const suffix of ["/self-review","/revisions","/export-history"])
+      expect((await handleSettledReview(request(suffix,"POST"),DOC)).status).toBe(404);
+    expect(state.review).not.toHaveBeenCalled();expect(state.edit).not.toHaveBeenCalled();expect(state.history).not.toHaveBeenCalled();
+    vi.stubEnv("CARESLINK_LOCAL_TASK_ENTRY_JOB_ID",DOC);
+    expect((await handleSettledReview(request(),DOC)).status).toBe(404);
   });
   it.each([["","GET","read"],["/self-review","POST","review"],["/export-history?revisionId="+REV,"GET","history"],["/export-history","POST","history"]] as const)("delegates untouched request to existing %s %s handler",async(suffix,method,key)=>{
     const r=request(suffix,method);expect((await handleSettledReview(r,DOC)).status).toBe(200);

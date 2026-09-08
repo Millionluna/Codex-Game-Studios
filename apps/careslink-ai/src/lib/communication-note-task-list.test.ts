@@ -19,8 +19,8 @@ describe("multi-task metadata contract",()=>{
   it("does not execute record accessors",()=>{const getter=vi.fn();const value={...page};Object.defineProperty(value,"tasks",{enumerable:true,get:getter});expect(()=>parseCommunicationNoteTaskPage(value)).toThrow();expect(getter).not.toHaveBeenCalled();});
   it.each(["","private","2026-09-08T01:00:00.123456Z~javascript:alert(1)",encodeCommunicationNoteTaskCursor(cursor)+"x"])("rejects invalid encoded position %#",value=>expect(()=>decodeCommunicationNoteTaskCursor(value)).toThrow());
   it("sends a cookie GET with position only and validates the returned page",async()=>{
-    const fetcher=vi.fn().mockResolvedValue(Response.json({status:"AVAILABLE",documents:[],taskPage:{tasks:[],nextCursor:null}}));
+    const fetcher=vi.fn().mockResolvedValue(Response.json({status:"AVAILABLE",documents:[],documentsCursor:null,taskPage:{tasks:[],nextCursor:null}}));
     await loadCommunicationNoteSavedDrafts(new AbortController().signal,fetcher,"MULTI",cursor);
-    expect(fetcher).toHaveBeenCalledWith("/api/ai-documents/communication-note/documents?before="+encodeURIComponent(encodeCommunicationNoteTaskCursor(cursor)),expect.objectContaining({method:"GET",cache:"no-store",credentials:"same-origin"}));
+    expect(fetcher).toHaveBeenCalledWith("/api/ai-documents/communication-note/documents?"+new URLSearchParams({before:encodeCommunicationNoteTaskCursor(cursor)}),expect.objectContaining({method:"GET",cache:"no-store",credentials:"same-origin"}));
   });
 });

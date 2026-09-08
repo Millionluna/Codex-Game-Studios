@@ -114,7 +114,7 @@ try {
     .replace('"./communication-note-settlement.fixture"', '"./__settlement-fixture"').replace('"./communication-note-self-review.fixture"', '"./__review-database-fixture"'));
   if (workspaceTask) await emit("src/lib/__workspace-task-fixture.ts", (await readFile(join(app, "scripts/browser-e2e/communication-note-workspace-task.fixture.ts"), "utf8"))
     .replaceAll('"../../src/lib/', '"./').replace('"./communication-note-admission.fixture"', '"./__admission-fixture"')
-    .replace('"./communication-note-saved-drafts.fixture"', '"./__saved-drafts-fixture"'));
+    .replace('"./communication-note-self-review.fixture"', '"./__review-database-fixture"'));
   await symlink(join(app, "node_modules"), join(root, "node_modules"), "dir");
   await emit("package.json", JSON.stringify({ name: "careslink-local-browser-fixture", private: true,
     dependencies: (JSON.parse(await readFile(join(app, "package.json"), "utf8"))).dependencies }));

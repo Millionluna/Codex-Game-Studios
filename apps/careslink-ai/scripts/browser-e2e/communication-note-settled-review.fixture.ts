@@ -23,6 +23,12 @@ export async function handleSettledReview(request: Request, documentId: string) 
     : editing && url.pathname===base+"/revisions" && request.method==="POST" ? saveEditDatabaseDocument
     : url.pathname===base+"/export-history" && ["GET","POST"].includes(request.method) ? handleDatabaseExportHistory : undefined;
   if(!handler) return absent();
+  // Catalog navigation opens any current-owner document through the existing
+  // fresh-session/RLS reader. This does not widen edits, review or exports:
+  // every other action still requires the exact parent settlement binding.
+  if(process.env.CARESLINK_LOCAL_TASK_ENTRY==="OWNER_TASK_LIST" &&
+    process.env.CARESLINK_LOCAL_TASK_ENTRY_JOB_ID===undefined && handler===readReviewDatabaseDocument)
+    return handler(request,documentId);
   try {
     const binding=await readSettlementResultBinding(root);
     if(binding.canonicalId!==documentId || (!editing && url.searchParams.has("revisionId") && url.searchParams.get("revisionId")!==binding.revisionId)) return absent();

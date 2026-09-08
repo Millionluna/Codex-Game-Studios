@@ -177,6 +177,24 @@ languages. Formal workspace activation and the general saved-draft catalog are
 still pending; the draft section retains its exact-settled-document fixture.
 See [multi-task scope and verification](communication-note-product-integration-m1y.md#communication-note-owner-isolated-multi-task-workspace-2026-09-08).
 
+### Communication Note current-owner saved-draft catalog (2026-09-08)
+
+This supersedes the singleton saved-draft section above: fresh cookie/session
+→ existing Product API document list (20 metadata rows, stable UUID order)
+→ server-side live Communication Note filter → current-version document link
+→ existing fresh-session/owner reader → same-language workspace. Filtered empty
+pages retain their next cursor. Tasks and drafts have independent page controls;
+refresh or lifecycle reauthorization clears both and restarts at their first
+pages. Listing never shows wording, changes review state or charges Points.
+
+The browser proved two independent current-version reads, three workspace
+locales and revoked-session clearing. SQL proves 25 documents across 20/5 pages.
+No new migration or permissions were added; formal app activation remains off.
+Only catalog GET navigation was broadened in the owned fixture: editing,
+self-review and export/history still require the exact settled-document guard.
+The next slice is default-off formal workspace wiring with local validation.
+See [catalog scope and verification](communication-note-product-integration-m1y.md#communication-note-current-owner-saved-draft-catalog-2026-09-08).
+
 ## 4. Save, history and delete
 
 ### Current flow

@@ -54,9 +54,49 @@ const task={jobId:DOC,status:"QUEUED",createdAt:result.documents[0].updatedAt,up
 const pageTime="2026-09-08T01:00:00.000000Z";
 const manyTasks=Array.from({length:20},(_,i)=>({jobId:`22222222-2222-4222-8222-${String(100-i).padStart(12,"0")}`,status:"QUEUED" as const,createdAt:pageTime,updatedAt:pageTime}));
 const pageCursor={jobId:manyTasks[19].jobId,createdAt:pageTime};
-const multi={...result,taskPage:{tasks:manyTasks,nextCursor:pageCursor}};
+const multi={...result,documentsCursor:null,taskPage:{tasks:manyTasks,nextCursor:pageCursor}};
 const renderMulti=()=>act(async()=>root.render(<CommunicationNoteSavedDrafts locale="en" loginHref={LOGIN} includeTask="MULTI"/>));
 const button=(text:string)=>Array.from(container.querySelectorAll("button")).find(b=>b.textContent===text)!;
+describe("multi-document workspace pagination",()=>{
+  const draftCursor="document.v1:"+DOC;
+  const catalog={...multi,documentsCursor:draftCursor};
+  it("keeps task and document pages independent and clears both positions on reauthorization",async()=>{
+    mocks.load.mockResolvedValue(catalog);await renderMulti();
+    await act(async()=>button("Next saved drafts").click());
+    expect(mocks.load).toHaveBeenLastCalledWith(expect.any(AbortSignal),undefined,"MULTI",null,draftCursor);
+    await act(async()=>button("Older tasks").click());
+    expect(mocks.load).toHaveBeenLastCalledWith(expect.any(AbortSignal),undefined,"MULTI",pageCursor,draftCursor);
+    await act(async()=>button("Latest tasks").click());
+    expect(mocks.load).toHaveBeenLastCalledWith(expect.any(AbortSignal),undefined,"MULTI",null,draftCursor);
+    await act(async()=>button("First draft page").click());
+    expect(mocks.load).toHaveBeenLastCalledWith(expect.any(AbortSignal),undefined,"MULTI",null,null);
+    await act(async()=>button("Next saved drafts").click());
+    await act(async()=>window.dispatchEvent(new Event("focus")));
+    expect(mocks.load).toHaveBeenLastCalledWith(expect.any(AbortSignal),undefined,"MULTI",null,null);
+  });
+  it("shows an empty filtered page without dropping its next-page navigation",async()=>{
+    mocks.load.mockResolvedValue({...catalog,documents:[]});await renderMulti();
+    expect(container.textContent).toContain("No saved Communication Notes on this page");
+    expect(container.textContent).not.toContain("No saved Communication Notes yet");
+    await act(async()=>button("Next saved drafts").click());
+    expect(mocks.load).toHaveBeenLastCalledWith(expect.any(AbortSignal),undefined,"MULTI",null,draftCursor);
+  });
+  it("clears document links and cursors during a read and ignores a late page after auth failure",async()=>{
+    mocks.load.mockResolvedValue(catalog);await renderMulti();let resolve:(v:unknown)=>void=()=>{};
+    mocks.load.mockImplementationOnce(()=>new Promise(r=>{resolve=r;}));await act(async()=>button("Next saved drafts").click());
+    expect(hasEntry()).toBe(false);expect(button("Next saved drafts")).toBeUndefined();
+    mocks.load.mockResolvedValue({status:"AUTH_REQUIRED"});await act(async()=>window.dispatchEvent(new Event("storage")));
+    await act(async()=>resolve(catalog));expect(hasEntry()).toBe(false);expect(mocks.replace).toHaveBeenCalledWith(LOGIN);
+  });
+  it.each(["en","zh-Hans","zh-Hant"] as const)("renders 20 exact current-version links in %s without body or review authority",locale=>{
+    const documents=Array.from({length:20},(_,i)=>({...result.documents[0],canonicalId:`11111111-1111-4111-8111-${String(i+1).padStart(12,"0")}`,revisionNumber:i+1}));
+    const markup=renderToStaticMarkup(<CommunicationNoteSavedDraftsView locale={locale} includeTask="MULTI" result={{...catalog,documents}} onRefresh={()=>{}} onDraftPage={()=>{}}/>);
+    const view=document.createElement("div");view.innerHTML=markup;expect(view.querySelectorAll('a[href*="/documents/"]')).toHaveLength(20);
+    for(const d of documents)expect(markup).toContain(`/documents/${d.canonicalId}?lang=${locale}`);
+    expect(markup).not.toContain("revisionId=");expect(view.textContent).toMatch(/review before use|使用前请复核|使用前請複核/);
+    expect(markup).toContain("careslink-ai-logo-reverse.svg");expect(view.querySelectorAll("button").length).toBeGreaterThan(1);
+  });
+});
 describe("multi-task workspace navigation",()=>{
   it.each(["en","zh-Hans","zh-Hant"] as const)("renders multiple exact links and original brand in %s",locale=>{
     const markup=renderToStaticMarkup(<CommunicationNoteSavedDraftsView locale={locale} includeTask="MULTI" result={multi} onRefresh={()=>{}} onPage={()=>{}}/>);
@@ -67,9 +107,9 @@ describe("multi-task workspace navigation",()=>{
   it("replaces a page with a fresh read and returns to latest without generating",async()=>{
     mocks.load.mockResolvedValue(multi);await renderMulti();expect(container.querySelectorAll('a[href*="/jobs/"]')).toHaveLength(20);
     mocks.load.mockResolvedValue({...result,taskPage:{tasks:[{...manyTasks[0],jobId:DOC}],nextCursor:null}});
-    await act(async()=>button("Older tasks").click());expect(mocks.load).toHaveBeenLastCalledWith(expect.any(AbortSignal),undefined,"MULTI",pageCursor);
+    await act(async()=>button("Older tasks").click());expect(mocks.load).toHaveBeenLastCalledWith(expect.any(AbortSignal),undefined,"MULTI",pageCursor,null);
     expect(container.querySelectorAll('a[href*="/jobs/"]')).toHaveLength(1);
-    mocks.load.mockResolvedValue(multi);await act(async()=>button("Latest tasks").click());expect(mocks.load).toHaveBeenLastCalledWith(expect.any(AbortSignal),undefined,"MULTI",null);
+    mocks.load.mockResolvedValue(multi);await act(async()=>button("Latest tasks").click());expect(mocks.load).toHaveBeenLastCalledWith(expect.any(AbortSignal),undefined,"MULTI",null,null);
   });
   it("clears a delayed page on revocation and rejects its late reply",async()=>{
     mocks.load.mockResolvedValue(multi);await renderMulti();let resolve:(v:unknown)=>void=()=>{};

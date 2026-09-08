@@ -2628,3 +2628,82 @@ current-user Communication Note saved-draft catalog, preserving minimal metadata
 pagination, exact-current-version links and fresh review/access checks. Develop
 and verify locally first; no external activation or AI call is implied. Other
 four Notes, real model integration and billing remain separate unfinished work.
+
+## Communication Note current-owner saved-draft catalog (2026-09-08)
+
+This supersedes the exact-settled-document restriction for **listing and GET
+navigation** in `--workspace-task`. The reusable server projection now calls
+the existing, freshly authenticated Product API `listDocuments` with a fixed
+20-row limit. It reuses `public.list_v1_shadow_documents`; no SQL migration,
+new database role, grant, table SELECT or Hosted manifest change is needed.
+The cursor is `document.v1:<uuid>`, a position in the current owner's existing
+metadata list, never identity or read authority. The RPC rechecks an active
+session and rejects foreign/unknown cursors. The adapter validates source
+metadata; the catalog also validates page size, order and continuation.
+
+Only live Communication Notes with a saved current revision reach the browser,
+as canonical ID, current revision number, source locale and update time. No
+facts, document text, review approval, credentials or Points are in the list.
+Other Note types, tombstones/deleted records and revisionless rows are filtered
+server-side. The existing RPC excludes PURGED records. Its order is stable
+UUID order, **not newest-update order**; all three locales say so. A source
+page containing other types or deleted records can produce fewer than 20 or
+zero visible drafts. Its continuation remains usable, and the empty-page copy
+does not falsely claim that the user has no saved documents anywhere.
+
+Task `before` and draft `draftAfter` cursors are independent. Paging one keeps
+the other's position; explicit task-latest/draft-first controls reset only that
+section. Manual refresh, focus/storage/online and lifecycle reauthorization
+reset both positions and clear all old metadata. Timeouts, errors, revoked
+sessions and delayed replies cannot restore old entries or pagination controls.
+No browser storage, polling, generation retry or write port was added. The
+fixed transport rejects extra/duplicate queries, bearer/cross-origin requests
+and caller-supplied owner/type/limit fields before either database list read.
+
+Current-version links carry the document ID and UI locale, not a pinned
+revision. The owned fixture routes catalog GETs through the existing general
+document reader, which rechecks current session, owner, document type/lifecycle
+and revision membership in real SQL. **Edit, self-review and export/history
+actions remain limited to the exact newly settled fixture document.** Merely
+listing/opening another seeded document does not widen those writes. The
+historical singleton-list fixture remains for regression coverage. Formal
+workspace/API activation is still unchanged and no real worker is enabled.
+
+Verification:
+
+- Full suite: **4,979 passed / 12 skipped**, 297 files (296 passed / one skipped),
+  37 new cases. TypeScript, zero-warning changed-file lint, 64-page Next build,
+  32-chunk client boundary and 73-file adapter checks passed.
+- `--workspace-task-check`: **118 local PostgreSQL scenarios**, including eight
+  new rollback-only catalog scenarios. Two original plus 23 synthetic drafts
+  traverse disjoint 20/5 pages. Checks cover minimal metadata, other types and
+  tombstones, foreign/mismatched/revoked sessions and foreign cursors, current
+  revision metadata, unknown cursor denial and absence of authenticated table
+  SELECT. Seed constraints remain enabled and all extra rows are rolled back.
+  Existing task/settlement/edit/review/list matrices continue to pass.
+- Browser: current-owner list shows two independent seeded drafts, opens
+  `11111111-1111-4111-8111-111111111111` version 1 in English and
+  `44444444-4444-4444-8444-444444444444` version 1 in Traditional Chinese,
+  returns with the same locale, renders Simplified Chinese, then clears both
+  sections and reaches sign-in after session revocation and refresh. Both
+  documents remain self-review REQUIRED with exports disabled. No warning or
+  error logs. >20-row paging is SQL/DOM evidence, not a browser pagination claim.
+- Browser database ends with **30 available / 0 reserved Points**, zero
+  admissions/generation jobs, reserves/terminal events, review events, edit
+  receipts, sync changes or export reports. The initial single Points ledger
+  entry is the fixed synthetic test grant, not a real purchase or charge.
+- Security Advisors on the exact owned `AjOjt8` Unix socket reported no issues.
+  Both owned roots (`zcYgoT`, `AjOjt8`) were stopped and removed; tab 31 closed
+  and port 3395 released. No push, PR, deploy, Production/Hosted, real care data,
+  AI/provider, KMS/vault or payment operation.
+
+Impeccable guided reuse of the established green Logo/typography and compact
+three-language list. Supabase guidance kept the existing narrow RPC and fresh
+session checks; Next/React/browser guidance kept server dependencies and stale
+responses out of the client. This is not five-Note completion, real AI/credit
+billing readiness, mobile/offline or cross-device E2E evidence.
+
+**Next bounded implementation:** wire the verified multi-task/multi-draft
+workspace into the formal app behind an explicit default-off feature gate,
+preserving the legacy workspace and fail-closed runtime. Verify locally before
+any separate Hosted capability binding, Preview or deployment authorization.
