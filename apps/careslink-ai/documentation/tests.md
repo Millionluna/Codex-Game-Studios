@@ -4670,6 +4670,34 @@ See the [durable candidate scope and remaining gate](communication-note-product-
 
 See [the complete local scope and cleanup evidence](communication-note-product-integration-m1y.md#communication-note-export-history--real-local-browser-roundtrip-2026-09-08).
 
+### Communication Note fixed synthetic full-flow gate (2026-09-08)
+
+- The owned `--flow` mode joins the unchanged composer → task page → real local
+  saved result → review → TXT export/history. Persistent on-page notices identify
+  simulated task progress, a pre-seeded result and display-only Points. It only
+  accepts one exact English synthetic fixture; it is not real model generation.
+- Real form/schema/privacy checks and Cookie/current-session checks remain in
+  the path. Unit coverage includes guard/transport/owner rejection, mismatched
+  source facts, concurrent admission replay, duplicate-key conflict, read-only
+  synthetic progress, pre-completion result denial and revoked-session replay.
+- Browser acceptance proved five empty-field errors, successful confirmed
+  submission, queued/running/succeeded states, reload without resubmission,
+  exact result/fact binding, pre-review export denial, post-review TXT history
+  write/read/reload and private-content clearing after local session revocation.
+  No browser warnings/errors were returned; the approved green UI was reused.
+- **23 new / 57 bridge-focused / 44 boundary-focused tests passed.** Final full
+  regression: **4,667 passed / 12 skipped**, 287 files (286 passed / 1 skipped).
+  TypeScript, full zero-warning lint, 64-page build, 116-chunk client boundary,
+  73-file adapters and diff checks passed. The temporary app built 5 static
+  pages plus the dynamic flow and passed 54 local database scenario groups.
+- Independent final SQL counts: one review, one TXT report, zero edit/sync
+  receipts, **zero database generation jobs and zero Points ledger entries**.
+  Task state was only process memory, not a durable admission/worker. Root
+  `/private/tmp/cl-job-browser-uhNRAL` and its tab were removed after child exit;
+  directory absence and closed port 3395 were independently confirmed.
+
+See [full-flow scope and remaining real-admission gate](communication-note-product-integration-m1y.md#communication-note-fixed-synthetic-full-flow-integration-2026-09-08).
+
 ### Current live/read-only evidence
 
 - Supabase migrations, tables, RLS flags, policies, grants, function grants and aggregate row counts were checked read-only.

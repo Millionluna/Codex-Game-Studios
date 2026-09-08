@@ -1963,3 +1963,81 @@ Use explicit synthetic admission/worker outputs, not real AI or a Production
 binding, and distinguish this UX evidence from real generation/Points evidence.
 The original five-Note launch scope and separately approved activation gates
 remain unchanged.
+
+## Communication Note fixed synthetic full-flow integration (2026-09-08)
+
+`node scripts/browser-e2e/communication-note-recovery.mjs --flow` now joins the
+existing facts composer, task page and real-local-database result/review/export
+page inside one built, owned loopback fixture. **This is UX integration evidence,
+not real generation, durable task admission or Points accounting.**
+
+- Every page carries a test notice: no AI or Points charged, simulated task
+  progress, pre-seeded result, disposable local database. The instructions give
+  the only accepted English facts. The displayed 100 available / 0 reserved /
+  20-Point cost is explicitly demonstration data. Other input locales do not
+  enable submission in this fixed fixture; result-page locales remain available.
+- The unchanged composer performs minimum-fact/privacy review and both explicit
+  confirmations. The owned POST bridge checks exact loopback Host/Origin,
+  Fetch Metadata and method before adapting the request to the existing
+  HTTPS-only **test factory**. This internal URL substitution is not TLS
+  evidence and never relaxes the formal handler.
+- The real principal resolver checks the synthetic Cookie identity and real
+  local active-session RPC. The existing generation handler repeats schema,
+  privacy and confirmation validation; the test submitter then accepts only
+  the exact fixed facts and English locale, and compares them with the strict
+  saved-document reader's source facts before returning one synthetic task.
+- The task stores only idempotency/request digests, creation time and bound
+  result metadata in process memory. Concurrent same-key submission produces
+  one created acknowledgement; exact replay returns the same job. Another key
+  conflicts, changed facts are rejected, and replay rechecks authorization.
+  No request facts/key are logged or persisted by this test adapter.
+- Progress is explicitly time-derived `QUEUED` → `RUNNING` → `SUCCEEDED` over
+  16 seconds. Status GET only reads metadata and rechecks the exact saved
+  revision; it never enqueues, writes Points, invokes a worker or generates
+  content. Result/read/review/edit/history routes are inaccessible before the
+  synthetic admission has completed, even if their fixed UUIDs are known.
+- Formal composer/page/generation-route sources and readiness latches join the
+  runner's source-isolation checks and remain unchanged. The exact test-factory
+  importer inventory now permits this one server-only owned fixture, with guard
+  and no-provider/no-raw-query assertions; there is no wildcard allowance.
+
+### Acceptance and cleanup
+
+The isolated in-app-browser tab exercised empty-form rejection (five required
+fields), exact fact entry, privacy review and both confirmations, submission,
+automatic queued/running/succeeded observations, full task-page reload without
+resubmission, and the link to the exact saved revision. The result's source facts
+matched all submitted fields. Four exports were disabled before review; after
+synthetic review, TXT export was initiated and its one durable history record
+survived a whole-page reload. Session revocation then removed all private result
+and history content and showed the synthetic sign-in boundary. Browser warning/
+error logs were empty. The existing green components and Logo were not edited.
+
+Independent database observations before review and after export proved **zero
+generation jobs and zero Points ledger entries**. The final cluster had one
+review event, one version-1 TXT `DOWNLOAD_INITIATED` report, zero wording receipts
+and zero sync changes. Only this TXT browser report was re-exercised in the full
+flow; this does not extend prior native save/open or four-format acceptance.
+
+Verification: **23 new flow tests**, 57 flow/database-bridge focused tests,
+44 flow/runtime-boundary focused tests; final full suite **4,667 passed / 12
+skipped**, 287 files (286 passed / 1 skipped). TypeScript, zero-warning lint,
+64/64-page webpack build, 116-chunk client-boundary check, 73-file adapters and
+diff checks passed. The owned fixture also passed the 54 database scenario
+groups and its separate build (5 static pages plus dynamic flow routes).
+Initial test-only type errors and the expected exact-importer inventory failure
+were corrected before final verification; no product security gate was opened.
+
+The single owned root `/private/tmp/cl-job-browser-uhNRAL` stopped and was
+removed with `sourceUnchanged: true`; its absence and closed port 3395 were
+independently checked. The test tab was closed, with other user tabs preserved.
+No new SQL candidate, Hosted/Production change, push, deployment, model call or
+Points write occurred. Next.js guidance kept the test routes server-only;
+Supabase guidance preserved fresh session checks; browser guidance required
+actual form, navigation, refresh and denied-access evidence.
+
+**Next local implementation slice:** replace synthetic task admission with the
+existing real local database enqueue / 20-Point reservation path, and verify
+exact retry does not reserve twice. Keep synthetic data, model calls off and
+formal/Hosted activation closed. Terminal settlement, real worker/model output,
+Hosted identity/TLS and the five-Note launch gates remain separate evidence.

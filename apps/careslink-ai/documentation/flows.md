@@ -52,6 +52,19 @@
 
 **Conflict with V1**: current plan is 3 credits per monthly period and one credit per generation. V1 requires one-time 300 welcome Points, versioned service rates, point lots and no parallel legacy balance truth.
 
+### Communication Note owned local full-flow fixture (2026-09-08)
+
+The explicit `--flow` browser runner now joins facts entry → confirmed privacy
+review → one synthetic task → exact pre-seeded result → real local self-review
+and export history. The task and 100/20-Point display are clearly labelled
+simulations; progress does not write a database job, reserve Points or call AI.
+Only fixed English synthetic facts are accepted, matched against the existing
+local result. Refresh does not resubmit, and active-session checks protect task
+and result reads. The formal generation gates remain off.
+See [the bounded full-flow evidence](communication-note-product-integration-m1y.md#communication-note-fixed-synthetic-full-flow-integration-2026-09-08).
+Real task admission/reservation, worker output and Hosted activation are not
+proved by this fixture.
+
 ## 4. Save, history and delete
 
 ### Current flow

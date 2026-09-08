@@ -10,8 +10,9 @@ const app = fileURLToPath(new URL("../../", import.meta.url));
 const port = 3395, host = "127.0.0.1";
 const prefix = "/private/tmp/cl-job-browser-";
 const args = process.argv.slice(2);
-if (args.length > 1 || (args.length === 1 && !["--built", "--database-review", "--edit", "--database-edit", "--database-history"].includes(args[0]))) throw new Error("Use no argument, --built, --database-review, --edit, --database-edit or --database-history for this local fixture");
-const databaseHistory = args[0] === "--database-history";
+if (args.length > 1 || (args.length === 1 && !["--built", "--database-review", "--edit", "--database-edit", "--database-history", "--flow"].includes(args[0]))) throw new Error("Use no argument, --built, --database-review, --edit, --database-edit, --database-history or --flow for this local fixture");
+const flow = args[0] === "--flow";
+const databaseHistory = args[0] === "--database-history" || flow;
 const databaseEdit = args[0] === "--database-edit" || databaseHistory;
 const databaseReview = args[0] === "--database-review" || databaseEdit;
 const built = args[0] === "--built" || databaseReview || args[0] === "--edit";
@@ -25,6 +26,8 @@ const copy = async (source, target) => {
 };
 const emit = async (path, source) => { await mkdir(join(root, path, ".."), { recursive: true }); await writeFile(join(root, path), source); };
 const tracked = ["src/lib/supabase-server.ts", "src/app/ai-documents/communication-note/jobs/[jobId]/page.tsx",
+  "src/app/ai-documents/communication-note/page.tsx", "src/app/ai-documents/communication-note/communication-note-composer.tsx",
+  "src/app/api/ai-documents/communication-note/generate/route.ts", "src/lib/communication-note-generation-feature.ts",
   "src/app/api/ai-documents/communication-note/jobs/[jobId]/route.ts", "src/app/api/ai-documents/communication-note/documents/[documentId]/route.ts",
   "src/app/api/ai-documents/communication-note/documents/[documentId]/self-review/route.ts",
   "src/app/api/ai-documents/communication-note/documents/[documentId]/revisions/route.ts",
@@ -69,6 +72,7 @@ try {
   await copy("src/lib", "src/lib"); await copy("src/components", "src/components");
   await copy("src/app/ai-documents/communication-note/jobs", "src/app/ai-documents/communication-note/jobs");
   await copy("src/app/ai-documents/communication-note/documents", "src/app/ai-documents/communication-note/documents");
+  if (flow) await copy("src/app/ai-documents/communication-note/communication-note-composer.tsx", "src/app/ai-documents/communication-note/communication-note-composer.tsx");
   for (const path of ["src/app/globals.css", "src/app/layout.tsx", "next.config.ts", "tsconfig.json", "postcss.config.mjs"]) await copy(path, path);
   const tsconfig = JSON.parse(await readFile(join(root, "tsconfig.json"), "utf8"));
   // Type-check every fixture route and all of its transitive imports, not
@@ -87,6 +91,8 @@ try {
     .replaceAll('"../../src/lib/', '"./'));
   if (databaseReview) await emit("src/lib/__review-database-fixture.ts",
     (await readFile(join(app, "scripts/browser-e2e/communication-note-self-review.fixture.ts"), "utf8")).replaceAll('"../../src/lib/', '"./'));
+  if (flow) await emit("src/lib/__flow-fixture.ts", (await readFile(join(app, "scripts/browser-e2e/communication-note-flow.fixture.ts"), "utf8"))
+    .replaceAll('"../../src/lib/', '"./').replace('"./communication-note-self-review.fixture"', '"./__review-database-fixture"'));
   if (edit) await emit("src/lib/__edit-fixture.ts", (await readFile(join(app, "scripts/browser-e2e/communication-note-edit.fixture.ts"), "utf8")).replaceAll('"../../src/lib/', '"./'));
   await symlink(join(app, "node_modules"), join(root, "node_modules"), "dir");
   await emit("package.json", JSON.stringify({ name: "careslink-local-browser-fixture", private: true,
@@ -165,6 +171,44 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 export async function GET(request: Request, context: { params: Promise<{ documentId: string }> }) { return handleDatabaseExportHistory(request, (await context.params).documentId); }
 export async function POST(request: Request, context: { params: Promise<{ documentId: string }> }) { return handleDatabaseExportHistory(request, (await context.params).documentId); }`);
+  if (flow) {
+    const layout = await readFile(join(root, "src/app/layout.tsx"), "utf8");
+    await emit("src/app/layout.tsx", layout.replace("{children}", `<aside role="note" style={{padding:12,borderBottom:"1px solid #bacbc3"}}>
+Local synthetic test / 本地合成演练：No AI or Points charged. Task progress is simulated; the result is pre-seeded, not generated. Review and export history use a disposable local database. <a href="/">Test instructions</a>
+</aside>{children}`));
+    await emit("src/app/page.tsx", `import { assertFlowFixture, FLOW_FACTS } from "@/lib/__flow-fixture";
+export const dynamic = "force-dynamic";
+export default function FlowInstructions() { assertFlowFixture(); return <main style={{padding:32}}>
+<h1>Communication Note — local full-flow test</h1>
+<p>One fixed English synthetic task per run. The displayed 100 Points and 20-Point cost are demonstration values only: nothing is reserved or charged. Never enter real care data.</p>
+<p>Enter the exact facts below, leave Follow-up empty, run the privacy check, and confirm both acknowledgements. Task progress is simulated over 16 seconds; the pre-seeded result must match these facts. All test data is deleted on shutdown.</p>
+<dl>{Object.entries(FLOW_FACTS).map(([key,value]) => <div key={key}><dt>{key}</dt><dd>{Array.isArray(value)?value.join("; "):value}</dd></div>)}</dl>
+<a href="/ai-documents/communication-note?lang=en">Start fixed English flow</a>
+</main>; }`);
+    await emit("src/app/ai-documents/communication-note/page.tsx", `import { CommunicationNoteComposer } from "./communication-note-composer";
+import { assertFlowFixture, FLOW_POINTS } from "@/lib/__flow-fixture";
+import { parseCommunicationNoteComposerLocale } from "@/lib/communication-note-composer";
+export const dynamic = "force-dynamic";
+export default async function FlowComposerPage({searchParams}:{searchParams:Promise<Record<string,string|string[]|undefined>>}) {
+  assertFlowFixture(); const params=await searchParams; let locale: "en"|"zh-Hans"|"zh-Hant"="en";
+  try { locale=parseCommunicationNoteComposerLocale(params.lang); } catch { /* Fixed safe fallback. */ }
+  return <CommunicationNoteComposer locale={locale} pointsPreview={FLOW_POINTS} generationAvailable={locale==="en"} />;
+}`);
+    await emit("src/app/api/ai-documents/communication-note/generate/route.ts", `export { submitFlowTask as POST } from "@/lib/__flow-fixture";
+export const dynamic = "force-dynamic"; export const runtime = "nodejs";`);
+    await emit("src/app/api/ai-documents/communication-note/jobs/[jobId]/route.ts", `import { readFlowTask } from "@/lib/__flow-fixture";
+export const dynamic = "force-dynamic"; export const runtime = "nodejs";
+export async function GET(request:Request, context:{params:Promise<{jobId:string}>}) {return readFlowTask(request,(await context.params).jobId);}`);
+    for (const [suffix, handler, methods] of [["", "readReviewDatabaseDocument", ["GET"]], ["/self-review", "confirmReviewDatabaseDocument", ["POST"]],
+      ["/revisions", "saveEditDatabaseDocument", ["POST"]], ["/export-history", "handleDatabaseExportHistory", ["GET", "POST"]]]) {
+      await emit(`src/app/api/ai-documents/communication-note/documents/[documentId]${suffix}/route.ts`, `import { flowResultBoundary } from "@/lib/__flow-fixture";
+import { ${handler} } from "@/lib/__review-database-fixture";
+export const dynamic = "force-dynamic"; export const runtime = "nodejs";
+${methods.map(method => `export async function ${method}(request:Request,context:{params:Promise<{documentId:string}>}) {
+  return flowResultBoundary(request,(await context.params).documentId,${handler});
+}`).join("\n")}`);
+    }
+  }
   await emit("src/app/auth/login/page.tsx", `export default function LoginFixture() { return <main style={{padding:32}}>
 <h1>Sign-in required</h1><p>Local synthetic login boundary. No real credentials are accepted.</p><a href="/">Test controls</a></main>; }
 `);
@@ -176,6 +220,7 @@ export async function POST(request: Request, context: { params: Promise<{ docume
 `);
   const env = { PATH: process.env.PATH, TMPDIR: process.env.TMPDIR, NODE_ENV: built ? "production" : "development",
     NEXT_TELEMETRY_DISABLED: "1", CARESLINK_LOCAL_BROWSER_FIXTURE: "SYNTHETIC_LOOPBACK_ONLY", ...reviewDatabase?.env,
+    ...(flow ? { CARESLINK_LOCAL_FLOW_FIXTURE: "FIXED_SYNTHETIC_ONLY" } : {}),
     ...(edit ? { CARESLINK_LOCAL_EDIT_FIXTURE: "PROCESS_MEMORY_ONLY" } : {}) };
   const launch = (arguments_) => {
     child = spawn(process.execPath, [join(app, "node_modules/next/dist/bin/next"), ...arguments_],
@@ -188,7 +233,7 @@ export async function POST(request: Request, context: { params: Promise<{ docume
   if (stopped) process.exit(0);
   const completion = launch([...(built ? ["start"] : ["dev", "--webpack"]), "--hostname", host, "--port", String(port)]);
   console.log(JSON.stringify({ stage: "browser-fixture-start", root, url: `http://${host}:${port}`, built,
-    syntheticOnly: true, hostedVerified: false, databaseReview, databaseEdit, databaseHistory }));
+    syntheticOnly: true, hostedVerified: false, databaseReview, databaseEdit, databaseHistory, flow }));
   if (reviewDatabase) {
     controls = createInterface({ input: process.stdin, crlfDelay: Infinity });
     let queue = Promise.resolve();
