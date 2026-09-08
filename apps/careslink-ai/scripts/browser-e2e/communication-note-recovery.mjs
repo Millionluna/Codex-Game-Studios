@@ -33,6 +33,8 @@ const copy = async (source, target) => {
 };
 const emit = async (path, source) => { await mkdir(join(root, path, ".."), { recursive: true }); await writeFile(join(root, path), source); };
 const tracked = ["src/lib/supabase-server.ts", "src/app/ai-documents/communication-note/jobs/[jobId]/page.tsx",
+  "src/app/ai-documents/page.tsx", "src/app/ai-documents/communication-note-workspace-page.tsx",
+  "src/app/api/ai-documents/communication-note/documents/route.ts", "src/lib/communication-note-workspace-runtime.server.ts",
   "src/app/ai-documents/communication-note/page.tsx", "src/app/ai-documents/communication-note/communication-note-composer.tsx",
   "src/app/api/ai-documents/communication-note/generate/route.ts", "src/lib/communication-note-generation-feature.ts",
   "src/app/api/ai-documents/communication-note/jobs/[jobId]/route.ts", "src/app/api/ai-documents/communication-note/documents/[documentId]/route.ts",
@@ -276,7 +278,7 @@ export const dynamic="force-dynamic"; export const runtime="nodejs";
 ${methods.map(method => `export async function ${method}(request:Request,context:{params:Promise<{documentId:string}>}) {return handleSettledReview(request,(await context.params).documentId);}`).join("\n")}`);
     }
   }
-  if (settledList) {
+  if (settledList && !workspaceTask) {
     await emit("src/app/ai-documents/page.tsx", `import { CommunicationNoteSavedDrafts } from "@/components/communication-note-saved-drafts";
 import { resolveCommunicationNoteDocumentLocale } from "@/lib/communication-note-document-i18n";
 export const dynamic="force-dynamic";
@@ -286,6 +288,21 @@ export default async function SavedDraftsPage({searchParams}:{searchParams:Promi
 }`);
     await emit("src/app/api/ai-documents/communication-note/documents/route.ts", `export { ${workspaceTask ? 'readWorkspaceTask' : 'listSettledDrafts'} as GET } from "@/lib/${workspaceTask ? '__workspace-task-fixture' : '__saved-drafts-fixture'}";
 export const dynamic="force-dynamic"; export const runtime="nodejs";`);
+  }
+  if (workspaceTask) {
+    // Exercise the source app page, feature gate and API route unchanged.
+    // Only the owned copy receives a synthetic Unix-socket runtime binding.
+    // The preserved legacy shell imports sign-out, but this fixture is not an
+    // Auth mutation test. Satisfy that import with a deny-only local action.
+    await emit("src/app/auth/actions.ts", `"use server";
+export async function signOutAction() { throw new Error("Local fixture denies Auth mutations"); }
+`);
+    await copy("src/app/ai-documents/page.tsx", "src/app/ai-documents/page.tsx");
+    await copy("src/app/ai-documents/communication-note-workspace-page.tsx", "src/app/ai-documents/communication-note-workspace-page.tsx");
+    await copy("src/app/api/ai-documents/communication-note/documents/route.ts", "src/app/api/ai-documents/communication-note/documents/route.ts");
+    await emit("src/lib/communication-note-workspace-runtime.server.ts", `// TEST ONLY, owned disposable copy.
+export { workspaceFixtureRuntime as COMMUNICATION_NOTE_WORKSPACE_FORMAL_RUNTIME } from "./__workspace-task-fixture";
+`);
   }
   await emit("src/app/auth/login/page.tsx", `export default function LoginFixture() { return <main style={{padding:32}}>
 <h1>Sign-in required</h1><p>Local synthetic login boundary. No real credentials are accepted.</p><a href="/">Test controls</a></main>; }
@@ -298,6 +315,7 @@ export const dynamic="force-dynamic"; export const runtime="nodejs";`);
 `);
   const env = { PATH: process.env.PATH, TMPDIR: process.env.TMPDIR, NODE_ENV: built ? "production" : "development",
     NEXT_TELEMETRY_DISABLED: "1", CARESLINK_LOCAL_BROWSER_FIXTURE: "SYNTHETIC_LOOPBACK_ONLY", ...reviewDatabase?.env,
+    ...(workspaceTask ? { CARESLINK_COMMUNICATION_NOTE_WORKSPACE_ENABLED: "true" } : {}),
     ...(flow ? { CARESLINK_LOCAL_FLOW_FIXTURE: "FIXED_SYNTHETIC_ONLY" } : {}),
     ...(edit ? { CARESLINK_LOCAL_EDIT_FIXTURE: "PROCESS_MEMORY_ONLY" } : {}) };
   const launch = (arguments_) => {

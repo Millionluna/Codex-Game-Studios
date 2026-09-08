@@ -25,7 +25,7 @@ describe("owned multi-task workspace bridge",()=>{
     expect(response.headers.get("cache-control")).toContain("no-store");expect(response.headers.get("vary")).toBe("Cookie, Authorization");
     expect(mocks.query).toHaveBeenCalledWith(expect.stringContaining("list_v1_communication_note_jobs"),[OWNER,SESSION,null,null,20,"1.0.0-shadow.1","2026-08-09.v1-shadow"]);
     expect(mocks.resolve.mock.invocationCallOrder[0]).toBeLessThan(mocks.list.mock.invocationCallOrder[0]);
-    expect(mocks.list).toHaveBeenCalledWith(expect.any(Request),{limit:20});
+    expect(mocks.list).toHaveBeenCalledWith(expect.any(Request),{limit:20},{userId:OWNER,sessionId:SESSION,transport:"COOKIE"});
   });
   it("is genuinely empty before admission",async()=>{mocks.query.mockResolvedValue({rows:[{data:{tasks:[],nextCursor:null}}]});
     expect(await(await readWorkspaceTask(request())).json()).toEqual({status:"AVAILABLE",documents:[],documentsCursor:null,taskPage:{tasks:[],nextCursor:null}});});
@@ -71,11 +71,13 @@ describe("owned multi-task workspace bridge",()=>{
     vi.stubEnv("CARESLINK_LOCAL_TASK_ENTRY","OWNER_TASK_LIST");vi.stubEnv("CARESLINK_LOCAL_TASK_ENTRY_JOB_ID",JOB);expect((await readWorkspaceTask(request())).status).toBe(503);
     expect(mocks.list).not.toHaveBeenCalled();
   });
-  it("does not install a formal route or expose a write port",()=>{
+  it("uses the formal route in an owned copy without installing a hosted runtime or write port",()=>{
     const runner=readFileSync(new URL("./communication-note-recovery.mjs",import.meta.url),"utf8");
     expect(runner).toContain("Do not retry for this scenario. Use Back to AI Documents");
     const fixture=readFileSync(new URL("./communication-note-workspace-task.fixture.ts",import.meta.url),"utf8");
     expect(fixture).not.toMatch(/PASSWORD|new Client|enqueue\(|globalThis|writeFile|localStorage/);
     expect(readFileSync(new URL("../../src/app/ai-documents/page.tsx",import.meta.url),"utf8")).not.toContain("CommunicationNoteSavedDrafts");
+    expect(runner).toContain('await copy("src/app/api/ai-documents/communication-note/documents/route.ts"');
+    expect(readFileSync(new URL("../../src/lib/communication-note-workspace-runtime.server.ts",import.meta.url),"utf8")).toContain("undefined as CommunicationNoteWorkspaceRuntime");
   });
 });

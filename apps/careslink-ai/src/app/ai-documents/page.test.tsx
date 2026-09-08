@@ -1,5 +1,6 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+vi.mock("server-only", () => ({}));
 import { getGeneratedMaterialDraftStore } from "../../lib/generated-material-draft-store";
 import { NDIS_CASE_NOTE_DISCLAIMER } from "../../lib/ndis-case-note-companion";
 import AiDocumentsPage from "./page";
@@ -21,6 +22,8 @@ const creditMocks = vi.hoisted(() => ({
 const pointsUiMocks = vi.hoisted(() => ({
   isEnabled: vi.fn(),
 }));
+const workspaceMocks = vi.hoisted(() => ({ render: vi.fn() }));
+vi.mock("./communication-note-workspace-page", () => ({ renderCommunicationNoteWorkspacePage: workspaceMocks.render }));
 
 vi.mock("@/components/app-shell", async () =>
   import("../../components/app-shell"),
@@ -75,12 +78,30 @@ vi.mock("@/lib/referral-workspace-i18n", async () =>
 
 describe("AI Documents page", () => {
   beforeEach(() => {
+    vi.stubEnv("CARESLINK_COMMUNICATION_NOTE_WORKSPACE_ENABLED", undefined);
+    workspaceMocks.render.mockReset();
     pointsUiMocks.isEnabled.mockReturnValue(false);
     creditMocks.getUsage.mockClear();
   });
 
   afterEach(() => {
     vi.unstubAllEnvs();
+  });
+  it("routes explicit opt-in to the new workspace before touching legacy drafts or credits",async()=>{
+    vi.stubEnv("CARESLINK_COMMUNICATION_NOTE_WORKSPACE_ENABLED","true");
+    const view=<main>Workspace route marker</main>, query={lang:"zh-Hant"};workspaceMocks.render.mockResolvedValue(view);
+    expect(await AiDocumentsPage({searchParams:Promise.resolve(query)})).toBe(view);
+    expect(workspaceMocks.render).toHaveBeenCalledExactlyOnceWith(query);expect(creditMocks.getUsage).not.toHaveBeenCalled();
+  });
+  it("does not allow a query parameter or public flag to enable the workspace",async()=>{
+    vi.stubEnv("NEXT_PUBLIC_CARESLINK_COMMUNICATION_NOTE_WORKSPACE_ENABLED","true");
+    await AiDocumentsPage({searchParams:Promise.resolve({account:"user-approved",lang:"en",CARESLINK_COMMUNICATION_NOTE_WORKSPACE_ENABLED:"true"})});
+    expect(workspaceMocks.render).not.toHaveBeenCalled();
+  });
+  it("preserves legacy rendering when the new shell returns the non-provider fallback",async()=>{
+    vi.stubEnv("CARESLINK_COMMUNICATION_NOTE_WORKSPACE_ENABLED","true");workspaceMocks.render.mockResolvedValue(null);
+    const element=await AiDocumentsPage({searchParams:Promise.resolve({account:"user-approved",lang:"en"})});
+    expect(renderToStaticMarkup(element)).toContain("Saved Documents");expect(workspaceMocks.render).toHaveBeenCalledOnce();
   });
 
   it("renders the two-job shell and only the current provider's saved documents", async () => {

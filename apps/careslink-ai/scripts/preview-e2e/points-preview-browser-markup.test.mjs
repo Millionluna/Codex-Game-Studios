@@ -11,6 +11,7 @@ vi.mock("@/components/app-shell", () => ({ AppShell: ({ children }) => createEle
 vi.mock("@/components/referral-workspace-auth-gate", () => ({ ReferralWorkspaceLoginGate: () => null }));
 vi.mock("@/components/generated-draft-delete-button", () => ({ GeneratedDraftDeleteButton: () => null }));
 vi.mock("@/lib/points-ui-feature.server", () => ({ isCaresLinkV1PointsUiEnabled: () => true }));
+vi.mock("../../src/lib/communication-note-workspace-feature.server", () => ({ isCommunicationNoteWorkspaceEnabled: () => false }));
 vi.mock("@/lib/v1/points-page-data.server", () => ({ resolveCaresLinkV1PointsPageData: async () => state.points }));
 vi.mock("@/lib/referral-workspace-session", () => ({ getWorkspaceAccessGateWithServerSession: async () => ({
   status: "signed_in", source: "supabase", account: { id: "22222222-2222-4222-8222-222222222222", role: "provider" },

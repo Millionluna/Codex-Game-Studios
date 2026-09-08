@@ -195,6 +195,22 @@ self-review and export/history still require the exact settled-document guard.
 The next slice is default-off formal workspace wiring with local validation.
 See [catalog scope and verification](communication-note-product-integration-m1y.md#communication-note-current-owner-saved-draft-catalog-2026-09-08).
 
+### Communication Note default-off formal workspace route (2026-09-08)
+
+The formal `/ai-documents` page now chooses the new workspace only with an
+exact server-side opt-in, preserving the legacy page by default and the admin
+branch. Server account auth precedes canonical locale routing; private metadata
+still loads through its own fresh-session HTTP boundary. Page/API responses
+are private/no-store/no-referrer/noindex. No demo/account query selects an owner.
+
+The actual formal list API uses a shared read-only composition but its source
+runtime remains undefined, so a UI flag alone always produces a safe 503 and no
+data IO. The owned local browser copy binds only the two narrow existing readers
+and verifies task/draft navigation and revoked-session clearing through the real
+page/API files. No source credential, hosted role or writer is activated.
+The next slice is a default-off read-only runtime adapter, not deployment or
+generation activation. See [formal route scope](communication-note-product-integration-m1y.md#communication-note-default-off-formal-workspace-route-2026-09-08).
+
 ## 4. Save, history and delete
 
 ### Current flow

@@ -47,9 +47,9 @@ describe("exact settled document list bridge",()=>{
     state.list.mockRejectedValue(new CaresLinkV1ContractError(code,"private"));const response=await listSettledDrafts(request());expect(response.status).toBe(401);expect(await response.json()).toEqual({status:"AUTH_REQUIRED"});expect(state.binding).not.toHaveBeenCalled();
   });
   it("does not leak backend errors",async()=>{state.list.mockRejectedValue(new Error("secret"));expect(await(await listSettledDrafts(request())).json()).toEqual({status:"UNAVAILABLE"});});
-  it("is wired only by the new disposable mode",()=>{
+  it("keeps the historical singleton list confined to its disposable mode",()=>{
     const runner=readFileSync(new URL("./communication-note-recovery.mjs",import.meta.url),"utf8");
-    expect(runner).toContain('if (settledList) {');expect(runner).toContain('--settlement-list-check');
+    expect(runner).toContain('if (settledList && !workspaceTask) {');expect(runner).toContain('--settlement-list-check');
     const source=readFileSync(new URL("../../src/app/ai-documents/page.tsx",import.meta.url),"utf8");expect(source).not.toContain("CommunicationNoteSavedDrafts");
     const fixture=readFileSync(new URL("./communication-note-saved-drafts.fixture.ts",import.meta.url),"utf8");expect(fixture).not.toMatch(/PASSWORD|globalThis|new Client|getDocument\(/);
   });

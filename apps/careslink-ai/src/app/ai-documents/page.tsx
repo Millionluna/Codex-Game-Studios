@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { isCommunicationNoteWorkspaceEnabled } from "../../lib/communication-note-workspace-feature.server";
+import { CARESLINK_AI_NOINDEX_ROBOTS } from "../../lib/seo-policy";
 import {
   ArrowRight,
   Coins,
@@ -36,10 +38,16 @@ import {
 
 type SearchParams = Record<string, string | string[] | undefined>;
 
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+export const revalidate = 0;
+
 export const metadata: Metadata = {
   title: "AI Documents",
   description:
     "Create and review guided document drafts, then return to owner-scoped saved work.",
+  robots: CARESLINK_AI_NOINDEX_ROBOTS,
+  referrer: "no-referrer",
 };
 
 export default async function AiDocumentsPage({
@@ -48,6 +56,11 @@ export default async function AiDocumentsPage({
   searchParams?: Promise<SearchParams>;
 }) {
   const params = await searchParams;
+  if (isCommunicationNoteWorkspaceEnabled()) {
+    const { renderCommunicationNoteWorkspacePage } = await import("./communication-note-workspace-page");
+    const workspace = await renderCommunicationNoteWorkspacePage(params);
+    if (workspace) return workspace;
+  }
   const locale = getLocaleFromSearchParams(params);
   const copy = getAiDocumentsCopy(locale);
   const workspaceCopy = getReferralWorkspaceCopy(locale);

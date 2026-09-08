@@ -2707,3 +2707,95 @@ billing readiness, mobile/offline or cross-device E2E evidence.
 workspace into the formal app behind an explicit default-off feature gate,
 preserving the legacy workspace and fail-closed runtime. Verify locally before
 any separate Hosted capability binding, Preview or deployment authorization.
+
+## Communication Note default-off formal workspace route (2026-09-08)
+
+The verified workspace is now wired into the **formal source app**, replacing
+the previous browser-only page/HTTP handler composition. This is route wiring,
+not a Hosted activation. `CARESLINK_COMMUNICATION_NOTE_WORKSPACE_ENABLED` is a
+server-only, exact-`true` UI switch; absent, false, differently cased, public or
+query-string flags leave the legacy workspace unchanged. The existing admin
+workspace is retained, with no self-redirect loop. No flag was set in Vercel,
+Supabase, Production or any existing environment file.
+
+When selected, the page resolves its account from the server Supabase session,
+never from a demo/account query. Signed-out users receive a fixed safe login
+next path; provider queries are canonicalized to one supported locale. Admins
+fall back to the existing page. The client receives only locale, safe login
+link and `MULTI` mode: no owner, session, draft metadata, text or credentials are
+serialized into its initial props. Existing green branding and the three-language
+surface are reused without a redesign. Legacy Credits/NDIS behavior remains
+covered with the new flag off.
+
+The new formal `GET /api/ai-documents/communication-note/documents` is dynamic,
+Node-only and non-cacheable. It uses the shared `communication-note-workspace`
+server composition. Its source-installed runtime is **still undefined**: even
+with the UI flag true, the actual formal GET returns fixed metadata-free 503
+without parsing requests, authenticating or opening a connection. Environment
+flags cannot install a purpose-reader credential, database grant or writer.
+No live data/connection was added, and other generation/recovery/worker formal
+capabilities remain unchanged.
+
+The explicit read-only composition accepts a fresh principal resolver and a
+factory exposing exactly document-list/task-list methods, with no enqueue,
+SQL, edit or other write port. It binds both readers to the same server identity,
+rejects bearer/cross-origin transport, authenticates before cursor parsing,
+keeps the fixed two independent positions/20-row limit, aborts before or between
+reads, and strictly validates output. A failed/revoked read clears the entire
+response, never partial drafts or a previous page. All API responses have
+private/no-store, no-referrer, noindex/nofollow, nosniff and Cookie/Authorization
+Vary. The page also has private/no-store/no-referrer/noindex headers and metadata.
+
+The owned `--workspace-task` runner now copies the actual source page, its
+server shell and the actual API route unchanged. Only the disposable copy's
+runtime module is bound to the existing fixed Unix-socket fixture ports and its
+process receives the UI opt-in. Document reads verify that the separately
+rechecked cookie user/session still matches the principal bound to the task
+reader. The legacy shell's unused sign-out import has a deny-only synthetic
+action, not real Auth mutation code. Source hashes attest that these copied
+bindings do not leak back into the real app. The historical singleton-list
+mode is preserved separately.
+
+Verification:
+
+- Full **5,027 passed / 12 skipped**, 299 files (298 passed / one skipped),
+  48 added tests. TypeScript, zero-warning changed-file lint, Next build and
+  32-chunk client-boundary checks passed. The build reports **63 generated
+  entries** and includes the new dynamic API route; the existing application
+  routes remain in the build output.
+  The 73-file adapter sync check and diff checks passed.
+- Tests cover the actual formal GET with UI flag absent/true but runtime absent,
+  no-I/O disabled handling, old workspace/Points markup, admin fallback, safe
+  three-locale auth/redirect props, transport/owner/cursor validation, narrow
+  ports, revocation, abort and no partial responses. Early mock/import/string
+  expectations were updated for the new source wiring without weakening gates.
+- Both local fixture starts passed **74 existing PostgreSQL preflight scenarios**
+  (54 review/history/edit, 12 admission, 8 catalog). The first owned build lacked
+  the legacy shell's sign-out import; it stopped/cleaned before serving. The
+  deny-only local stub fixed the harness; no Auth capability was broadened.
+  No SQL migration, role, grant or Hosted manifest change was made this turn.
+- Browser on the source-routed copy: two saved drafts → separate fixed synthetic
+  admission with deliberately lost response → return without retry → find the
+  original queued task → task status → parent-only synthetic cancellation and
+  release → workspace → Traditional current saved draft → same-language return
+  → Simplified workspace → revoke session → refresh → sign-in with old metadata
+  cleared. Job `2a6eb9ac-b913-4ce5-b9f7-53fe1c6f52fc` ends CANCELLED; exactly one
+  admission/RESERVE/RELEASE, zero COMMIT, **30 available / 0 reserved**. Two seed
+  documents remain version 1; zero review events, edit receipts, sync changes
+  or export reports. The opened draft remains review REQUIRED, exports disabled.
+- Browser warning/error logs were empty. HTTP page headers were checked directly.
+  Exact-socket Security Advisors found no issues. Both owned roots (`U2M8hK`,
+  `kK5Te6`) were stopped/removed, tab 32 closed and port 3395 released. No actual
+  AI/provider call, KMS/vault, real payment or care data; no push, PR or deploy.
+
+Next/React guidance kept the shell server-authenticated and its props minimal;
+Supabase guidance retained fresh-session and read-only capability boundaries;
+browser guidance required the source-routed UI check, not build success alone.
+This is not Hosted Auth/worker readiness, five-Note completion, credit billing,
+cross-device, mobile or native-offline evidence.
+
+**Next bounded implementation:** implement the formal **read-only runtime
+adapter/composition** behind the same default-off gate, binding authenticated
+document and purpose-scoped task reads to one user/session. Keep credentials,
+Hosted grants, feature activation, generation and deployment outside that local
+implementation until separately authorized and verified.

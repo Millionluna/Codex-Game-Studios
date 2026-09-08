@@ -4872,6 +4872,28 @@ See [full-flow scope and remaining real-admission gate](communication-note-produ
   remain unchanged; non-settled fixture document writes remain denied.
 - [Catalog implementation, evidence and next default-off app binding](communication-note-product-integration-m1y.md#communication-note-current-owner-saved-draft-catalog-2026-09-08).
 
+### Communication Note default-off formal workspace route gate (2026-09-08)
+
+- Formal page/API source wiring now exists. Exact server-side opt-in selects
+  the authenticated three-language shell; default/off retains legacy behavior
+  and admins keep their original workspace. Actual formal GET stays fixed 503
+  without IO even with UI opt-in, because its runtime remains source-unbound.
+- Full **5,027 passed / 12 skipped**, 299 files; 48 new gate/auth/route/port/abort
+  cases. TypeScript, zero-warning lint, Next build (63 prerendered entries plus
+  the dynamic workspace API), 32-chunk boundary and 73-file adapter check pass.
+- Browser runner copies the actual page/shell/API unchanged and substitutes only
+  a guarded temporary Unix-socket runtime plus an unused deny-only sign-out
+  stub. Two starts passed 74 existing SQL preflight cases each; the first build
+  stopped on the missing legacy action import and cleaned safely before serving.
+- Browser: source workspace → lost-ack admission → original task → cancellation
+  → workspace → Traditional saved draft → same-language return → Simplified
+  workspace → revoked refresh/sign-in. One reserve/release, no commit; 30/0
+  Points, no human review, edit or export. Three locales and actual private page
+  headers verified; no browser warnings/errors. Exact-socket Advisors: no issues.
+- Both owned roots/tab 32 cleaned. No SQL/permission/Hosted manifest, external
+  environment, actual AI, Production, push or deployment change.
+- [Source route wiring, evidence and next read-only composition](communication-note-product-integration-m1y.md#communication-note-default-off-formal-workspace-route-2026-09-08).
+
 ### Current live/read-only evidence
 
 - Supabase migrations, tables, RLS flags, policies, grants, function grants and aggregate row counts were checked read-only.
