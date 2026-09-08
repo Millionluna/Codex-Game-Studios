@@ -1856,3 +1856,110 @@ browser-to-durable-history flow. **Next:** bind the existing export UI to this
 candidate only inside an owned disposable local database fixture, and verify
 export → durable report → refresh/readback plus denied-access handling. Keep
 formal routes hard-off and do not promote or deploy as part of that local gate.
+
+## Communication Note export history / real local browser roundtrip (2026-09-08)
+
+The existing green result/review/export page now has a reproducible **owned
+local test binding** to the durable history candidate. Run
+`node scripts/browser-e2e/communication-note-recovery.mjs --database-history`
+from this app. This is not a formal route activation or a retained database.
+The runner accepts no database target or credentials: it creates its own
+Unix-socket-only PostgreSQL 16 cluster and a built loopback app on port 3395.
+Synthetic Cookie identity replaces Hosted Auth issuance only; active sessions,
+review, wording edits, history transactions and independent reads use real SQL.
+
+### Test binding and isolation
+
+- The explicit history mode composes the 14 self-review, 21 history and 19
+  wording-edit scenario groups (**54 passed**) before resetting only its own
+  synthetic fixture. It installs narrow history RPC/schema permissions only
+  there. The runtime LOGIN is non-admin/NOINHERIT/NOBYPASSRLS; direct review
+  and history table reads are denied. History RPCs require the extra
+  `CARESLINK_LOCAL_HISTORY_DATABASE=OWNED_UNIX_SOCKET_ONLY` guard as well as
+  the existing exact owned-root, Unix-socket and non-Hosted guards.
+- The bridge invokes the existing durable adapter through the real HTTP
+  handler, current-session resolver and parameterized record/list RPCs. Extra
+  owner arguments, arbitrary SQL/RPCs, mismatched Host/Origin and Bearer
+  credentials fail before database access. Fixed rejections are preserved;
+  diagnostics contain operation/status metadata, never Note text or credentials.
+- The formal export-history route joins the runner's source-isolation checks.
+  It and the formal review/edit routes remain unbound/hard-off. No migration
+  candidate, approved manifest, product component, CSS, Logo or model setting
+  was changed. Outbound server fetch is disabled in the owned copy.
+- Fixed stdin controls `history-off` / `history-on` toggle only the local
+  history switch. Existing `revoke` / `restore` affect only the fixture session;
+  `status` returns aggregate version/format/outcome counts, not content.
+
+### Browser and independent database evidence
+
+An isolated in-app-browser tab exercised the built fixture, not the user's
+Safari session or existing tabs:
+
+1. Version 1 started with empty history, review required and all four export
+   buttons disabled. After inspecting synthetic facts and confirming review,
+   TXT export produced one committed `DURABLE` report. A whole-page reload and
+   explicit history refresh returned that same record; there was no memory-only
+   warning or false claim that a file had been saved.
+2. Copy, DOCX and PDF added exactly one report each. The database independently
+   contained four version-1 reports: `COPY_REPORTED` for Copy and
+   `DOWNLOAD_INITIATED` for each file format. This run verifies browser reports,
+   not native saved-file/open or cross-app clipboard evidence; those remain
+   bounded by the separate earlier Safari acceptance record.
+3. With the history switch off, another TXT download was initiated but its
+   report returned 503. The page retained the download-start message and showed
+   a separate unconfirmed-history warning. Restoring the switch and refreshing
+   history still returned exactly four reports: no automatic retry, retroactive
+   write or repeated export occurred.
+4. A real wording save created version 2 and one edit/sync receipt. Its history
+   was initially empty and review reset to required. Opening version 1 retained
+   all four reports while disabling old-version exports. After a new version-2
+   review, one TXT report appeared only in version 2, including Simplified and
+   Traditional Chinese readback of the same record.
+5. Deleting the fixture session while version-1 history was visible made the
+   next history read return 401 and replaced the entire private view with the
+   synthetic sign-in boundary. No Note or history remained visible. Restoring
+   the session required a new authorized page read. Browser warning/error logs
+   were empty; no framework overlay appeared.
+6. Final independent SQL observation: **5 reports across 2 revisions, 2 review
+   events, 1 wording receipt and 1 sync change; zero Points ledger entries and
+   zero generation jobs**. Supabase CLI 2.115.0 security advisors against this
+   exact local Unix socket returned `results: []` while the test capability was
+   installed. The CLI's generic “remote database” label does not describe the
+   transport: the explicit percent-encoded socket path and PostgreSQL target
+   attestation prove local-only access.
+
+### Verification, cleanup and remaining scope
+
+- Focused tests: **147 passed**, including 34 owned-database bridge tests.
+  Full regression: **4,644 passed / 12 skipped**, 286 files (285 passed /
+  1 skipped). TypeScript, zero-warning full lint, 64/64-page webpack build,
+  116-chunk client-boundary scan, 73-file adapter sync and diff checks passed.
+  The owned browser fixture separately built all 6 static pages.
+- Initial combined runs stopped after the matrices because the bootstrap
+  readback probe omitted JWT `exp`. The new history SQL correctly rejected it
+  with `AUTH_REQUIRED`; the probe now supplies a bounded synthetic expiry.
+  No security check was weakened. Fixed checkpoint/error-code diagnostics were
+  added to make future failures actionable without printing private payloads.
+- All four attempts stopped their owned PostgreSQL processes and removed their
+  own temporary roots. The first attempt predates root-name logging; its
+  cleanup reported `removed/sourceUnchanged: true`. Named diagnostic roots
+  `/private/tmp/cl-job-browser-KkGHYS`, `/private/tmp/cl-job-browser-kXuRUj` and
+  passing root `/private/tmp/cl-job-browser-yvfpV6` were independently confirmed
+  absent, and port 3395 was independently confirmed closed. The test tab was
+  closed. No existing database, user tab or prior native export file was removed.
+- Supabase least-privilege guidance kept grants disposable and runtime access
+  narrow; Next.js guidance kept Node-only handlers confined to the built test
+  copy; browser-verification guidance required actual page actions and a visual
+  check. The approved green identity was preserved.
+
+This closes the **local browser → durable history → reload/readback** gate,
+not Hosted Auth/PostgREST/TLS, formal activation, cross-device recovery or
+release readiness. No push, deployment, Hosted/Production change, real care
+data, AI call or Points write occurred.
+
+**Next local integration slice:** join the existing facts-entry, job-status and
+saved-result/review/export pages in one owned synthetic end-to-end fixture.
+Use explicit synthetic admission/worker outputs, not real AI or a Production
+binding, and distinguish this UX evidence from real generation/Points evidence.
+The original five-Note launch scope and separately approved activation gates
+remain unchanged.

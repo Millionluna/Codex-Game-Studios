@@ -8,12 +8,14 @@ import { setTimeout as delay } from "node:timers/promises";
 import pg from "pg";
 import { verifySelfReviewScenarios } from "../preview-e2e/communication-note-self-review-local-scenarios.mjs";
 import { verifyWordingEditScenarios } from "../preview-e2e/communication-note-edit-local-scenarios.mjs";
+import { verifyExportHistoryScenarios } from "../preview-e2e/communication-note-export-history-local-scenarios.mjs";
 
 const exec = promisify(execFile), childEnv = { PATH: "/usr/bin:/bin", LANG: "C", LC_ALL: "C" };
 const OWNER = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", SESSION = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
 export const REVIEW_DOC = "11111111-1111-4111-8111-111111111111";
 const REV = "22222222-2222-4222-8222-222222222222", REV2 = "33333333-3333-4333-8333-333333333333";
 const RUNTIME = "cl_review_browser_runtime", CLUSTER = "careslink-review-browser-pg16", PORT = 15437;
+const HISTORY_RPCS = "public.record_communication_note_export_report(uuid,uuid,jsonb),public.list_communication_note_export_reports(uuid,uuid),careslink_communication_history.access_reports(uuid,uuid,uuid,jsonb)";
 async function bounded(promise, milliseconds) {
   let timer;
   try {
@@ -27,8 +29,8 @@ async function bounded(promise, milliseconds) {
  * and removes it only after stop() proves this child exited. */
 export function createReviewBrowserDatabase(root, mode = "REVIEW") {
   assert.match(root, /^\/private\/tmp\/cl-job-browser-[a-zA-Z0-9]{6}$/u);
-  assert.ok(mode === "REVIEW" || mode === "EDIT");
-  const edit = mode === "EDIT";
+  assert.ok(mode === "REVIEW" || mode === "EDIT" || mode === "HISTORY");
+  const history = mode === "HISTORY", edit = mode === "EDIT" || history;
   const base = join(root, "pg"), data = join(base, "data"), socket = join(base, "socket");
   let server, exited, owner, bootstrapMayBeRunning = false, closing = false;
   const clients = [], password = randomBytes(32).toString("hex");
@@ -42,7 +44,8 @@ export function createReviewBrowserDatabase(root, mode = "REVIEW") {
   };
   return {
     env: { CARESLINK_LOCAL_REVIEW_DATABASE: "OWNED_UNIX_SOCKET_ONLY", CARESLINK_LOCAL_REVIEW_PASSWORD: password,
-      ...(edit ? { CARESLINK_LOCAL_EDIT_DATABASE: "OWNED_UNIX_SOCKET_ONLY" } : {}) },
+      ...(edit ? { CARESLINK_LOCAL_EDIT_DATABASE: "OWNED_UNIX_SOCKET_ONLY" } : {}),
+      ...(history ? { CARESLINK_LOCAL_HISTORY_DATABASE: "OWNED_UNIX_SOCKET_ONLY" } : {}) },
     async start() {
       assert.equal(await realpath(root), root);
       let bin;
@@ -70,14 +73,21 @@ export function createReviewBrowserDatabase(root, mode = "REVIEW") {
         current_setting('cluster_name') as cluster,inet_server_addr() is null as unix_only`)).rows,
       [{ data, socket, listeners: "", cluster: CLUSTER, unix_only: true }]);
       const passed = [];
-      await verifySelfReviewScenarios(owner, await open(), await open(), passed, () => {});
+      const checkpoint = name => console.log(JSON.stringify({ stage: "review-database-scenario", name }));
+      await verifySelfReviewScenarios(owner, await open(), await open(), passed, checkpoint);
       assert.equal(passed.length, 14);
+      if (history) {
+        await verifyExportHistoryScenarios(owner, await open(), await open(), passed, checkpoint);
+        assert.equal(passed.length, 35);
+        await owner.query("delete from careslink_communication_history.reports");
+      }
       if (edit) {
-        await verifyWordingEditScenarios(owner, await open(), await open(), passed, () => {});
-        assert.equal(passed.length, 33);
+        await verifyWordingEditScenarios(owner, await open(), await open(), passed, checkpoint);
+        assert.equal(passed.length, history ? 54 : 33);
       }
       // Reset only this just-created synthetic fixture after the full matrix.
       // The application LOGIN never receives this operator's privileges.
+      checkpoint("browser:reset-synthetic-state");
       await owner.query("delete from public.self_review_events");
       if (edit) {
         await owner.query("delete from public.ai_document_mutation_receipts");
@@ -95,21 +105,35 @@ export function createReviewBrowserDatabase(root, mode = "REVIEW") {
       }
       await owner.query("update public.ai_documents set current_revision_id=$2,current_revision_number=1 where id=$1", [REVIEW_DOC, REV]);
       await owner.query("delete from public.ai_document_revisions where id=$1 and document_id=$2", [REV2, REVIEW_DOC]);
+      if (history) {
+        // Only this owned, disposable database receives the opt-in capability.
+        checkpoint("browser:install-temporary-history-capability");
+        await owner.query("grant usage on schema careslink_communication_history to authenticated");
+        await owner.query(`grant execute on function ${HISTORY_RPCS} to authenticated`);
+        await owner.query("update careslink_communication_history.flags set enabled=true");
+      }
       await owner.query(`create role ${RUNTIME} login noinherit nosuperuser nocreatedb nocreaterole noreplication nobypassrls password '${password}'`);
       await owner.query(`grant authenticated to ${RUNTIME} with admin false, inherit false, set true`);
       const runtime = await open(RUNTIME, password);
+      checkpoint("browser:attest-runtime-and-readback");
       assert.deepEqual((await runtime.query("select current_user as role,inet_server_addr() is null as unix_only")).rows,
         [{ role: RUNTIME, unix_only: true }]);
       await assert.rejects(runtime.query("select * from public.self_review_events"), e => e.code === "42501");
+      if (history) await assert.rejects(runtime.query("select * from careslink_communication_history.reports"), e => e.code === "42501");
       await runtime.query("begin"); await runtime.query("set local role authenticated");
-      await runtime.query("select set_config('request.jwt.claims',$1,true)", [JSON.stringify({ sub: OWNER, session_id: SESSION, role: "authenticated", is_anonymous: false })]);
+      await runtime.query("select set_config('request.jwt.claims',$1,true)", [JSON.stringify({ sub: OWNER, session_id: SESSION,
+        role: "authenticated", is_anonymous: false, exp: Math.floor(Date.now() / 1000) + 3600 })]);
       const initial = (await runtime.query("select public.get_v1_shadow_document($1) as data", [REVIEW_DOC])).rows[0].data;
       assert.equal(initial.selfReviewStatus, "REQUIRED"); assert.equal(initial.revisions.length, 1);
       assert.equal(initial.document.currentRevisionId, initial.revisions[0].revisionId);
+      if (history) {
+        const list = (await runtime.query("select public.list_communication_note_export_reports($1,$2) as data", [REVIEW_DOC, REV])).rows[0].data;
+        assert.equal(list.storage, "DURABLE"); assert.deepEqual(list.entries, []);
+      }
       await runtime.query("commit");
       await runtime.end();
       console.log(JSON.stringify({ stage: "review-database-ready", postgresMajor: 16, matrixPassed: passed.length,
-        unixOnly: true, runtimePrivileged: false, authSynthetic: true, hostedVerified: false, edit }));
+        unixOnly: true, runtimePrivileged: false, authSynthetic: true, hostedVerified: false, edit, history }));
     },
     async command(command) {
       assert.ok(owner); assert.equal(closing, false);
@@ -138,6 +162,8 @@ export function createReviewBrowserDatabase(root, mode = "REVIEW") {
         await owner.query("delete from auth.sessions where id=$1 and user_id=$2", [SESSION, OWNER]);
       } else if (command === "restore") {
         await owner.query("insert into auth.sessions(id,user_id) values($1,$2) on conflict(id) do nothing", [SESSION, OWNER]);
+      } else if (history && (command === "history-off" || command === "history-on")) {
+        await owner.query("update careslink_communication_history.flags set enabled=$1", [command === "history-on"]);
       } else if (command !== "status") throw new Error("FIXED_LOCAL_COMMAND_ONLY");
       const state = (await owner.query(`select
         (select count(*)::int from public.self_review_events) as review_events,
@@ -147,10 +173,17 @@ export function createReviewBrowserDatabase(root, mode = "REVIEW") {
         exists(select 1 from auth.sessions where id=$2) as session_active,
         (select count(*)::int from public.point_ledger_entries) as points_entries,
         (select count(*)::int from careslink_v1_generation.jobs) as generation_jobs`, [REVIEW_DOC, SESSION])).rows[0];
-      console.log(JSON.stringify({ stage: "review-database-observation", command, ...state }));
+      const reports = history ? (await owner.query(`select revision_number,format,outcome,count(*)::int as count
+        from careslink_communication_history.reports group by revision_number,format,outcome order by revision_number,format,outcome`)).rows : undefined;
+      console.log(JSON.stringify({ stage: "review-database-observation", command, ...state, reports }));
     },
     async stop() {
       closing = true;
+      if (history && owner) {
+        await owner.query("rollback").catch(() => {});
+        await owner.query(`revoke execute on function ${HISTORY_RPCS} from authenticated`).catch(() => {});
+        await owner.query("revoke usage on schema careslink_communication_history from authenticated").catch(() => {});
+      }
       if (edit && owner) {
         // Best effort only; shutdown still runs if initialization failed. The
         // whole owned database is removed after process-exit proof regardless.

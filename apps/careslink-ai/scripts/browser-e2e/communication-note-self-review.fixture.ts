@@ -12,6 +12,8 @@ import { createCommunicationNoteGenerationCurrentSessionStatusResolver } from ".
 import { createSupabaseCaresLinkV1ProductApi, type CaresLinkV1SupabaseRpcResult } from "../../src/lib/v1/product-api-supabase.server";
 import { createCommunicationNoteDurableEditWriter } from "../../src/lib/communication-note-edit-durable.server";
 import { handleCommunicationNoteEdit } from "../../src/lib/communication-note-edit.server";
+import { createCommunicationNoteDurableExportHistory } from "../../src/lib/communication-note-export-history-durable.server";
+import { handleExportHistory } from "../../src/lib/communication-note-export-history.server";
 
 export const REVIEW_DOC = "11111111-1111-4111-8111-111111111111";
 const OWNER = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", SESSION = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
@@ -42,6 +44,13 @@ export function reviewFixtureRpcCommand(name: string, args?: Readonly<Record<str
     assertReviewDatabaseFixture();
     definitions.save_communication_note_wording = { sql: "select public.save_communication_note_wording($1,$2,$3::jsonb) as data",
       keys: ["p_document_id", "p_mutation_id", "p_command"] };
+  }
+  if (process.env.CARESLINK_LOCAL_HISTORY_DATABASE === "OWNED_UNIX_SOCKET_ONLY") {
+    assertReviewDatabaseFixture();
+    definitions.record_communication_note_export_report = { sql: "select public.record_communication_note_export_report($1,$2,$3::jsonb) as data",
+      keys: ["p_document_id", "p_attempt_id", "p_report"] };
+    definitions.list_communication_note_export_reports = { sql: "select public.list_communication_note_export_reports($1,$2) as data",
+      keys: ["p_document_id", "p_revision_id"] };
   }
   const def = Object.hasOwn(definitions, name) ? definitions[name] : undefined;
   if (!def || (args !== undefined && (!args || typeof args !== "object" || Array.isArray(args))) ||
@@ -92,7 +101,7 @@ export async function createReviewDatabaseAuthClient() {
       } catch (error) {
         await client.query("rollback").catch(() => {});
         const e = error as { code?: string; message?: string };
-        const message = e.code === "P0001" && ["AUTH_REQUIRED", "SESSION_REVOKED", "NOT_FOUND", "STALE_REVISION", "INVALID_REQUEST", "PRIVACY_REVIEW_REQUIRED"].includes(e.message ?? "") ? e.message! : "UNAVAILABLE";
+        const message = e.code === "P0001" && ["AUTH_REQUIRED", "SESSION_REVOKED", "NOT_FOUND", "STALE_REVISION", "INVALID_REQUEST", "PRIVACY_REVIEW_REQUIRED", "REVIEW_REQUIRED"].includes(e.message ?? "") ? e.message! : "UNAVAILABLE";
         console.log(JSON.stringify({ fixture: "review-postgres-rpc", operation: name, committed: false, status: message, checkpoint,
           errorCode: /^[A-Z0-9]{5}$/.test(e.code ?? "") ? e.code : "UNCLASSIFIED" }));
         return { data: null, error: { code: "P0001", message } };
@@ -142,5 +151,22 @@ export async function saveEditDatabaseDocument(request: Request, documentId: str
     write: createCommunicationNoteDurableEditWriter({ env: editEnv, createCookieClient: async () => client }),
   });
   console.log(JSON.stringify({ fixture: "edit-postgres-http", status: response.status }));
+  return response;
+}
+
+export async function handleDatabaseExportHistory(request: Request, documentId: string) {
+  assertReviewDatabaseFixture();
+  if (process.env.CARESLINK_LOCAL_HISTORY_DATABASE !== "OWNED_UNIX_SOCKET_ONLY") return new Response(null, { status: 503 });
+  if (request.headers.get("host") !== "127.0.0.1:3395") return new Response(null, { status: 400 });
+  const incoming = new URL(request.url);
+  const local = new Request(new URL(incoming.pathname + incoming.search, "http://127.0.0.1:3395"), request);
+  const response = await handleExportHistory(local, documentId, {
+    ...createCommunicationNoteDurableExportHistory({
+      env: { ...env, CARESLINK_COMMUNICATION_NOTE_EXPORT_HISTORY_ENABLED: "true" },
+      createCookieClient: createReviewDatabaseAuthClient,
+    }),
+    localFixtureOrigin: "http://127.0.0.1:3395",
+  });
+  console.log(JSON.stringify({ fixture: "export-history-postgres-http", method: request.method, status: response.status }));
   return response;
 }

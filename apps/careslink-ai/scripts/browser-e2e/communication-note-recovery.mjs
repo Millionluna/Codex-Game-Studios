@@ -10,8 +10,9 @@ const app = fileURLToPath(new URL("../../", import.meta.url));
 const port = 3395, host = "127.0.0.1";
 const prefix = "/private/tmp/cl-job-browser-";
 const args = process.argv.slice(2);
-if (args.length > 1 || (args.length === 1 && !["--built", "--database-review", "--edit", "--database-edit"].includes(args[0]))) throw new Error("Use no argument, --built, --database-review, --edit or --database-edit for this local fixture");
-const databaseEdit = args[0] === "--database-edit";
+if (args.length > 1 || (args.length === 1 && !["--built", "--database-review", "--edit", "--database-edit", "--database-history"].includes(args[0]))) throw new Error("Use no argument, --built, --database-review, --edit, --database-edit or --database-history for this local fixture");
+const databaseHistory = args[0] === "--database-history";
+const databaseEdit = args[0] === "--database-edit" || databaseHistory;
 const databaseReview = args[0] === "--database-review" || databaseEdit;
 const built = args[0] === "--built" || databaseReview || args[0] === "--edit";
 const edit = args[0] === "--edit";
@@ -26,7 +27,8 @@ const emit = async (path, source) => { await mkdir(join(root, path, ".."), { rec
 const tracked = ["src/lib/supabase-server.ts", "src/app/ai-documents/communication-note/jobs/[jobId]/page.tsx",
   "src/app/api/ai-documents/communication-note/jobs/[jobId]/route.ts", "src/app/api/ai-documents/communication-note/documents/[documentId]/route.ts",
   "src/app/api/ai-documents/communication-note/documents/[documentId]/self-review/route.ts",
-  "src/app/api/ai-documents/communication-note/documents/[documentId]/revisions/route.ts"];
+  "src/app/api/ai-documents/communication-note/documents/[documentId]/revisions/route.ts",
+  "src/app/api/ai-documents/communication-note/documents/[documentId]/export-history/route.ts"];
 
 async function cleanup() {
   if (stopped) return; stopped = true;
@@ -59,8 +61,9 @@ try {
   await new Promise(resolve => probe.close(resolve));
   for (const path of tracked) sourceHashes.set(path, await readFile(join(app, path), "utf8"));
   root = await mkdtemp(prefix);
+  console.log(JSON.stringify({ stage: "browser-fixture-owned-root", root }));
   if (databaseReview) {
-    reviewDatabase = createReviewBrowserDatabase(root, databaseEdit ? "EDIT" : "REVIEW");
+    reviewDatabase = createReviewBrowserDatabase(root, databaseHistory ? "HISTORY" : databaseEdit ? "EDIT" : "REVIEW");
     await reviewDatabase.start();
   }
   await copy("src/lib", "src/lib"); await copy("src/components", "src/components");
@@ -113,7 +116,7 @@ export default function FixtureControls() { return <main style={{padding:32}}>
 <a href={"/ai-documents/communication-note/jobs/"+JOB+"?lang=en"}>Open current job</a></main>; }
 `);
   if (databaseReview) await emit("src/app/page.tsx", `export default function ReviewDatabaseFixture() { return <main style={{padding:32}}>
-<h1>Local database ${databaseEdit ? "edit and review" : "review"} test</h1><p>Real local PostgreSQL storage; synthetic identity and draft only. No Hosted Auth, AI or Points.</p>
+<h1>Local database ${databaseHistory ? "export history, edit and review" : databaseEdit ? "edit and review" : "review"} test</h1><p>Real local PostgreSQL storage; synthetic identity and draft only. No Hosted Auth, AI or Points. This disposable database is deleted when the test ends.</p>
 <p><a href="/ai-documents/communication-note/documents/${REVIEW_DOC}?lang=zh-Hans">打开简体中文复核页</a></p>
 <p><a href="/ai-documents/communication-note/documents/${REVIEW_DOC}?lang=en">Open English review</a></p>
 <p><a href="/ai-documents/communication-note/documents/${REVIEW_DOC}?lang=zh-Hant">開啟繁體中文複核頁</a></p>
@@ -157,6 +160,11 @@ export async function POST(request: Request, context: { params: Promise<{ docume
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 export async function POST(request: Request, context: { params: Promise<{ documentId: string }> }) { return saveEditDatabaseDocument(request, (await context.params).documentId); }`);
+  if (databaseHistory) await emit("src/app/api/ai-documents/communication-note/documents/[documentId]/export-history/route.ts", `import { handleDatabaseExportHistory } from "@/lib/__review-database-fixture";
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+export async function GET(request: Request, context: { params: Promise<{ documentId: string }> }) { return handleDatabaseExportHistory(request, (await context.params).documentId); }
+export async function POST(request: Request, context: { params: Promise<{ documentId: string }> }) { return handleDatabaseExportHistory(request, (await context.params).documentId); }`);
   await emit("src/app/auth/login/page.tsx", `export default function LoginFixture() { return <main style={{padding:32}}>
 <h1>Sign-in required</h1><p>Local synthetic login boundary. No real credentials are accepted.</p><a href="/">Test controls</a></main>; }
 `);
@@ -180,15 +188,22 @@ export async function POST(request: Request, context: { params: Promise<{ docume
   if (stopped) process.exit(0);
   const completion = launch([...(built ? ["start"] : ["dev", "--webpack"]), "--hostname", host, "--port", String(port)]);
   console.log(JSON.stringify({ stage: "browser-fixture-start", root, url: `http://${host}:${port}`, built,
-    syntheticOnly: true, hostedVerified: false, databaseReview, databaseEdit }));
+    syntheticOnly: true, hostedVerified: false, databaseReview, databaseEdit, databaseHistory }));
   if (reviewDatabase) {
     controls = createInterface({ input: process.stdin, crlfDelay: Infinity });
     let queue = Promise.resolve();
     controls.on("line", line => { queue = queue.then(() => reviewDatabase.command(line.trim())).catch(async () => {
       console.error("Fixed local database control failed"); await stopAndExit();
     }); });
-    console.log("Local database controls: status | advance | revoke | restore (stdin only)");
+    console.log(`Local database controls: status | advance | revoke | restore${databaseHistory ? " | history-off | history-on" : ""} (stdin only)`);
   }
   await completion;
   await cleanup();
-} catch { await cleanup(); throw new Error("Local browser fixture failed"); }
+} catch (error) {
+  // Metadata-only diagnostics: never echo SQL, connection strings or payloads.
+  console.error(JSON.stringify({ stage: "browser-fixture-failed",
+    code: /^[A-Z0-9_]{1,30}$/.test(error?.code ?? "") ? error.code : "UNCLASSIFIED",
+    diagnostic: /^[A-Z_]+$|^permission denied for (schema|table|function) [a-z_]+$/.test(error?.message ?? "") ? error.message : "UNAVAILABLE",
+    source: String(error?.stack ?? "").split("\n").find(line => /at .*communication-note-self-review\.database\.mjs:\d+:\d+\)?$/.test(line))?.trim() }));
+  await cleanup(); throw new Error("Local browser fixture failed");
+}
