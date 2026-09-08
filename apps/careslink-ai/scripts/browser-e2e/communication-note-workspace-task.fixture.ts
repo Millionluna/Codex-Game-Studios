@@ -1,15 +1,13 @@
 /** TEST ONLY. Installs narrow local read ports in an owned copy, never in
  * the formal source runtime. The actual app handler owns the HTTP contract. */
 import "server-only";
-import { assertAdmissionFixture, queryAdmissionFixture } from "./communication-note-admission.fixture";
-import { createReviewDatabaseAuthClient } from "./communication-note-self-review.fixture";
-import { COMMUNICATION_NOTE_JOB_LIST_SQL } from "../../src/lib/v1/communication-note-job-list-repository.server";
+import { assertReviewDatabaseFixture, createReviewDatabaseAuthClient } from "./communication-note-self-review.fixture";
+import { createWorkspaceTaskReadPort } from "./communication-note-workspace-task-connection.fixture";
 import { createCommunicationNoteWorkspaceHandler, type CommunicationNoteWorkspaceRuntime } from "../../src/lib/communication-note-workspace.server";
-import { createCommunicationNoteWorkspaceDurableRuntime, COMMUNICATION_NOTE_WORKSPACE_TASK_CALLER,
-  COMMUNICATION_NOTE_WORKSPACE_TASK_PURPOSE } from "../../src/lib/communication-note-workspace-durable.server";
+import { createCommunicationNoteWorkspaceDurableRuntime } from "../../src/lib/communication-note-workspace-durable.server";
 
 function guard(request: Request) {
-  assertAdmissionFixture();
+  assertReviewDatabaseFixture();
   if (process.env.CARESLINK_LOCAL_TASK_ENTRY !== "OWNER_TASK_LIST" || process.env.CARESLINK_LOCAL_TASK_ENTRY_JOB_ID !== undefined ||
     request.headers.get("host") !== "127.0.0.1:3395") throw new Error("Local workspace unavailable");
 }
@@ -23,18 +21,8 @@ const durable = createCommunicationNoteWorkspaceDurableRuntime({
     VERCEL: "1", VERCEL_ENV: "preview", VERCEL_TARGET_ENV: "preview", VERCEL_PROJECT_ID: "prj_1234567890abcdef",
     SUPABASE_URL: `https://${REF}.supabase.co`, NEXT_PUBLIC_SUPABASE_URL: `https://${REF}.supabase.co`,
     SUPABASE_PUBLISHABLE_KEY: "sb_publishable_1234567890abcdef", NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "sb_publishable_1234567890abcdef" },
-  createCookieClient: async () => { assertAdmissionFixture(); return createReviewDatabaseAuthClient(); },
-  resolveTaskRead: async () => {
-    assertAdmissionFixture();
-    return Object.freeze({ projectRef: REF, purpose: COMMUNICATION_NOTE_WORKSPACE_TASK_PURPOSE,
-      callerRole: COMMUNICATION_NOTE_WORKSPACE_TASK_CALLER,
-      execute: async (parameters, { signal }) => {
-        assertAdmissionFixture();
-        if (signal.aborted) throw new Error("Local read aborted");
-        return queryAdmissionFixture(COMMUNICATION_NOTE_JOB_LIST_SQL, parameters);
-      },
-    });
-  },
+  createCookieClient: async () => { assertReviewDatabaseFixture(); return createReviewDatabaseAuthClient(); },
+  resolveTaskRead: async ({ principal }) => createWorkspaceTaskReadPort(principal),
 })!;
 export const workspaceFixtureRuntime: CommunicationNoteWorkspaceRuntime = Object.freeze({
   resolvePrincipal: async request => { guard(request); return durable.resolvePrincipal(request); },

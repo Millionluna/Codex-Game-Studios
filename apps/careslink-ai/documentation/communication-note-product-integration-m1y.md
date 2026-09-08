@@ -2963,3 +2963,76 @@ fixture's broad admission-connection bridge with this separate list-only port,
 then verify list refresh, pagination/navigation and cancelled reads through the
 actual workspace page. Keep formal/Hosted activation and credential issuance
 separate; no deployment is part of that next local slice.
+
+### Communication Note dedicated task port in the local workspace (2026-09-08)
+
+The owned workspace now uses the actual physical task-list port, not the broad
+admission connection. Its separate test-only delivery module validates the owned
+environment and passes the server-resolved principal, fixed Unix socket and
+list-only LOGIN to the source constructor. Only safe outcome/abort flags are
+logged. Credentials do not enter the page, HTTP response or client bundle.
+The local admission LOGIN lost its list-caller membership, and its query bridge
+no longer accepts the task-list statement. No Hosted permission was changed.
+
+The parent-owned fixture installs one restricted list LOGIN, with connection
+limit 2 and set-only caller membership, and never copies its operator into Next.
+Fixed stdin-only controls provide synthetic pagination rows and a bounded lock
+probe; no new HTTP mutation endpoint was added. `task-seed` runs three existing
+synthetic terminal outcomes, then adds 22 metadata catalog clones without extra
+reservations or charges. The resulting 25 tasks are not 25 AI generations.
+`task-lock` holds only this disposable job table, observes exact runtime backend
+locks and automatically releases within 45 seconds. Teardown always attempts
+role cleanup before the mandatory cluster shutdown/removal.
+
+Verification:
+
+- Full **5,143 passed / 24 skipped**, 303 files (301 passed / two opt-in files
+  skipped), including 13 new delivery tests; focused bridge/admission/runner/
+  delivery tests: **98 passed**. TypeScript, zero-warning lint, formal webpack
+  Next build (63 generated entries), 117-chunk formal client boundary, 39-chunk
+  owned client boundary, adapter sync (73 files) and diff checks pass.
+- `--workspace-task-check` passed the existing **118 real PG16 scenarios** plus
+  the new dedicated-role guards. Its LOGIN was explicitly removed, then
+  `/private/tmp/cl-job-browser-2dTRkQ` was stopped and removed.
+- Actual source-routed page in `/private/tmp/cl-job-browser-tCDbP2`: initial
+  empty task list/two seed drafts; seeded 25 tasks/three drafts; English first
+  page **20**, second page **5**, union **25 distinct task links**; returning to
+  latest reproduced the same first page; refresh retained 20. Traditional
+  Chinese also passed 20/5 pagination, and Simplified Chinese recovered 20.
+- During the fixed table lock, Refresh showed the actual loading state. Clicking
+  the Simplified language link left that page. The parent observed its real
+  task backend waiting on a lock, then disappearing after approximately **480
+  ms**, with **zero locks while the blocker remained held**. The source port
+  reported `returned:false, aborted:true`. The new page's read also failed
+  closed during fault injection; no success was claimed until unlock/refresh.
+  After recovery, runtime sessions and locks were both zero.
+- Opened a listed FAILED task, read its actual status, returned to the same
+  Traditional-language workspace/latest 20 tasks, and opened current seed
+  draft version 1. Review remained REQUIRED and all four export controls were
+  disabled; no human confirmation or export was performed. Parent-only session
+  revocation followed by Refresh cleared both lists and displayed sign-in.
+- Browser warning/error captures were empty. Exact owned-socket Supabase
+  Security Advisors returned no issues. Read-only browser operations preserved
+  the post-seed baseline: 10 available / 0 reserved synthetic Points, three
+  admissions/reserves/terminals, seven ledger entries, 25 jobs, zero reviews,
+  one mutation receipt/one sync change from the synthetic setup, no export
+  reports, and the opened seed draft remained revision 1.
+- Owned tab 34 was closed; existing user tabs were not closed. SIGINT teardown
+  reported the individual LOGIN cleanup as unconfirmed, but the database
+  process exit and entire owned directory removal were confirmed, with tracked
+  source unchanged. This is whole-fixture disposal evidence, not a credential
+  revocation receipt. Both temporary roots are gone and port 3395 is released.
+
+Supabase/Next.js guidance kept the dedicated role and credential module isolated
+to the owned server copy. The browser skill's CLI was unavailable; the existing
+CUA browser integration performed the actual UI, screenshot and console checks
+without installing software. No production TSX, green design/Logo, SQL migration,
+formal binding, online environment, actual model/provider, KMS/vault, payment,
+push/PR or deployment changed.
+
+**Remaining limitation / next bounded implementation:** this fixture reuses one
+fixture-lifetime source password; each delivery's 60-second expiry does not
+revoke it. Implement and locally verify task-list-specific single-use credential
+issuance/revocation before considering a formal or Hosted binding. Do not reuse
+the status purpose's authority or treat these UI tests as all-five-Note launch
+approval. Production and real AI generation remain out of scope.

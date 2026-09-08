@@ -64,6 +64,8 @@ const forbiddenMarkers = [
   "careslink_v1_job_list_runtime_",
   "cl-task-read-",
   "cl-task-clean-",
+  "CARESLINK_LOCAL_TASK_READ_ROLE",
+  "CARESLINK_LOCAL_TASK_READ_PASSWORD",
 ];
 
 if (!existsSync(buildIdPath) || !existsSync(chunksRoot)) {

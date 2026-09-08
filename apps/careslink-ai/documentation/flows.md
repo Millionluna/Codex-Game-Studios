@@ -244,6 +244,21 @@ with this dedicated list-only port, then exercises actual-page refresh,
 pagination/navigation and cancellation without deploying. See
 [physical-port scope and evidence](communication-note-product-integration-m1y.md#communication-note-task-list-physical-cancellation-and-cleanup-2026-09-08).
 
+### Communication Note dedicated task port in the local workspace (2026-09-08)
+
+The owned workspace's server-resolved principal now reaches the real single-use
+task port via a separate local credential module; the admission bridge and LOGIN
+can no longer read task lists. Actual page tests cover 25 distinct tasks across
+20/5 pages, refresh/latest return, three locales, task/current-draft navigation,
+and revoked-session clearing. During locked-read navigation, the real backend
+and locks disappeared in ~480 ms; unlock/refresh recovered the new page.
+
+This changes only the owned fixture, not the formal binding or green UI. Its
+source password lasts for the fixture and is not revoked by a delivery deadline.
+Next is locally verified list-purpose credential issuance/revocation before any
+Hosted binding, not Production activation. See
+[owned integration evidence](communication-note-product-integration-m1y.md#communication-note-dedicated-task-port-in-the-local-workspace-2026-09-08).
+
 ## 4. Save, history and delete
 
 ### Current flow

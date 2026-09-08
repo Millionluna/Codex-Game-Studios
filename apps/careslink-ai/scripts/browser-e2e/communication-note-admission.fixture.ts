@@ -11,7 +11,6 @@ import { parseCommunicationNoteGenerationJob } from "../../src/lib/communication
 import { createCaresLinkV1CommunicationNotePointsAdmissionRepository } from "../../src/lib/v1/note-generation-owner-repository.server";
 import { CARESLINK_V1_COMMUNICATION_NOTE_POINTS_ADMISSION_POSTGRES_SQL } from "../../src/lib/v1/communication-note-points-admission-purpose-caller.server";
 import { createCaresLinkV1CommunicationNoteJobStatusRepository, CARESLINK_V1_COMMUNICATION_NOTE_JOB_STATUS_POSTGRES_SQL } from "../../src/lib/v1/communication-note-job-status-repository.server";
-import { COMMUNICATION_NOTE_JOB_LIST_SQL } from "../../src/lib/v1/communication-note-job-list-repository.server";
 import { resolveCommunicationNotePointsPreview } from "../../src/lib/communication-note-points-preview.server";
 import { stringifyCaresLinkV1CanonicalJson } from "../../src/lib/v1/canonical-json";
 import { CaresLinkV1ContractError } from "../../src/lib/v1/shared-contracts";
@@ -52,8 +51,7 @@ function transport(request: Request, path: string, method: string) {
 export async function queryAdmissionFixture(sql: string, values: readonly unknown[]) {
   const root = assertAdmissionFixture();
   const write = sql === CARESLINK_V1_COMMUNICATION_NOTE_POINTS_ADMISSION_POSTGRES_SQL;
-  const list = sql === COMMUNICATION_NOTE_JOB_LIST_SQL && process.env.CARESLINK_LOCAL_TASK_ENTRY === "OWNER_TASK_LIST";
-  if ((!write && !list && sql !== CARESLINK_V1_COMMUNICATION_NOTE_JOB_STATUS_POSTGRES_SQL) || values.length !== (write ? 19 : list ? 7 : 5))
+  if ((!write && sql !== CARESLINK_V1_COMMUNICATION_NOTE_JOB_STATUS_POSTGRES_SQL) || values.length !== (write ? 19 : 5))
     throw new Error("Local purpose statement denied");
   if (await realpath(root) !== root || await realpath(root + "/pg/socket") !== root + "/pg/socket") throw new Error("Local target denied");
   const client = new Client({ host: root + "/pg/socket", port: 15437, database: "postgres", user: "cl_admission_browser_runtime",
@@ -65,7 +63,7 @@ export async function queryAdmissionFixture(sql: string, values: readonly unknow
     const target = (await client.query("select current_user as role,inet_server_addr() is null as unix_only,current_setting('cluster_name') as cluster")).rows[0];
     if (target.role !== "cl_admission_browser_runtime" || target.unix_only !== true || target.cluster !== "careslink-review-browser-pg16") throw new Error("Local target denied");
     await client.query("begin");
-    await client.query(write ? "set local role careslink_v1_generation_points_admission_caller" : list ? "set local role careslink_v1_generation_job_list_caller" : "set local role careslink_v1_generation_job_status_caller");
+    await client.query(write ? "set local role careslink_v1_generation_points_admission_caller" : "set local role careslink_v1_generation_job_status_caller");
     const result = await client.query(sql, [...values]);
     await client.query("commit");
     return { rows: result.rows };

@@ -4950,6 +4950,35 @@ See [full-flow scope and remaining real-admission gate](communication-note-produ
   browser fixture and verify actual page reads/cancellation.
 - [Physical read boundary and evidence](communication-note-product-integration-m1y.md#communication-note-task-list-physical-cancellation-and-cleanup-2026-09-08).
 
+### Communication Note dedicated task port in the local workspace (2026-09-08)
+
+- Owned page now uses the actual source physical port through an isolated local
+  delivery module. The admission bridge no longer accepts list SQL and its
+  disposable LOGIN no longer has list-caller membership. Formal binding stays
+  undefined; no Hosted grants, production component or design changes.
+- Full **5,143 passed / 24 skipped**, 303 files; 13 new delivery tests; focused
+  fixture set **98 passed**. Existing real PG16 matrix **118 passed** with the
+  dedicated role guards. TypeScript, zero-warning lint, formal webpack build,
+  117/39-chunk formal/owned client scans, adapter sync and diff checks pass.
+- Actual page: empty initial tasks → 25 synthetic rows → English **20/5** pages,
+  25 unique links, identical latest-page return and refresh; Traditional **20/5**
+  and Simplified recovered **20**. Open FAILED task → same-language workspace →
+  current seed draft v1 REQUIRED / exports disabled; no confirmation/export.
+- Real locked task read + language navigation: backend disappeared in ~480 ms,
+  zero locks while blocker stayed held, source port `aborted:true`. Fault-time
+  new read failed closed; explicit unlock/refresh recovered. Session revocation
+  and refresh cleared lists and displayed sign-in. Browser warnings/errors [].
+- Security Advisors: no issues on exact owned Unix database. Browser reads left
+  post-seed synthetic Points/events unchanged (10/0 Points, three admissions,
+  seven ledger entries, 25 jobs, zero reviews/exports; setup receipt/sync = 1/1).
+  Twenty-two extra catalog rows did not generate or reserve anything.
+- Roots `2dTRkQ` and `tCDbP2` stopped/removed, tracked source unchanged, tab 34
+  closed. The latter SIGINT run could not confirm individual LOGIN cleanup;
+  whole-cluster disposal was confirmed. No Hosted credential revocation claim.
+- Next local slice: dedicated task credential issuance/revocation. Existing
+  fixture-lifetime source password reuse is not production custody evidence.
+- [UI integration scope and evidence](communication-note-product-integration-m1y.md#communication-note-dedicated-task-port-in-the-local-workspace-2026-09-08).
+
 ### Current live/read-only evidence
 
 - Supabase migrations, tables, RLS flags, policies, grants, function grants and aggregate row counts were checked read-only.

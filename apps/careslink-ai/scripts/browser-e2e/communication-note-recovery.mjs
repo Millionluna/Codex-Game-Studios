@@ -33,6 +33,8 @@ const copy = async (source, target) => {
 };
 const emit = async (path, source) => { await mkdir(join(root, path, ".."), { recursive: true }); await writeFile(join(root, path), source); };
 const tracked = ["src/lib/supabase-server.ts", "src/app/ai-documents/communication-note/jobs/[jobId]/page.tsx",
+  "src/lib/communication-note-workspace-task-postgres.server.ts",
+  "scripts/browser-e2e/communication-note-workspace-task.fixture.ts", "scripts/browser-e2e/communication-note-workspace-task-connection.fixture.ts",
   "src/lib/communication-note-workspace-durable.server.ts", "src/lib/communication-note-workspace.server.ts",
   "src/app/ai-documents/page.tsx", "src/app/ai-documents/communication-note-workspace-page.tsx",
   "src/app/api/ai-documents/communication-note/documents/route.ts", "src/lib/communication-note-workspace-runtime.server.ts",
@@ -116,7 +118,10 @@ try {
     .replaceAll('"../../src/lib/', '"./').replace('"./communication-note-admission.fixture"', '"./__admission-fixture"')
     .replace('"./communication-note-settlement.fixture"', '"./__settlement-fixture"').replace('"./communication-note-self-review.fixture"', '"./__review-database-fixture"'));
   if (workspaceTask) await emit("src/lib/__workspace-task-fixture.ts", (await readFile(join(app, "scripts/browser-e2e/communication-note-workspace-task.fixture.ts"), "utf8"))
-    .replaceAll('"../../src/lib/', '"./').replace('"./communication-note-admission.fixture"', '"./__admission-fixture"')
+    .replaceAll('"../../src/lib/', '"./').replace('"./communication-note-workspace-task-connection.fixture"', '"./__workspace-task-connection-fixture"')
+    .replace('"./communication-note-self-review.fixture"', '"./__review-database-fixture"'));
+  if (workspaceTask) await emit("src/lib/__workspace-task-connection-fixture.ts", (await readFile(join(app, "scripts/browser-e2e/communication-note-workspace-task-connection.fixture.ts"), "utf8"))
+    .replaceAll('"../../src/lib/', '"./')
     .replace('"./communication-note-self-review.fixture"', '"./__review-database-fixture"'));
   await symlink(join(app, "node_modules"), join(root, "node_modules"), "dir");
   await emit("package.json", JSON.stringify({ name: "careslink-local-browser-fixture", private: true,
@@ -337,7 +342,7 @@ export { workspaceFixtureRuntime as COMMUNICATION_NOTE_WORKSPACE_FORMAL_RUNTIME 
     controls.on("line", line => { queue = queue.then(() => reviewDatabase.command(line.trim())).catch(async () => {
       console.error("Fixed local database control failed"); await stopAndExit();
     }); });
-    console.log(`Local database controls: status${admission ? "" : " | advance"} | revoke | restore${databaseHistory ? " | history-off | history-on" : ""}${settlement ? " | settle-failure | settle-cancel | settle-success | settle-replay" : ""} (stdin only)`);
+    console.log(`Local database controls: status${admission ? "" : " | advance"} | revoke | restore${databaseHistory ? " | history-off | history-on" : ""}${settlement ? " | settle-failure | settle-cancel | settle-success | settle-replay" : ""}${workspaceTask ? " | task-seed | task-lock | task-unlock | task-status" : ""} (stdin only)`);
   }
   await completion;
   await cleanup();

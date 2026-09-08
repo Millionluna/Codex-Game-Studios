@@ -112,7 +112,7 @@ export async function installAdmissionBrowserDatabase(owner, actor, root, passwo
   await owner.query("update public.privacy_reviews set confirmed_at=now(),expires_at=now()+interval '30 minutes' where owner_user_id=$1", [OWNER]);
   await owner.query(`create role cl_admission_browser_runtime login noinherit nosuperuser nocreatedb nocreaterole
     noreplication nobypassrls password '${password}' connection limit 4`);
-  await owner.query(`grant careslink_v1_generation_points_admission_caller,careslink_v1_generation_job_status_caller,careslink_v1_generation_job_list_caller
+  await owner.query(`grant careslink_v1_generation_points_admission_caller,careslink_v1_generation_job_status_caller
     to cl_admission_browser_runtime with admin false,inherit false,set true`);
   await owner.query("commit");
   // Do not give admission credentials authenticated, table or worker authority.

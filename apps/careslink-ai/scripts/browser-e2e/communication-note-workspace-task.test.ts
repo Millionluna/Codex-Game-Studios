@@ -1,9 +1,9 @@
 import { readFileSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-const mocks=vi.hoisted(()=>({guard:vi.fn(),resolve:vi.fn(),query:vi.fn(),list:vi.fn()}));
+const mocks=vi.hoisted(()=>({guard:vi.fn(),resolve:vi.fn(),query:vi.fn(),list:vi.fn(),port:vi.fn()}));
 vi.mock("server-only",()=>({}));
-vi.mock("./communication-note-admission.fixture",()=>({assertAdmissionFixture:mocks.guard,queryAdmissionFixture:mocks.query}));
-vi.mock("./communication-note-self-review.fixture",()=>({createReviewDatabaseAuthClient:async()=>({rpc:mocks.list})}));
+vi.mock("./communication-note-self-review.fixture",()=>({assertReviewDatabaseFixture:mocks.guard,createReviewDatabaseAuthClient:async()=>({rpc:mocks.list})}));
+vi.mock("./communication-note-workspace-task-connection.fixture",()=>({createWorkspaceTaskReadPort:mocks.port}));
 // The actual Cookie/claims/session composition is covered without this mock in
 // communication-note-workspace-durable.server.test.ts and by the owned PG app.
 vi.mock("../../src/lib/communication-note-generation-principal.server",()=>({createCommunicationNoteGenerationPrincipalResolver:()=>mocks.resolve}));
@@ -19,13 +19,16 @@ beforeEach(()=>{
   mocks.resolve.mockResolvedValue({ok:true,principal:{userId:OWNER,sessionId:SESSION,transport:"COOKIE"}});
   mocks.list.mockResolvedValue({data:{documents:[],nextCursor:null,hasMore:false},error:null});
   mocks.query.mockResolvedValue({rows:[{data:page}]});
+  mocks.port.mockReturnValue({projectRef:"abcdefghijklmnopqrst",purpose:"COMMUNICATION_NOTE_JOB_LIST_READ",
+    callerRole:"careslink_v1_generation_job_list_caller",execute:mocks.query});
 });
 afterEach(()=>vi.unstubAllEnvs());
 describe("owned multi-task workspace bridge",()=>{
   it("reads only server-bound owner/session metadata without a preallocated job ID",async()=>{
     const response=await readWorkspaceTask(request());expect(await response.json()).toEqual({status:"AVAILABLE",documents:[],documentsCursor:null,taskPage:page});
     expect(response.headers.get("cache-control")).toContain("no-store");expect(response.headers.get("vary")).toBe("Cookie, Authorization");
-    expect(mocks.query).toHaveBeenCalledWith(expect.stringContaining("list_v1_communication_note_jobs"),[OWNER,SESSION,null,null,20,"1.0.0-shadow.1","2026-08-09.v1-shadow"]);
+    expect(mocks.query).toHaveBeenCalledWith([OWNER,SESSION,null,null,20,"1.0.0-shadow.1","2026-08-09.v1-shadow"],{signal:expect.any(AbortSignal)});
+    expect(mocks.port).toHaveBeenCalledWith({userId:OWNER,sessionId:SESSION,transport:"COOKIE"});
     expect(mocks.resolve.mock.invocationCallOrder[0]).toBeLessThan(mocks.list.mock.invocationCallOrder[0]);
     expect(mocks.list).toHaveBeenCalledWith("list_v1_shadow_documents",{p_after_document_id:null,p_limit:20});
   });
@@ -48,7 +51,7 @@ describe("owned multi-task workspace bridge",()=>{
   it("accepts only a position cursor and keeps identity server-bound",async()=>{
     mocks.query.mockResolvedValue({rows:[{data:{tasks:[],nextCursor:null}}]});
     expect((await readWorkspaceTask(request("?before="+encodeURIComponent(TIME+"~"+JOB)))).status).toBe(200);
-    expect(mocks.query.mock.calls[0][1]).toEqual([OWNER,SESSION,TIME,JOB,20,"1.0.0-shadow.1","2026-08-09.v1-shadow"]);
+    expect(mocks.query.mock.calls[0][0]).toEqual([OWNER,SESSION,TIME,JOB,20,"1.0.0-shadow.1","2026-08-09.v1-shadow"]);
     expect(mocks.list.mock.calls[0][1]).toEqual({p_after_document_id:null,p_limit:20});expect(mocks.resolve.mock.calls[0][0].headers.get("cookie")).toBe("cl_browser_fixture=owner");
   });
   it("keeps the two cursors independent and sends no owner or size from the browser",async()=>{
@@ -56,7 +59,7 @@ describe("owned multi-task workspace bridge",()=>{
     mocks.query.mockResolvedValue({rows:[{data:{tasks:[],nextCursor:null}}]});
     expect((await readWorkspaceTask(request("?before="+encodeURIComponent(TIME+"~"+JOB)+"&draftAfter="+encodeURIComponent(cursor)))).status).toBe(200);
     expect(mocks.list.mock.calls[0][1]).toEqual({p_after_document_id:JOB,p_limit:20});
-    expect(mocks.query.mock.calls[0][1].slice(0,5)).toEqual([OWNER,SESSION,TIME,JOB,20]);
+    expect(mocks.query.mock.calls[0][0].slice(0,5)).toEqual([OWNER,SESSION,TIME,JOB,20]);
   });
   it.each(["?draftAfter=private","?draftAfter=&draftAfter=bad","?noteType=handover"])("rejects draft query %s before either read",async query=>{
     expect((await readWorkspaceTask(request(query))).status).toBe(503);expect(mocks.list).not.toHaveBeenCalled();expect(mocks.query).not.toHaveBeenCalled();
