@@ -5022,6 +5022,24 @@ See [full-flow scope and remaining real-admission gate](communication-note-produ
   lock and build tracing pinned to the AI app's own directory.
 - [Evidence and custody obligations](communication-note-product-integration-m1y.md#communication-note-default-off-server-task-lease-adapter-2026-09-09).
 
+### Communication Note supervised local credential recovery (2026-09-09)
+
+- Policy suite **26 passed**; full suite **5,258 passed / 41 skipped**, 307 files.
+- Opt-in recovery suite **7 passed**, repeated after final process-exit/reason
+  assertions. Real SIGKILL at issuance commit/revoke barrier/uncommitted DROP;
+  real SIGSTOP; 60-second expiry with the issuer timers suppressed; singleton
+  rejection; changed-OID startup failure without harming a same-prefix canary.
+  Command:
+  `CARESLINK_TASK_CREDENTIAL_RECOVERY_LOCAL=OWNED_UNIX_ONLY pnpm exec vitest run scripts/browser-e2e/communication-note-task-credential-recovery.local.test.mjs --bail 1`.
+- Existing real credential suite **10 passed**, with 118 setup scenarios.
+  Business snapshot unchanged, all owned databases and processes disposed.
+- TypeScript/full lint, webpack (63 entries), client boundary (117 chunks),
+  73-file adapter sync and diff checks passed. Security Advisors on the exact
+  owned Z693AB Unix socket found no issues.
+- No new browser, Hosted, supervisor-host-crash or PG-crash claim. Formal
+  runtime stays off; no product migration, model call, push/PR or deployment.
+- [Detailed limits and next built-page acceptance](communication-note-product-integration-m1y.md#communication-note-supervised-local-credential-recovery-2026-09-09).
+
 ### Current live/read-only evidence
 
 - Supabase migrations, tables, RLS flags, policies, grants, function grants and aggregate row counts were checked read-only.

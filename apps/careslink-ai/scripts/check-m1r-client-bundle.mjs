@@ -70,6 +70,9 @@ const forbiddenMarkers = [
   "CARESLINK_LOCAL_TASK_BROKER_CAPABILITY",
   "task-credential.sock",
   "cl_local_task_credential",
+  "CARESLINK_LOCAL_TASK_CREDENTIAL_V2",
+  "LOCAL_SUPERVISOR_ALREADY_RUNNING",
+  "LOCAL_RESTART_BUDGET_EXHAUSTED",
 ];
 
 if (!existsSync(buildIdPath) || !existsSync(chunksRoot)) {

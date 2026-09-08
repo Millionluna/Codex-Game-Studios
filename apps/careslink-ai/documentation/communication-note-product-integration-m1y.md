@@ -3196,7 +3196,93 @@ continued default-off wiring. No TSX/green design/Logo, SQL migration, Hosted
 permissions, Production, live model/provider, KMS/vault, payment, push/PR or
 deployment changed. This is not five-Note launch approval.
 
-**Next bounded step:** implement and verify local custody recovery after issuer
+**Next bounded step at that checkpoint (completed below):** implement and verify local custody recovery after issuer
 interruption/restart, with supervised expiry and pending-receipt reconciliation.
 Use only disposable local databases; managed custody, Hosted PG17/TLS and formal
 activation still require separate evidence/authority.
+
+### Communication Note supervised local credential recovery (2026-09-09)
+
+The owned workspace now runs its fixed Unix credential broker in a separate Node
+child. A parent-only supervisor keeps the database inspection connection, checks
+heartbeat/expiry every 500 ms, and observes the specific ChildProcess's exit.
+The child receives its fixture root/capability over private Node IPC, not argv
+or inherited environment. Operator modules, fault controls and database access
+remain outside the copied Next application; there is no new browser/HTTP route.
+
+Two session advisory locks enforce one supervisor and one issuer per exact
+owned PG16 cluster. A new issuer validates the private schema owner, version,
+RLS and ACLs, then reconciles every unfinished receipt before listening. It
+never redelivers a prior password. Recovery commits the login/password barrier,
+terminates only the receipt's matching role-name/OID sessions, verifies absence,
+and atomically drops the role with its REVOKED tombstone. A role-OID mismatch or
+incompatible catalog stops startup without deleting a merely same-prefix role.
+The session fence is released on connection loss; see
+[PostgreSQL advisory locks](https://www.postgresql.org/docs/16/explicit-locking.html#ADVISORY-LOCKS).
+Password removal and existing-session termination remain separate operations;
+see [ALTER ROLE](https://www.postgresql.org/docs/16/sql-alterrole.html).
+
+After an unexpected issuer exit, the supervisor confirms child close and checks
+that its nonce-named PostgreSQL backend is absent before spawning a replacement.
+No externally supplied PID is accepted. Missing heartbeat for more than two
+seconds triggers termination/recovery. Independently observed receipt expiry,
+with a monotonic cap and one-second grace, catches lost child timers even when
+heartbeats remain healthy. Recovery revokes all outstanding leases, including
+ones not yet expired; active readers may therefore fail closed and retry later.
+This is not a promise of exact 60-second session termination: polling, database
+query/termination and restart deadlines add latency.
+
+Automatic recovery is capped at six attempts per disposable run. A failed startup
+stays FAILED with no issuer listener; it does not silently retry or claim cleanup.
+Stop performs cleanup-only reconciliation after terminating the owned child,
+without opening IPC for new issuance. A stale Unix socket is removed only after
+the issuer lock is held and its exact path/type/owner/mode have been checked.
+The private test catalog is now V2; incompatible older disposable catalogs are
+rejected, not upgraded. No product migration was added.
+
+Verification:
+
+- New ordinary policy suite: **26 passed**, covering owned-root/capability and
+  database attestation, bounded expiry calculations, process scope and operator
+  non-copying. Full suite: **5,258 passed / 41 skipped**, 307 files (303 passed,
+  four explicitly opt-in database files).
+- New real process suite: **7 passed**, repeated after adding explicit recovery
+  reason and child-close checks. Includes competing supervisor/issuer rejection;
+  actual SIGKILL after issuance commit but before delivery; interruption after
+  the revoke barrier and during uncommitted DROP; actual SIGSTOP heartbeat loss;
+  genuine 60-second expiry with every issuer timer suppressed; and a changed
+  receipt OID that leaves startup failed without harming a same-prefix canary.
+  Tests assert PROCESS_EXIT, HEARTBEAT_LOST and EXPIRY_OVERDUE where applicable.
+- Restarted issuance works only after reconciliation, old IDs do not redeliver,
+  old passwords fail, owned sessions/locks disappear, repeated revoke is safe,
+  and an unrelated live role/connection survives. The final intentionally
+  corrupted receipt was restored only inside the owned fixture so cleanup-only
+  disposal could be verified. Business Points/reservation/job/review/edit
+  snapshots remained unchanged.
+- Existing real credential suite: **10 passed**, with its existing 118 setup
+  checks. Normal independent expiry, least privilege, browser-request abort,
+  DROP dependency failure and source-read behavior remain intact.
+- TypeScript/full lint, formal webpack build (63 entries), extended client
+  boundary (117 chunks), 73-file adapter sync and diff checks passed.
+  Supabase CLI 2.115.0 Security Advisors on the exact owned
+  `/private/tmp/cl-job-browser-Z693AB/pg/socket` reported **no issues**.
+  Its generic “remote database” CLI label refers to the explicit --db-url mode,
+  not a Hosted connection. All disposable roots/processes were stopped/removed.
+
+Run the new opt-in suite with:
+`CARESLINK_TASK_CREDENTIAL_RECOVERY_LOCAL=OWNED_UNIX_ONLY pnpm exec vitest run scripts/browser-e2e/communication-note-task-credential-recovery.local.test.mjs --bail 1`.
+Supabase/PostgreSQL guidance informed the role/OID scope, short transactional
+barriers, private RLS/ACL checks and session-lock ownership. No packages were
+upgraded. No application UI, green Logo, formal runtime enablement, Hosted
+permissions, Production, real care data/model, KMS/vault, payment, push/PR or
+deployment changed. No new browser run is claimed.
+
+Limits: the supervisor and PG database must remain alive/reachable for this
+local recovery evidence. Simultaneous supervisor/host failure, PG crash recovery,
+durable external service identity/storage, Hosted PG17/TLS and production
+availability are not proved. This does not approve launch of all five Notes.
+
+**Next bounded step:** exercise the Communication Note workspace in the built
+browser fixture using this supervised chain: task list/pagination → result and
+review navigation → displayed Points, plus cancellation/recovery. Keep synthetic
+data, the existing green design and formal runtime off; do not deploy.

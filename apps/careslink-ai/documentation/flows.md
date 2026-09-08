@@ -287,8 +287,23 @@ undefined; the local database operator stays outside the application.
 
 84 new unit tests and 10 real owned-PG tests passed. Typed receipt validation is
 not managed custody evidence: the trusted provider must enforce a terminal fence.
-Next: local issuer interruption/restart and supervised orphan reconciliation.
+Next at this checkpoint: local issuer interruption/restart and supervised orphan reconciliation (completed below).
 See [adapter evidence and limits](communication-note-product-integration-m1y.md#communication-note-default-off-server-task-lease-adapter-2026-09-09).
+
+### Communication Note supervised local credential recovery (2026-09-09)
+
+Owned parent supervisor → private issuer child → one-use source credential.
+Unexpected exit, lost heartbeat or overdue receipt → terminate only that child
+→ verify its PG backend gone → acquire issuer fence → reconcile unfinished
+receipts → open Unix IPC again. Any mismatch or failed cleanup stops issuance.
+No password is replayed and no role is selected by name-prefix alone.
+
+The supervisor's expiry check survives a lost child timer. Seven real process
+scenarios and ten existing real database scenarios passed; the production
+runtime remains unbound. This still depends on the supervisor and local PG
+surviving, not a durable Hosted custody service. Next: same-revision built-page
+workspace/result/review/Points acceptance on synthetic data.
+See [process recovery evidence](communication-note-product-integration-m1y.md#communication-note-supervised-local-credential-recovery-2026-09-09).
 
 ## 4. Save, history and delete
 

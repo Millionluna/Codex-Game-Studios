@@ -15,7 +15,7 @@ import { verifySettledReviewScenarios } from "./communication-note-settled-revie
 import { verifyCommunicationNoteJobList } from "./communication-note-job-list.database.mjs";
 import { verifyCommunicationNoteDraftCatalog } from "./communication-note-draft-catalog.database.mjs";
 import { installWorkspaceTaskBrowserController } from "./communication-note-workspace-task.database.mjs";
-import { installTaskCredentialBroker } from "./communication-note-task-credential.database.mjs";
+import { installTaskCredentialSupervisor } from "./communication-note-task-credential.supervisor.mjs";
 
 const exec = promisify(execFile), childEnv = { PATH: "/usr/bin:/bin", LANG: "C", LC_ALL: "C" };
 const OWNER = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", SESSION = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
@@ -132,7 +132,7 @@ export function createReviewBrowserDatabase(root, mode = "REVIEW") {
         await admissionRuntime.end();
         if (settlement) terminalController = await installSettlementBrowserController(owner, open, root);
         if (workspaceTaskId) {
-          taskCredentialBroker = await installTaskCredentialBroker(root, open, taskBrokerCapability);
+          taskCredentialBroker = await installTaskCredentialSupervisor(root, open, taskBrokerCapability);
           workspaceTaskController = await installWorkspaceTaskBrowserController(owner, open, root);
         }
       }
@@ -181,6 +181,8 @@ export function createReviewBrowserDatabase(root, mode = "REVIEW") {
       }
       finally { await runtime.end(); }
     },
+    // Direct owned-test API, not forwarded by the browser/HTTP command route.
+    taskCredentialSupervisorForTest() { assert.ok(taskCredentialBroker); return taskCredentialBroker; },
     async command(command) {
       assert.ok(owner); assert.equal(closing, false);
       if (workspaceTaskController && ["task-seed", "task-lock", "task-unlock", "task-status"].includes(command)) {
