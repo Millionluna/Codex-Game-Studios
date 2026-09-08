@@ -109,7 +109,7 @@ describe("Communication Note generation job view", () => {
     }
   });
 
-  it("keeps malformed job navigation on the clean composer route", () => {
+  it("keeps malformed job navigation on the clean workspace route", () => {
     const markup = renderToStaticMarkup(
       createElement(CommunicationNoteGenerationJobView, {
         jobId: "",
@@ -123,7 +123,38 @@ describe("Communication Note generation job view", () => {
     expect(markup).toContain("此工作流程不支持所请求的语言");
     expect(markup).not.toContain("/jobs/");
     expect(markup).not.toContain("zh-TW");
+    expect(markup).not.toContain("/communication-note?lang=");
+    expect(markup).toContain('href="/ai-documents?lang=zh-Hans"');
   });
+
+  it.each((["en", "zh-Hans", "zh-Hant"] as const).flatMap(locale =>
+    (["QUEUED", "RUNNING", "SUCCEEDED", "FAILED", "CANCELLED"] as const).map(status => ({ locale, status }))))(
+    "returns $status to the $locale workspace without losing exact task/result links",
+    ({ locale, status }) => {
+      const markup = renderView(job(status), locale);
+      const header = markup.match(/<header[\s\S]*?<\/header>/)?.[0];
+      expect(header?.match(new RegExp(`href="/ai-documents\\?lang=${locale}"`, "g"))).toHaveLength(2);
+      expect(header).toContain(locale === "en" ? "Back to workspace" : "返回工作台");
+      expect(header).not.toContain("/communication-note?lang=");
+      expect(header).toContain(`/jobs/${JOB_ID}?lang=${locale}`);
+      if (status === "SUCCEEDED") expect(markup).toContain(`revisionId=${REVISION_ID}`);
+      if (status === "FAILED" || status === "CANCELLED") expect(markup).toContain(`/communication-note?lang=${locale}`);
+    },
+  );
+
+  it.each((["en", "zh-Hans", "zh-Hant"] as const).flatMap(locale =>
+    ([undefined, "UNAVAILABLE", "FORBIDDEN", "NOT_FOUND"] as const).map(status => ({ locale, status }))))(
+    "keeps a fixed workspace exit while $locale / $status is unresolved",
+    ({ locale, status }) => {
+      const markup = renderToStaticMarkup(createElement(CommunicationNoteGenerationJobView, {
+        jobId: JOB_ID, locale, result: status ? { status } : undefined,
+      }));
+      expect(markup).toContain(`href="/ai-documents?lang=${locale}"`);
+      expect(markup).toContain(locale === "en" ? "Back to workspace" : "返回工作台");
+      expect(markup).not.toContain("/communication-note?lang=");
+      expect(markup).not.toMatch(/history\.back|returnTo=|idempotency-key|<form/);
+    },
+  );
 });
 
 function renderView(

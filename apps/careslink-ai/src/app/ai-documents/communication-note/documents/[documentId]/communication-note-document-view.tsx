@@ -83,11 +83,11 @@ export function CommunicationNoteDocumentView({
           </a>
           <div className="flex flex-wrap items-center justify-end gap-2">
             <a
-              href={buildComposerHref(locale)}
-              className="inline-flex min-h-10 items-center gap-2 rounded-md px-3 text-xs font-semibold text-white/78 hover:bg-white/10 hover:text-white"
+              href={buildWorkspaceHref(locale)}
+              className="inline-flex min-h-11 items-center gap-2 rounded-md px-3 text-xs font-semibold text-white/78 hover:bg-white/10 hover:text-white focus-visible:ring-2 focus-visible:ring-[#9fe1ca]"
             >
               <ArrowLeft className="size-4" aria-hidden="true" />
-              {copy.backToBuilder}
+              {copy.backToWorkspace}
             </a>
             <nav
               aria-label={copy.languageLabel}
@@ -107,7 +107,7 @@ export function CommunicationNoteDocumentView({
                           revisionId: selectedRevisionId,
                           locale: supportedLocale,
                         })
-                      : buildComposerHref(supportedLocale)
+                      : buildWorkspaceHref(supportedLocale)
                   }
                   hrefLang={supportedLocale}
                   lang={supportedLocale}
@@ -672,11 +672,6 @@ function DocumentState({
   );
 }
 
-function buildComposerHref(locale: CommunicationNoteDocumentLocale) {
-  return `/ai-documents/communication-note?lang=${encodeURIComponent(locale)}`;
-}
-
 function buildWorkspaceHref(locale: CommunicationNoteDocumentLocale) {
-  const workspaceLocale = locale === "zh-Hant" ? "en" : locale;
-  return `/ai-documents?lang=${encodeURIComponent(workspaceLocale)}`;
+  return `/ai-documents?lang=${encodeURIComponent(locale)}`;
 }

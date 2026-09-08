@@ -31,7 +31,7 @@ export function resolveCommunicationNoteDocumentLocale(value: SearchValue): {
 export type CommunicationNoteDocumentCopy = Readonly<{
   metadataTitle: string;
   metadataDescription: string;
-  backToBuilder: string;
+  backToWorkspace: string;
   languageLabel: string;
   localeLabels: Readonly<Record<CommunicationNoteDocumentLocale, string>>;
   unsupportedLocale: string;
@@ -103,7 +103,7 @@ const COPY: Readonly<
     metadataTitle: "Communication Note draft",
     metadataDescription:
       "Review an owner-scoped saved Communication Note draft and its exact revision.",
-    backToBuilder: "Back to Communication Note",
+    backToWorkspace: "Back to workspace",
     languageLabel: "Page language",
     localeLabels: COMMON_LOCALE_LABELS,
     unsupportedLocale:
@@ -188,7 +188,7 @@ const COPY: Readonly<
   "zh-Hans": {
     metadataTitle: "沟通记录草稿",
     metadataDescription: "查看仅限文档所有者访问的沟通记录草稿及其精确版本。",
-    backToBuilder: "返回沟通记录",
+    backToWorkspace: "返回工作台",
     languageLabel: "页面语言",
     localeLabels: COMMON_LOCALE_LABELS,
     unsupportedLocale:
@@ -264,7 +264,7 @@ const COPY: Readonly<
   "zh-Hant": {
     metadataTitle: "溝通記錄草稿",
     metadataDescription: "查看僅限文件擁有人存取的溝通記錄草稿及其精確版本。",
-    backToBuilder: "返回溝通記錄",
+    backToWorkspace: "返回工作台",
     languageLabel: "頁面語言",
     localeLabels: COMMON_LOCALE_LABELS,
     unsupportedLocale:

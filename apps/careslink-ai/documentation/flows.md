@@ -146,6 +146,19 @@ per disposable run, not formal multi-task or cross-device recovery. The check
 mode passed 98 real local database scenarios. See [task-entry evidence and next
 navigation slice](communication-note-product-integration-m1y.md#communication-note-in-progress-task-workspace-entry-2026-09-08).
 
+### Communication Note direct workspace navigation (2026-09-08)
+
+Task and saved-draft headers now return directly to the same-language workspace
+through both Logo and labelled return link. Invalid-ID exits also remain on a
+fixed workspace path. A failed task's explicit new-note action stays separate;
+returning never submits generation. The local loop is workspace → task → exact
+saved version → workspace → current saved version. Existing reauthorization on
+each destination and exact-version/review rules remain in place. The final
+browser run confirmed Traditional Chinese no longer switches to English on
+draft return, and revoked-session return shows sign-in without private data.
+The general multi-task catalog and formal workspace activation remain open.
+See [navigation verification](communication-note-product-integration-m1y.md#communication-note-workspace-navigation-loop-2026-09-08).
+
 ## 4. Save, history and delete
 
 ### Current flow

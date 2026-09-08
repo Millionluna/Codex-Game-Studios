@@ -155,6 +155,31 @@ describe("Communication Note saved-document view", () => {
     const markup = render("en", { status: "NOT_FOUND" }, true);
     expect(markup).toContain("The requested language is not supported");
   });
+
+  it.each((["en", "zh-Hans", "zh-Hant"] as const).flatMap(locale =>
+    (["AVAILABLE", "EMPTY", "NOT_FOUND", "UNAVAILABLE", undefined] as const).map(status => ({ locale, status }))))(
+    "returns $locale / $status directly to the same-language workspace",
+    ({ locale, status }) => {
+      const result = status === "AVAILABLE" ? currentDocument() : status === "EMPTY"
+        ? { status, canonicalId: DOC, sourceLocale: "en" as const } : status ? { status } : undefined;
+      const markup = render(locale, result);
+      const header = markup.match(/<header[\s\S]*?<\/header>/)?.[0];
+      expect(header?.match(new RegExp(`href="/ai-documents\\?lang=${locale}"`, "g"))).toHaveLength(2);
+      expect(header).toContain(locale === "en" ? "Back to workspace" : "返回工作台");
+      expect(header).not.toContain("/communication-note?lang=");
+      expect(header).toContain(`/documents/${DOC}?lang=${locale}&amp;revisionId=${REV2}`);
+      expect(header).not.toMatch(/history\.back|returnTo=|contentHash|idempotencyKey/);
+    },
+  );
+
+  it.each(["en", "zh-Hans", "zh-Hant"] as const)("keeps invalid document exits safe in %s", locale => {
+    const markup = renderToStaticMarkup(createElement(CommunicationNoteDocumentView, {
+      canonicalId: "", locale, documentNavigationAvailable: false, result: { status: "NOT_FOUND" },
+    }));
+    expect(markup).toContain(`href="/ai-documents?lang=${locale}"`);
+    expect(markup).not.toContain("/documents/");
+    expect(markup).not.toContain("/communication-note?lang=");
+  });
 });
 
 function render(

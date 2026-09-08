@@ -40,7 +40,7 @@ type JobStatusCopy = Readonly<{
 export type CommunicationNoteGenerationJobCopy = Readonly<{
   metadataTitle: string;
   metadataDescription: string;
-  backToBuilder: string;
+  backToWorkspace: string;
   languageLabel: string;
   localeLabels: Readonly<Record<CommunicationNoteGenerationJobLocale, string>>;
   unsupportedLocale: string;
@@ -91,7 +91,7 @@ const COPY: Readonly<
     metadataTitle: "Communication Note generation",
     metadataDescription:
       "Check an owner-scoped Communication Note generation job.",
-    backToBuilder: "Back to Communication Note",
+    backToWorkspace: "Back to workspace",
     languageLabel: "Page language",
     localeLabels: LOCALE_LABELS,
     unsupportedLocale:
@@ -165,7 +165,7 @@ const COPY: Readonly<
   "zh-Hans": {
     metadataTitle: "Communication Note 生成任务",
     metadataDescription: "查看仅限所有者访问的 Communication Note 生成任务。",
-    backToBuilder: "返回 Communication Note",
+    backToWorkspace: "返回工作台",
     languageLabel: "页面语言",
     localeLabels: LOCALE_LABELS,
     unsupportedLocale:
@@ -233,7 +233,7 @@ const COPY: Readonly<
   "zh-Hant": {
     metadataTitle: "Communication Note 產生任務",
     metadataDescription: "查看僅限擁有者存取的 Communication Note 產生任務。",
-    backToBuilder: "返回 Communication Note",
+    backToWorkspace: "返回工作台",
     languageLabel: "頁面語言",
     localeLabels: LOCALE_LABELS,
     unsupportedLocale:

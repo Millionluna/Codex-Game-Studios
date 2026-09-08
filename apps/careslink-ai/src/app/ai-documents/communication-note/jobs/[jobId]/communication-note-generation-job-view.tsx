@@ -57,7 +57,7 @@ export function CommunicationNoteGenerationJobView({
       <header className="case-note-brandbar border-b border-white/10">
         <div className="mx-auto flex min-h-16 max-w-[1600px] flex-wrap items-center justify-between gap-3 px-4 py-2 sm:px-6 lg:px-8">
           <a
-            href={buildComposerHref(locale)}
+            href={buildWorkspaceHref(locale)}
             className="inline-flex items-center rounded-sm focus-visible:ring-2 focus-visible:ring-[#9fe1ca]"
             aria-label="CaresLink AI"
           >
@@ -72,11 +72,11 @@ export function CommunicationNoteGenerationJobView({
           </a>
           <div className="flex flex-wrap items-center justify-end gap-2">
             <a
-              href={buildComposerHref(locale)}
-              className="inline-flex min-h-11 items-center gap-2 rounded-md px-3 text-xs font-semibold text-white/78 hover:bg-white/10 hover:text-white"
+              href={buildWorkspaceHref(locale)}
+              className="inline-flex min-h-11 items-center gap-2 rounded-md px-3 text-xs font-semibold text-white/78 hover:bg-white/10 hover:text-white focus-visible:ring-2 focus-visible:ring-[#9fe1ca]"
             >
               <ArrowLeft className="size-4" aria-hidden="true" />
-              {copy.backToBuilder}
+              {copy.backToWorkspace}
             </a>
             <nav
               aria-label={copy.languageLabel}
@@ -96,7 +96,7 @@ export function CommunicationNoteGenerationJobView({
                             jobId,
                             locale: supportedLocale,
                           })
-                        : buildComposerHref(supportedLocale)
+                        : buildWorkspaceHref(supportedLocale)
                     }
                     hrefLang={supportedLocale}
                     lang={supportedLocale}
@@ -448,10 +448,10 @@ function JobState({
             </button>
           ) : (
             <a
-              href={buildComposerHref(locale)}
+              href={buildWorkspaceHref(locale)}
               className="taito-secondary mt-6 w-full sm:w-auto"
             >
-              {copy.backToBuilder}
+              {copy.backToWorkspace}
             </a>
           )}
         </div>
@@ -462,4 +462,9 @@ function JobState({
 
 function buildComposerHref(locale: CommunicationNoteGenerationJobLocale) {
   return `/ai-documents/communication-note?lang=${encodeURIComponent(locale)}`;
+}
+
+/** Fixed destination, never history.back(), a referrer or a caller-supplied URL. */
+function buildWorkspaceHref(locale: CommunicationNoteGenerationJobLocale) {
+  return `/ai-documents?lang=${encodeURIComponent(locale)}`;
 }

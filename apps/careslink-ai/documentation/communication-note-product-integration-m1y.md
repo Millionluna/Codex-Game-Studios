@@ -2485,3 +2485,66 @@ kept the committed identity and simple task/list hierarchy.
 path and verify the complete Communication Note navigation loop, still using
 local synthetic data. Formal multi-task catalog/activation, real provider/vault,
 the other Note types and billing remain separate unfinished work.
+
+## Communication Note workspace navigation loop (2026-09-08)
+
+Task detail now returns directly to `/ai-documents?lang=<locale>` through its
+Logo and labelled return link, including loading, queued/running, terminal and
+missing/unavailable states. Invalid-ID language links also use the clean
+workspace destination. Failed/cancelled tasks retain their separate, explicit
+new-note link; returning never invokes it. Destinations are fixed application
+paths, not browser history, referrers or supplied return URLs. Exact job,
+revision and status-check links remain unchanged.
+
+Browser verification found the adjacent draft header still linked back to the
+composer and downgraded Traditional Chinese to English on Logo return. Both
+draft-header exits now use the same localized workspace destination, including
+content-free and invalid-ID states. The return controls keep the existing green
+style, have a visible keyboard focus ring and a 44px minimum target. No save,
+edit, review, export, auth or Points logic changes.
+
+The formal legacy workspace and data/feature bindings remain unchanged. The
+complete three-locale task/list destination is still wired only by the owned
+`--workspace-task` fixture; preserving `lang=zh-Hant` in these links does not
+translate or activate the formal legacy workspace. This is navigation work,
+not multi-task catalog, provider or five-Note launch completion.
+
+Verification:
+
+- 45 new view tests cover three languages, all job states, saved/content-free
+  drafts, invalid IDs, exact task/revision links and distinct new-note actions.
+  Full suite: **4,896 passed / 12 skipped**, 294 files (293 passed / one skipped).
+  Zero-warning lint, TypeScript/build, 64 static pages, 32-chunk client boundary
+  and 73-file adapter checks passed.
+- Both independent browser runs passed the existing 66-scenario local database
+  preflight (54 review/history/edit plus 12 admission/task). No new SQL, grants,
+  migrations or harness mode was added; the prior 98-scenario matrix remains
+  earlier evidence, not a newly rerun matrix in this slice.
+- Initial run checked English return, Simplified Logo return, Traditional task
+  return and discovered the draft-header inconsistency. After fixing it, a
+  fresh run proved actual admission with lost acknowledgement → workspace →
+  same task → synthetic success → exact saved draft → Traditional workspace
+  via return link → reopen current draft → workspace via Logo → task → revoke
+  session → return → sign-in with no private content. No test-control detour
+  was needed within that final task/draft/workspace loop.
+- Final run task `d72d0ee9-74ab-4124-88d9-27a4b0246d5f`, document
+  `b55361fd-b17c-4dd8-8f9d-9aca12474da6`: **one admission/job/RESERVE/COMMIT,
+  10 available / 0 reserved**, zero review events/export reports. The generated
+  draft still required self-review and TXT stayed disabled. Navigation caused
+  no extra save, generation or settlement. No real human-review, provider,
+  native offline or mobile viewport claim is made.
+- Inspected pages had no warning/error logs. Security Advisors on each exact
+  owned Unix socket found no issues. `/private/tmp/cl-job-browser-Vc0JxL` and
+  `/private/tmp/cl-job-browser-t9ejwJ` were stopped, removed and checked absent;
+  port 3395 was released. Only the two owned browser tabs were closed. No push,
+  deployment, Hosted/Production mutation, real data, AI or payment operation.
+
+Impeccable guidance kept the committed identity and consistent return action;
+Next/React/browser guidance required actual navigation and unchanged private
+read boundaries. Supabase guidance preserved fresh session checks.
+
+**Next bounded implementation:** build an owner-isolated, minimal-metadata
+multi-task list contract and read path to replace the single-candidate fixture
+entry. Develop and verify locally with synthetic data first; no Hosted grants,
+activation, deployment or AI calls are implied. Other Note types and billing
+remain unfinished.

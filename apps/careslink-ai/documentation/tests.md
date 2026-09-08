@@ -4812,6 +4812,23 @@ See [full-flow scope and remaining real-admission gate](communication-note-produ
   Advisors passed. Both owned roots and the dedicated tab were cleaned.
 - [Implementation limits, readback and next navigation slice](communication-note-product-integration-m1y.md#communication-note-in-progress-task-workspace-entry-2026-09-08).
 
+### Communication Note workspace navigation gate (2026-09-08)
+
+- Task and draft Logo/return links now target the fixed same-language workspace,
+  including unresolved/invalid-ID states. The explicit new-note action remains
+  separate; exact task/revision links and all writes are unchanged.
+- 45 new view cases passed. Full **4,896 passed / 12 skipped**, 294 files;
+  typecheck/build, zero-warning lint, 64 static pages, 32-chunk boundary and
+  73-file adapter checks passed. Existing local database preflight: 66 scenarios
+  per independent run, with no new schema, permission or harness mode.
+- Browser: lost admission reply → workspace → task → synthetic success → exact
+  draft → return → reopen current draft → Logo/workspace → task → revoked-session
+  return → sign-in. Traditional locale is retained. Final ledger remains one
+  job/reserve/commit and 10/0; self-review required, TXT disabled, zero reports.
+- Both owned roots/tabs were cleaned. Local security Advisors found no issues.
+  No Hosted activation, real provider, human review or native offline claim.
+- [Navigation evidence and next multi-task read slice](communication-note-product-integration-m1y.md#communication-note-workspace-navigation-loop-2026-09-08).
+
 ### Current live/read-only evidence
 
 - Supabase migrations, tables, RLS flags, policies, grants, function grants and aggregate row counts were checked read-only.
