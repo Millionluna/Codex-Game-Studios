@@ -105,8 +105,13 @@ legacy `DOWNLOADED`/`SHARED` or saved-file receipts. History failure does not
 change the export result or automatically retry/re-export. Its private GET/POST
 route remains hard-off without a dedicated trusted binding; only the owned
 synthetic fixture installs a process-memory binding and labels that limitation.
-There is no durable history database installation or browser-persistent cache.
+An uninstalled durable read/write candidate now passes real disposable local
+PostgreSQL tests, including ownership/session checks and concurrent replay.
+Its private RLS table and private definer remain outside the approved migration
+manifest; API roles receive no candidate grants. There is no retained database
+installation, durable browser roundtrip or browser-persistent cache.
 See the [local history evidence](communication-note-product-integration-m1y.md#communication-note-revision-bound-export-history-local-slice-2026-09-08).
+See also the [durable candidate evidence](communication-note-product-integration-m1y.md#communication-note-durable-export-history-candidate-2026-09-08).
 
 The bounded native Safari synthetic gate passed real cross-app paste and actual
 TXT/DOCX/PDF saving/opening. DOCX opened in TextEdit, not Microsoft Word. See the
@@ -121,7 +126,8 @@ The schema draft separates `export_jobs` from append-only `export_events`, binds
 All export paths must bind to a specific revision and shared renderer/template
 version. The local Communication Note Record copy already excludes privacy
 findings, internal facts analysis, Points and model metadata; external copies
-are static snapshots and never sync changes back. Durable event history,
+are static snapshots and never sync changes back. Durable event history browser
+integration and separately gated activation,
 bilingual/historical/batch exports, artifact delivery controls and App Share
 Sheet integration remain separate work. A browser's download-start result must
 not be represented as proof that the user saved a file.

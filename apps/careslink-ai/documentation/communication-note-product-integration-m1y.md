@@ -1762,3 +1762,97 @@ session, revision/review, deletion and idempotent replay/concurrency. Keep the
 formal route hard-off until its separate activation gate. Microsoft Word,
 native discard-confirmation navigation and real Offline/Online remain unpassed;
 this slice does not close those gates or implement the other Note applications.
+
+## Communication Note durable export history candidate (2026-09-08)
+
+Implemented a dedicated durable read/write adapter and CLI-generated candidate
+`20260908014022_add_communication_note_export_history_shadow.sql` on top of
+`6dbd49b`. The candidate remains in `supabase/migration-candidates`, not the
+approved migration manifest. **Both formal HTTP handlers remain unbound.**
+No retained database, Preview/Production project, AI model or Points was used.
+
+### Storage and authorization
+
+- `careslink_communication_history.reports` is a private, RLS-enabled table
+  with exactly 12 columns: owner, attempt, document, revision, revision number,
+  format, outcome, device start time, server record time, template, profile and
+  shadow marker. No body, facts, translation, filename, file URL or raw error is
+  stored. A composite owner/attempt primary key deduplicates reports across
+  documents; the revision read index matches owner/document/revision and
+  descending server time/attempt ID. Document/revision deletion cascades remove
+  dependent reports; tombstoned documents cannot serve existing history.
+- The private definer uses an isolated NOLOGIN/NOINHERIT/NOBYPASSRLS executor
+  and empty `search_path`. Metadata-only column grants cannot read revision
+  content or privacy proofs, and there are no direct Auth, Points or legacy
+  artifact-table grants. Document/flag UPDATE column permissions permit row
+  locks only; `WITH CHECK(false)` prevents mutation. Reports are append-only
+  for this executor, with no UPDATE/DELETE/TRUNCATE privilege.
+- Two public invoker-only facades expose the narrow record/list signatures but
+  receive **no API-role execution grant**. The candidate grants no private
+  schema usage or executor membership to application callers. All local caller
+  capabilities used by the tests were temporary and removed with the cluster.
+- Record, list and replay share active verified Provider/session checks, then
+  locked independent history/mobile-sync switches and an owner-bound document
+  SHARE lock. A transaction-scoped owner/attempt advisory lock serializes
+  competing reports; the unique key remains authoritative. Expiry and session
+  validity are checked with wall-clock time again after possible waits and
+  before returning. Edits, review changes and deletion serialize through the
+  existing document lock convention; application callers cannot directly append
+  review events or change the document pointer.
+- Writes require the exact current revision and its latest confirmed review,
+  including on replay. Changed format/outcome/device time or document/revision
+  reuse of an attempt fails. Historical metadata reads do not require or grant
+  permission to re-export the old version. Readback uses one bounded 21-row
+  snapshot to return the latest 20 and `hasMore`, sorted by server time rather
+  than the untrusted device clock. Template/profile/revision number and record
+  time are assigned server-side; only browser-reported outcomes are claimed.
+- The server-only adapter requires a dedicated disabled-by-default capability,
+  existing durable Product API gate and exact non-Production Preview target.
+  It uses one request-scoped verified Cookie client for auth/session/RPC, never
+  owner/session body parameters, generic document-write authority, service-role
+  fallback or automatic retry. A lost/aborted receipt remains uncertain.
+
+### Verification and limits
+
+- **123 focused tests** passed, including 42 new durable adapter cases; final
+  full regression **4,632 passed / 12 skipped**, 286 files (285 passed / 1
+  skipped). The exact current-session importer inventory was updated for this
+  one uninstalled module, without broadening the allowed import pattern.
+  Final TypeScript, zero-warning lint, 64/64-page webpack build, strengthened
+  116-chunk client-boundary scan, 73-file adapter check and `git diff --check`
+  all passed.
+- The fixed `--history` runner passed **35 real local PostgreSQL 16 scenarios**
+  (14 dependency regressions, 21 history groups): non-superuser candidate DDL,
+  defaults/ACLs/RLS/column grants, independent committed readback, concurrent
+  first submission/cross-document collision, altered replay, rollback, all
+  format/outcome pairs, foreign owner, type/lifecycle/revision, review reset,
+  active Provider/session and forged user-metadata rejection, latest-20 order,
+  index eligibility and expiry/revocation/edit/deletion lock races. Reads and
+  writes both held session, switch and lifecycle locks until commit. Unrelated
+  revisions, review events, sync receipts, Points and generation jobs were
+  unchanged by the history operations.
+- Supabase CLI 2.115.0 local security advisors returned `results: []`. The
+  migration was generated with `supabase migration new`, moved out of active
+  migrations before editing and applied transactionally only in the disposable
+  fixture. No migration-history record or Hosted manifest was changed.
+- An initial test-only column-count assertion stopped the first run; it was
+  replaced with an exact column-name assertion. The failed cluster
+  `/private/tmp/cl-export-history-To6HDW` and complete passing cluster
+  `/private/tmp/cl-export-history-258NVC` both stopped and were removed; exact
+  directory absences were independently verified. No TCP listeners or caller-
+  supplied database targets were accepted. Only disposable synthetic data and
+  roles were removed; existing files and databases were untouched.
+- Supabase guidance drove explicit grants/RLS separation and the private
+  definer boundary; PostgreSQL guidance drove lock order and composite indexing.
+  Relevant official references were checked: [function security](https://supabase.com/docs/guides/database/functions),
+  [grant changes](https://supabase.com/changelog/45329-breaking-change-tables-not-exposed-to-data-and-graphql-api-automatically)
+  and [PG16 locking](https://www.postgresql.org/docs/16/explicit-locking.html).
+  Next.js guidance added client-bundle exclusion checks for the history RPC
+  names and enable flag. No page, visual identity or browser flow changed.
+
+This proves an uninstalled durable candidate on real local PostgreSQL, not
+Hosted Auth/PostgREST/TLS, a retained schema, cross-device history or a complete
+browser-to-durable-history flow. **Next:** bind the existing export UI to this
+candidate only inside an owned disposable local database fixture, and verify
+export → durable report → refresh/readback plus denied-access handling. Keep
+formal routes hard-off and do not promote or deploy as part of that local gate.

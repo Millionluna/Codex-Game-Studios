@@ -1294,6 +1294,8 @@ describe("V1 shadow runtime boundary", () => {
       [
         // Dedicated, default-off writer candidate; no formal route importer.
         join(process.cwd(), "src/lib/communication-note-edit-durable.server.ts"),
+        // Dedicated history read/write candidate; both formal routes stay unbound.
+        join(process.cwd(), "src/lib/communication-note-export-history-durable.server.ts"),
         // Fixed, server-only loopback fixture; no additional product importer.
         join(
           process.cwd(),

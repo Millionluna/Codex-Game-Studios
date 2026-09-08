@@ -49,6 +49,11 @@ const forbiddenMarkers = [
   "Job status managed custody unavailable",
   "Job status credential custody unavailable",
   "careslink-preview-runtime-credential-broker-management",
+  // Dedicated export-history persistence is never a browser capability.
+  "CARESLINK_COMMUNICATION_NOTE_EXPORT_HISTORY_ENABLED",
+  "record_communication_note_export_report",
+  "list_communication_note_export_reports",
+  "careslink_communication_history_executor",
 ];
 
 if (!existsSync(buildIdPath) || !existsSync(chunksRoot)) {

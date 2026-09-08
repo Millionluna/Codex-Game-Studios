@@ -9,12 +9,14 @@ import pg from "pg";
 
 import { verifySelfReviewScenarios as verifyScenarios } from "./communication-note-self-review-local-scenarios.mjs";
 import { verifyWordingEditScenarios } from "./communication-note-edit-local-scenarios.mjs";
+import { verifyExportHistoryScenarios } from "./communication-note-export-history-local-scenarios.mjs";
 
 // This fixture cannot accept an existing database, URL, role or filesystem target.
 // It tests PostgreSQL lock semantics, not hosted Supabase ownership/ACLs or TLS.
 const edit = process.argv.length === 3 && process.argv[2] === "--edit";
-const TEMP_PREFIX = edit ? "/private/tmp/cl-wording-edit-" : "/private/tmp/cl-self-review-";
-const CLUSTER_NAME = edit ? "careslink-wording-edit-local-pg16" : "careslink-self-review-local-pg16";
+const history = process.argv.length === 3 && process.argv[2] === "--history";
+const TEMP_PREFIX = history ? "/private/tmp/cl-export-history-" : edit ? "/private/tmp/cl-wording-edit-" : "/private/tmp/cl-self-review-";
+const CLUSTER_NAME = history ? "careslink-export-history-local-pg16" : edit ? "careslink-wording-edit-local-pg16" : "careslink-self-review-local-pg16";
 const PORT = 15437; // Private per-run Unix socket only; no TCP listener.
 const execFileAsync = promisify(execFile);
 const childEnv = { PATH: "/usr/bin:/bin", LANG: "C", LC_ALL: "C" };
@@ -68,7 +70,7 @@ async function main() {
   process.once("SIGINT", interrupt);
   process.once("SIGTERM", interrupt);
   try {
-    assert.ok(process.argv.length === 2 || edit);
+    assert.ok(process.argv.length === 2 || edit || history);
     const bin = await findPg16();
     root = await mkdtemp(TEMP_PREFIX);
     assert.equal(await realpath(root), root);
@@ -141,6 +143,13 @@ async function main() {
       stage = "wording-edit-regressions";
       await verifyWordingEditScenarios(owner, await connect(), await connect(), scenarios,
         (name) => { scenario = name; });
+    }
+    if (history) {
+      stage = "export-history-regressions";
+      await verifyExportHistoryScenarios(owner, await connect(), await connect(), scenarios,
+        (name) => { scenario = name; });
+    }
+    if (edit || history) {
       stage = "local-security-advisors";
       // Fixed local target only. No --linked, project ref or external URL.
       try {
@@ -176,7 +185,7 @@ async function main() {
         stopped = !bootstrapMayBeRunning;
       }
       if (root && stopped) {
-        assert.match(root, /^\/private\/tmp\/cl-(?:self-review|wording-edit)-[a-zA-Z0-9]{6}$/u);
+        assert.match(root, /^\/private\/tmp\/cl-(?:self-review|wording-edit|export-history)-[a-zA-Z0-9]{6}$/u);
         assert.equal(await realpath(root), root);
         assert.equal((await lstat(root)).isDirectory(), true);
         await rm(root, { recursive: true }); // Only this run's mkdtemp directory, after exit proof.
@@ -191,7 +200,7 @@ async function main() {
   }
   const ok = !failure && stopped && removed;
   process.stdout.write(`${JSON.stringify({
-    stage: ok ? edit ? "local-wording-edit-verification" : "local-self-review-verification" : stage,
+    stage: ok ? history ? "local-export-history-verification" : edit ? "local-wording-edit-verification" : "local-self-review-verification" : stage,
     ok, postgresMajor: 16, syntheticOnly: true, hostedVerified: false,
     scenarios, ...(ok ? {} : { failedScenario: scenario }),
     ...(advisors ? { advisors } : {}),
