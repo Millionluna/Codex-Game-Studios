@@ -1,10 +1,10 @@
 import { readFileSync } from "node:fs";
 import { afterEach,beforeEach,describe,expect,it,vi } from "vitest";
-const state=vi.hoisted(()=>({binding:vi.fn(),read:vi.fn(),review:vi.fn(),history:vi.fn()}));
+const state=vi.hoisted(()=>({binding:vi.fn(),read:vi.fn(),review:vi.fn(),history:vi.fn(),edit:vi.fn()}));
 vi.mock("server-only",()=>({}));
 vi.mock("./communication-note-admission.fixture",()=>({assertAdmissionFixture:()=>"/private/tmp/cl-job-browser-abc123"}));
 vi.mock("./communication-note-settlement.fixture",()=>({readSettlementResultBinding:state.binding}));
-vi.mock("./communication-note-self-review.fixture",()=>({readReviewDatabaseDocument:state.read,confirmReviewDatabaseDocument:state.review,handleDatabaseExportHistory:state.history}));
+vi.mock("./communication-note-self-review.fixture",()=>({readReviewDatabaseDocument:state.read,confirmReviewDatabaseDocument:state.review,handleDatabaseExportHistory:state.history,saveEditDatabaseDocument:state.edit}));
 import {handleSettledReview} from "./communication-note-settled-review.fixture";
 const DOC="99999999-9999-4999-8999-999999999999",REV="22222222-2222-4222-8222-222222222222";
 const base="/api/ai-documents/communication-note/documents/"+DOC;
@@ -15,7 +15,8 @@ beforeEach(()=>{
   vi.clearAllMocks();vi.stubEnv("CARESLINK_LOCAL_SETTLEMENT_DATABASE","OWNED_UNIX_SOCKET_ONLY");
   vi.stubEnv("CARESLINK_LOCAL_HISTORY_DATABASE","OWNED_UNIX_SOCKET_ONLY");vi.stubEnv("CARESLINK_LOCAL_SETTLED_REVIEW","EXACT_SETTLED_RESULT_ONLY");
   state.binding.mockResolvedValue({canonicalId:DOC,revisionId:REV});
-  for(const fn of [state.read,state.review,state.history]) fn.mockImplementation(async()=>Response.json({status:"AVAILABLE"}));
+  vi.stubEnv("CARESLINK_LOCAL_SETTLED_EDIT","");vi.stubEnv("CARESLINK_LOCAL_EDIT_DATABASE","");
+  for(const fn of [state.read,state.review,state.history,state.edit]) fn.mockImplementation(async()=>Response.json({status:"AVAILABLE"}));
 });
 afterEach(()=>vi.unstubAllEnvs());
 describe("exact settled result review/history bridge",()=>{
@@ -51,8 +52,31 @@ describe("exact settled result review/history bridge",()=>{
     expect(runner).not.toContain("communication-note-settled-review.database.mjs");
     expect(runner).toContain('settledReview ? "SETTLEMENT_REVIEW"');
     const fixture=readFileSync(new URL("./communication-note-settled-review.fixture.ts",import.meta.url),"utf8");
-    expect(fixture).not.toMatch(/PASSWORD|new Client|settlementSql|globalThis|saveEditDatabaseDocument/);
+    expect(fixture).not.toMatch(/PASSWORD|new Client|settlementSql|globalThis/);
     const database=readFileSync(new URL("./communication-note-self-review.database.mjs",import.meta.url),"utf8");
     expect(database).toContain('edit = mode === "EDIT" || mode === "HISTORY"');
+  });
+});
+describe("settled-document editing opt-in",()=>{
+  const enable=()=>{vi.stubEnv("CARESLINK_LOCAL_SETTLED_EDIT","EXACT_SETTLED_DOCUMENT_ONLY");vi.stubEnv("CARESLINK_LOCAL_EDIT_DATABASE","OWNED_UNIX_SOCKET_ONLY");};
+  it.each(["CARESLINK_LOCAL_SETTLED_EDIT","CARESLINK_LOCAL_EDIT_DATABASE"])("requires both edit guards, not only %s",async name=>{
+    enable();vi.stubEnv(name,"");expect((await handleSettledReview(request("/revisions","POST"),DOC)).status).toBe(404);expect(state.edit).not.toHaveBeenCalled();
+    expect((await handleSettledReview(request("?revisionId="+DOC),DOC)).status).toBe(404);expect(state.read).not.toHaveBeenCalled();
+  });
+  it("passes the original edit body to the existing bounded-parser/auth writer",async()=>{
+    enable();const r=request("/revisions","POST");expect((await handleSettledReview(r,DOC)).status).toBe(200);
+    expect(state.edit).toHaveBeenCalledWith(r,DOC);expect(r.bodyUsed).toBe(false);
+  });
+  it.each(["","/export-history"])("uses real revision-membership checks for %s",async suffix=>{
+    enable();const r=request(suffix+"?revisionId="+DOC),handler=suffix?state.history:state.read;
+    handler.mockResolvedValue(Response.json({status:"NOT_FOUND"},{status:404}));expect((await handleSettledReview(r,DOC)).status).toBe(404);
+    expect(handler).toHaveBeenCalledWith(r,DOC);
+  });
+  it("keeps another document inaccessible even with editing enabled",async()=>{
+    enable();state.binding.mockResolvedValue({canonicalId:REV,revisionId:REV});
+    expect((await handleSettledReview(request("/revisions","POST"),DOC)).status).toBe(404);expect(state.edit).not.toHaveBeenCalled();
+  });
+  it.each([401,409])("preserves revoked/stale edit responses %s",async status=>{
+    enable();state.edit.mockResolvedValue(new Response(null,{status}));expect((await handleSettledReview(request("/revisions","POST"),DOC)).status).toBe(status);
   });
 });

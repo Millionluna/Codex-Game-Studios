@@ -2263,3 +2263,71 @@ then verify a new version requires a new self-review and retains the old
 version's separate export history. Keep synthetic inputs, AI calls off and
 formal activation closed. Real provider/vault integration, remaining Note types
 and billing are not completed by this local flow.
+
+## Communication Note settled draft wording edit and version history integration (2026-09-08)
+
+The opt-in `--settlement-edit` continues the actual newly settled local draft
+through the existing wording editor. The original `--settlement` and
+`--settlement-review` modes retain their narrower routes. No formal product
+route, green component/Logo, SQL migration/candidate or Hosted activation changes.
+
+### Implementation and scope
+
+- Two independent edit guards enable the existing revisions POST adapter and
+  wording-edit capability only in the owned disposable database. The untouched
+  request still passes the existing bounded parser, fresh session/owner checks
+  and transaction-level base-revision/idempotency checks. Terminal authority
+  remains parent/stdin-only, outside Next.
+- The exclusive mode-0600 result binding still identifies only the actual newly
+  settled document. Edit mode allows selection of its later revisions; the
+  existing document projection and history SQL validate revision membership.
+  No result metadata is rewritten and no caller-selected document is exposed.
+- Saving changes only the three wording fields, appends one revision and
+  requires a new self-review. Source facts, privacy binding and the old revision
+  stay unchanged. The generation job remains anchored to its original version,
+  including after a terminal receipt replay following the edit.
+
+### Verification
+
+`--settlement-edit-check` passed **89 real local database scenarios**: 14 review,
+21 history, 19 existing edit, 8 admission, 9 terminal, 9 settled-review and 9 new
+settled-edit cases. The extension covers exact edit replay, changed replay and
+stale-base denial; unchanged facts/original version; fresh review required;
+separate version histories; foreign/revoked denial; and terminal replay without
+extra Points, jobs or documents. The actual document ends with two revisions,
+two review events and one export report per revision.
+
+An independent production-built browser fixture completed fixed admission,
+lost-response recovery and successful settlement. Version 1 was test-reviewed
+and a TXT download initiated. The unchanged editor saved the fixed English,
+Simplified and Traditional Chinese wording as version 2. All four export buttons
+were disabled again and the new version's history was empty. Opening version 1
+showed its original wording and its one TXT report, with historical editing and
+export still unavailable. Returning to version 2 required three fresh simulated
+confirmations; TXT initiation then added only a version-2 report. Full reload
+preserved the new wording/review, and history refresh restored that same report.
+
+Final browser observations: **1 job, 1 RESERVE, 1 COMMIT, 10 available / 0
+reserved**, two review events and exactly one `DOWNLOAD_INITIATED` TXT report
+for each version. Editing and terminal replay added no charge. Revoking the
+synthetic session and reloading showed sign-in with private content removed.
+Verified loaded pages had no warning/error logs. These are simulated test-user
+confirmations and browser initiation reports, not a real person's review,
+professional approval or confirmed OS file saving/opening. No AI was called.
+
+Eight new bridge tests passed (28 in the file); the full suite passed **4,739 /
+12 skipped** across 290 files (289 passed / 1 skipped). Typecheck, zero-warning
+lint, 64/64-page Turbopack build, 32-chunk client-boundary scan and 73-file adapter
+check passed. Local Unix-socket security Advisors returned no findings. Owned
+`/private/tmp/cl-job-browser-5YtpkI` and `cl-job-browser-Mty6tL` were stopped,
+removed and independently checked absent; port 3395 had no listener. Only the
+owned browser tab was closed. No push, deployment or Hosted/Production mutation
+occurred. Supabase/Postgres guidance preserved temporary narrow permissions and
+short transactions; Next/browser guidance preserved the server-only boundary
+and required actual save, version navigation and reload/access checks.
+
+**Next bounded implementation:** connect a document-list/revisit entry for this
+locally saved draft so it can be found and reopened after leaving the result
+page. Preserve the green design, synthetic inputs and no-AI/local-only boundary.
+Formal edit/history activation, real provider/vault integration, the remaining
+Note types and billing remain separate work; this is not a five-Note launch gate.

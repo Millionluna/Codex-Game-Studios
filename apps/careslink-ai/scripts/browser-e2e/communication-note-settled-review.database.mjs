@@ -4,7 +4,8 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { readFile, realpath } from "node:fs/promises";
 
-export async function verifySettledReviewScenarios(owner, actor, root, terminal) {
+export async function verifySettledReviewScenarios(owner, actor, root, terminal, verifyEdits=false) {
+  assert.equal(typeof verifyEdits,"boolean");
   assert.match(root,/^\/private\/tmp\/cl-job-browser-[a-zA-Z0-9]{6}$/u);
   assert.equal(await realpath(root),root);
   const {canonicalId:doc,revisionId:rev}=JSON.parse(await readFile(root+"/settlement-result.json","utf8"));
@@ -13,6 +14,7 @@ export async function verifySettledReviewScenarios(owner, actor, root, terminal)
     [{role:"cl_review_browser_runtime",unix_only:true}]);
   const before=await terminal.observe();
   const sql={read:"select public.get_v1_shadow_document($1) as data",
+    edit:"select public.save_communication_note_wording($1,$2,$3::jsonb) as data",
     review:"select public.confirm_communication_note_self_review($1,$2,$3,true,true,true) as data",
     list:"select public.list_communication_note_export_reports($1,$2) as data",
     report:"select public.record_communication_note_export_report($1,$2,$3::jsonb) as data"};
@@ -75,4 +77,66 @@ export async function verifySettledReviewScenarios(owner, actor, root, terminal)
     assert.equal((await owner.query("select count(*)::int as n from careslink_communication_history.reports where document_id=$1",[doc])).rows[0].n,1);
   });
   console.log(JSON.stringify({stage:"settled-review-matrix",passed,reviewEvents:1,historyReports:1,pointsUnchanged:true,actualFileExport:false}));
+  if(!verifyEdits) return;
+  const editStart=passed, editKey=randomUUID(), newReviewKey=randomUUID(), newReportKey=randomUUID();
+  const original=initial.revisions.find(r=>r.revisionId===rev);
+  const command={baseRevisionId:rev,englishDraft:"Synthetic wording edit, version two. No AI model was called.",
+    reviewVersions:{"zh-Hans":"合成措辞修改，第二版。","zh-Hant":"合成措辭修改，第二版。"},wordingConfirmed:true};
+  const editArgs=[doc,editKey,JSON.stringify(command)];
+  let ack,newRev,newReport;
+  await scenario("edit:settled-draft-saves-one-new-revision",async()=>{
+    ack=await call("edit",editArgs);newRev=ack.revisionId;
+    assert.equal(ack.status,"SAVED");assert.equal(ack.revisionNumber,2);assert.equal(ack.baseRevisionId,rev);
+    assert.equal(ack.selfReviewStatus,"REQUIRED");assert.notEqual(newRev,rev);
+  });
+  await scenario("edit:exact-replay-and-stale-base-denial",async()=>{
+    assert.deepEqual(await call("edit",editArgs),ack);
+    await denied(call("edit",[doc,editKey,JSON.stringify({...command,englishDraft:"Changed replay"})]),"INVALID_REQUEST");
+    await denied(call("edit",[doc,randomUUID(),JSON.stringify(command)]),"STALE_REVISION");
+  });
+  await scenario("edit:new-review-required-original-facts-and-history-preserved",async()=>{
+    const d=await call("read",[doc]),selected=d.revisions.find(r=>r.revisionId===newRev);
+    assert.equal(d.document.currentRevisionId,newRev);assert.equal(d.selfReviewStatus,"REQUIRED");assert.equal(d.revisions.length,2);
+    assert.deepEqual(d.revisions.find(r=>r.revisionId===rev),original);
+    assert.deepEqual(selected.content,{...original.content,englishDraft:command.englishDraft,reviewVersions:command.reviewVersions});
+    assert.equal(selected.privacyReviewId,original.privacyReviewId);
+    assert.deepEqual((await call("list",[doc,rev])).entries,[receipt.entry]);
+    assert.deepEqual((await call("list",[doc,newRev])).entries,[]);
+  });
+  await scenario("edit:old-review-and-export-replays-cannot-authorize-new-version",async()=>{
+    await denied(call("review",reviewArgs),"STALE_REVISION");
+    await denied(call("report",reportArgs),"STALE_REVISION");
+    await denied(call("report",[doc,newReportKey,JSON.stringify({...report,revisionId:newRev})]),"REVIEW_REQUIRED");
+  });
+  await scenario("edit:fresh-review-and-report-record-once",async()=>{
+    const args=[doc,newRev,newReviewKey],first=await call("review",args);
+    assert.equal(first.status,"CONFIRMED");assert.deepEqual(await call("review",args),first);
+    const next=[doc,newReportKey,JSON.stringify({...report,revisionId:newRev})];
+    newReport=await call("report",next);assert.equal(newReport.status,"RECORDED");assert.deepEqual(await call("report",next),newReport);
+  });
+  await scenario("edit:both-version-histories-stay-separated",async()=>{
+    assert.deepEqual((await call("list",[doc,rev])).entries,[receipt.entry]);
+    assert.deepEqual((await call("list",[doc,newRev])).entries,[newReport.entry]);
+    assert.equal(newReport.entry.revisionNumber,2);
+    await denied(call("list",[doc,"22222222-2222-4222-8222-222222222222"]),"NOT_FOUND");
+  });
+  await scenario("edit:foreign-and-revoked-replays-denied",async()=>{
+    await denied(call("edit",editArgs,true),"NOT_FOUND");
+    await owner.query("delete from auth.sessions where id=$1 and user_id=$2",[SESSION,OWNER]);
+    try {await denied(call("edit",editArgs),"AUTH_REQUIRED");}
+    finally {await owner.query("insert into auth.sessions(id,user_id) values($1,$2)",[SESSION,OWNER]);}
+  });
+  await scenario("edit:terminal-replay-keeps-original-generation-anchor",async()=>{
+    await terminal.run("settle-replay");
+    assert.deepEqual((await owner.query("select result_document_id,result_revision_id from careslink_v1_generation.jobs where status='SUCCEEDED' and owner_user_id=$1",[OWNER])).rows,
+      [{result_document_id:doc,result_revision_id:rev}]);
+  });
+  await scenario("edit:no-additional-points-jobs-documents-or-extra-versions",async()=>{
+    assert.deepEqual(await terminal.observe(),{...before,revisions:before.revisions+1});
+    assert.equal((await call("read",[doc])).selfReviewStatus,"CONFIRMED");
+    assert.deepEqual((await owner.query(`select
+      (select count(*)::int from public.self_review_events where document_id=$1) reviews,
+      (select count(*)::int from careslink_communication_history.reports where document_id=$1) reports`,[doc])).rows,[{reviews:2,reports:2}]);
+  });
+  console.log(JSON.stringify({stage:"settled-edit-matrix",passed:passed-editStart,revisions:2,reviewEvents:2,historyReports:2,pointsUnchanged:true}));
 }

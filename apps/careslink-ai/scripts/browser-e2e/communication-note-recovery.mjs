@@ -10,14 +10,15 @@ const app = fileURLToPath(new URL("../../", import.meta.url));
 const port = 3395, host = "127.0.0.1";
 const prefix = "/private/tmp/cl-job-browser-";
 const args = process.argv.slice(2);
-if (args.length > 1 || (args.length === 1 && !["--built", "--database-review", "--edit", "--database-edit", "--database-history", "--flow", "--admission", "--settlement", "--settlement-check", "--settlement-review", "--settlement-review-check"].includes(args[0]))) throw new Error("Use a fixed local fixture mode only");
-const settledReview = args[0] === "--settlement-review" || args[0] === "--settlement-review-check";
-const settlementCheck = args[0] === "--settlement-check" || args[0] === "--settlement-review-check";
+if (args.length > 1 || (args.length === 1 && !["--built", "--database-review", "--edit", "--database-edit", "--database-history", "--flow", "--admission", "--settlement", "--settlement-check", "--settlement-review", "--settlement-review-check", "--settlement-edit", "--settlement-edit-check"].includes(args[0]))) throw new Error("Use a fixed local fixture mode only");
+const settledEdit = args[0] === "--settlement-edit" || args[0] === "--settlement-edit-check";
+const settledReview = args[0] === "--settlement-review" || args[0] === "--settlement-review-check" || settledEdit;
+const settlementCheck = args[0] === "--settlement-check" || args[0] === "--settlement-review-check" || args[0] === "--settlement-edit-check";
 const settlement = args[0] === "--settlement" || settlementCheck || settledReview;
 const admission = args[0] === "--admission" || settlement;
 const flow = args[0] === "--flow";
 const databaseHistory = args[0] === "--database-history" || flow || settledReview;
-const databaseEdit = args[0] === "--database-edit" || (databaseHistory && !settledReview);
+const databaseEdit = args[0] === "--database-edit" || (databaseHistory && !settledReview) || settledEdit;
 const databaseReview = args[0] === "--database-review" || databaseEdit || admission;
 const built = args[0] === "--built" || databaseReview || args[0] === "--edit";
 const edit = args[0] === "--edit";
@@ -70,7 +71,7 @@ try {
   root = await mkdtemp(prefix);
   console.log(JSON.stringify({ stage: "browser-fixture-owned-root", root }));
   if (databaseReview) {
-    reviewDatabase = createReviewBrowserDatabase(root, settledReview ? "SETTLEMENT_REVIEW" : settlement ? "SETTLEMENT" : admission ? "ADMISSION" : databaseHistory ? "HISTORY" : databaseEdit ? "EDIT" : "REVIEW");
+    reviewDatabase = createReviewBrowserDatabase(root, settledEdit ? "SETTLEMENT_EDIT" : settledReview ? "SETTLEMENT_REVIEW" : settlement ? "SETTLEMENT" : admission ? "ADMISSION" : databaseHistory ? "HISTORY" : databaseEdit ? "EDIT" : "REVIEW");
     await reviewDatabase.start();
   }
   if (settlementCheck) { await reviewDatabase.verifySettlement(); await cleanup(); process.exit(0); }
@@ -233,7 +234,7 @@ export default async function AdmissionInstructions() { assertAdmissionFixture()
 <p>Only fixed synthetic facts. Starts with 30 synthetic Points; admission reserves 20. No welcome grant, purchase or actual charge.</p>
 <p>The first successful database admission deliberately returns an unavailable response. Use Retry on the composer: the same key must recover the same queued task without a second reservation.</p>
 <p>${settlement ? "The local operator can settle one queued job with fixed synthetic success, failure or cancellation, then replay it. No terminal authority is exposed over HTTP. Success consumes the reservation; failure/cancellation releases it. A successful result is authored synthetic test content, not AI output." : "Jobs stay queued: no worker, AI, payload encryption or result is exercised."} All local test data is deleted on shutdown.</p>
-${settledReview ? "<p>Only the newly settled draft can be self-reviewed and exported. Review and export history use real local PostgreSQL. Editing stays unavailable. Export reports describe browser actions, not confirmed file delivery. Review/export do not charge Points.</p>" : ""}
+${settledReview ? `<p>Only the newly settled draft can be self-reviewed and exported. Review and export history use real local PostgreSQL. ${settledEdit ? "Wording edits save a new version that requires a new self-review. The old version keeps its own export history. Editing does not charge Points. Use synthetic wording only." : "Editing stays unavailable."} Export reports describe browser actions, not confirmed file delivery. Review/export do not charge Points.</p>` : ""}
 <p role="status">{points.status==="AVAILABLE" ? "Available: "+points.availablePoints+" Points · Reserved: "+points.reservedPoints+" Points" : "Points unavailable"}</p>
 <dl>{Object.entries(ADMISSION_FACTS).map(([key,value])=><div key={key}><dt>{key}</dt><dd>{Array.isArray(value)?value.join("; "):value}</dd></div>)}</dl>
 <a href="/ai-documents/communication-note?lang=en">Start fixed English admission</a></main>; }`);
@@ -260,7 +261,7 @@ export { GET as POST };`);
     if (settlement) await emit("src/app/api/ai-documents/communication-note/documents/[documentId]/route.ts", `import { readSettlementDocument } from "@/lib/__settlement-fixture";
 export const dynamic="force-dynamic"; export const runtime="nodejs";
 export async function GET(request:Request,context:{params:Promise<{documentId:string}>}) {return readSettlementDocument(request,(await context.params).documentId);}`);
-    if (settledReview) for (const [suffix, methods] of [["", ["GET"]], ["/self-review", ["POST"]], ["/export-history", ["GET", "POST"]]]) {
+    if (settledReview) for (const [suffix, methods] of [["", ["GET"]], ["/self-review", ["POST"]], ["/export-history", ["GET", "POST"]], ...(settledEdit ? [["/revisions", ["POST"]]] : [])]) {
       await emit(`src/app/api/ai-documents/communication-note/documents/[documentId]${suffix}/route.ts`, `import { handleSettledReview } from "@/lib/__settled-review-fixture";
 export const dynamic="force-dynamic"; export const runtime="nodejs";
 ${methods.map(method => `export async function ${method}(request:Request,context:{params:Promise<{documentId:string}>}) {return handleSettledReview(request,(await context.params).documentId);}`).join("\n")}`);
@@ -290,7 +291,7 @@ ${methods.map(method => `export async function ${method}(request:Request,context
   if (stopped) process.exit(0);
   const completion = launch([...(built ? ["start"] : ["dev", "--webpack"]), "--hostname", host, "--port", String(port)]);
   console.log(JSON.stringify({ stage: "browser-fixture-start", root, url: `http://${host}:${port}`, built,
-    syntheticOnly: true, hostedVerified: false, databaseReview, databaseEdit, databaseHistory, flow, admission, settlement, settledReview }));
+    syntheticOnly: true, hostedVerified: false, databaseReview, databaseEdit, databaseHistory, flow, admission, settlement, settledReview, settledEdit }));
   if (reviewDatabase) {
     controls = createInterface({ input: process.stdin, crlfDelay: Infinity });
     let queue = Promise.resolve();

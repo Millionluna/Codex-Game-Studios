@@ -4752,6 +4752,26 @@ See [full-flow scope and remaining real-admission gate](communication-note-produ
   Formal routes, migrations, production and model/provider activation unchanged.
 - [Scope, exact-result boundary and next editing slice](communication-note-product-integration-m1y.md#communication-note-settled-draft-review-and-export-integration-2026-09-08).
 
+### Communication Note settled-draft wording edit/version gate (2026-09-08)
+
+- `node scripts/browser-e2e/communication-note-recovery.mjs --settlement-edit-check`
+  passed 89 real local database scenarios: 14 review, 21 history, 19 edit,
+  8 admission, 9 terminal, 9 settled-review and 9 settled-edit. New cases prove
+  exactly-once revision save, replay/stale/auth denials, unchanged source facts,
+  fresh review, separated histories and unchanged generation anchor/Points.
+- `--settlement-edit` browser run: actual new draft → version-1 simulated review
+  and TXT initiation → wording save as version 2 → required fresh review/empty
+  history → old version's original wording and report → version-2 review/TXT →
+  reload/readback. Each version has exactly one report. Revoked-session reload
+  clears private content; terminal replay adds no charge. Final Points: 10/0.
+  Human review, model output and OS file delivery are not attested.
+- Eight new tests; full **4,739 passed / 12 skipped**, 290 files. Typecheck,
+  zero-warning lint, 64-page build, 32-chunk client boundary, 73-file adapter
+  check and local security Advisors passed. Both owned roots and the dedicated
+  browser tab were cleaned; port 3395 had no listener. No formal route/schema,
+  green UI/Logo, Hosted, provider or Production activation changed.
+- [Scope, exact-document revision binding and next revisit entry](communication-note-product-integration-m1y.md#communication-note-settled-draft-wording-edit-and-version-history-integration-2026-09-08).
+
 ### Current live/read-only evidence
 
 - Supabase migrations, tables, RLS flags, policies, grants, function grants and aggregate row counts were checked read-only.

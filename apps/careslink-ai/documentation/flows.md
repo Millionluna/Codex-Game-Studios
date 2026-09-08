@@ -102,6 +102,21 @@ does not attest human content quality or OS file delivery. The separate
 `--settlement-review-check` runs 61 database scenarios and cleans its cluster.
 See [the settled-draft review/export evidence](communication-note-product-integration-m1y.md#communication-note-settled-draft-review-and-export-integration-2026-09-08).
 
+### Communication Note settled draft edit/version fixture (2026-09-08)
+
+The separate `--settlement-edit` mode adds wording edits for only that newly
+settled document: reviewed version 1 with its own TXT report → save new wording
+as version 2 → review required and exports disabled → fresh review → independent
+version-2 report. Historical navigation preserves version 1's original wording
+and report without carrying over review/export authority. Reload restores the
+new version's saved content/review; history refresh reads the same report.
+Existing parsers and SQL enforce ownership, revision membership, active session,
+base revision and replay. The generation job keeps its original version anchor;
+editing/review/export and terminal replay do not charge Points. The opt-in
+`--settlement-edit-check` proves 89 local database scenarios. All test data is
+deleted; formal activation, real model calls and OS delivery claims stay closed.
+See [the settled-draft editing evidence and next revisit entry](communication-note-product-integration-m1y.md#communication-note-settled-draft-wording-edit-and-version-history-integration-2026-09-08).
+
 ## 4. Save, history and delete
 
 ### Current flow
