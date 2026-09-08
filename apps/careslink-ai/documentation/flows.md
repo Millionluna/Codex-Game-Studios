@@ -253,11 +253,28 @@ can no longer read task lists. Actual page tests cover 25 distinct tasks across
 and revoked-session clearing. During locked-read navigation, the real backend
 and locks disappeared in ~480 ms; unlock/refresh recovered the new page.
 
-This changes only the owned fixture, not the formal binding or green UI. Its
-source password lasts for the fixture and is not revoked by a delivery deadline.
-Next is locally verified list-purpose credential issuance/revocation before any
-Hosted binding, not Production activation. See
+This historical checkpoint changed only the owned fixture, not the formal
+binding or green UI. Its fixture-lifetime password limitation is replaced by
+the following local credential slice, not by Hosted activation. See
 [owned integration evidence](communication-note-product-integration-m1y.md#communication-note-dedicated-task-port-in-the-local-workspace-2026-09-08).
+
+### Communication Note local single-use task credentials (2026-09-08)
+
+Owned Next read → private parent Unix issuer → fresh-session check → one new
+60-second/two-connection list LOGIN → actual source read + connection cleanup →
+NOLOGIN/password removal → exact owned-session termination → LOGIN removal +
+private revocation tombstone → only then release task metadata. Every refresh
+or page gets a distinct request/credential; duplicate delivery never returns a
+secret. Lost response or browser cancellation still triggers cleanup; an
+independent expiry timer handles abandonment while the parent remains alive.
+Uncertain cleanup withholds data and closes further issuance for that fixture.
+
+The built page passed 20/5 pagination, three locales, cancellation/recovery and
+session-revocation clearing, ending with seven REVOKED receipts and no active
+task roles/connections/locks. The formal binding is still undefined. Next is a
+typed default-off server lease adapter, not copying the local database operator
+into the app. Managed custody, crash/restart cleanup, Hosted grants and live AI
+remain separate. See [local lifecycle evidence](communication-note-product-integration-m1y.md#communication-note-local-single-use-task-credentials-2026-09-08).
 
 ## 4. Save, history and delete
 

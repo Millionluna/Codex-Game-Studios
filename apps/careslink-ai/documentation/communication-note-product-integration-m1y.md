@@ -3036,3 +3036,92 @@ revoke it. Implement and locally verify task-list-specific single-use credential
 issuance/revocation before considering a formal or Hosted binding. Do not reuse
 the status purpose's authority or treat these UI tests as all-five-Note launch
 approval. Production and real AI generation remain out of scope.
+
+### Communication Note local single-use task credentials (2026-09-08)
+
+The previous fixture-lifetime task password is replaced in `--workspace-task`.
+The owned parent now runs `communication-note-task-credential.database.mjs` on
+one private, mode-0600 Unix socket inside its mode-0700 temporary directory. The
+Next copy receives only a fixture-scoped IPC capability, not a bootstrap client
+or reusable task database password. Only fixed issue/revoke operations, bounded
+JSON and the two synthetic Cookie identities are accepted. The issuer attests
+the exact owned PG16 data directory, cluster, no TCP listener and bootstrap
+identity before changing anything. It rechecks real provider/session state on
+issuance; no status-purpose membership or generic SQL endpoint is added.
+
+Each execution uses a random request ID, gets one new list-only LOGIN with a
+60-second password/delivery expiry and connection limit two (reader + independent
+cleanup observer), runs the actual existing physical source port, then revokes
+before returning metadata. A private RLS-enabled table contains issuance and
+revocation tombstones but no passwords. Concurrent or later duplicate delivery
+IDs never replay a secret. Limits are four active leases, eight pending IPC
+requests and 512 receipts per disposable run; these are fixture guardrails, not
+production capacity or availability policy.
+
+Revocation commits NOLOGIN, password removal and membership revocation first,
+terminates only the receipt's exact owned role/OID sessions, verifies absence,
+then drops that LOGIN and records REVOKED. Successful read data is withheld if
+the matching receipt is missing, malformed, late after abort, or uncertain.
+Lost issuance replies are cleaned using the already known request ID; an
+independent monotonic expiry timer also covers abandoned consumers. A failed
+cleanup of an owned lease stops further issuance. Repeating a confirmed revoke
+is safe and does not reissue the credential. PostgreSQL password expiry is not
+session termination; both are tested separately in this implementation. See
+[PostgreSQL CREATE ROLE](https://www.postgresql.org/docs/16/sql-createrole.html)
+and [ALTER ROLE](https://www.postgresql.org/docs/16/sql-alterrole.html).
+
+Verification:
+
+- Full **5,148 passed / 34 skipped**, 304 files (301 passed, three opt-in files).
+  The bridge now has 18 tests; bridge + workspace projection: **44 passed**.
+  TypeScript, zero-warning full lint, formal webpack build (63 generated
+  entries), formal/owned client boundaries (117/39 chunks), 73-file adapter
+  sync and diff checks passed. No formal application source, TSX or migration
+  changed. The new marker scan covers the IPC capability/socket/private table.
+- Explicit `CARESLINK_TASK_CREDENTIAL_LOCAL=OWNED_UNIX_ONLY` real-PG suite:
+  **10 passed**, with the existing **118** setup/settlement/catalog scenarios.
+  Covers exact source reads, one-delivery concurrent replay, wrong scope and
+  identity, true Auth-session expiry, capacity, least privilege, old-password
+  denial, two-session termination/zero locks with an unrelated live canary,
+  actual blocked-read cancellation, and real 60-second abandoned-consumer
+  expiry. Deliberate DROP dependency failure leaves REVOKING/NOLOGIN/no password,
+  denies new issuance, and only reports success after verified cleanup.
+  The Points/reservation/job/review/edit baseline remains unchanged. The first
+  implementation attempt found SQLSTATE 42P08 on a shared text/regrole parameter;
+  an explicit text cast fixed it. Failed and successful fixtures were disposed.
+- Built actual-page test in `/private/tmp/cl-job-browser-3ghTio`: empty tasks →
+  fixed three synthetic terminal outcomes plus 22 no-charge catalog clones →
+  English **20/5**, **25 distinct links**. Each refresh/page read issues a new
+  role and receives its own successful revocation receipt. During a locked read,
+  language navigation removed the old backend in ~**273 ms**, with zero locks
+  while the blocker remained held; `aborted:true, revoked:true, returned:false`.
+  The new page's fault-time read failed closed and was also revoked. Unlock +
+  Simplified refresh returned 20 tasks; Traditional navigation returned 20.
+  Session revoke + refresh cleared lists and displayed sign-in. Console
+  warnings/errors were empty and the existing green Logo/layout was retained.
+- Final browser inventory: **seven REVOKED receipts; zero active roles,
+  sessions or locks**. Business baseline: 10 available / 0 reserved synthetic
+  Points, three admissions/reserves/terminals, seven ledger entries, 25 jobs,
+  zero reviews/export reports and one setup receipt/sync change. Supabase
+  Security Advisors on the exact owned Unix socket returned no issues.
+- Tab 35 closed, existing user tabs untouched. SIGTERM sent only to the verified
+  parent PID let the broker confirm `activeLeases:0`, then stop PG and remove
+  the owned root with tracked source unchanged. Port 3395 was confirmed free.
+
+Supabase/PostgreSQL guidance informed the least-privilege grants, explicit
+login barrier and independent termination proof; Next.js guidance kept IPC and
+secrets server-only. Browser verification used the available CUA integration
+because the skill CLI was not installed; no software was installed.
+
+This remains a local parent-operated prototype: its reusable IPC capability is
+not production identity/custody, its tombstones last only until fixture disposal,
+and a parent crash/SIGKILL, restart/reconciliation, externally supervised expiry,
+Hosted PG17/TLS and managed issuance/revocation have NOT been verified. SQL
+password expiry blocks future password login but does not guarantee cleanup if
+the issuer process dies. No Hosted grants, Production, live AI, KMS/vault,
+payments, push/PR or deployment changed; this is not five-Note launch approval.
+
+**Next bounded implementation:** extract the verified single-read lease lifecycle
+into a default-off formal server adapter with typed issue/revoke receipts and
+failure tests. Keep the local Unix operator outside that adapter; actual managed
+custody, Hosted permissions and runtime activation remain separately gated.

@@ -4979,6 +4979,31 @@ See [full-flow scope and remaining real-admission gate](communication-note-produ
   fixture-lifetime source password reuse is not production custody evidence.
 - [UI integration scope and evidence](communication-note-product-integration-m1y.md#communication-note-dedicated-task-port-in-the-local-workspace-2026-09-08).
 
+### Communication Note local single-use task credentials (2026-09-08)
+
+- Replaces the previous fixture-lifetime task password with per-read issuance
+  and verified revocation. Parent-only Unix issuer, private RLS tombstones,
+  exactly list-purpose privileges; no operator in Next, no formal activation.
+- Full **5,148 passed / 34 skipped**, 304 files. Bridge **18 tests**, bridge plus
+  projection **44 passed**. Explicit real-PG credential suite **10 passed** plus
+  the existing **118** setup scenarios; opt-in command:
+  `CARESLINK_TASK_CREDENTIAL_LOCAL=OWNED_UNIX_ONLY npx vitest run scripts/browser-e2e/communication-note-task-credential.local.test.mjs`.
+- Covers concurrent one-time delivery/replay rejection, live Auth checks, scope
+  and capacity limits, two-session revoke/zero locks, old-password rejection,
+  real source-read cancellation, real 60-second orphan expiry, failed-revoke
+  receipt withholding and issuance shutdown. Business-state snapshot unchanged.
+- Actual browser: English 20/5 and 25 unique links; locked navigation cancellation
+  ~273 ms, zero locks, confirmed revoke; Simplified/Traditional recovery to 20;
+  revoked session clears lists. Final seven revoked receipts, zero roles,
+  sessions and locks. Console errors/warnings empty, security Advisors clean.
+- TypeScript, full lint, webpack build, 117/39 client chunks and adapter sync
+  pass. Owned PG/process/root removed, tab 35 closed, port 3395 free. No push,
+  deploy, model call or Production modification. Early SQL parameter ambiguity
+  was fixed and its failed fixtures cleaned; not counted as a passing attempt.
+- [Lifecycle limits and next formal adapter](communication-note-product-integration-m1y.md#communication-note-local-single-use-task-credentials-2026-09-08).
+  Crash recovery, external expiry supervision, managed custody and Hosted
+  activation are not established by this local evidence.
+
 ### Current live/read-only evidence
 
 - Supabase migrations, tables, RLS flags, policies, grants, function grants and aggregate row counts were checked read-only.

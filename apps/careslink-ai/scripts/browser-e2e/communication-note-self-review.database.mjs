@@ -15,6 +15,7 @@ import { verifySettledReviewScenarios } from "./communication-note-settled-revie
 import { verifyCommunicationNoteJobList } from "./communication-note-job-list.database.mjs";
 import { verifyCommunicationNoteDraftCatalog } from "./communication-note-draft-catalog.database.mjs";
 import { installWorkspaceTaskBrowserController } from "./communication-note-workspace-task.database.mjs";
+import { installTaskCredentialBroker } from "./communication-note-task-credential.database.mjs";
 
 const exec = promisify(execFile), childEnv = { PATH: "/usr/bin:/bin", LANG: "C", LC_ALL: "C" };
 const OWNER = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", SESSION = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
@@ -37,15 +38,14 @@ export function createReviewBrowserDatabase(root, mode = "REVIEW") {
   assert.match(root, /^\/private\/tmp\/cl-job-browser-[a-zA-Z0-9]{6}$/u);
   assert.ok(["REVIEW", "EDIT", "HISTORY", "ADMISSION", "SETTLEMENT", "SETTLEMENT_REVIEW", "SETTLEMENT_EDIT", "SETTLEMENT_LIST", "WORKSPACE_TASK"].includes(mode));
   const workspaceTaskId = mode === "WORKSPACE_TASK" ? randomUUID() : undefined;
-  const taskReadRole = workspaceTaskId ? "careslink_v1_job_list_runtime_" + randomBytes(8).toString("hex") : undefined;
-  const taskReadPassword = workspaceTaskId ? randomBytes(32).toString("base64url") : undefined;
+  const taskBrokerCapability = workspaceTaskId ? randomBytes(32).toString("base64url") : undefined;
   const settledList = mode === "SETTLEMENT_LIST" || mode === "WORKSPACE_TASK";
   const settledEdit = mode === "SETTLEMENT_EDIT" || settledList, settledReview = mode === "SETTLEMENT_REVIEW" || settledEdit;
   const settlement = mode === "SETTLEMENT" || settledReview, admission = mode === "ADMISSION" || settlement, admissionPassword = randomBytes(32).toString("hex");
   const history = mode === "HISTORY" || settledReview, edit = mode === "EDIT" || mode === "HISTORY" || settledEdit;
   const base = join(root, "pg"), data = join(base, "data"), socket = join(base, "socket");
   let server, exited, owner, bootstrapMayBeRunning = false, closing = false;
-  let terminalController, workspaceTaskController;
+  let terminalController, workspaceTaskController, taskCredentialBroker;
   const clients = [], password = randomBytes(32).toString("hex");
   const open = async (user = "review_test_bootstrap", secret = "") => {
     const client = new pg.Client({ host: socket, port: PORT, user, password: secret, database: "postgres", ssl: false,
@@ -63,7 +63,7 @@ export function createReviewBrowserDatabase(root, mode = "REVIEW") {
       ...(settledEdit ? { CARESLINK_LOCAL_SETTLED_EDIT: "EXACT_SETTLED_DOCUMENT_ONLY" } : {}),
       ...(settledList ? { CARESLINK_LOCAL_SETTLED_LIST: "EXACT_SETTLED_DOCUMENT_ONLY" } : {}),
       ...(workspaceTaskId ? { CARESLINK_LOCAL_TASK_ENTRY: "OWNER_TASK_LIST",
-        CARESLINK_LOCAL_TASK_READ_ROLE: taskReadRole, CARESLINK_LOCAL_TASK_READ_PASSWORD: taskReadPassword } : {}),
+        CARESLINK_LOCAL_TASK_BROKER_CAPABILITY: taskBrokerCapability } : {}),
       ...(edit ? { CARESLINK_LOCAL_EDIT_DATABASE: "OWNED_UNIX_SOCKET_ONLY" } : {}),
       ...(history ? { CARESLINK_LOCAL_HISTORY_DATABASE: "OWNED_UNIX_SOCKET_ONLY" } : {}) },
     async start() {
@@ -131,7 +131,10 @@ export function createReviewBrowserDatabase(root, mode = "REVIEW") {
         await verifyAdmissionBrowserDatabase(owner, admissionRuntime, workspaceTaskId);
         await admissionRuntime.end();
         if (settlement) terminalController = await installSettlementBrowserController(owner, open, root);
-        if (workspaceTaskId) workspaceTaskController = await installWorkspaceTaskBrowserController(owner, open, root, taskReadRole, taskReadPassword);
+        if (workspaceTaskId) {
+          taskCredentialBroker = await installTaskCredentialBroker(root, open, taskBrokerCapability);
+          workspaceTaskController = await installWorkspaceTaskBrowserController(owner, open, root);
+        }
       }
       if (history) {
         // Only this owned, disposable database receives the opt-in capability.
@@ -191,7 +194,10 @@ export function createReviewBrowserDatabase(root, mode = "REVIEW") {
         }
         else if (command === "task-lock") await workspaceTaskController.lock();
         else if (command === "task-unlock") await workspaceTaskController.unlock();
-        else await workspaceTaskController.status();
+        else {
+          await workspaceTaskController.status();
+          console.log(JSON.stringify({ stage: "task-credential-inventory", receipts: await taskCredentialBroker.status() }));
+        }
         return;
       }
       if (settlement && command.startsWith("settle-")) {
@@ -251,6 +257,9 @@ export function createReviewBrowserDatabase(root, mode = "REVIEW") {
         // The mandatory whole-cluster shutdown/removal below is still required
         // if an individual test-role cleanup cannot be confirmed.
         console.log(JSON.stringify({ stage: "workspace-task-login-cleanup-unconfirmed" }));
+      });
+      await taskCredentialBroker?.stop().catch(() => {
+        console.log(JSON.stringify({ stage: "task-credential-broker-cleanup-unconfirmed" }));
       });
       if (history && owner) {
         await owner.query("rollback").catch(() => {});

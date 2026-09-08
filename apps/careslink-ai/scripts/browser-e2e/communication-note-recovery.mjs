@@ -35,6 +35,7 @@ const emit = async (path, source) => { await mkdir(join(root, path, ".."), { rec
 const tracked = ["src/lib/supabase-server.ts", "src/app/ai-documents/communication-note/jobs/[jobId]/page.tsx",
   "src/lib/communication-note-workspace-task-postgres.server.ts",
   "scripts/browser-e2e/communication-note-workspace-task.fixture.ts", "scripts/browser-e2e/communication-note-workspace-task-connection.fixture.ts",
+  "scripts/browser-e2e/communication-note-task-credential.fixture.ts",
   "src/lib/communication-note-workspace-durable.server.ts", "src/lib/communication-note-workspace.server.ts",
   "src/app/ai-documents/page.tsx", "src/app/ai-documents/communication-note-workspace-page.tsx",
   "src/app/api/ai-documents/communication-note/documents/route.ts", "src/lib/communication-note-workspace-runtime.server.ts",
@@ -122,7 +123,9 @@ try {
     .replace('"./communication-note-self-review.fixture"', '"./__review-database-fixture"'));
   if (workspaceTask) await emit("src/lib/__workspace-task-connection-fixture.ts", (await readFile(join(app, "scripts/browser-e2e/communication-note-workspace-task-connection.fixture.ts"), "utf8"))
     .replaceAll('"../../src/lib/', '"./')
+    .replace('"./communication-note-task-credential.fixture"', '"./__task-credential-fixture"')
     .replace('"./communication-note-self-review.fixture"', '"./__review-database-fixture"'));
+  if (workspaceTask) await emit("src/lib/__task-credential-fixture.ts", await readFile(join(app, "scripts/browser-e2e/communication-note-task-credential.fixture.ts"), "utf8"));
   await symlink(join(app, "node_modules"), join(root, "node_modules"), "dir");
   await emit("package.json", JSON.stringify({ name: "careslink-local-browser-fixture", private: true,
     dependencies: (JSON.parse(await readFile(join(app, "package.json"), "utf8"))).dependencies }));
