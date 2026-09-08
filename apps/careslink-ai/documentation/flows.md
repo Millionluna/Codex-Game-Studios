@@ -98,6 +98,16 @@ are disabled. Safe filenames and bounded browser Blob URL cleanup are present;
 DOCX/PDF renderers load lazily. There is no durable export job/event history,
 hosted artifact storage/download URL, batch export or Hosted activation.
 
+The local export-history slice now reports minimal version-bound browser events
+after an authorised export and explicitly reads the selected revision's latest
+20 reports. Outcomes are `COPY_REPORTED`, `DOWNLOAD_INITIATED` or `FAILED`, not
+legacy `DOWNLOADED`/`SHARED` or saved-file receipts. History failure does not
+change the export result or automatically retry/re-export. Its private GET/POST
+route remains hard-off without a dedicated trusted binding; only the owned
+synthetic fixture installs a process-memory binding and labels that limitation.
+There is no durable history database installation or browser-persistent cache.
+See the [local history evidence](communication-note-product-integration-m1y.md#communication-note-revision-bound-export-history-local-slice-2026-09-08).
+
 The bounded native Safari synthetic gate passed real cross-app paste and actual
 TXT/DOCX/PDF saving/opening. DOCX opened in TextEdit, not Microsoft Word. See the
 [acceptance scope](communication-note-product-integration-m1y.md#communication-note-native-safari-export-acceptance-2026-09-08).

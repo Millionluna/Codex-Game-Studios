@@ -1683,3 +1683,82 @@ record bodies or a fabricated file-save receipt. Review the existing inactive
 event contract before implementing; database activation remains separately
 gated. Microsoft Word compatibility, native discard-confirmation navigation and
 real Offline/Online remain unpassed and must not be inferred from this gate.
+
+## Communication Note revision-bound export history local slice (2026-09-08)
+
+Implemented the local history interface, strict wire contract and uninstalled
+trusted server port on top of `f439a53`. This is **not durable export history**:
+the formal GET/POST route returns `UNAVAILABLE` before reading the request body
+when no binding is installed. There is no environment-based durable fallback,
+new database/schema/role grant, Hosted activation or browser-persistent cache.
+
+### Behaviour and trust boundary
+
+- Copy/TXT/DOCX/PDF keep the existing exact saved/reviewed-revision access check
+  and green UI. History reporting occurs only after native/browser work, so
+  Clipboard user activation is preserved. Outcomes are `COPY_REPORTED`,
+  `DOWNLOAD_INITIATED` or `FAILED`; none proves that a file was saved, remains
+  available, or has been professionally approved. The inactive legacy event
+  contract's `DOWNLOADED`/`SHARED` states are deliberately not reused.
+- A report body contains only `revisionId`, `format`, `outcome` and `startedAt`;
+  an attempt UUID travels in the idempotency header. The server supplies the
+  revision number, `recordedAt`, pinned template version and `RECORD_COPY`
+  profile. Device start times are untrusted and explicitly labelled. Record
+  bodies, source facts, review translations, owner IDs, filenames and raw
+  errors are not accepted in history payloads or returned in entries.
+- Every history read explicitly requests one selected revision, with at most
+  its latest 20 reports ordered by server time and ID. Old-version metadata is
+  readable after access validation, but does not enable historical export.
+  Empty, pending, unavailable and partial-history views are translated in all
+  three locales. Existing history is cleared while a fresh read is pending.
+- History writes/reads are private same-origin Cookie requests with no-store
+  responses. Guards reject bearer/cross-origin/malformed/oversized requests;
+  strict parsing also binds response IDs, exact fields, template and outcome.
+  Each client operation is bounded to five seconds; no automatic retry,
+  re-export, background beacon or optimistic history entry is created. Access
+  loss aborts work and drops late data. A lost history receipt leaves the
+  export result unchanged and displays a separate warning.
+- A future durable port must transactionally recheck active provider Cookie
+  session, owner, document type and non-deleted lifecycle on every read, write
+  and replay. Writes additionally require the exact current reviewed revision;
+  replay is scoped to owner/attempt and rejects altered reports. This is a
+  dedicated write capability, not an expansion of `DOCUMENT_DETAIL` authority.
+  These transaction requirements are **not yet a database implementation**.
+
+### Evidence
+
+- **135 focused tests**; full regression **4,590 passed / 12 skipped** across
+  285 files (284 passed / 1 skipped). TypeScript, zero-warning lint,
+  64/64-page webpack build, 116-chunk private-client boundary scan, 73-file
+  adapter check and `git diff --check` passed.
+  Contract, HTTP, fixture and component tests cover strict minimisation,
+  replay, access denial, deletion/review reset, timeout and post-export logging
+  failure. The list parser explicitly projects response fields so caller-only
+  `signal`/`fetcher` fields cannot accidentally escape into a response.
+- Only the owned 6/6-page local fixture at
+  `/private/tmp/cl-job-browser-znk7Ik` installed the memory-backed port, capped
+  at 128 events with immutable same-attempt receipts. The UI explicitly stated
+  that records disappear when the test server stops.
+- The actual browser passed: empty history while unreviewed; inspected
+  synthetic review; TXT download initiation; version-1 report; page reload and
+  server readback; wording edit to version 2 with empty history; reopening
+  version 1 with its original report and disabled historical exports. This
+  proves the bounded browser/server flow, not durable or cross-device storage.
+- English, Simplified and Traditional Chinese views were inspected. At
+  390/768/1280 widths there was no horizontal overflow, new/existing export
+  buttons were 44 pixels high and keyboard focus remained visible. No captured
+  browser warning/error or framework overlay appeared. Next.js/React guidance
+  preserved route/client boundaries; Impeccable guidance retained the approved
+  visual identity and separated uncertain history from successful export.
+- Owned tab closed, viewport reset, fixture stopped/removed with unchanged
+  source hashes; independent checks confirmed its exact root absent and port
+  3395 closed. Only disposable synthetic state was removed. Existing native
+  Safari tabs and earlier Downloads were untouched. No real care data, AI
+  call, Points write, database operation, push or deployment occurred.
+
+**Next:** implement a dedicated, still-uninstalled durable history write/read
+candidate with real disposable local PostgreSQL tests for ownership, active
+session, revision/review, deletion and idempotent replay/concurrency. Keep the
+formal route hard-off until its separate activation gate. Microsoft Word,
+native discard-confirmation navigation and real Offline/Online remain unpassed;
+this slice does not close those gates or implement the other Note applications.

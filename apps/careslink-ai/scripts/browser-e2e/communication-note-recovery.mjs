@@ -149,6 +149,10 @@ export async function POST(request: Request, context: { params: Promise<{ docume
   if (edit) await emit("src/app/api/ai-documents/communication-note/documents/[documentId]/revisions/route.ts", `import { saveEditFixtureDocument } from "@/lib/__edit-fixture";
 export const dynamic = "force-dynamic";
 export async function POST(request: Request, context: { params: Promise<{ documentId: string }> }) { return saveEditFixtureDocument(request, (await context.params).documentId); }`);
+  if (edit) await emit("src/app/api/ai-documents/communication-note/documents/[documentId]/export-history/route.ts", `import { editFixtureExportHistory } from "@/lib/__edit-fixture";
+export const dynamic = "force-dynamic";
+export async function GET(request: Request, context: { params: Promise<{ documentId: string }> }) { return editFixtureExportHistory(request, (await context.params).documentId); }
+export async function POST(request: Request, context: { params: Promise<{ documentId: string }> }) { return editFixtureExportHistory(request, (await context.params).documentId); }`);
   if (databaseEdit) await emit("src/app/api/ai-documents/communication-note/documents/[documentId]/revisions/route.ts", `import { saveEditDatabaseDocument } from "@/lib/__review-database-fixture";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";

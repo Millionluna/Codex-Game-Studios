@@ -13,6 +13,10 @@ const mocks = vi.hoisted(() => ({
   confirmReview: vi.fn(),
   saveEdit: vi.fn(),
   copyRecord: vi.fn(), downloadRecord: vi.fn(), downloadDocx: vi.fn(), downloadPdf: vi.fn(), disposeExport: vi.fn(),
+  recordHistory: vi.fn(), loadHistory: vi.fn(),
+}));
+vi.mock("../../../../../lib/communication-note-export-history-client", () => ({
+  recordExportHistory: mocks.recordHistory, loadExportHistory: mocks.loadHistory,
 }));
 
 vi.mock("../../../../../lib/communication-note-export-browser", () => ({
@@ -65,6 +69,8 @@ beforeEach(() => {
   mocks.downloadRecord.mockReset().mockReturnValue(mocks.disposeExport);
   mocks.downloadDocx.mockReset().mockResolvedValue(mocks.disposeExport);
   mocks.downloadPdf.mockReset().mockResolvedValue(mocks.disposeExport);
+  mocks.recordHistory.mockReset().mockResolvedValue({ status: "RECORDED" });
+  mocks.loadHistory.mockReset().mockResolvedValue({ status: "UNAVAILABLE" });
   container = document.createElement("div");
   document.body.append(container);
   root = createRoot(container);
@@ -76,6 +82,76 @@ afterEach(async () => {
 });
 
 describe("Communication Note private result loader", () => {
+  it("reports only version/format/device time after each successful export, not body content", async () => {
+    mocks.loadDocument.mockResolvedValue(reviewedDocument()); await renderLoader();
+    expect(mocks.loadHistory).not.toHaveBeenCalled(); expect(mocks.recordHistory).not.toHaveBeenCalled();
+    for (const [label, format, outcome] of [["Copy record text", "COPY", "COPY_REPORTED"], ["Download TXT", "TXT", "DOWNLOAD_INITIATED"],
+      ["Download DOCX", "DOCX", "DOWNLOAD_INITIATED"], ["Download PDF", "PDF", "DOWNLOAD_INITIATED"]]) {
+      await act(async () => exportButton(label).click());
+      const call = mocks.recordHistory.mock.calls.at(-1)![0];
+      expect(call).toMatchObject({ canonicalId: DOC, report: { revisionId: REV, format, outcome } });
+      expect(Object.keys(call.report).sort()).toEqual(["format", "outcome", "revisionId", "startedAt"]);
+      expect(new Date(call.report.startedAt).toISOString()).toBe(call.report.startedAt);
+      expect(JSON.stringify(call)).not.toMatch(/Synthetic export text|factsSummary|englishDraft|contentHash/);
+    }
+    expect(new Set(mocks.recordHistory.mock.calls.map(([call]) => call.attemptId)).size).toBe(4);
+  });
+  it("keeps the actual export success when history is unavailable, without re-exporting", async () => {
+    mocks.loadDocument.mockResolvedValue(reviewedDocument()); mocks.recordHistory.mockResolvedValue({ status: "UNAVAILABLE" });
+    await renderLoader(); await act(async () => exportButton("Download TXT").click());
+    expect(container.textContent).toContain("TXT download started.");
+    expect(container.textContent).toContain("The history entry could not be confirmed.");
+    expect(container.textContent).not.toContain("Nothing was exported.");
+    await act(async () => exportButton("View or refresh export history").click());
+    expect(container.textContent).toContain("do not export again just to add a history entry");
+    expect(mocks.downloadRecord).toHaveBeenCalledTimes(1); expect(mocks.recordHistory).toHaveBeenCalledTimes(1);
+  });
+  it("records a sanitized browser failure only after the version read succeeds", async () => {
+    mocks.loadDocument.mockResolvedValue(reviewedDocument()); mocks.downloadPdf.mockRejectedValue(new CommunicationNoteExportError("PDF_UNSUPPORTED_TEXT"));
+    await renderLoader(); await act(async () => exportButton("Download PDF").click());
+    expect(mocks.recordHistory.mock.calls[0][0].report).toMatchObject({ format: "PDF", outcome: "FAILED" });
+    expect(JSON.stringify(mocks.recordHistory.mock.calls)).not.toContain("PDF_UNSUPPORTED_TEXT");
+  });
+  it.each(["AUTH_REQUIRED", "NOT_FOUND"] as const)("does not report inaccessible exports: %s", async status => {
+    mocks.loadDocument.mockResolvedValueOnce(reviewedDocument()).mockResolvedValueOnce({ status });
+    await renderLoader(); await act(async () => exportButton("Download TXT").click());
+    expect(mocks.recordHistory).not.toHaveBeenCalled();
+  });
+  it("reads scoped history on explicit action and labels temporary device reports", async () => {
+    mocks.loadDocument.mockResolvedValue(reviewedDocument());
+    mocks.loadHistory.mockResolvedValue({ status: "AVAILABLE", canonicalId: DOC, revisionId: REV, storage: "PROCESS_MEMORY_ONLY", hasMore: true,
+      entries: [{ attemptId: "one", revisionNumber: 1, format: "TXT", outcome: "DOWNLOAD_INITIATED", startedAt: NOW }] });
+    await renderLoader(); await act(async () => exportButton("View or refresh export history").click());
+    expect(mocks.loadHistory).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ canonicalId: DOC, revisionId: REV }));
+    expect(container.textContent).toContain("Temporary test history only");
+    expect(container.textContent).toContain("Version 1 · TXT · Download initiated");
+    expect(container.textContent).toContain("Started (device time)");
+    expect(container.textContent).toContain("older reports are not shown");
+    expect(mocks.downloadRecord).not.toHaveBeenCalled();
+  });
+  it("shows a specific empty history state without creating an event", async () => {
+    mocks.loadDocument.mockResolvedValue(reviewedDocument());
+    mocks.loadHistory.mockResolvedValue({ status: "AVAILABLE", storage: "PROCESS_MEMORY_ONLY", entries: [], hasMore: false });
+    await renderLoader(); await act(async () => exportButton("View or refresh export history").click());
+    expect(container.textContent).toContain("No export reports are recorded for this version.");
+    expect(mocks.recordHistory).not.toHaveBeenCalled();
+  });
+  it.each(["AUTH_REQUIRED", "NOT_FOUND"] as const)("clears private content on a history read denial: %s", async status => {
+    mocks.loadDocument.mockResolvedValue(reviewedDocument()); mocks.loadHistory.mockResolvedValue({ status });
+    await renderLoader(); await act(async () => exportButton("View or refresh export history").click());
+    expect(container.textContent).not.toContain("Synthetic export text");
+  });
+  it("ignores a late history response after focus refresh", async () => {
+    let resolve!: (v: unknown) => void;
+    mocks.loadDocument.mockResolvedValueOnce(reviewedDocument()).mockResolvedValueOnce({ status: "NOT_FOUND" });
+    mocks.loadHistory.mockImplementation(() => new Promise(r => { resolve = r; }));
+    await renderLoader(); await act(async () => exportButton("View or refresh export history").click());
+    const signal = mocks.loadHistory.mock.calls[0][0].signal;
+    await act(async () => window.dispatchEvent(new Event("focus")));
+    expect(signal.aborted).toBe(true);
+    await act(async () => resolve({ status: "AVAILABLE", entries: [], storage: "PROCESS_MEMORY_ONLY" }));
+    expect(container.textContent).not.toContain("Temporary test history only");
+  });
   it("requires a saved self-review and hides export while editing", async () => {
     mocks.loadDocument.mockResolvedValue(documentResult("Private draft")); await renderLoader();
     expect(exportButton("Copy record text").disabled).toBe(true);

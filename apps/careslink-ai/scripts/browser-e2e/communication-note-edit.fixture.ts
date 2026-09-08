@@ -4,7 +4,10 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import { cookies } from "next/headers";
 import { handleCommunicationNoteEdit } from "../../src/lib/communication-note-edit.server";
-import { handleCommunicationNoteDocumentRead } from "../../src/lib/communication-note-document.server";
+import { handleCommunicationNoteDocumentRead, readCommunicationNoteDocument } from "../../src/lib/communication-note-document.server";
+import { handleExportHistory, type ExportHistoryBinding } from "../../src/lib/communication-note-export-history.server";
+import { buildExportHistoryHref, EXPORT_HISTORY_LIMIT, type ExportHistoryEntry } from "../../src/lib/communication-note-export-history-contract";
+import { COMMUNICATION_NOTE_TEXT_TEMPLATE } from "../../src/lib/communication-note-export";
 import { handleCommunicationNoteSelfReview } from "../../src/lib/communication-note-self-review.server";
 import { createMemoryCaresLinkV1ProductApiStore, createCaresLinkV1ProductApiContentHash, createCaresLinkV1CleanedFactsHash } from "../../src/lib/v1/product-api-memory";
 import { createValidCaresLinkV1CleanedFacts } from "../../src/lib/v1/cleaned-facts-test-fixtures";
@@ -31,7 +34,8 @@ export async function createEditFixtureState() {
     contentHash: createCaresLinkV1ProductApiContentHash(content), schemaVersion: CARESLINK_V1_NOTE_SCHEMA_VERSION, privacyReviewId: PROOF },
   { idempotencyKey: "synthetic:edit:seed:0001" });
   const reviews = new Map<string, Extract<CommunicationNoteSelfReviewResult, { status: "CONFIRMED" }>>();
-  return { store, principal, reviews };
+  const exportHistory = new Map<string, ExportHistoryEntry>();
+  return { store, principal, reviews, exportHistory };
 }
 const STATE = Symbol.for("careslink.synthetic.edit.fixture");
 function guard() {
@@ -88,4 +92,46 @@ export async function confirmEditFixtureReview(request: Request, id: string) {
       saveState: "SERVER_ACKNOWLEDGED", draftNotice: "Draft – review required" } as const;
     state.reviews.set(mutationId, receipt); return receipt;
   } });
+}
+
+/** Test-only process memory, never installed in a formal route. The browser
+ * receipt names PROCESS_MEMORY_ONLY and the UI displays that limitation. */
+export function createEditFixtureHistoryBinding(state: Awaited<ReturnType<typeof createEditFixtureState>>, source: CaresLinkV1ProductApiRuntime): ExportHistoryBinding {
+  async function authorize(request: Request, canonicalId: string, revisionId: string) {
+    const url = new URL(request.url);
+    url.pathname = buildExportHistoryHref(canonicalId).replace(/\/export-history$/, "");
+    url.search = new URLSearchParams({ revisionId }).toString();
+    return readCommunicationNoteDocument(new Request(url, { headers: request.headers, signal: request.signal }), canonicalId, source);
+  }
+  return {
+    localFixtureOrigin: "http://127.0.0.1:3395",
+    record: async ({ request, canonicalId, attemptId, report }) => {
+      const saved = await authorize(request, canonicalId, report.revisionId);
+      if (saved.status !== "AVAILABLE") return { status: saved.status === "EMPTY" ? "NOT_FOUND" : saved.status };
+      if (!saved.isCurrentRevision) return { status: "STALE_REVISION" };
+      if (saved.selfReviewStatus !== "CONFIRMED") return { status: "REVIEW_REQUIRED" };
+      if (request.signal.aborted) return { status: "UNAVAILABLE" };
+      const existing = state.exportHistory.get(attemptId);
+      if (existing && (existing.revisionId !== report.revisionId || existing.format !== report.format ||
+          existing.outcome !== report.outcome || existing.startedAt !== report.startedAt)) return { status: "INVALID_REQUEST" };
+      if (!existing && state.exportHistory.size >= 128) return { status: "UNAVAILABLE" };
+      const entry: ExportHistoryEntry = existing ?? Object.freeze({ ...report, attemptId,
+        revisionNumber: saved.revision.revisionNumber, recordedAt: new Date().toISOString(),
+        templateVersion: COMMUNICATION_NOTE_TEXT_TEMPLATE, profile: "RECORD_COPY" });
+      state.exportHistory.set(attemptId, entry);
+      return { status: "RECORDED", canonicalId, storage: "PROCESS_MEMORY_ONLY", entry };
+    },
+    list: async ({ request, canonicalId, revisionId }) => {
+      const saved = await authorize(request, canonicalId, revisionId);
+      if (saved.status !== "AVAILABLE") return { status: saved.status === "EMPTY" ? "NOT_FOUND" : saved.status };
+      if (request.signal.aborted) return { status: "UNAVAILABLE" };
+      const all = [...state.exportHistory.values()].filter(item => item.revisionId === revisionId)
+        .sort((a, b) => b.recordedAt.localeCompare(a.recordedAt) || b.attemptId.localeCompare(a.attemptId));
+      return { status: "AVAILABLE", canonicalId, revisionId, storage: "PROCESS_MEMORY_ONLY",
+        entries: all.slice(0, EXPORT_HISTORY_LIMIT), hasMore: all.length > EXPORT_HISTORY_LIMIT };
+    },
+  };
+}
+export async function editFixtureExportHistory(request: Request, id: string) {
+  return handleExportHistory(localRequest(request), id, createEditFixtureHistoryBinding(await fixture(), await runtime()));
 }
