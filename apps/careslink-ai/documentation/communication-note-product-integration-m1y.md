@@ -2331,3 +2331,76 @@ locally saved draft so it can be found and reopened after leaving the result
 page. Preserve the green design, synthetic inputs and no-AI/local-only boundary.
 Formal edit/history activation, real provider/vault integration, the remaining
 Note types and billing remain separate work; this is not a five-Note launch gate.
+
+## Communication Note saved draft list and revisit integration (2026-09-08)
+
+The new `--settlement-list` connects a reusable, three-locale saved-drafts surface
+at `/ai-documents` **only in the disposable local app**. The formal workspace
+still uses its existing legacy draft store; no formal page/API route, migration,
+retained permission, Hosted/Production flag or deployment is changed.
+
+### Implementation and boundary
+
+- The existing `list_v1_shadow_documents` RPC supplies owner-scoped metadata
+  through the existing non-superuser runtime and fresh cookie/session checks.
+  The fixture's RPC allowlist adds this read only when its independent list
+  guard is enabled. No table grant, new SQL function or document-content read
+  is needed for the list.
+- The server filters to the exact newly settled document from the existing
+  private result binding. Unrelated seed documents, other Note types, deleted
+  records and documents without a saved revision are not displayed. A missing
+  result before settlement gives an empty list; invalid bindings/backend errors
+  give unavailability. A paginated response fails closed, so this fixed single-
+  document fixture cannot be mistaken for a complete general-purpose catalog.
+- The response contains only document ID, version number, source locale and
+  update time. Exact-key parsing rejects content, review approvals, duplicate
+  IDs and malformed metadata. The browser does not display raw IDs or source
+  text, persist metadata in device storage, submit generation or change Points.
+- The list's normal link rechecks and opens the **current** version. The original
+  task-result link remains pinned to the revision created by generation. List
+  rows do not imply a self-review confirmation or permission to export.
+- Reuse the committed green tokens, reverse Logo and controls. English,
+  Simplified and Traditional Chinese include empty, loading, failure and refresh
+  states. Requests are GET/no-store, bounded by an eight-second client timeout.
+  Focus, auth-storage, online and persisted-page return reauthorize; hide/offline
+  clears the list and stale/aborted responses cannot restore it. Offline shows
+  retryable unavailability rather than an indefinite checking message.
+
+### Verification and limits
+
+`--settlement-list-check` passed **94 real local PostgreSQL scenarios**: the
+previous 89 plus five list cases covering current edited-version metadata,
+absence of wording/review approval, foreign-owner exclusion, revoked-session
+denial and unchanged ledger/documents/history on repeated reads. This uses the
+existing narrow runtime, not application access through the bootstrap role.
+
+Independent browser evidence: empty list → create fixed synthetic task → recover
+lost admission acknowledgement → terminal success → leave task page → find the
+actual new version 1 in the list → open/edit/save version 2 → return using Logo →
+reload list → reopen current version 2 with review still required and TXT export
+disabled. Three-locale navigation and manual list refresh passed. Revoking the
+synthetic session then refreshing the list cleared metadata and showed sign-in.
+Final browser counts were **1 job, 1 RESERVE, 1 COMMIT, 10 available / 0 reserved**;
+the one wording edit added one revision, and no review/export report was created
+by list access. Loaded pages had no warning/error logs. The later offline-copy
+adjustment is covered by DOM-event tests, not a new native network-toggle claim.
+
+The 55 new tests passed; full suite **4,794 passed / 12 skipped**, 293 files
+(292 passed / 1 skipped). Typecheck, zero-warning lint, 64/64-page production
+build and 32-chunk client-boundary scan passed. Local security Advisors returned
+no findings. Owned `/private/tmp/cl-job-browser-BGYbku` and
+`/private/tmp/cl-job-browser-0ZDon2` were stopped/removed and independently checked
+absent; port 3395 had no listener. The dedicated browser tab was closed while
+other tabs were preserved. No AI, real care data, payment, push or deployment.
+
+Impeccable guidance preserved identity and a restrained metadata list; committed
+foreground/canvas and primary-action text contrast measured 11.94:1 and 12.18:1.
+Supabase/Postgres guidance kept existing minimal grants and short transactions;
+Next/React/browser guidance required private state clearing and actual revisit
+checks. No accessibility certification, native offline/cross-device recovery,
+real human review or formal catalog activation is claimed.
+
+**Next bounded implementation:** add a local entry for the in-progress generation
+task so leaving before completion does not lose the path back to its status.
+Keep fixed synthetic data, no AI/provider calls and no Hosted activation. The
+remaining Note types, real provider/vault integration and billing remain open.

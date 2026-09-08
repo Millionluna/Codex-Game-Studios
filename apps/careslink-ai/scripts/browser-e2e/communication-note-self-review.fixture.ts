@@ -14,6 +14,7 @@ import { createCommunicationNoteDurableEditWriter } from "../../src/lib/communic
 import { handleCommunicationNoteEdit } from "../../src/lib/communication-note-edit.server";
 import { createCommunicationNoteDurableExportHistory } from "../../src/lib/communication-note-export-history-durable.server";
 import { handleExportHistory } from "../../src/lib/communication-note-export-history.server";
+import { CaresLinkV1ContractError } from "../../src/lib/v1/shared-contracts";
 
 export const REVIEW_DOC = "11111111-1111-4111-8111-111111111111";
 const OWNER = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", SESSION = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
@@ -43,6 +44,10 @@ export function reviewFixtureRpcCommand(name: string, args?: Readonly<Record<str
   if (process.env.CARESLINK_LOCAL_ADMISSION_DATABASE === "OWNED_UNIX_SOCKET_ONLY") {
     assertReviewDatabaseFixture();
     definitions.get_v1_communication_note_points_preview = { sql: "select public.get_v1_communication_note_points_preview() as data", keys: [] };
+  }
+  if (process.env.CARESLINK_LOCAL_SETTLED_LIST === "EXACT_SETTLED_DOCUMENT_ONLY") {
+    assertReviewDatabaseFixture();
+    definitions.list_v1_shadow_documents = { sql: "select public.list_v1_shadow_documents($1,$2) as data", keys: ["p_after_document_id", "p_limit"] };
   }
   if (process.env.CARESLINK_LOCAL_EDIT_DATABASE === "OWNED_UNIX_SOCKET_ONLY") {
     assertReviewDatabaseFixture();
@@ -122,6 +127,26 @@ export async function readReviewDatabaseDocument(request: Request, documentId: s
       resolveSessionStatus: createCommunicationNoteGenerationCurrentSessionStatusResolver(client) }),
     getProductApi: async principal => createSupabaseCaresLinkV1ProductApi({ client, principal }),
   });
+}
+
+export async function readReviewDatabaseList(request: Request) {
+  assertReviewDatabaseFixture();
+  if (process.env.CARESLINK_LOCAL_SETTLED_LIST !== "EXACT_SETTLED_DOCUMENT_ONLY") throw new Error("Local list unavailable");
+  const client = await createReviewDatabaseAuthClient();
+  const auth = await resolveCaresLinkV1ProductApiAuth(new Request("https://careslink.internal/v1/documents", {
+    headers: request.headers, signal: request.signal,
+  }), { env, createCookieAuthClient: async () => client,
+    resolveSessionStatus: createCommunicationNoteGenerationCurrentSessionStatusResolver(client) });
+  if (!auth.ok) {
+    if (["auth_required", "invalid_session", "session_revoked"].includes(auth.reason))
+      throw new CaresLinkV1ContractError("AUTH_REQUIRED", "Local session unavailable");
+    throw new Error("Local list unavailable");
+  }
+  if (auth.identity.source !== "cookie") throw new CaresLinkV1ContractError("AUTH_REQUIRED", "Cookie required");
+  const api = createSupabaseCaresLinkV1ProductApi({ client, principal: {
+    userId: auth.identity.userId, sessionId: auth.identity.sessionId, transport: "COOKIE",
+  } });
+  return api.listDocuments({ limit: 100 });
 }
 
 export async function confirmReviewDatabaseDocument(request: Request, documentId: string) {

@@ -32,8 +32,9 @@ async function bounded(promise, milliseconds) {
  * and removes it only after stop() proves this child exited. */
 export function createReviewBrowserDatabase(root, mode = "REVIEW") {
   assert.match(root, /^\/private\/tmp\/cl-job-browser-[a-zA-Z0-9]{6}$/u);
-  assert.ok(["REVIEW", "EDIT", "HISTORY", "ADMISSION", "SETTLEMENT", "SETTLEMENT_REVIEW", "SETTLEMENT_EDIT"].includes(mode));
-  const settledEdit = mode === "SETTLEMENT_EDIT", settledReview = mode === "SETTLEMENT_REVIEW" || settledEdit;
+  assert.ok(["REVIEW", "EDIT", "HISTORY", "ADMISSION", "SETTLEMENT", "SETTLEMENT_REVIEW", "SETTLEMENT_EDIT", "SETTLEMENT_LIST"].includes(mode));
+  const settledList = mode === "SETTLEMENT_LIST";
+  const settledEdit = mode === "SETTLEMENT_EDIT" || settledList, settledReview = mode === "SETTLEMENT_REVIEW" || settledEdit;
   const settlement = mode === "SETTLEMENT" || settledReview, admission = mode === "ADMISSION" || settlement, admissionPassword = randomBytes(32).toString("hex");
   const history = mode === "HISTORY" || settledReview, edit = mode === "EDIT" || mode === "HISTORY" || settledEdit;
   const base = join(root, "pg"), data = join(base, "data"), socket = join(base, "socket");
@@ -54,6 +55,7 @@ export function createReviewBrowserDatabase(root, mode = "REVIEW") {
       ...(settlement ? { CARESLINK_LOCAL_SETTLEMENT_DATABASE: "OWNED_UNIX_SOCKET_ONLY" } : {}),
       ...(settledReview ? { CARESLINK_LOCAL_SETTLED_REVIEW: "EXACT_SETTLED_RESULT_ONLY" } : {}),
       ...(settledEdit ? { CARESLINK_LOCAL_SETTLED_EDIT: "EXACT_SETTLED_DOCUMENT_ONLY" } : {}),
+      ...(settledList ? { CARESLINK_LOCAL_SETTLED_LIST: "EXACT_SETTLED_DOCUMENT_ONLY" } : {}),
       ...(edit ? { CARESLINK_LOCAL_EDIT_DATABASE: "OWNED_UNIX_SOCKET_ONLY" } : {}),
       ...(history ? { CARESLINK_LOCAL_HISTORY_DATABASE: "OWNED_UNIX_SOCKET_ONLY" } : {}) },
     async start() {
@@ -159,7 +161,7 @@ export function createReviewBrowserDatabase(root, mode = "REVIEW") {
         await verifySettlementBrowserController(owner, runtime, terminalController);
         if (settledReview) {
           const actor = await open(RUNTIME, password);
-          try { await verifySettledReviewScenarios(owner, actor, root, terminalController, settledEdit); }
+          try { await verifySettledReviewScenarios(owner, actor, root, terminalController, settledEdit, settledList); }
           finally { await actor.end(); }
         }
       }

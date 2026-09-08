@@ -4772,6 +4772,26 @@ See [full-flow scope and remaining real-admission gate](communication-note-produ
   green UI/Logo, Hosted, provider or Production activation changed.
 - [Scope, exact-document revision binding and next revisit entry](communication-note-product-integration-m1y.md#communication-note-settled-draft-wording-edit-and-version-history-integration-2026-09-08).
 
+### Communication Note saved-list/revisit gate (2026-09-08)
+
+- `node scripts/browser-e2e/communication-note-recovery.mjs --settlement-list-check`
+  passed 94 real local database scenarios, including five new list cases:
+  edited current-version metadata, content exclusion, foreign/revoked denial
+  and unchanged Points/history on repeated reads. No new migration or SQL grant.
+- `--settlement-list` browser: empty → actual generation admission/settlement →
+  leave task → list/open new draft → edit version 2 → Logo/list/reload → open
+  current version 2 with review required. All three locales and manual refresh
+  passed. Revocation plus list refresh removed metadata and showed sign-in.
+  Final balance 10/0, one job/reserve/commit; no list-induced review/export.
+- 55 new unit/DOM tests cover strict metadata, fixed transport/document binding,
+  empty vs failure, stale responses, timeout, lifecycle clearing and offline
+  feedback. Native offline and cross-device recovery are not newly attested.
+- Full **4,794 passed / 12 skipped**, 293 files; typecheck, zero-warning lint,
+  64-page build, 32-chunk client boundary and local security Advisors passed.
+  Both owned roots and the dedicated tab were cleaned; no port 3395 listener.
+  Formal workspace and routes remain unchanged; only the owned fixture is wired.
+- [List scope, current-version navigation and next task-revisit slice](communication-note-product-integration-m1y.md#communication-note-saved-draft-list-and-revisit-integration-2026-09-08).
+
 ### Current live/read-only evidence
 
 - Supabase migrations, tables, RLS flags, policies, grants, function grants and aggregate row counts were checked read-only.

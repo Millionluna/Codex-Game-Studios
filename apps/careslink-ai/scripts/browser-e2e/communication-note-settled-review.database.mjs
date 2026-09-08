@@ -4,8 +4,9 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { readFile, realpath } from "node:fs/promises";
 
-export async function verifySettledReviewScenarios(owner, actor, root, terminal, verifyEdits=false) {
+export async function verifySettledReviewScenarios(owner, actor, root, terminal, verifyEdits=false, verifyList=false) {
   assert.equal(typeof verifyEdits,"boolean");
+  assert.equal(typeof verifyList,"boolean");assert.ok(!verifyList || verifyEdits);
   assert.match(root,/^\/private\/tmp\/cl-job-browser-[a-zA-Z0-9]{6}$/u);
   assert.equal(await realpath(root),root);
   const {canonicalId:doc,revisionId:rev}=JSON.parse(await readFile(root+"/settlement-result.json","utf8"));
@@ -14,6 +15,7 @@ export async function verifySettledReviewScenarios(owner, actor, root, terminal,
     [{role:"cl_review_browser_runtime",unix_only:true}]);
   const before=await terminal.observe();
   const sql={read:"select public.get_v1_shadow_document($1) as data",
+    documents:"select public.list_v1_shadow_documents($1,$2) as data",
     edit:"select public.save_communication_note_wording($1,$2,$3::jsonb) as data",
     review:"select public.confirm_communication_note_self_review($1,$2,$3,true,true,true) as data",
     list:"select public.list_communication_note_export_reports($1,$2) as data",
@@ -139,4 +141,34 @@ export async function verifySettledReviewScenarios(owner, actor, root, terminal,
       (select count(*)::int from careslink_communication_history.reports where document_id=$1) reports`,[doc])).rows,[{reviews:2,reports:2}]);
   });
   console.log(JSON.stringify({stage:"settled-edit-matrix",passed:passed-editStart,revisions:2,reviewEvents:2,historyReports:2,pointsUnchanged:true}));
+  if(!verifyList) return;
+  const listStart=passed, listBefore=await terminal.observe();
+  await scenario("list:actual-new-draft-points-to-edited-current-version",async()=>{
+    const page=await call("documents",[null,100]);assert.equal(page.hasMore,false);assert.equal(page.nextCursor,null);
+    const matching=page.documents.filter(d=>d.canonicalId===doc);assert.equal(matching.length,1);
+    assert.equal(matching[0].currentRevisionId,newRev);assert.equal(matching[0].currentRevisionNumber,2);
+    assert.equal(matching[0].noteType,"communication");assert.equal(matching[0].deletedAt,null);
+  });
+  await scenario("list:metadata-has-no-wording-facts-or-review-approval",async()=>{
+    const page=await call("documents",[null,100]);
+    for(const d of page.documents) assert.deepEqual(Object.keys(d).sort(),["canonicalId","noteType","sourceLocale","lifecycleStatus","currentRevisionId","currentRevisionNumber","contractVersion","schemaVersion","createdAt","updatedAt","deletedAt"].sort());
+    assert.ok(!JSON.stringify(page).includes(command.englishDraft));
+  });
+  await scenario("list:foreign-owner-cannot-discover-new-draft",async()=>{
+    const page=await call("documents",[null,100],true);
+    assert.ok(page.documents.every(d=>d.canonicalId!==doc && d.canonicalId!=="11111111-1111-4111-8111-111111111111"));
+  });
+  await scenario("list:revoked-session-cannot-read-metadata",async()=>{
+    await owner.query("delete from auth.sessions where id=$1 and user_id=$2",[SESSION,OWNER]);
+    try {await denied(call("documents",[null,100]),"SESSION_REVOKED");}
+    finally {await owner.query("insert into auth.sessions(id,user_id) values($1,$2)",[SESSION,OWNER]);}
+  });
+  await scenario("list:repeated-revisit-does-not-write-or-settle",async()=>{
+    const first=await call("documents",[null,100]);assert.deepEqual(await call("documents",[null,100]),first);
+    assert.deepEqual(await terminal.observe(),listBefore);
+    assert.equal((await call("read",[doc])).document.currentRevisionId,newRev);
+    assert.deepEqual((await call("list",[doc,rev])).entries,[receipt.entry]);
+    assert.deepEqual((await call("list",[doc,newRev])).entries,[newReport.entry]);
+  });
+  console.log(JSON.stringify({stage:"settled-list-matrix",passed:passed-listStart,metadataOnly:true,pointsUnchanged:true}));
 }

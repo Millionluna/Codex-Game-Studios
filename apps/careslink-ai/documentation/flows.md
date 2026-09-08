@@ -117,6 +117,21 @@ editing/review/export and terminal replay do not charge Points. The opt-in
 deleted; formal activation, real model calls and OS delivery claims stay closed.
 See [the settled-draft editing evidence and next revisit entry](communication-note-product-integration-m1y.md#communication-note-settled-draft-wording-edit-and-version-history-integration-2026-09-08).
 
+### Communication Note saved-list revisit fixture (2026-09-08)
+
+`--settlement-list` wires the new saved-list surface only in the disposable
+local workspace: empty → task/save → leave → list current-version metadata →
+open with fresh access/self-review checks → edit → return/reload → open latest
+version. The task's original result link remains revision-pinned. The list uses
+the existing owner-scoped metadata RPC, then filters to the exact newly settled
+document; it never fetches draft wording or grants review/export authority.
+Three locales, retryable failures, lifecycle clearing and eight-second timeout
+are supported. Revoked-session refresh removes the list. Reading generates no
+job/Points/review/export write. `--settlement-list-check` proves 94 database
+scenarios; the formal legacy workspace, general catalog/pagination, Hosted and
+real provider activation remain unchanged.
+See [saved-list evidence and the next in-progress task entry](communication-note-product-integration-m1y.md#communication-note-saved-draft-list-and-revisit-integration-2026-09-08).
+
 ## 4. Save, history and delete
 
 ### Current flow
