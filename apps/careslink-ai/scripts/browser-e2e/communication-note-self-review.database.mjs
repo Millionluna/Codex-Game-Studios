@@ -12,6 +12,7 @@ import { verifyExportHistoryScenarios } from "../preview-e2e/communication-note-
 import { installAdmissionBrowserDatabase, verifyAdmissionBrowserDatabase } from "./communication-note-admission.database.mjs";
 import { installSettlementBrowserController, verifySettlementBrowserController } from "./communication-note-settlement.database.mjs";
 import { verifySettledReviewScenarios } from "./communication-note-settled-review.database.mjs";
+import { verifyCommunicationNoteJobList } from "./communication-note-job-list.database.mjs";
 
 const exec = promisify(execFile), childEnv = { PATH: "/usr/bin:/bin", LANG: "C", LC_ALL: "C" };
 const OWNER = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", SESSION = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
@@ -57,7 +58,7 @@ export function createReviewBrowserDatabase(root, mode = "REVIEW") {
       ...(settledReview ? { CARESLINK_LOCAL_SETTLED_REVIEW: "EXACT_SETTLED_RESULT_ONLY" } : {}),
       ...(settledEdit ? { CARESLINK_LOCAL_SETTLED_EDIT: "EXACT_SETTLED_DOCUMENT_ONLY" } : {}),
       ...(settledList ? { CARESLINK_LOCAL_SETTLED_LIST: "EXACT_SETTLED_DOCUMENT_ONLY" } : {}),
-      ...(workspaceTaskId ? { CARESLINK_LOCAL_TASK_ENTRY: "FIXED_SINGLE_ADMISSION", CARESLINK_LOCAL_TASK_ENTRY_JOB_ID: workspaceTaskId } : {}),
+      ...(workspaceTaskId ? { CARESLINK_LOCAL_TASK_ENTRY: "OWNER_TASK_LIST" } : {}),
       ...(edit ? { CARESLINK_LOCAL_EDIT_DATABASE: "OWNED_UNIX_SOCKET_ONLY" } : {}),
       ...(history ? { CARESLINK_LOCAL_HISTORY_DATABASE: "OWNED_UNIX_SOCKET_ONLY" } : {}) },
     async start() {
@@ -161,6 +162,7 @@ export function createReviewBrowserDatabase(root, mode = "REVIEW") {
       const runtime = await open("cl_admission_browser_runtime", admissionPassword);
       try {
         await verifySettlementBrowserController(owner, runtime, terminalController);
+        if (mode === "WORKSPACE_TASK") await verifyCommunicationNoteJobList(owner);
         if (settledReview) {
           const actor = await open(RUNTIME, password);
           try { await verifySettledReviewScenarios(owner, actor, root, terminalController, settledEdit, settledList); }

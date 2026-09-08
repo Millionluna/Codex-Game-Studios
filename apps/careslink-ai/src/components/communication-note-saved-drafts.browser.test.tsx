@@ -51,6 +51,43 @@ describe("saved draft revisit surface",()=>{
   });
 });
 const task={jobId:DOC,status:"QUEUED",createdAt:result.documents[0].updatedAt,updatedAt:result.documents[0].updatedAt} as const;
+const pageTime="2026-09-08T01:00:00.000000Z";
+const manyTasks=Array.from({length:20},(_,i)=>({jobId:`22222222-2222-4222-8222-${String(100-i).padStart(12,"0")}`,status:"QUEUED" as const,createdAt:pageTime,updatedAt:pageTime}));
+const pageCursor={jobId:manyTasks[19].jobId,createdAt:pageTime};
+const multi={...result,taskPage:{tasks:manyTasks,nextCursor:pageCursor}};
+const renderMulti=()=>act(async()=>root.render(<CommunicationNoteSavedDrafts locale="en" loginHref={LOGIN} includeTask="MULTI"/>));
+const button=(text:string)=>Array.from(container.querySelectorAll("button")).find(b=>b.textContent===text)!;
+describe("multi-task workspace navigation",()=>{
+  it.each(["en","zh-Hans","zh-Hant"] as const)("renders multiple exact links and original brand in %s",locale=>{
+    const markup=renderToStaticMarkup(<CommunicationNoteSavedDraftsView locale={locale} includeTask="MULTI" result={multi} onRefresh={()=>{}} onPage={()=>{}}/>);
+    const view=document.createElement("div");view.innerHTML=markup;expect(view.querySelectorAll('a[href*="/jobs/"]')).toHaveLength(20);
+    for(const task of manyTasks){expect(markup).toContain(`/jobs/${task.jobId}?lang=${locale}`);expect(view.textContent).not.toContain(task.jobId);}
+    expect(markup).toContain("careslink-ai-logo-reverse.svg");expect(view.textContent).not.toContain("Synthetic call occurred.");
+  });
+  it("replaces a page with a fresh read and returns to latest without generating",async()=>{
+    mocks.load.mockResolvedValue(multi);await renderMulti();expect(container.querySelectorAll('a[href*="/jobs/"]')).toHaveLength(20);
+    mocks.load.mockResolvedValue({...result,taskPage:{tasks:[{...manyTasks[0],jobId:DOC}],nextCursor:null}});
+    await act(async()=>button("Older tasks").click());expect(mocks.load).toHaveBeenLastCalledWith(expect.any(AbortSignal),undefined,"MULTI",pageCursor);
+    expect(container.querySelectorAll('a[href*="/jobs/"]')).toHaveLength(1);
+    mocks.load.mockResolvedValue(multi);await act(async()=>button("Latest tasks").click());expect(mocks.load).toHaveBeenLastCalledWith(expect.any(AbortSignal),undefined,"MULTI",null);
+  });
+  it("clears a delayed page on revocation and rejects its late reply",async()=>{
+    mocks.load.mockResolvedValue(multi);await renderMulti();let resolve:(v:unknown)=>void=()=>{};
+    mocks.load.mockImplementationOnce(()=>new Promise(r=>{resolve=r;}));await act(async()=>button("Older tasks").click());
+    expect(container.querySelector('a[href*="/jobs/"]')).toBeNull();
+    mocks.load.mockResolvedValue({status:"AUTH_REQUIRED"});await act(async()=>window.dispatchEvent(new Event("focus")));
+    await act(async()=>resolve(multi));expect(container.querySelector('a[href*="/jobs/"]')).toBeNull();expect(mocks.replace).toHaveBeenCalledWith(LOGIN);
+  });
+  it.each(["offline","pagehide","storage"])("clears every page immediately on %s",async event=>{
+    mocks.load.mockResolvedValue(multi);await renderMulti();mocks.load.mockImplementation(()=>new Promise(()=>{}));
+    await act(async()=>window.dispatchEvent(new Event(event)));expect(container.querySelector('a[href*="/jobs/"]')).toBeNull();expect(container.querySelector('a[href*="/documents/"]')).toBeNull();
+  });
+  it("never offers stale pagination or creation after a page error",async()=>{
+    mocks.load.mockResolvedValue(multi);await renderMulti();mocks.load.mockRejectedValue(new Error("private"));
+    await act(async()=>button("Older tasks").click());expect(container.textContent).toContain("cannot be checked");expect(container.textContent).not.toContain("private");
+    expect(button("Older tasks")).toBeUndefined();expect(container.querySelector('a[href="/ai-documents/communication-note?lang=en"]')).toBeNull();
+  });
+});
 const workspace={...result,task};
 const hasTask=()=>Boolean(container.querySelector('a[href*="/jobs/"]'));
 const renderWorkspace=()=>act(async()=>root.render(<CommunicationNoteSavedDrafts locale="en" loginHref={LOGIN} includeTask/>));

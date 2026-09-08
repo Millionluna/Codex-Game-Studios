@@ -159,6 +159,24 @@ draft return, and revoked-session return shows sign-in without private data.
 The general multi-task catalog and formal workspace activation remain open.
 See [navigation verification](communication-note-product-integration-m1y.md#communication-note-workspace-navigation-loop-2026-09-08).
 
+### Communication Note owner-isolated multi-task workspace (2026-09-08)
+
+This supersedes the singleton `--workspace-task` wiring above. Fresh cookie
+provider/session → private purpose RPC → current owner's Communication tasks
+(newest first, 20 per page) → exact task → saved version → same-language
+workspace. Cursor pagination carries position only, never owner identity.
+Refresh and lifecycle changes reauthorize from the latest page; pending/failed
+or revoked reads clear both sections. A separate create action can admit a new
+task, while status reads never submit/retry generation or charge Points.
+
+The real browser proved two independent tasks after a lost acknowledgement and
+a failure/release, followed by success/commit and revoked-session clearing.
+The new SQL remains an unactivated local candidate outside the pinned Hosted
+manifest. The reusable UI preserves the existing green identity and three
+languages. Formal workspace activation and the general saved-draft catalog are
+still pending; the draft section retains its exact-settled-document fixture.
+See [multi-task scope and verification](communication-note-product-integration-m1y.md#communication-note-owner-isolated-multi-task-workspace-2026-09-08).
+
 ## 4. Save, history and delete
 
 ### Current flow

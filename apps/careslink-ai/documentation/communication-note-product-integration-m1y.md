@@ -2548,3 +2548,83 @@ multi-task list contract and read path to replace the single-candidate fixture
 entry. Develop and verify locally with synthetic data first; no Hosted grants,
 activation, deployment or AI calls are implied. Other Note types and billing
 remain unfinished.
+
+## Communication Note owner-isolated multi-task workspace (2026-09-08)
+
+The owned `--workspace-task` fixture now replaces its preallocated singleton
+with a real owner-scoped PostgreSQL task list. Each admission gets a new random
+candidate; exact-request replay still uses the existing idempotent admission
+RPC. No browser request key or task locator is required to recover a lost reply.
+
+The reusable `communication-note-task-list.ts` contract exposes only `jobId`,
+status, creation/update times and a position cursor. Pages contain at most 20
+tasks, sorted by `(created_at DESC, id DESC)` with full microsecond precision.
+The cursor never chooses an owner, page size or Note type. Duplicate, unordered,
+out-of-page, malformed or excessive responses fail closed. Older-page reads
+replace the visible list; refresh/lifecycle reauthorization returns to latest.
+Pending, failed or revoked reads remove both task and draft metadata. No task
+polling, browser persistence, generation retry or Points mutation is added.
+
+The CLI-created SQL remains in `supabase/migration-candidates`, **outside the
+unchanged 47-file Hosted migration manifest**. It creates private NOLOGIN,
+NOINHERIT, NOBYPASSRLS caller/executor roles. The executor receives seven
+metadata columns only, forced owner/type RLS, a matching partial keyset index
+and the existing fresh provider-session helper. It rechecks wall-clock session
+freshness after acquiring auth locks and after reading the page. The caller
+receives only this RPC, with no table, payload, owner-executor or write access.
+The candidate grants no LOGIN/runtime membership or Data API execution. The
+existing strictly local parent alone binds its attested Unix-socket test role.
+This is not a hosted grant/activation or new Production migration.
+
+The green Logo, typography, three locales and same-language navigation are
+retained. Multiple tasks show status and timestamps, with explicit older/latest
+page controls. Creating another Note is a separate action, available only after
+successful list authorization; the existing composer still checks Points and
+privacy. Success continues to say review is required. Impeccable guided use of
+the existing compact list layout; Supabase guidance kept least-privilege and
+fresh-session boundaries, and Next/React/browser guidance kept stale reads out
+of the rendered surface.
+
+Verification:
+
+- Full suite: **4,942 passed / 12 skipped**, 296 files (295 passed / one skipped),
+  a net 46 additional cases. TypeScript, zero-warning changed-file lint, Next
+  64-page build, 32-chunk client boundary and 73-file adapter checks passed.
+- `--workspace-task-check`: **110 local PostgreSQL scenarios**. Twelve new list
+  cases cover 25 owner tasks across 20/5 pages with timestamp ties, a foreign
+  task and another Note type, foreign cursor reuse, new same-owner session,
+  revoked/mismatched/expired sessions, provider-role removal, input bounds,
+  narrow ACLs, index use and unchanged Points on repeated reads. Parent-only
+  extra metadata/payload/proof fixtures are not paid admissions or AI output;
+  all FK/CHECK constraints are checked and the probe transaction is rolled back.
+  Initial test-data FK mistakes were corrected without weakening constraints.
+- Real browser flow: empty workspace → first admission with deliberately lost
+  response → return without retry → original queued task → synthetic failure
+  releases 20 Points → second independent admission → workspace shows both
+  tasks newest first → synthetic success → Traditional workspace → saved draft
+  → same-language return → revoke session → refresh → sign-in. Pagination clicks
+  are covered by DOM tests and database pages, not claimed as a >20-row browser
+  run. No native offline, mobile viewport, real AI or human-review claim.
+- Final browser tasks: `fba5f4f0-8dde-4a83-8053-5352e4c909b1` (FAILED) and
+  `c90658e3-40a7-4554-8681-ee90ea2ddcda` (SUCCEEDED); saved document
+  `07a2e5cb-ddbc-453c-80dc-f17fb966ff5f`. Exactly two admissions/reserves,
+  one RELEASE and one COMMIT; **10 available / 0 reserved**. Zero review events
+  or export reports. The one save receipt/sync change is generation persistence,
+  not a wording edit. Export buttons remain disabled pending human self-review.
+- No browser warning/error logs; Security Advisors on the exact owned Unix
+  socket reported no issues. All owned roots from these runs were stopped and
+  removed, including final `/private/tmp/cl-job-browser-mX0KjS`; tab 30 closed,
+  port 3395 released. No push, PR, deployment, Hosted/Production, real data,
+  provider, KMS/vault or payment operation.
+
+**Still deliberately local:** the formal legacy workspace/API binding is
+unchanged. The saved-draft section still uses the one-settled-document fixture;
+the new task catalog does not attest a general saved-document catalog or
+cross-device browser E2E. The historical single-task parser/view mode remains
+for regression coverage but is no longer the workspace fixture entry.
+
+**Next bounded implementation:** replace the one-settled-document list with a
+current-user Communication Note saved-draft catalog, preserving minimal metadata,
+pagination, exact-current-version links and fresh review/access checks. Develop
+and verify locally first; no external activation or AI call is implied. Other
+four Notes, real model integration and billing remain separate unfinished work.

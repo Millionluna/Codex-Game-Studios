@@ -240,7 +240,7 @@ export const dynamic="force-dynamic";
 export default async function AdmissionInstructions() { assertAdmissionFixture(); const points=await readAdmissionPoints(); return <main style={{padding:32}}>
 <h1>Communication Note — local queue and Points test</h1>
 <p>Only fixed synthetic facts. Starts with 30 synthetic Points; admission reserves 20. No welcome grant, purchase or actual charge.</p>
-<p>The first successful database admission deliberately returns an unavailable response. ${workspaceTask ? "Do not retry for this scenario. Use Back to AI Documents to recover the single task from the workspace, without its request key. This run accepts one fixed synthetic task only." : "Use Retry on the composer: the same key must recover the same queued task without a second reservation."}</p>
+<p>The first successful database admission deliberately returns an unavailable response. ${workspaceTask ? "Do not retry for this scenario. Use Back to AI Documents to recover the task from your paginated workspace, without its request key. After a parent-controlled failure releases Points, create another fixed synthetic task to verify multiple entries." : "Use Retry on the composer: the same key must recover the same queued task without a second reservation."}</p>
 <p>${settlement ? "The local operator can settle one queued job with fixed synthetic success, failure or cancellation, then replay it. No terminal authority is exposed over HTTP. Success consumes the reservation; failure/cancellation releases it. A successful result is authored synthetic test content, not AI output." : "Jobs stay queued: no worker, AI, payload encryption or result is exercised."} All local test data is deleted on shutdown.</p>
 ${settledReview ? `<p>Only the newly settled draft can be self-reviewed and exported. Review and export history use real local PostgreSQL. ${settledEdit ? "Wording edits save a new version that requires a new self-review. The old version keeps its own export history. Editing does not charge Points. Use synthetic wording only." : "Editing stays unavailable."} Export reports describe browser actions, not confirmed file delivery. Review/export do not charge Points.</p>` : ""}
 <p role="status">{points.status==="AVAILABLE" ? "Available: "+points.availablePoints+" Points · Reserved: "+points.reservedPoints+" Points" : "Points unavailable"}</p>
@@ -282,7 +282,7 @@ import { resolveCommunicationNoteDocumentLocale } from "@/lib/communication-note
 export const dynamic="force-dynamic";
 export default async function SavedDraftsPage({searchParams}:{searchParams:Promise<Record<string,string|string[]|undefined>>}) {
   const {locale,unsupported}=resolveCommunicationNoteDocumentLocale((await searchParams).lang);
-  return <CommunicationNoteSavedDrafts locale={locale} includeTask={${workspaceTask}} unsupportedLocale={unsupported} loginHref={"/auth/login?next="+encodeURIComponent("/ai-documents?lang="+locale)} />;
+  return <CommunicationNoteSavedDrafts locale={locale} includeTask={${workspaceTask ? '"MULTI"' : 'false'}} unsupportedLocale={unsupported} loginHref={"/auth/login?next="+encodeURIComponent("/ai-documents?lang="+locale)} />;
 }`);
     await emit("src/app/api/ai-documents/communication-note/documents/route.ts", `export { ${workspaceTask ? 'readWorkspaceTask' : 'listSettledDrafts'} as GET } from "@/lib/${workspaceTask ? '__workspace-task-fixture' : '__saved-drafts-fixture'}";
 export const dynamic="force-dynamic"; export const runtime="nodejs";`);

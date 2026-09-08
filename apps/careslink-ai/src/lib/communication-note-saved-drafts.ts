@@ -1,3 +1,5 @@
+import { encodeCommunicationNoteTaskCursor, parseCommunicationNoteTaskPage, type CommunicationNoteTaskCursor,
+  type CommunicationNoteTaskPage } from "./communication-note-task-list";
 /** Metadata only. No document text, review approval, Points or write commands. */
 export const COMMUNICATION_NOTE_SAVED_DRAFTS_API = "/api/ai-documents/communication-note/documents";
 export type CommunicationNoteSavedDraft = Readonly<{
@@ -13,7 +15,7 @@ export type CommunicationNoteWorkspaceTask = Readonly<{
   updatedAt: string;
 }>;
 export type CommunicationNoteSavedDraftsResult =
-  | Readonly<{ status: "AVAILABLE"; documents: readonly CommunicationNoteSavedDraft[]; task?: CommunicationNoteWorkspaceTask | null }>
+  | Readonly<{ status: "AVAILABLE"; documents: readonly CommunicationNoteSavedDraft[]; task?: CommunicationNoteWorkspaceTask | null; taskPage?: CommunicationNoteTaskPage }>
   | Readonly<{ status: "AUTH_REQUIRED" }>
   | Readonly<{ status: "UNAVAILABLE" }>;
 
@@ -24,14 +26,15 @@ function record(value: unknown, keys: readonly string[]): Record<string, unknown
       Object.keys(value).sort().join(",") !== [...keys].sort().join(",")) throw invalid();
   return value as Record<string, unknown>;
 }
-export function parseCommunicationNoteSavedDrafts(httpStatus: number, value: unknown, includeTask = false): CommunicationNoteSavedDraftsResult {
+export function parseCommunicationNoteSavedDrafts(httpStatus: number, value: unknown, includeTask: boolean | "MULTI" = false,
+  before: CommunicationNoteTaskCursor | null = null): CommunicationNoteSavedDraftsResult {
   if (!value || typeof value !== "object" || !("status" in value)) throw invalid();
   if (value.status === "AUTH_REQUIRED" || value.status === "UNAVAILABLE") {
     record(value, ["status"]);
     if (httpStatus !== (value.status === "AUTH_REQUIRED" ? 401 : 503)) throw invalid();
     return Object.freeze({ status: value.status });
   }
-  const data = record(value, includeTask ? ["status", "documents", "task"] : ["status", "documents"]);
+  const data = record(value, includeTask === "MULTI" ? ["status", "documents", "taskPage"] : includeTask ? ["status", "documents", "task"] : ["status", "documents"]);
   if (httpStatus !== 200 || data.status !== "AVAILABLE" || !Array.isArray(data.documents) || data.documents.length > 100) throw invalid();
   const documents = data.documents.map(value => {
     const d = record(value, ["canonicalId", "revisionNumber", "sourceLocale", "updatedAt"]);
@@ -45,7 +48,7 @@ export function parseCommunicationNoteSavedDrafts(httpStatus: number, value: unk
   });
   if (new Set(documents.map(d => d.canonicalId)).size !== documents.length) throw invalid();
   let task: CommunicationNoteWorkspaceTask | null = null;
-  if (includeTask && data.task !== null) {
+  if (includeTask === true && data.task !== null) {
     const t = record(data.task, ["jobId", "status", "createdAt", "updatedAt"]);
     if (typeof t.jobId !== "string" || !UUID.test(t.jobId) || typeof t.status !== "string" ||
         !["QUEUED", "RUNNING", "SUCCEEDED", "FAILED", "CANCELLED"].includes(t.status) ||
@@ -54,14 +57,17 @@ export function parseCommunicationNoteSavedDrafts(httpStatus: number, value: unk
     task = Object.freeze({ jobId: t.jobId, status: t.status as CommunicationNoteWorkspaceTask["status"],
       createdAt: String(t.createdAt), updatedAt: String(t.updatedAt) });
   }
-  return Object.freeze({ status: "AVAILABLE", documents: Object.freeze(documents), ...(includeTask ? { task } : {}) });
+  return Object.freeze({ status: "AVAILABLE", documents: Object.freeze(documents),
+    ...(includeTask === "MULTI" ? { taskPage: parseCommunicationNoteTaskPage(data.taskPage, before) } : includeTask ? { task } : {}) });
 }
 
 export async function loadCommunicationNoteSavedDrafts(signal: AbortSignal,
-  fetcher: typeof fetch = fetch, includeTask = false): Promise<CommunicationNoteSavedDraftsResult> {
-  const response = await fetcher(COMMUNICATION_NOTE_SAVED_DRAFTS_API, {
+  fetcher: typeof fetch = fetch, includeTask: boolean | "MULTI" = false,
+  before: CommunicationNoteTaskCursor | null = null): Promise<CommunicationNoteSavedDraftsResult> {
+  if (before !== null && includeTask !== "MULTI") throw invalid();
+  const response = await fetcher(COMMUNICATION_NOTE_SAVED_DRAFTS_API + (before ? "?before=" + encodeURIComponent(encodeCommunicationNoteTaskCursor(before)) : ""), {
     method: "GET", credentials: "same-origin", cache: "no-store",
     headers: { Accept: "application/json" }, signal,
   });
-  return parseCommunicationNoteSavedDrafts(response.status, await response.json(), includeTask);
+  return parseCommunicationNoteSavedDrafts(response.status, await response.json(), includeTask, before);
 }

@@ -4829,6 +4829,26 @@ See [full-flow scope and remaining real-admission gate](communication-note-produ
   No Hosted activation, real provider, human review or native offline claim.
 - [Navigation evidence and next multi-task read slice](communication-note-product-integration-m1y.md#communication-note-workspace-navigation-loop-2026-09-08).
 
+### Communication Note owner-isolated multi-task list gate (2026-09-08)
+
+- `--workspace-task` now uses a purpose-scoped PostgreSQL task list instead of
+  the fixed candidate. The SQL is a local migration candidate, not part of the
+  unchanged Hosted manifest. No formal workspace/API or Production activation.
+- `--workspace-task-check`: **110 real local database scenarios**, including 12
+  new owner/session/type isolation, 25-task keyset pagination, bounds, ACL,
+  index and read-only Points checks. All extra catalog probes are rolled back.
+- Full **4,942 passed / 12 skipped**, 296 files; typecheck, changed-file lint,
+  64-page build, 32-chunk client boundary and 73-file adapter checks passed.
+- Browser: lost response → find original task without retry → synthetic failure
+  → independent second admission → both tasks → synthetic success → Traditional
+  saved draft → workspace → revoked refresh → sign-in. Two reserves, one
+  RELEASE/COMMIT, 10/0 Points; no human review or export, no extra generation.
+- The desktop UI, actual two-task flow and no-console-error check passed.
+  >20-row pagination is SQL/DOM evidence, not a native-browser pagination claim.
+  Exact-socket Security Advisors found no issues; all owned fixtures and tab 30
+  were cleaned. No Hosted/real-AI/native-offline/cross-device claims.
+- [Implementation boundaries and next saved-draft catalog](communication-note-product-integration-m1y.md#communication-note-owner-isolated-multi-task-workspace-2026-09-08).
+
 ### Current live/read-only evidence
 
 - Supabase migrations, tables, RLS flags, policies, grants, function grants and aggregate row counts were checked read-only.

@@ -8,6 +8,7 @@ import { replaceCommunicationNoteLocation } from "../lib/communication-note-docu
 import { COMMUNICATION_NOTE_DOCUMENT_LOCALES, formatCommunicationNoteDocumentDate,
   getCommunicationNoteDocumentCopy, type CommunicationNoteDocumentLocale } from "../lib/communication-note-document-i18n";
 import { loadCommunicationNoteSavedDrafts, type CommunicationNoteSavedDraftsResult } from "../lib/communication-note-saved-drafts";
+import type { CommunicationNoteTaskCursor } from "../lib/communication-note-task-list";
 
 type VisibleResult = Exclude<CommunicationNoteSavedDraftsResult, { status: "AUTH_REQUIRED" }>;
 const COPY = {
@@ -47,13 +48,18 @@ const TASK_COPY = {
     open: "開啟任務狀態", boundary: "返回僅檢查狀態和存取權限，不啟動或重試生成、不確認複核，也不扣 Points。",
     states: { QUEUED: "排隊中", RUNNING: "生成中", SUCCEEDED: "草稿已儲存，仍需複核", FAILED: "生成失敗", CANCELLED: "任務已取消" } },
 } as const;
+const PAGE_COPY = {
+  en: { heading: "Generation tasks", created: "Created", next: "Older tasks", latest: "Latest tasks", description: "Newest first, up to 20 tasks per page. Open a task to check its outcome before starting another generation." },
+  "zh-Hans": { heading: "生成任务", created: "创建时间", next: "更早的任务", latest: "最新任务", description: "按创建时间倒序，每页最多 20 条。再次生成前，请先打开任务查看处理结果。" },
+  "zh-Hant": { heading: "生成任務", created: "建立時間", next: "較早的任務", latest: "最新任務", description: "按建立時間倒序，每頁最多 20 筆。再次生成前，請先開啟任務查看處理結果。" },
+} as const;
 
 /** Reusable surface; this slice connects it only in the owned local fixture. */
 export function CommunicationNoteSavedDrafts({ locale, loginHref, unsupportedLocale = false, includeTask = false }: Readonly<{
-  locale: CommunicationNoteDocumentLocale; loginHref: string; unsupportedLocale?: boolean; includeTask?: boolean;
+  locale: CommunicationNoteDocumentLocale; loginHref: string; unsupportedLocale?: boolean; includeTask?: boolean | "MULTI";
 }>) {
-  const [state, setState] = useState<{ loginHref: string; includeTask: boolean; result?: VisibleResult }>();
-  const refreshRef = useRef<() => void>(() => undefined);
+  const [state, setState] = useState<{ loginHref: string; includeTask: boolean | "MULTI"; result?: VisibleResult; before?: CommunicationNoteTaskCursor | null }>();
+  const refreshRef = useRef<(before?: CommunicationNoteTaskCursor | null) => void>(() => undefined);
   useEffect(() => {
     let mounted = true, sequence = 0;
     let controller: AbortController | undefined;
@@ -63,7 +69,7 @@ export function CommunicationNoteSavedDrafts({ locale, loginHref, unsupportedLoc
       if (timeout !== undefined) clearTimeout(timeout);
       timeout = undefined; setState({ loginHref, includeTask });
     }
-    async function refresh() {
+    async function refresh(before: CommunicationNoteTaskCursor | null = null) {
       clear();
       const ticket = sequence, current = new AbortController(); controller = current;
       timeout = setTimeout(() => {
@@ -72,11 +78,12 @@ export function CommunicationNoteSavedDrafts({ locale, loginHref, unsupportedLoc
         }
       }, 8_000);
       try {
-        const result = includeTask ? await loadCommunicationNoteSavedDrafts(current.signal, undefined, true)
+        const result = includeTask === "MULTI" ? await loadCommunicationNoteSavedDrafts(current.signal, undefined, "MULTI", before)
+          : includeTask ? await loadCommunicationNoteSavedDrafts(current.signal, undefined, true)
           : await loadCommunicationNoteSavedDrafts(current.signal);
         if (!mounted || current.signal.aborted || ticket !== sequence) return;
         if (result.status === "AUTH_REQUIRED") { clear(); replaceCommunicationNoteLocation(loginHref); return; }
-        setState({ loginHref, includeTask, result });
+        setState({ loginHref, includeTask, result, before });
       } catch {
         if (mounted && !current.signal.aborted && ticket === sequence)
           setState({ loginHref, includeTask, result: { status: "UNAVAILABLE" } });
@@ -88,7 +95,7 @@ export function CommunicationNoteSavedDrafts({ locale, loginHref, unsupportedLoc
     const offline = () => { clear(); setState({ loginHref, includeTask, result: { status: "UNAVAILABLE" } }); };
     const visibility = () => { if (document.visibilityState === "visible") recheck(); else clear(); };
     const pageShow = (event: PageTransitionEvent) => { if (event.persisted) recheck(); };
-    refreshRef.current = recheck; recheck();
+    refreshRef.current = before => { void refresh(before); }; recheck();
     window.addEventListener("focus", recheck); window.addEventListener("storage", recheck);
     window.addEventListener("online", recheck); window.addEventListener("offline", offline);
     window.addEventListener("pagehide", clear); window.addEventListener("pageshow", pageShow);
@@ -103,15 +110,20 @@ export function CommunicationNoteSavedDrafts({ locale, loginHref, unsupportedLoc
     };
   }, [loginHref, includeTask]);
   return <CommunicationNoteSavedDraftsView locale={locale} unsupportedLocale={unsupportedLocale} includeTask={includeTask}
+    olderPage={state?.loginHref === loginHref && state.includeTask === includeTask && !!state.before}
+    onPage={cursor => refreshRef.current(cursor)}
     result={state?.loginHref === loginHref && state.includeTask === includeTask ? state.result : undefined} onRefresh={() => refreshRef.current()} />;
 }
 
-export function CommunicationNoteSavedDraftsView({ locale, result, onRefresh, unsupportedLocale = false, includeTask = false }: Readonly<{
-  locale: CommunicationNoteDocumentLocale; result?: VisibleResult; onRefresh: () => void; unsupportedLocale?: boolean; includeTask?: boolean;
+export function CommunicationNoteSavedDraftsView({ locale, result, onRefresh, unsupportedLocale = false, includeTask = false, olderPage = false, onPage }: Readonly<{
+  locale: CommunicationNoteDocumentLocale; result?: VisibleResult; onRefresh: () => void; unsupportedLocale?: boolean; includeTask?: boolean | "MULTI";
+  olderPage?: boolean; onPage?: (cursor: CommunicationNoteTaskCursor | null) => void;
 }>) {
   const copy = COPY[locale], documentCopy = getCommunicationNoteDocumentCopy(locale);
   const taskCopy = TASK_COPY[locale], surfaceCopy = includeTask ? taskCopy : copy;
   const task = includeTask && result?.status === "AVAILABLE" ? result.task : null;
+  const taskPage = includeTask === "MULTI" && result?.status === "AVAILABLE" ? result.taskPage : undefined;
+  const pageCopy = PAGE_COPY[locale];
   const DraftHeading = includeTask ? "h3" : "h2";
   return <main className="case-note-page">
     <header className="case-note-brandbar">
@@ -131,7 +143,7 @@ export function CommunicationNoteSavedDraftsView({ locale, result, onRefresh, un
       <div className="flex flex-wrap items-start justify-between gap-5">
         <div><h1 id="saved-drafts-title" className="text-2xl font-semibold sm:text-3xl">{surfaceCopy.title}</h1>
           <p className="mt-3 max-w-[70ch] text-sm leading-6">{surfaceCopy.description}</p></div>
-        {!includeTask || (result?.status === "AVAILABLE" && result.task === null) ?
+        {!includeTask || (result?.status === "AVAILABLE" && (result.task === null || includeTask === "MULTI")) ?
           <a className="jade-action" href={`/ai-documents/communication-note?lang=${locale}`}>{copy.create}</a> : null}
       </div>
       {unsupportedLocale ? <p role="status" className="mt-4">{documentCopy.unsupportedLocale}</p> : null}
@@ -144,15 +156,31 @@ export function CommunicationNoteSavedDraftsView({ locale, result, onRefresh, un
       </div>
       {includeTask && result?.status === "AVAILABLE" ? <>
         <section className="border-b border-line py-6" aria-labelledby="workspace-task-title">
-          <h2 id="workspace-task-title" className="text-xl font-semibold">{taskCopy.heading}</h2>
-          {task ? <div className="mt-4 flex flex-wrap items-center justify-between gap-5">
+          <h2 id="workspace-task-title" className="text-xl font-semibold">{includeTask === "MULTI" ? pageCopy.heading : taskCopy.heading}</h2>
+          {taskPage ? <>
+            <p className="mt-3 max-w-[70ch] text-sm leading-6">{pageCopy.description}</p>
+            {taskPage.tasks.length === 0 ? <p className="mt-3 text-sm">{taskCopy.empty}</p> :
+              <ul aria-label={pageCopy.heading} className="mt-2 divide-y divide-line">
+                {taskPage.tasks.map(t => <li key={t.jobId} className="flex flex-wrap items-center justify-between gap-5 py-5">
+                  <div><h3 id={`task-${t.jobId}`} className="font-semibold">{taskCopy.states[t.status]}</h3>
+                    <p className="mt-2 text-sm">{pageCopy.created}: <time dateTime={t.createdAt}>{formatCommunicationNoteDocumentDate(t.createdAt, locale)}</time></p>
+                    <p className="mt-2 text-sm">{copy.updated}: <time dateTime={t.updatedAt}>{formatCommunicationNoteDocumentDate(t.updatedAt, locale)}</time></p></div>
+                  <a className="jade-action" aria-describedby={`task-${t.jobId}`}
+                    href={buildCommunicationNoteGenerationJobHref({ jobId: t.jobId, locale })}>{taskCopy.open}</a>
+                </li>)}
+              </ul>}
+            <nav aria-label={pageCopy.heading} className="mt-4 flex flex-wrap gap-3">
+              {olderPage ? <button className="jade-action" type="button" onClick={onRefresh}>{pageCopy.latest}</button> : null}
+              {taskPage.nextCursor && onPage ? <button className="jade-action" type="button" onClick={() => onPage(taskPage.nextCursor)}>{pageCopy.next}</button> : null}
+            </nav>
+          </> : task ? <div className="mt-4 flex flex-wrap items-center justify-between gap-5">
             <div><p className="font-semibold">{taskCopy.states[task.status]}</p>
               <p className="mt-2 text-sm">{copy.updated}: <time dateTime={task.updatedAt}>{formatCommunicationNoteDocumentDate(task.updatedAt, locale)}</time></p></div>
             <a className="jade-action" href={buildCommunicationNoteGenerationJobHref({ jobId: task.jobId, locale })}>{taskCopy.open}</a>
           </div> : <p className="mt-3 text-sm">{taskCopy.empty}</p>}
         </section>
         <h2 className="mt-7 text-xl font-semibold">{copy.title}</h2>
-        {result.documents.length === 0 ? <p className="mt-3 text-sm leading-6">{task ? taskCopy.noDraft : copy.empty}</p> : null}
+        {result.documents.length === 0 ? <p className="mt-3 text-sm leading-6">{task || taskPage?.tasks.length ? taskCopy.noDraft : copy.empty}</p> : null}
       </> : null}
       {result?.status === "AVAILABLE" && result.documents.length > 0 ?
         <ul aria-label={copy.title} className="mt-4 divide-y divide-line">
