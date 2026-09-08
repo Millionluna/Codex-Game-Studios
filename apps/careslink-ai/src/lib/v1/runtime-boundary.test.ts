@@ -898,6 +898,7 @@ describe("V1 shadow runtime boundary", () => {
           ),
       ),
     ).toEqual([
+      join(process.cwd(), "src/lib/communication-note-workspace-task-postgres.server.ts"),
       join(process.cwd(), "src/lib/v1/communication-note-job-status-postgres.server.ts"),
       modulePath,
     ]);
@@ -913,6 +914,18 @@ describe("V1 shadow runtime boundary", () => {
     expect(source).toContain(
       "SOURCE_PRODUCT_RUNTIME_COMPOSITION_NOT_ACTIVATED",
     );
+  });
+
+  it("keeps the new task physical reader server-only and absent from formal runtime imports", () => {
+    const file = join(process.cwd(), "src/lib/communication-note-workspace-task-postgres.server.ts");
+    const source = readFileSync(file, "utf8");
+    expect(source).toMatch(/^import "server-only";/);
+    expect(source).toContain("COMMUNICATION_NOTE_TASK_POSTGRES_READY = false as const");
+    expect(source).not.toMatch(/process\.env|import\.meta\.env|connectionString\s*:|\bnew\s+(?:\w+\.)?Pool\s*\(|fetch\s*\(|console\.|job-status-(?:custody|purpose|postgres)|pg_signal_backend\s+to/i);
+    expect(walkAllScriptFiles("src").filter(path => !/\.test\.[cm]?[jt]sx?$/.test(path) &&
+      /(?:from\s+|import\s*\()["'][^"']*communication-note-workspace-task-postgres\.server["']/.test(readFileSync(path, "utf8")))).toEqual([]);
+    expect(readFileSync(join(process.cwd(), "src/lib/communication-note-workspace-runtime.server.ts"), "utf8"))
+      .toMatch(/COMMUNICATION_NOTE_WORKSPACE_FORMAL_RUNTIME\s*=\s*undefined/);
   });
 
   it("quarantines the M1s Product runtime identities to its own test and forbids ambient authority", () => {

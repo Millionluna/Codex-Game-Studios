@@ -2876,3 +2876,90 @@ Notes, live AI generation or credit billing.
 purpose port's physical connection, cancellation and cleanup boundary. Keep
 credential issuance, Hosted grants, runtime binding, feature activation and any
 Preview/Production deployment separate and explicitly authorized.
+
+### Communication Note task-list physical cancellation and cleanup (2026-09-08)
+
+The preceding local implementation is complete. The new server-only
+`communication-note-workspace-task-postgres.server.ts` implements the existing
+four-field list-purpose port. It is lazy, single-use and owner/session-bound;
+only the fixed seven-parameter, 20-row task statement can execute. Cursor
+positions retain microsecond precision. No generic SQL, pool, ambient database
+credential or single-job-status credential reuse is exposed.
+
+The injected non-Production direct target requires PG17, port 5432, the expected
+database and certificate-verified TLS with a copied, digest-pinned CA. Both
+physical sessions attest the runtime LOGIN's restricted flags, connection limit
+2, exactly one set-only list-caller membership, and the caller's lack of parent
+memberships. The separately named TestOnly constructor accepts only the owned
+PG16 Unix fixture path and attests its cluster. Neither constructor installs
+itself into the formal runtime; `COMMUNICATION_NOTE_WORKSPACE_FORMAL_RUNTIME`
+remains undefined and `COMMUNICATION_NOTE_TASK_POSTGRES_READY` remains false.
+
+Each execution opens its same-LOGIN cleanup connection first, then one read
+connection. The main connection alone activates the list caller. Read lifetime
+is bounded to 10 seconds, with separate connect, query, statement, lock and idle
+timeouts. The statement is autocommit, not a read-only transaction, because the
+existing fresh-session helper takes auth row locks. The SQL candidate, its RLS
+and privileges are unchanged.
+
+Cancellation destroys the owned read transport. A separate cleanup deadline
+(4.5 seconds, independent of the cancelled request) then terminates only that
+invocation's backend and checks its absence. Selection binds database, same
+LOGIN, random application nonce and, once known, PID plus microsecond backend
+start. It does not terminate arbitrary same-user sessions. The same unprivileged
+LOGIN can perform this cleanup without adding `pg_signal_backend`; no privileged
+control connection is introduced. A positive termination wait follows
+[PostgreSQL's termination semantics](https://www.postgresql.org/docs/17/functions-admin.html),
+not just a client disconnect or cancellation signal. Cleanup failure withholds
+metadata; only exact `SESSION_REVOKED` survives successful cleanup, without raw
+database errors. Both client connections close and retained password references
+are cleared on completion (not a claim of secure memory zeroization).
+
+**Credential boundary still open:** the port consumes a server-injected delivery
+valid for at most 90 seconds. Delivery expiry and local reference clearing do
+not revoke the source password, prevent another port from reusing that source,
+or attest credential custody/direct grants. No issuer, durable NOLOGIN fence,
+Hosted role/membership, cloud credential, target approval or activation was
+added. Those remain separate prerequisites before any Hosted binding.
+
+Verification:
+
+- Full **5,130 passed / 24 skipped**, 302 files (300 passed / two opt-in files
+  skipped). Added 51 physical-port unit cases and one source-boundary case.
+  Covers fixed inputs, one-shot/concurrent reuse, captured inputs, target/TLS/
+  role checks, connect failure, pre/mid-read abort, late connection/result,
+  independent cleanup wait/deadline/failure, safe errors and secret references.
+- The explicit command
+  `CARESLINK_TASK_POSTGRES_LOCAL=OWNED_UNIX_ONLY node node_modules/vitest/vitest.mjs run scripts/browser-e2e/communication-note-task-postgres.local.test.mjs`
+  passed **12 actual-source PG16 tests** after the existing **118 fixture
+  scenarios**. Three synthetic task rows, microsecond cursor pagination, foreign
+  ownership, revoked/expired sessions, blocked auth-row cancellation, server
+  lock timeout, actual cleanup-connection loss, unrelated-session survival,
+  excess membership, direct-table denial and HTTP-core composition passed.
+  Cookie Auth/document replies in the HTTP-core test are mocks; its task port,
+  task SQL and fresh-session checks are real. No new browser run is claimed.
+- Every new transport case checks zero runtime sessions and unchanged ledger,
+  reservations, jobs, reviews and edits. Cancellation also checks zero locks for
+  the read PID while its unrelated blocker transaction remains alive. The local
+  fixture creates then explicitly removes each synthetic LOGIN; this is fixture
+  teardown, **not implemented production credential revocation**. Both local
+  test runs stopped and removed their owned databases. Earlier synthetic fixture
+  setup/settlement activity is not attributed to the read-only transport.
+- TypeScript, zero-warning lint, webpack Next build (63 generated entries),
+  expanded client scan (117 static chunks), 73-file adapter sync and diff checks
+  pass. Two existing pg importer allowlists gained exactly this server module;
+  the new test proves no formal source imports it. An initial comment-matching
+  test false positive was corrected to detect actual Pool construction.
+- No migration/candidate, Hosted manifest, formal binding, remote permission,
+  cloud resource, environment or green visual/Logo change. No push/PR/deploy,
+  real care data, AI/provider, KMS/vault or payment call.
+
+Supabase connection-limit/idle-timeout/least-privilege guidance informed the two
+bounded purpose sessions; Next.js guidance kept them server-only and unbound.
+This completes the local physical read boundary, not live AI or five-Note launch.
+
+**Next bounded implementation:** replace the owned local workspace browser
+fixture's broad admission-connection bridge with this separate list-only port,
+then verify list refresh, pagination/navigation and cancelled reads through the
+actual workspace page. Keep formal/Hosted activation and credential issuance
+separate; no deployment is part of that next local slice.

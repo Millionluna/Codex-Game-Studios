@@ -227,6 +227,23 @@ and revoked-session clearing without any admission, Points or review writes.
 Next is local task-port connection/cancellation/cleanup implementation, not
 Hosted activation. See [adapter evidence](communication-note-product-integration-m1y.md#communication-note-read-only-workspace-database-adapter-2026-09-08).
 
+### Communication Note task-list physical cancellation and cleanup (2026-09-08)
+
+The local list-purpose port now opens an independent same-LOGIN cleanup
+connection before its single-use read connection. Both attest the narrow role
+and target; only the read session activates the list caller and fixed statement.
+Abort closes that transport, then independently bounded cleanup targets its
+random nonce plus known PID/start and checks that the backend is gone. Errors,
+timeouts and uncertain cleanup suppress metadata; no other session is targeted.
+
+Twelve actual-source PG16 transport tests (including blocked auth-row cancel,
+cleanup connection loss and HTTP-core composition) pass. This is not credential
+issuance/revocation or live binding: formal runtime remains undefined. The next
+local slice replaces the owned workspace browser fixture's broad test connection
+with this dedicated list-only port, then exercises actual-page refresh,
+pagination/navigation and cancellation without deploying. See
+[physical-port scope and evidence](communication-note-product-integration-m1y.md#communication-note-task-list-physical-cancellation-and-cleanup-2026-09-08).
+
 ## 4. Save, history and delete
 
 ### Current flow

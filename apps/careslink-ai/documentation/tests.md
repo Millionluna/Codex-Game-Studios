@@ -4918,6 +4918,38 @@ See [full-flow scope and remaining real-admission gate](communication-note-produ
   local implementation, not attested by a runtime port's labels.
 - [Adapter scope and evidence](communication-note-product-integration-m1y.md#communication-note-read-only-workspace-database-adapter-2026-09-08).
 
+### Communication Note task-list physical cancellation and cleanup (2026-09-08)
+
+- New server-only list-purpose PostgreSQL port: one use, fixed seven parameters,
+  owner/session binding, PG17 direct/pinned TLS or explicit owned PG16 Unix test
+  constructor. No ambient credentials, generic query, pool or status-purpose
+  reuse. Formal runtime remains undefined; readiness remains false.
+- Same low-privilege LOGIN has at most two connections. Its independent cleanup
+  connection checks exact own-backend termination/absence before metadata can
+  return. Read deadline 10 seconds; cleanup deadline 4.5 seconds survives abort.
+  Cleanup failure/late result is unavailable, not partial success.
+- Full **5,130 passed / 24 skipped**, 302 files. Added 51 unit cases and one
+  boundary case. Two exact pg importer allowlists gained only this server file;
+  no formal source importer or privileged fallback was allowed.
+- Explicit `CARESLINK_TASK_POSTGRES_LOCAL=OWNED_UNIX_ONLY` opt-in: **12 passed**
+  actual-source PG16 cases after 118 existing fixture cases. Owner metadata,
+  microsecond pagination, owner isolation, revoked/expired sessions, real lock
+  cancellation/timeout, lost cleanup connection, unrelated-session survival,
+  extra membership/table denial and HTTP-core composition pass. HTTP Cookie
+  Auth/document replies are mocked; task SQL and session locks are real.
+- Every transport case leaves zero runtime sessions and unchanged ledger,
+  reservations, jobs, reviews and edits. Cancelled read has zero PID locks while
+  the blocker remains alive. Owned test LOGINs and both temporary databases were
+  removed after shutdown; this is not production credential revocation evidence.
+- TypeScript, zero-warning lint, webpack build (63 generated entries), expanded
+  117-chunk client scan, 73-file adapter sync and diff checks pass. No new browser
+  evidence or PG17/Hosted TLS execution is claimed. No migration, online role,
+  binding, deployment or actual model/payment change.
+- Delivery expiry is not source-password revocation. Issuance/custody/Hosted
+  activation remain separate. Next: wire this port into the owned workspace
+  browser fixture and verify actual page reads/cancellation.
+- [Physical read boundary and evidence](communication-note-product-integration-m1y.md#communication-note-task-list-physical-cancellation-and-cleanup-2026-09-08).
+
 ### Current live/read-only evidence
 
 - Supabase migrations, tables, RLS flags, policies, grants, function grants and aggregate row counts were checked read-only.
