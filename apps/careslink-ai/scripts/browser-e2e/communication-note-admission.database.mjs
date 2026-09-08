@@ -122,13 +122,14 @@ export async function installAdmissionBrowserDatabase(owner, actor, root, passwo
     reservedPoints: 0, workerStarted: false, kmsVerified: false, modelCalled: false }));
 }
 
-export async function verifyAdmissionBrowserDatabase(owner, runtime) {
+export async function verifyAdmissionBrowserDatabase(owner, runtime, workspaceTaskId) {
+  if (workspaceTaskId !== undefined) assert.match(workspaceTaskId, /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u);
   const sql = `select careslink_v1_generation.admit_and_reserve_v1_bound_communication_note_generation_job(
     $1::uuid,$2::uuid,$3::text,$4::uuid,$5::uuid,$6::uuid,$7::text,$8::text,$9::text,$10::text,
     $11::text,$12::text,$13::text,$14::timestamptz,$15::text,$16::text,$17::text,$18::text,$19::text) as data`;
   const proof = (await owner.query("select cleaned_facts_hash from public.privacy_reviews where id='88888888-8888-4888-8888-888888888888'")).rows[0];
   const policy = (await owner.query("select * from careslink_v1_generation.payload_policies where policy_version='payload.local-browser.v1'")).rows[0];
-  const values = [OWNER,"cccccccc-cccc-4ccc-8ccc-cccccccccccc","COOKIE",randomUUID(),randomUUID(),
+  const values = [OWNER,"cccccccc-cccc-4ccc-8ccc-cccccccccccc","COOKIE",workspaceTaskId ?? randomUUID(),randomUUID(),
     "88888888-8888-4888-8888-888888888888","en","1.0.0-shadow.1","2026-08-09.v1-shadow",proof.cleaned_facts_hash,
     "c".repeat(64),"d".repeat(64),"e".repeat(64),new Date(Date.now()+20*60*1000).toISOString(),
     policy.policy_version,policy.policy_digest,policy.encryption_profile_version,policy.kms_key_version_resource_hash,policy.backup_disposition_version];
@@ -141,6 +142,13 @@ export async function verifyAdmissionBrowserDatabase(owner, runtime) {
   };
   await runtime.query("begin");
   try {
+    const readSql = "select careslink_v1_generation.get_v1_communication_note_job_status($1,$2,$3,$4,$5) as data";
+    const readValues = [OWNER,values[1],values[3],values[7],values[8]];
+    if (workspaceTaskId) {
+      await runtime.query("set local role careslink_v1_generation_job_status_caller");
+      await denied(readSql,readValues,"P0001","NOT_FOUND");
+      check("workspace-preallocated-id-is-empty-before-admission");
+    }
     await runtime.query("set local role careslink_v1_generation_points_admission_caller");
     await denied("select * from public.point_wallets",[],"42501");
     await denied("set local role careslink_v1_generation_executor",[],"42501"); check("runtime-no-table-or-worker-authority");
@@ -159,6 +167,14 @@ export async function verifyAdmissionBrowserDatabase(owner, runtime) {
     const read = (await runtime.query("select careslink_v1_generation.get_v1_communication_note_job_status($1,$2,$3,$4,$5) as data",
       [OWNER,values[1],values[3],values[7],values[8]])).rows[0].data.job;
     assert.deepEqual(read,first.job); check("purpose-reader-returns-real-queued-job");
+    if (workspaceTaskId) {
+      await denied(readSql,readValues.map((v,i)=>i===0?"bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb":i===1?"dddddddd-dddd-4ddd-8ddd-dddddddddddd":v),"P0001","NOT_FOUND");
+      check("workspace-foreign-owner-cannot-read-preallocated-task");
+      await denied(readSql,readValues.map((v,i)=>i===1?randomUUID():v),"P0001","SESSION_REVOKED");
+      check("workspace-revoked-session-cannot-read-preallocated-task");
+      for (let i=0;i<3;i++) assert.deepEqual((await runtime.query(readSql,readValues)).rows[0].data.job,first.job);
+      check("workspace-repeated-reads-return-original-queued-task");
+    }
   } finally { await runtime.query("rollback"); }
   assert.equal((await owner.query("select count(*)::int as n from careslink_v1_generation.jobs")).rows[0].n,0);
   assert.equal((await owner.query("select count(*)::int as n from public.point_reservations")).rows[0].n,0);

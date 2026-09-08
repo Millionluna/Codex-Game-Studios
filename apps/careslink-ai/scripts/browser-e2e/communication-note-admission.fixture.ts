@@ -77,6 +77,17 @@ export async function readAdmissionPoints() {
   assertAdmissionFixture();
   return resolveCommunicationNotePointsPreview(await createReviewDatabaseAuthClient());
 }
+/** One server-preallocated candidate per owned run; not a general task catalog.
+ * Allocated before admission, so losing the response cannot lose its locator. */
+export function getLocalWorkspaceTaskId(): string | undefined {
+  const mode = process.env.CARESLINK_LOCAL_TASK_ENTRY, id = process.env.CARESLINK_LOCAL_TASK_ENTRY_JOB_ID;
+  if (mode === undefined && id === undefined) return undefined;
+  assertAdmissionFixture();
+  if (mode !== "FIXED_SINGLE_ADMISSION" || typeof id !== "string" ||
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(id)) throw new Error("Local task entry unavailable");
+  return id;
+}
+
 export async function submitAdmissionTask(request: Request) {
   assertAdmissionFixture();
   if (!transport(request, API + "/generate", "POST")) return reply("FORBIDDEN", 403);
@@ -92,7 +103,7 @@ export async function submitAdmissionTask(request: Request) {
         throw new CaresLinkV1ContractError("VALIDATION_ERROR", "Only fixed synthetic facts are accepted");
       if (request.signal.aborted) throw new Error("Local request aborted");
       const admission = await createCaresLinkV1CommunicationNotePointsAdmissionRepository({ principal: command.principal,
-        query: queryAdmissionFixture }).enqueue({ jobId: randomUUID(), payloadId: randomUUID(),
+        query: queryAdmissionFixture }).enqueue({ jobId: getLocalWorkspaceTaskId() ?? randomUUID(), payloadId: randomUUID(),
         sourceLocale: "en", privacyReviewId: "88888888-8888-4888-8888-888888888888", cleanedFactsHash: command.cleanedFactsHash,
         idempotencyHash: digest(command.idempotencyKey), requestHash: digest({ locale: command.sourceLocale,
           factsHash: command.cleanedFactsHash, scanner: command.scannerPolicyVersion, privacy: command.privacyReview }),

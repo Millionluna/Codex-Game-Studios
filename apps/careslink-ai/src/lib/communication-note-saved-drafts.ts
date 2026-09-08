@@ -6,8 +6,14 @@ export type CommunicationNoteSavedDraft = Readonly<{
   sourceLocale: "en" | "zh-Hans" | "zh-Hant";
   updatedAt: string;
 }>;
+export type CommunicationNoteWorkspaceTask = Readonly<{
+  jobId: string;
+  status: "QUEUED" | "RUNNING" | "SUCCEEDED" | "FAILED" | "CANCELLED";
+  createdAt: string;
+  updatedAt: string;
+}>;
 export type CommunicationNoteSavedDraftsResult =
-  | Readonly<{ status: "AVAILABLE"; documents: readonly CommunicationNoteSavedDraft[] }>
+  | Readonly<{ status: "AVAILABLE"; documents: readonly CommunicationNoteSavedDraft[]; task?: CommunicationNoteWorkspaceTask | null }>
   | Readonly<{ status: "AUTH_REQUIRED" }>
   | Readonly<{ status: "UNAVAILABLE" }>;
 
@@ -18,14 +24,14 @@ function record(value: unknown, keys: readonly string[]): Record<string, unknown
       Object.keys(value).sort().join(",") !== [...keys].sort().join(",")) throw invalid();
   return value as Record<string, unknown>;
 }
-export function parseCommunicationNoteSavedDrafts(httpStatus: number, value: unknown): CommunicationNoteSavedDraftsResult {
+export function parseCommunicationNoteSavedDrafts(httpStatus: number, value: unknown, includeTask = false): CommunicationNoteSavedDraftsResult {
   if (!value || typeof value !== "object" || !("status" in value)) throw invalid();
   if (value.status === "AUTH_REQUIRED" || value.status === "UNAVAILABLE") {
     record(value, ["status"]);
     if (httpStatus !== (value.status === "AUTH_REQUIRED" ? 401 : 503)) throw invalid();
     return Object.freeze({ status: value.status });
   }
-  const data = record(value, ["status", "documents"]);
+  const data = record(value, includeTask ? ["status", "documents", "task"] : ["status", "documents"]);
   if (httpStatus !== 200 || data.status !== "AVAILABLE" || !Array.isArray(data.documents) || data.documents.length > 100) throw invalid();
   const documents = data.documents.map(value => {
     const d = record(value, ["canonicalId", "revisionNumber", "sourceLocale", "updatedAt"]);
@@ -38,14 +44,24 @@ export function parseCommunicationNoteSavedDrafts(httpStatus: number, value: unk
       sourceLocale: d.sourceLocale as CommunicationNoteSavedDraft["sourceLocale"], updatedAt: d.updatedAt });
   });
   if (new Set(documents.map(d => d.canonicalId)).size !== documents.length) throw invalid();
-  return Object.freeze({ status: "AVAILABLE", documents: Object.freeze(documents) });
+  let task: CommunicationNoteWorkspaceTask | null = null;
+  if (includeTask && data.task !== null) {
+    const t = record(data.task, ["jobId", "status", "createdAt", "updatedAt"]);
+    if (typeof t.jobId !== "string" || !UUID.test(t.jobId) || typeof t.status !== "string" ||
+        !["QUEUED", "RUNNING", "SUCCEEDED", "FAILED", "CANCELLED"].includes(t.status) ||
+        [t.createdAt, t.updatedAt].some(time => typeof time !== "string" || !/^\d{4}-\d{2}-\d{2}T/.test(time) || !Number.isFinite(Date.parse(time))) ||
+        Date.parse(String(t.updatedAt)) < Date.parse(String(t.createdAt))) throw invalid();
+    task = Object.freeze({ jobId: t.jobId, status: t.status as CommunicationNoteWorkspaceTask["status"],
+      createdAt: String(t.createdAt), updatedAt: String(t.updatedAt) });
+  }
+  return Object.freeze({ status: "AVAILABLE", documents: Object.freeze(documents), ...(includeTask ? { task } : {}) });
 }
 
 export async function loadCommunicationNoteSavedDrafts(signal: AbortSignal,
-  fetcher: typeof fetch = fetch): Promise<CommunicationNoteSavedDraftsResult> {
+  fetcher: typeof fetch = fetch, includeTask = false): Promise<CommunicationNoteSavedDraftsResult> {
   const response = await fetcher(COMMUNICATION_NOTE_SAVED_DRAFTS_API, {
     method: "GET", credentials: "same-origin", cache: "no-store",
     headers: { Accept: "application/json" }, signal,
   });
-  return parseCommunicationNoteSavedDrafts(response.status, await response.json());
+  return parseCommunicationNoteSavedDrafts(response.status, await response.json(), includeTask);
 }

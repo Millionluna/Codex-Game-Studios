@@ -32,8 +32,9 @@ async function bounded(promise, milliseconds) {
  * and removes it only after stop() proves this child exited. */
 export function createReviewBrowserDatabase(root, mode = "REVIEW") {
   assert.match(root, /^\/private\/tmp\/cl-job-browser-[a-zA-Z0-9]{6}$/u);
-  assert.ok(["REVIEW", "EDIT", "HISTORY", "ADMISSION", "SETTLEMENT", "SETTLEMENT_REVIEW", "SETTLEMENT_EDIT", "SETTLEMENT_LIST"].includes(mode));
-  const settledList = mode === "SETTLEMENT_LIST";
+  assert.ok(["REVIEW", "EDIT", "HISTORY", "ADMISSION", "SETTLEMENT", "SETTLEMENT_REVIEW", "SETTLEMENT_EDIT", "SETTLEMENT_LIST", "WORKSPACE_TASK"].includes(mode));
+  const workspaceTaskId = mode === "WORKSPACE_TASK" ? randomUUID() : undefined;
+  const settledList = mode === "SETTLEMENT_LIST" || mode === "WORKSPACE_TASK";
   const settledEdit = mode === "SETTLEMENT_EDIT" || settledList, settledReview = mode === "SETTLEMENT_REVIEW" || settledEdit;
   const settlement = mode === "SETTLEMENT" || settledReview, admission = mode === "ADMISSION" || settlement, admissionPassword = randomBytes(32).toString("hex");
   const history = mode === "HISTORY" || settledReview, edit = mode === "EDIT" || mode === "HISTORY" || settledEdit;
@@ -56,6 +57,7 @@ export function createReviewBrowserDatabase(root, mode = "REVIEW") {
       ...(settledReview ? { CARESLINK_LOCAL_SETTLED_REVIEW: "EXACT_SETTLED_RESULT_ONLY" } : {}),
       ...(settledEdit ? { CARESLINK_LOCAL_SETTLED_EDIT: "EXACT_SETTLED_DOCUMENT_ONLY" } : {}),
       ...(settledList ? { CARESLINK_LOCAL_SETTLED_LIST: "EXACT_SETTLED_DOCUMENT_ONLY" } : {}),
+      ...(workspaceTaskId ? { CARESLINK_LOCAL_TASK_ENTRY: "FIXED_SINGLE_ADMISSION", CARESLINK_LOCAL_TASK_ENTRY_JOB_ID: workspaceTaskId } : {}),
       ...(edit ? { CARESLINK_LOCAL_EDIT_DATABASE: "OWNED_UNIX_SOCKET_ONLY" } : {}),
       ...(history ? { CARESLINK_LOCAL_HISTORY_DATABASE: "OWNED_UNIX_SOCKET_ONLY" } : {}) },
     async start() {
@@ -120,7 +122,7 @@ export function createReviewBrowserDatabase(root, mode = "REVIEW") {
       if (admission) {
         await installAdmissionBrowserDatabase(owner, await open(), root, admissionPassword, settlement);
         const admissionRuntime = await open("cl_admission_browser_runtime", admissionPassword);
-        await verifyAdmissionBrowserDatabase(owner, admissionRuntime);
+        await verifyAdmissionBrowserDatabase(owner, admissionRuntime, workspaceTaskId);
         await admissionRuntime.end();
         if (settlement) terminalController = await installSettlementBrowserController(owner, open, root);
       }

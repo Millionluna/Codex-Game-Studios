@@ -4792,6 +4792,26 @@ See [full-flow scope and remaining real-admission gate](communication-note-produ
   Formal workspace and routes remain unchanged; only the owned fixture is wired.
 - [List scope, current-version navigation and next task-revisit slice](communication-note-product-integration-m1y.md#communication-note-saved-draft-list-and-revisit-integration-2026-09-08).
 
+### Communication Note in-progress workspace task gate (2026-09-08)
+
+- `node scripts/browser-e2e/communication-note-recovery.mjs --workspace-task-check`
+  passed 98 real local database scenarios, including four new exact-task cases:
+  pre-admission NOT_FOUND, foreign/revoked denial and repeated queued-task reads.
+  The existing purpose reader is reused; no migration or grant is added.
+- `--workspace-task` browser: empty → real admission with intentionally lost
+  response → leave **without retrying** → find the same queued task → reload and
+  three locales → open task → synthetic settlement → saved task/draft → current
+  version still requires review → revoked-session refresh clears both entries.
+  Final counts: one job/admission/reserve/commit, 10/0 Points, zero review/reports.
+- 57 new tests cover opt-in minimal task parsing, locator binding, whole-surface
+  auth clearing, remount/lifecycle recovery, stale mode responses and all locale
+  states. The fixed local candidate is not a general catalog or cross-device
+  recovery system. No new native offline or real AI/human-review claim.
+- Full **4,851 passed / 12 skipped**, 294 files; typecheck, zero-warning lint,
+  64-page build, 32-chunk client boundary, 73-file adapter check and local security
+  Advisors passed. Both owned roots and the dedicated tab were cleaned.
+- [Implementation limits, readback and next navigation slice](communication-note-product-integration-m1y.md#communication-note-in-progress-task-workspace-entry-2026-09-08).
+
 ### Current live/read-only evidence
 
 - Supabase migrations, tables, RLS flags, policies, grants, function grants and aggregate row counts were checked read-only.

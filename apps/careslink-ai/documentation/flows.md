@@ -132,6 +132,20 @@ scenarios; the formal legacy workspace, general catalog/pagination, Hosted and
 real provider activation remain unchanged.
 See [saved-list evidence and the next in-progress task entry](communication-note-product-integration-m1y.md#communication-note-saved-draft-list-and-revisit-integration-2026-09-08).
 
+### Communication Note in-progress task entry fixture (2026-09-08)
+
+`--workspace-task` adds one server-preallocated local admission locator before
+Next starts. Empty → actual admission → lose response → leave without retry →
+workspace exact-task read → queued detail → operator synthetic success → saved
+task plus current draft → open with fresh review/access checks. No browser
+request key, facts storage, task enumeration or new SQL privileges are needed.
+The workspace reuses the green three-locale surface; auth failure clears both
+task and draft metadata. Refresh does not submit, settle or charge. A present or
+unknown task hides this fixed mode's new-generation link. The mode is one task
+per disposable run, not formal multi-task or cross-device recovery. The check
+mode passed 98 real local database scenarios. See [task-entry evidence and next
+navigation slice](communication-note-product-integration-m1y.md#communication-note-in-progress-task-workspace-entry-2026-09-08).
+
 ## 4. Save, history and delete
 
 ### Current flow

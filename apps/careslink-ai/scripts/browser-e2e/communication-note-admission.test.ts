@@ -16,7 +16,7 @@ vi.mock("./communication-note-self-review.fixture", async original => ({
     getUser:async()=>({data:{user:{id,app_metadata:{role:"provider"}}},error:null})},rpc:state.rpc};
   },
 }));
-import { ADMISSION_FACTS, assertAdmissionFixture, submitAdmissionTask, readAdmissionTask, readAdmissionPoints, queryAdmissionFixture } from "./communication-note-admission.fixture";
+import { ADMISSION_FACTS, assertAdmissionFixture, submitAdmissionTask, readAdmissionTask, readAdmissionPoints, queryAdmissionFixture, getLocalWorkspaceTaskId } from "./communication-note-admission.fixture";
 import { CARESLINK_V1_COMMUNICATION_NOTE_POINTS_ADMISSION_POSTGRES_SQL as ADMIT } from "../../src/lib/v1/communication-note-points-admission-purpose-caller.server";
 import { CARESLINK_V1_COMMUNICATION_NOTE_JOB_STATUS_POSTGRES_SQL as READ } from "../../src/lib/v1/communication-note-job-status-repository.server";
 const JOB="99999999-9999-4999-8999-999999999999", KEY="66666666-6666-4666-8666-666666666666";
@@ -43,6 +43,15 @@ beforeEach(()=>{
 });
 afterEach(()=>{vi.restoreAllMocks();vi.unstubAllEnvs();});
 describe("owned local admission bridge",()=>{
+  it("binds admission to the server-preallocated task before losing the reply",async()=>{
+    vi.stubEnv("CARESLINK_LOCAL_TASK_ENTRY","FIXED_SINGLE_ADMISSION");vi.stubEnv("CARESLINK_LOCAL_TASK_ENTRY_JOB_ID",JOB);
+    expect(getLocalWorkspaceTaskId()).toBe(JOB);expect((await submitAdmissionTask(post())).status).toBe(503);
+    expect(state.query.mock.calls.find(([sql])=>sql===ADMIT)![1][3]).toBe(JOB);
+  });
+  it.each([undefined,"", "javascript:alert(1)","99999999-9999-1999-8999-999999999999"])("rejects invalid local task locator %s",id=>{
+    vi.stubEnv("CARESLINK_LOCAL_TASK_ENTRY","FIXED_SINGLE_ADMISSION");vi.stubEnv("CARESLINK_LOCAL_TASK_ENTRY_JOB_ID",id);expect(getLocalWorkspaceTaskId).toThrow();
+  });
+  it("rejects an unpaired local task locator",()=>{vi.stubEnv("CARESLINK_LOCAL_TASK_ENTRY_JOB_ID",JOB);expect(getLocalWorkspaceTaskId).toThrow();});
   it.each(["CARESLINK_LOCAL_ADMISSION_DATABASE","CARESLINK_LOCAL_ADMISSION_PASSWORD","CARESLINK_LOCAL_REVIEW_DATABASE","CARESLINK_LOCAL_REVIEW_PASSWORD","CARESLINK_LOCAL_BROWSER_FIXTURE"])("requires guard %s",key=>{
     vi.stubEnv(key,"");expect(assertAdmissionFixture).toThrow();expect(state.connect).not.toHaveBeenCalled();
   });

@@ -10,11 +10,12 @@ const app = fileURLToPath(new URL("../../", import.meta.url));
 const port = 3395, host = "127.0.0.1";
 const prefix = "/private/tmp/cl-job-browser-";
 const args = process.argv.slice(2);
-if (args.length > 1 || (args.length === 1 && !["--built", "--database-review", "--edit", "--database-edit", "--database-history", "--flow", "--admission", "--settlement", "--settlement-check", "--settlement-review", "--settlement-review-check", "--settlement-edit", "--settlement-edit-check", "--settlement-list", "--settlement-list-check"].includes(args[0]))) throw new Error("Use a fixed local fixture mode only");
-const settledList = args[0] === "--settlement-list" || args[0] === "--settlement-list-check";
+if (args.length > 1 || (args.length === 1 && !["--built", "--database-review", "--edit", "--database-edit", "--database-history", "--flow", "--admission", "--settlement", "--settlement-check", "--settlement-review", "--settlement-review-check", "--settlement-edit", "--settlement-edit-check", "--settlement-list", "--settlement-list-check", "--workspace-task", "--workspace-task-check"].includes(args[0]))) throw new Error("Use a fixed local fixture mode only");
+const workspaceTask = args[0] === "--workspace-task" || args[0] === "--workspace-task-check";
+const settledList = args[0] === "--settlement-list" || args[0] === "--settlement-list-check" || workspaceTask;
 const settledEdit = args[0] === "--settlement-edit" || args[0] === "--settlement-edit-check" || settledList;
 const settledReview = args[0] === "--settlement-review" || args[0] === "--settlement-review-check" || settledEdit;
-const settlementCheck = args[0] === "--settlement-check" || args[0] === "--settlement-review-check" || args[0] === "--settlement-edit-check" || args[0] === "--settlement-list-check";
+const settlementCheck = args[0] === "--settlement-check" || args[0] === "--settlement-review-check" || args[0] === "--settlement-edit-check" || args[0] === "--settlement-list-check" || args[0] === "--workspace-task-check";
 const settlement = args[0] === "--settlement" || settlementCheck || settledReview;
 const admission = args[0] === "--admission" || settlement;
 const flow = args[0] === "--flow";
@@ -72,7 +73,7 @@ try {
   root = await mkdtemp(prefix);
   console.log(JSON.stringify({ stage: "browser-fixture-owned-root", root }));
   if (databaseReview) {
-    reviewDatabase = createReviewBrowserDatabase(root, settledList ? "SETTLEMENT_LIST" : settledEdit ? "SETTLEMENT_EDIT" : settledReview ? "SETTLEMENT_REVIEW" : settlement ? "SETTLEMENT" : admission ? "ADMISSION" : databaseHistory ? "HISTORY" : databaseEdit ? "EDIT" : "REVIEW");
+    reviewDatabase = createReviewBrowserDatabase(root, workspaceTask ? "WORKSPACE_TASK" : settledList ? "SETTLEMENT_LIST" : settledEdit ? "SETTLEMENT_EDIT" : settledReview ? "SETTLEMENT_REVIEW" : settlement ? "SETTLEMENT" : admission ? "ADMISSION" : databaseHistory ? "HISTORY" : databaseEdit ? "EDIT" : "REVIEW");
     await reviewDatabase.start();
   }
   if (settlementCheck) { await reviewDatabase.verifySettlement(); await cleanup(); process.exit(0); }
@@ -111,6 +112,9 @@ try {
   if (settledList) await emit("src/lib/__saved-drafts-fixture.ts", (await readFile(join(app, "scripts/browser-e2e/communication-note-saved-drafts.fixture.ts"), "utf8"))
     .replaceAll('"../../src/lib/', '"./').replace('"./communication-note-admission.fixture"', '"./__admission-fixture"')
     .replace('"./communication-note-settlement.fixture"', '"./__settlement-fixture"').replace('"./communication-note-self-review.fixture"', '"./__review-database-fixture"'));
+  if (workspaceTask) await emit("src/lib/__workspace-task-fixture.ts", (await readFile(join(app, "scripts/browser-e2e/communication-note-workspace-task.fixture.ts"), "utf8"))
+    .replaceAll('"../../src/lib/', '"./').replace('"./communication-note-admission.fixture"', '"./__admission-fixture"')
+    .replace('"./communication-note-saved-drafts.fixture"', '"./__saved-drafts-fixture"'));
   await symlink(join(app, "node_modules"), join(root, "node_modules"), "dir");
   await emit("package.json", JSON.stringify({ name: "careslink-local-browser-fixture", private: true,
     dependencies: (JSON.parse(await readFile(join(app, "package.json"), "utf8"))).dependencies }));
@@ -236,7 +240,7 @@ export const dynamic="force-dynamic";
 export default async function AdmissionInstructions() { assertAdmissionFixture(); const points=await readAdmissionPoints(); return <main style={{padding:32}}>
 <h1>Communication Note — local queue and Points test</h1>
 <p>Only fixed synthetic facts. Starts with 30 synthetic Points; admission reserves 20. No welcome grant, purchase or actual charge.</p>
-<p>The first successful database admission deliberately returns an unavailable response. Use Retry on the composer: the same key must recover the same queued task without a second reservation.</p>
+<p>The first successful database admission deliberately returns an unavailable response. ${workspaceTask ? "Do not retry for this scenario. Use Back to AI Documents to recover the single task from the workspace, without its request key. This run accepts one fixed synthetic task only." : "Use Retry on the composer: the same key must recover the same queued task without a second reservation."}</p>
 <p>${settlement ? "The local operator can settle one queued job with fixed synthetic success, failure or cancellation, then replay it. No terminal authority is exposed over HTTP. Success consumes the reservation; failure/cancellation releases it. A successful result is authored synthetic test content, not AI output." : "Jobs stay queued: no worker, AI, payload encryption or result is exercised."} All local test data is deleted on shutdown.</p>
 ${settledReview ? `<p>Only the newly settled draft can be self-reviewed and exported. Review and export history use real local PostgreSQL. ${settledEdit ? "Wording edits save a new version that requires a new self-review. The old version keeps its own export history. Editing does not charge Points. Use synthetic wording only." : "Editing stays unavailable."} Export reports describe browser actions, not confirmed file delivery. Review/export do not charge Points.</p>` : ""}
 <p role="status">{points.status==="AVAILABLE" ? "Available: "+points.availablePoints+" Points · Reserved: "+points.reservedPoints+" Points" : "Points unavailable"}</p>
@@ -278,9 +282,9 @@ import { resolveCommunicationNoteDocumentLocale } from "@/lib/communication-note
 export const dynamic="force-dynamic";
 export default async function SavedDraftsPage({searchParams}:{searchParams:Promise<Record<string,string|string[]|undefined>>}) {
   const {locale,unsupported}=resolveCommunicationNoteDocumentLocale((await searchParams).lang);
-  return <CommunicationNoteSavedDrafts locale={locale} unsupportedLocale={unsupported} loginHref={"/auth/login?next="+encodeURIComponent("/ai-documents?lang="+locale)} />;
+  return <CommunicationNoteSavedDrafts locale={locale} includeTask={${workspaceTask}} unsupportedLocale={unsupported} loginHref={"/auth/login?next="+encodeURIComponent("/ai-documents?lang="+locale)} />;
 }`);
-    await emit("src/app/api/ai-documents/communication-note/documents/route.ts", `export { listSettledDrafts as GET } from "@/lib/__saved-drafts-fixture";
+    await emit("src/app/api/ai-documents/communication-note/documents/route.ts", `export { ${workspaceTask ? 'readWorkspaceTask' : 'listSettledDrafts'} as GET } from "@/lib/${workspaceTask ? '__workspace-task-fixture' : '__saved-drafts-fixture'}";
 export const dynamic="force-dynamic"; export const runtime="nodejs";`);
   }
   await emit("src/app/auth/login/page.tsx", `export default function LoginFixture() { return <main style={{padding:32}}>
@@ -307,7 +311,7 @@ export const dynamic="force-dynamic"; export const runtime="nodejs";`);
   if (stopped) process.exit(0);
   const completion = launch([...(built ? ["start"] : ["dev", "--webpack"]), "--hostname", host, "--port", String(port)]);
   console.log(JSON.stringify({ stage: "browser-fixture-start", root, url: `http://${host}:${port}`, built,
-    syntheticOnly: true, hostedVerified: false, databaseReview, databaseEdit, databaseHistory, flow, admission, settlement, settledReview, settledEdit, settledList }));
+    syntheticOnly: true, hostedVerified: false, databaseReview, databaseEdit, databaseHistory, flow, admission, settlement, settledReview, settledEdit, settledList, workspaceTask }));
   if (reviewDatabase) {
     controls = createInterface({ input: process.stdin, crlfDelay: Infinity });
     let queue = Promise.resolve();

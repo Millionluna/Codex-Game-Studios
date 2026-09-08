@@ -50,3 +50,43 @@ describe("saved draft revisit surface",()=>{
     expect(container.textContent).not.toContain("No saved Communication Notes yet");expect(container.textContent).not.toContain("private");expect(hasEntry()).toBe(false);
   });
 });
+const task={jobId:DOC,status:"QUEUED",createdAt:result.documents[0].updatedAt,updatedAt:result.documents[0].updatedAt} as const;
+const workspace={...result,task};
+const hasTask=()=>Boolean(container.querySelector('a[href*="/jobs/"]'));
+const renderWorkspace=()=>act(async()=>root.render(<CommunicationNoteSavedDrafts locale="en" loginHref={LOGIN} includeTask/>));
+describe("workspace task revisit surface",()=>{
+  it.each((["en","zh-Hans","zh-Hant"] as const).flatMap(locale=>(["QUEUED","RUNNING","SUCCEEDED","FAILED","CANCELLED"] as const).map(status=>({locale,status}))))("renders $locale / $status with safe task navigation",({locale,status})=>{
+    const markup=renderToStaticMarkup(<CommunicationNoteSavedDraftsView locale={locale} includeTask result={{...workspace,task:{...task,status}}} onRefresh={()=>{}}/>);
+    const visible=document.createElement("div");visible.innerHTML=markup;
+    expect(markup).toContain(`/jobs/${DOC}?lang=${locale}`);expect(visible.textContent).not.toContain(DOC);
+    expect(visible.querySelector("h3")?.textContent).toBe("Communication Note");
+    expect(visible.textContent).not.toContain("QUEUED");expect(visible.textContent).not.toContain("SUCCEEDED");
+    expect(markup).not.toContain('href="/ai-documents/communication-note?');
+    if(status==="SUCCEEDED")expect(visible.textContent).toMatch(/review required|仍需复核|仍需複核/);
+  });
+  it("reopens a pending task on a fresh mount without restoring submitted facts",async()=>{
+    mocks.load.mockResolvedValue(workspace);await renderWorkspace();expect(hasTask()).toBe(true);
+    await act(async()=>root.unmount());root=createRoot(container);await renderWorkspace();
+    expect(hasTask()).toBe(true);expect(mocks.load).toHaveBeenLastCalledWith(expect.any(AbortSignal),undefined,true);
+    expect(container.textContent).not.toContain("Synthetic call occurred.");
+  });
+  it.each(["offline","pagehide","focus"])("clears both entries immediately for %s",async event=>{
+    mocks.load.mockResolvedValue(workspace);await renderWorkspace();expect(hasEntry()&&hasTask()).toBe(true);
+    mocks.load.mockImplementation(()=>new Promise(()=>{}));await act(async()=>window.dispatchEvent(new Event(event)));
+    expect(hasEntry()||hasTask()).toBe(false);
+  });
+  it("clears task and drafts together on revoked access",async()=>{
+    mocks.load.mockResolvedValue(workspace);await renderWorkspace();mocks.load.mockResolvedValue({status:"AUTH_REQUIRED"});
+    await act(async()=>container.querySelector("button")!.click());expect(hasEntry()||hasTask()).toBe(false);expect(mocks.replace).toHaveBeenCalledWith(LOGIN);
+  });
+  it("does not offer a new generation while a task exists or its state is unknown",async()=>{
+    mocks.load.mockResolvedValue({status:"UNAVAILABLE"});await renderWorkspace();expect(container.querySelector('a[href="/ai-documents/communication-note?lang=en"]')).toBeNull();
+    mocks.load.mockResolvedValue({status:"AVAILABLE",documents:[],task:null});await act(async()=>container.querySelector("button")!.click());
+    expect(container.textContent).toContain("No generation task yet");expect(container.querySelector('a[href="/ai-documents/communication-note?lang=en"]')).not.toBeNull();
+  });
+  it("clears old mode data and ignores its delayed response",async()=>{
+    let resolve:(value:unknown)=>void=()=>{};mocks.load.mockImplementationOnce(()=>new Promise(r=>{resolve=r;}));await render();
+    mocks.load.mockResolvedValue({status:"UNAVAILABLE"});await renderWorkspace();await act(async()=>resolve(result));
+    expect(hasEntry()||hasTask()).toBe(false);expect(mocks.load.mock.calls[0][0].aborted).toBe(true);
+  });
+});

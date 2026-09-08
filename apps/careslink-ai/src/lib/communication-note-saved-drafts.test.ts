@@ -35,3 +35,26 @@ describe("saved draft metadata contract", () => {
     });
   });
 });
+const task = {jobId:document.canonicalId,status:"QUEUED",createdAt:document.updatedAt,updatedAt:document.updatedAt};
+describe("opt-in workspace task metadata",()=>{
+  it.each(["QUEUED","RUNNING","SUCCEEDED","FAILED","CANCELLED"])("accepts frozen minimal %s entry",status=>{
+    const result=parseCommunicationNoteSavedDrafts(200,{status:"AVAILABLE",documents:[],task:{...task,status}},true);
+    expect(result).toEqual({status:"AVAILABLE",documents:[],task:{...task,status}});
+    if(result.status!=="AVAILABLE")throw new Error();expect(Object.isFrozen(result.task)).toBe(true);
+  });
+  it("requires explicit opt-in and explicit empty task",()=>{
+    expect(()=>parseCommunicationNoteSavedDrafts(200,{status:"AVAILABLE",documents:[],task})).toThrow();
+    expect(()=>parseCommunicationNoteSavedDrafts(200,{status:"AVAILABLE",documents:[]},true)).toThrow();
+    expect(parseCommunicationNoteSavedDrafts(200,{status:"AVAILABLE",documents:[],task:null},true)).toEqual({status:"AVAILABLE",documents:[],task:null});
+  });
+  it.each([{jobId:"javascript:alert(1)"},{status:"APPROVED"},{createdAt:"private"},{updatedAt:"2026-09-07T00:00:00Z"},
+    {cleanedFacts:"private"},{result:{canonicalId:document.canonicalId}},{failureCode:"secret"},{reviewed:true}])("rejects excessive or invalid task %#",patch=>{
+    expect(()=>parseCommunicationNoteSavedDrafts(200,{status:"AVAILABLE",documents:[],task:{...task,...patch}},true)).toThrow();
+  });
+  it("never accepts task metadata alongside auth failure",()=>expect(()=>parseCommunicationNoteSavedDrafts(401,{status:"AUTH_REQUIRED",task},true)).toThrow());
+  it("reads the workspace with no client locator, facts or request key",async()=>{
+    const fetcher=vi.fn().mockResolvedValue(Response.json({status:"AVAILABLE",documents:[],task}));
+    expect(await loadCommunicationNoteSavedDrafts(new AbortController().signal,fetcher,true)).toMatchObject({task});
+    expect(fetcher).toHaveBeenCalledWith("/api/ai-documents/communication-note/documents",expect.objectContaining({method:"GET",cache:"no-store",credentials:"same-origin"}));
+  });
+});

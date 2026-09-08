@@ -2404,3 +2404,84 @@ real human review or formal catalog activation is claimed.
 task so leaving before completion does not lose the path back to its status.
 Keep fixed synthetic data, no AI/provider calls and no Hosted activation. The
 remaining Note types, real provider/vault integration and billing remain open.
+
+## Communication Note in-progress task workspace entry (2026-09-08)
+
+`--workspace-task` extends the saved-list fixture with a three-locale task entry.
+This is **one actual admission per owned local run**, not a general task catalog,
+production activation or durable cross-device recovery implementation. The
+formal legacy workspace, routes, migrations, grants and feature flags remain
+unchanged. Existing green tokens, Logo, typography and controls are preserved.
+
+### Implementation
+
+- The parent preallocates one random candidate job ID before starting Next and
+  passes it in server-only fixture environment. The actual atomic admission uses
+  that ID. No locator write follows SQL commit, so a lost response cannot create
+  a gap between a committed task and its locator. Other fixture modes continue
+  to use their existing random-candidate/replay behavior. This mode intentionally
+  does not support a second task after completion.
+- Workspace GET first uses the existing guarded metadata list and fresh
+  cookie/session checks. It then reads the exact candidate through the existing
+  purpose-only job-status repository, including a fresh principal and SQL
+  owner/session validation. A strict NOT_FOUND means no visible task; denial,
+  invalid data and read errors are not invented progress or empty successes.
+  No new SQL function, table grant, worker authority or application bootstrap
+  access is introduced. The existing terminal controller stays outside Next.
+- Strict opt-in parsing exposes only task ID, status and created/updated times
+  alongside the existing draft metadata. No facts, wording, request key, result
+  hash, failure details or review approval are returned. The task ID appears
+  only in its normal status link, not as visible list text or browser storage.
+- Queued/running/saved/failed/cancelled labels are localized. Reading or returning
+  cannot start/retry generation, confirm review or change Points. The local
+  create link is hidden while a task exists or access/state is unknown.
+- Both entries share the existing eight-second timeout, abort/stale-response
+  handling and focus/storage/online/page lifecycle checks. Auth failure clears
+  tasks and drafts together before sign-in. The workspace refresh is manual or
+  lifecycle-driven; the task detail retains its existing bounded polling.
+  These two server reads are not claimed as a single transactional snapshot.
+
+### Verification
+
+`--workspace-task-check` passed **98 real local PostgreSQL scenarios**: 54
+review/history/edit, 12 admission/task (previous eight plus pre-admission
+NOT_FOUND, foreign-owner denial, revoked-session denial and repeated exact-task
+reads), nine terminal, nine settled-review, nine settled-edit and five saved-list
+cases. All matrix data is disposed; the browser run starts fresh.
+
+Browser sequence on the independent owned run:
+empty workspace → one fixed synthetic admission → deliberately lost 503
+acknowledgement → **leave without retrying** → workspace finds the real queued
+task → full reload and EN/zh-Hans/zh-Hant navigation → open original task →
+operator synthetic success → workspace shows saved task plus its new draft →
+open current version with self-review required and TXT disabled → return →
+revoke synthetic session → refresh clears both entries and shows sign-in.
+
+Task `f06c4a2d-1dc1-4a7d-88f6-c84059d56a1f` remained the same throughout;
+the new draft was `9fd8bb52-ed2c-484b-aab2-39263b327cf6`. Final observations:
+**one job, one admission, one RESERVE, one COMMIT, 10 available / 0 reserved**.
+No review event or export report was created. The single edit receipt/sync
+change is the generation save, not a wording edit. Initial and completed page
+screenshots retained the green identity; inspected pages had no warning/error
+logs. The post-run harness instruction clarification and semantic h3 adjustment
+are covered by updated tests; no new native offline, mobile viewport, real human
+review, OS export or AI-provider claim is made.
+
+The 57 new tests passed (135 across the five focused files). Full suite:
+**4,851 passed / 12 skipped**, 294 files (293 passed / one skipped). Typecheck,
+zero-warning lint, 64-page Turbopack build, 32-chunk client-boundary scan and
+73-file adapter check passed. Security Advisors on the exact owned Unix socket
+returned no findings, not a Hosted audit. Owned roots
+`/private/tmp/cl-job-browser-9ngifZ` and `/private/tmp/cl-job-browser-r4U18o`
+were stopped/removed and checked absent; port 3395 was released and only the
+dedicated browser tab was closed. No push, deployment, cloud mutation, real data,
+AI, vault/KMS or payment operation occurred.
+
+Supabase/Postgres guidance kept the existing narrow roles; Next/React/browser
+guidance required real readback and private-state clearing. Impeccable guidance
+kept the committed identity and simple task/list hierarchy.
+
+**Next bounded implementation:** give task detail a direct return-to-workspace
+path and verify the complete Communication Note navigation loop, still using
+local synthetic data. Formal multi-task catalog/activation, real provider/vault,
+the other Note types and billing remain separate unfinished work.
