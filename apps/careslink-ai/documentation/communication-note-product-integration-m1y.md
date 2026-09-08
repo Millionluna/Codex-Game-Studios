@@ -3286,3 +3286,69 @@ availability are not proved. This does not approve launch of all five Notes.
 browser fixture using this supervised chain: task list/pagination → result and
 review navigation → displayed Points, plus cancellation/recovery. Keep synthetic
 data, the existing green design and formal runtime off; do not deploy.
+
+### Communication Note supervised browser acceptance — partial (2026-09-09)
+
+Source `2a20b15`, unchanged application files. Ran
+`node scripts/browser-e2e/communication-note-recovery.mjs --workspace-task`
+against the newly owned `/private/tmp/cl-job-browser-2d1fYR` PG16 Unix cluster
+and loopback-only built Next server on port 3395. The existing in-app browser
+provided screenshots, DOM and console evidence because the dedicated
+agent-browser CLI was unavailable; no browser software was installed.
+
+Story: owner workspace → actual documents GET handler → synthetic Cookie/session
+adapter → supervised one-use task credential → real local PostgreSQL metadata
+→ task status → exact saved revision/review, with Points unchanged by reading.
+Only the owned copy supplies the guarded runtime/Auth adapters. The source
+workspace, API route and UI are copied unchanged; no ambient environment file
+or live provider is loaded and outward fetch is denied.
+
+| Boundary | Result | Evidence |
+| --- | --- | --- |
+| Initial UI | Passed | Existing green CaresLink Logo; empty task list, two setup drafts; 30 available / 0 reserved Points; no console warning/error or error overlay. |
+| Workspace → API → PG → UI | Passed | Cookie session ACTIVE, document-list RPC and dedicated physical task reads; each completed task read logged `returned:true, revoked:true`. |
+| Task pagination | Passed | Fixed parent seed: 25 tasks (three terminal outcomes plus 22 catalog-only clones); browser pages 20 + 5, 25 unique links, overlap 0, return-to-latest works. Three saved drafts after seed. |
+| Task → saved result/review | Passed | Successful task opened the exact acknowledged document/revision. English, Simplified and Traditional Chinese review navigation retained that revision; return-to-workspace retained locale. |
+| Human-review boundary | Passed, navigation only | All three review confirmations remained unchecked; confirmation and Copy/TXT/DOCX/PDF buttons remained disabled in all three locales. No human-review submission, edit or export was performed. |
+| Displayed Points | Passed before fault injection | Test balance and actual composer showed 10 available / 0 reserved; composer displayed the 20-Point cost and insufficient-balance notice. Read/navigation observation still had 7 ledger entries, 3 admissions/reserves/terminals, 25 jobs, 0 reviews/exports and the setup-only 1 edit receipt / 1 sync change. |
+| Physical cancellation | Passed | While the parent held the jobs lock, refresh then language navigation removed the old reader/locks in 258 ms; `returned:false, revoked:true, aborted:true`. The replacement read timed out under the still-held lock in 993 ms and also revoked without returning data. |
+| Unlock → refresh recovery | Not completed | Operator command ordering error caused the diagnostic status query itself to fail and the runner to clean up, before recovery could be tested. |
+
+Before fault injection, repeated observer snapshots showed zero runtime roles,
+sessions and locks; the last receipt inventory had only REVOKED receipts.
+The owned build and its client-boundary scan passed across 39 static chunks.
+The startup reported the 54-check review/history/edit matrix, 12-check admission
+matrix and eight-check draft catalog matrix; the fixed seed reported nine
+terminal-settlement checks. The earlier 5,258-test full suite and formal build
+were not rerun or newly claimed in this browser-only batch. No new Security
+Advisors run was performed.
+
+The first unexpected failure was in test orchestration, not an observed
+application assertion: the operator sent `task-status` before `task-unlock`.
+`workspaceTaskController.status()` includes a count from the jobs table while
+another owned connection holds ACCESS EXCLUSIVE. Its owner connection has
+`lock_timeout=1000`, and the stdin queue awaits each command before starting
+the next. Consequently the diagnostic SELECT cannot complete while that lock
+is held, and the queued unlock cannot run first. This source-supported
+diagnosis matches the generic `Fixed local database control failed` output;
+the runner suppresses the underlying SQLSTATE, so no captured SQLSTATE is
+claimed. PostgreSQL documents the relevant
+[SELECT / ACCESS EXCLUSIVE conflict](https://www.postgresql.org/docs/16/explicit-locking.html#LOCKING-TABLES).
+
+Per full-story verification's stop-at-first-failure rule, no further acceptance
+or application change was attempted. Cleanup logged lock release, supervisor
+`activeLeases:0`, PostgreSQL stopped, and
+`stopped:true, removed:true, sourceUnchanged:true`. Independent checks found the
+exact temporary root absent, no listener on 3395 and no owned runner/issuer/PG
+process. Only the newly created browser tab 36 was closed; user tabs 1 and 12
+were left unchanged. Final post-fault business counters and session-revocation
+UI recovery were not reached and are not claimed.
+
+**Next bounded step:** repeat only the interrupted cancellation/recovery tail
+in a fresh owned synthetic fixture. Observe cancellation via the existing
+catalog-only monitor, then issue `task-unlock` and wait for its release marker
+before `task-status` or business `status`; refresh and verify recovered task
+metadata, unchanged Points and zero residual roles/sessions/locks. Finish the
+fixed synthetic session-revoke/re-authentication boundary and cleanup. Do not
+raise timeouts, weaken locks, alter business code, enable the formal runtime,
+deploy, or call a model to compensate for the operator ordering mistake.

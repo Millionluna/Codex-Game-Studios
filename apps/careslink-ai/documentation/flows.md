@@ -305,6 +305,24 @@ surviving, not a durable Hosted custody service. Next: same-revision built-page
 workspace/result/review/Points acceptance on synthetic data.
 See [process recovery evidence](communication-note-product-integration-m1y.md#communication-note-supervised-local-credential-recovery-2026-09-09).
 
+### Communication Note supervised browser acceptance — partial (2026-09-09)
+
+At source `2a20b15`, the built owned PG16 fixture passed workspace empty state,
+25-task pagination (20 + 5, no duplicate), success → exact revision → three-locale
+review navigation, and displayed 10 available / 0 reserved Points after the
+fixed synthetic seed. Reading did not create review/export or Points events;
+all review confirmations and export buttons remained gated. Green design and
+Logo were unchanged. Physical page-leave cancellation revoked the one-use
+credential and removed waiting locks in 258 ms.
+
+Recovery acceptance stopped because the operator mistakenly requested a jobs
+table count before releasing the intentionally held jobs lock. The diagnostic
+timed out and the runner cleaned up safely; application failure is not inferred.
+Next: repeat only the remaining local cancellation/recovery tail with
+`task-unlock` completed before `task-status`, then fixed session revocation and
+final business/cleanup checks. No formal runtime or Hosted activation.
+See [partial acceptance evidence](communication-note-product-integration-m1y.md#communication-note-supervised-browser-acceptance--partial-2026-09-09).
+
 ## 4. Save, history and delete
 
 ### Current flow

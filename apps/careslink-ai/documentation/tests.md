@@ -5040,6 +5040,38 @@ See [full-flow scope and remaining real-admission gate](communication-note-produ
   runtime stays off; no product migration, model call, push/PR or deployment.
 - [Detailed limits and next built-page acceptance](communication-note-product-integration-m1y.md#communication-note-supervised-local-credential-recovery-2026-09-09).
 
+### Communication Note supervised browser acceptance — partial (2026-09-09)
+
+- Source `2a20b15`; owned PG16 fixture `cl-job-browser-2d1fYR`, built Next on
+  127.0.0.1:3395, temporary browser tab 36. No application source changes.
+- Browser passed initial empty tasks, 20 + 5 disjoint pagination for 25 tasks,
+  successful job → exact saved revision, three-locale review page and return
+  navigation. Green Logo unchanged; console warnings/errors empty.
+- Review boxes stayed unchecked and all four exports stayed disabled. No
+  browser edit, export, review confirmation or new admission was submitted.
+- Fixed parent seed alone produced 10 available / 0 reserved Points; actual
+  composer agreed and displayed insufficient balance for a 20-Point admission.
+  Pre-fault business observations matched the seed baseline: 7 ledger entries,
+  3 admissions/reserves/terminals, 25 jobs, 0 review/export events, setup-only
+  edit/sync counts 1/1. Completed task reads revoked; snapshots had zero runtime
+  roles/sessions/locks. Owned client-boundary check passed 39 chunks.
+- Under the intentional jobs lock, page-leave cancellation removed the reader
+  and locks in 258 ms and logged `aborted:true, revoked:true, returned:false`.
+  The replacement read timed out under the same blocker in 993 ms, revoked and
+  rendered a safe unavailable message without stale tasks/drafts.
+- **Incomplete:** operator sent `task-status` before `task-unlock`; its jobs
+  count conflicts with the test lock, while serial stdin ordering prevents the
+  later unlock from running first. Generic control failure triggered disposal.
+  Underlying SQLSTATE was not exposed; this is a source-supported orchestration
+  diagnosis, not a new application defect or a completed recovery gate.
+- Stop rule honored. Cleanup proved active leases 0, PG stopped, exact root
+  removed, source unchanged; independent port/process checks were empty and
+  only tab 36 was closed. Post-fault business snapshot/session-revoke recovery
+  and a full-suite rerun are not claimed.
+- Next: unlock-before-status, refresh recovery, fixed session-revoke boundary
+  and final unchanged-business/zero-residual checks on fresh synthetic data.
+- [Evidence and corrected sequence](communication-note-product-integration-m1y.md#communication-note-supervised-browser-acceptance--partial-2026-09-09).
+
 ### Current live/read-only evidence
 
 - Supabase migrations, tables, RLS flags, policies, grants, function grants and aggregate row counts were checked read-only.
