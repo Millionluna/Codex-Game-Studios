@@ -2115,3 +2115,77 @@ browser fixture: success commits the reservation, failure/cancellation releases
 it, and terminal replay must not settle twice. Use fixed synthetic outcomes only;
 real payload/KMS, worker/model execution, Hosted activation and the five-Note
 launch gates remain separate. This admission gate is not a launch approval.
+
+## Communication Note real local terminal settlement browser gate (2026-09-08)
+
+The explicit `--settlement` fixture now connects the previous real local
+admission path to the existing terminal RPCs. `--settlement-check` runs the
+database matrix without starting Next. Product routes, green components/Logo,
+formal activation and Hosted/Production configuration remain unchanged.
+
+### Boundary and implemented behavior
+
+- Terminal authority exists only in the parent process behind four fixed stdin
+  commands: `settle-failure`, `settle-cancel`, `settle-success`, `settle-replay`.
+  The separate non-superuser runtime has direct EXECUTE on exactly six existing
+  claim/authorize/fence/success/failure/cancel RPCs, no role memberships or direct
+  table access. Its random password and replay tokens are never passed to Next.
+- Admission still atomically reserves 20 of 30 synthetic adjustment Points.
+  Failure/cancellation releases 20; success atomically saves one canonical
+  document/revision and commits the reservation. Replaying the exact terminal
+  arguments changes neither response nor aggregate ledger/document state.
+- Success is **authored synthetic content**, not an AI response. The real
+  payload-consumption port remains unbound. An explicitly test-only parent
+  update marks only the exact synthetic owner/job/payload/attempt/grant consumed
+  and supplies a synthetic grant hash; provider evidence is synthetic too.
+  No RLS, FK, timing or terminal consistency constraints are disabled.
+- This fresh fixture seeds a 5-second lease / 10-second attempt and minimum
+  payload window, with its exact recalculated policy digest. The earlier
+  admission-only policy remains unchanged. Initial success preflights caught
+  the shorter lease/window and missing grant-hash constraint; the test receipts
+  were corrected, not the existing migrations or database safety rules.
+- The only result bridge is a server-only GET for the newly settled document
+  and revision. Its mode-0600, exclusive-created metadata file contains those
+  two IDs only; malformed/symlinked/unrelated bindings deny access. Fresh
+  session/owner SQL checks still run. Review/edit/history writes remain closed
+  in this mode, and exports remain disabled pending self-review.
+
+### Verified result
+
+The standalone PostgreSQL matrix passed **9 terminal scenarios**, in addition
+to 14 existing review and 8 admission scenarios. Each terminal outcome, exact
+replay and rejected second command without a queued job was checked. Final
+counts: 3 jobs/reservations/settlements, 1 COMMIT, 2 RELEASE, **10 available /
+0 reserved**; only success added a document and revision.
+
+An independent browser run used the unchanged composer for all three jobs.
+The first deliberately lost admission acknowledgement recovered with the exact
+same request. The UI then showed Failed, Cancelled and Saved, with 30/0 after
+each release and 10/0 after success. The actual new result opened/reopened at
+version 1 with fixed synthetic wording, `Self-review required` and disabled
+Copy/TXT/DOCX/PDF. Revoking the synthetic session and reloading removed private
+content and showed sign-in, without another Points event. Warning/error logs
+were empty on verified loaded pages. This does not attest real model quality,
+real vault/KMS, Hosted identity, or successful review/export for this new result.
+
+The 21 new bridge/boundary tests passed; full suite **4,711 passed / 12 skipped**,
+289 files (288 passed / 1 skipped). Typecheck, zero-warning lint, 64/64-page
+Turbopack build, 32-chunk client-boundary scan and 73-file adapter check passed.
+The initial sandboxed build could not bind its internal process port; the
+authorized local retry passed. Local security Advisors returned no findings.
+
+Owned roots `cl-job-browser-bhG97L`, `cl-job-browser-91uqyq`,
+`cl-job-browser-WxXSjG`, `cl-job-browser-xT17LY`, `cl-job-browser-pdgChD`,
+`cl-job-browser-ypH3Mh` and `cl-job-browser-VxWs6V` under `/private/tmp` were
+independently checked absent; the last matrix and browser runs confirmed
+PostgreSQL stopped and source unchanged. The owned browser tab was closed;
+other user tabs were preserved. No Hosted mutation, actual payment, AI call,
+push or deployment occurred. Supabase/Postgres guidance preserved purpose-only
+rights and existing constraints; Next/browser guidance kept the terminal
+operator outside Next and required actual navigation/access evidence.
+
+**Next bounded implementation:** connect this newly settled local draft to the
+already tested durable self-review and export-history path, so the actual new
+document can complete the local application flow. Keep fixed synthetic facts,
+no model calls and formal/Hosted activation closed. Five-Note launch completion,
+real provider/vault integration and billing remain separate work.

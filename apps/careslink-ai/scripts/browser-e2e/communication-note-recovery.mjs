@@ -10,8 +10,10 @@ const app = fileURLToPath(new URL("../../", import.meta.url));
 const port = 3395, host = "127.0.0.1";
 const prefix = "/private/tmp/cl-job-browser-";
 const args = process.argv.slice(2);
-if (args.length > 1 || (args.length === 1 && !["--built", "--database-review", "--edit", "--database-edit", "--database-history", "--flow", "--admission"].includes(args[0]))) throw new Error("Use a fixed local fixture mode only");
-const admission = args[0] === "--admission";
+if (args.length > 1 || (args.length === 1 && !["--built", "--database-review", "--edit", "--database-edit", "--database-history", "--flow", "--admission", "--settlement", "--settlement-check"].includes(args[0]))) throw new Error("Use a fixed local fixture mode only");
+const settlementCheck = args[0] === "--settlement-check";
+const settlement = args[0] === "--settlement" || settlementCheck;
+const admission = args[0] === "--admission" || settlement;
 const flow = args[0] === "--flow";
 const databaseHistory = args[0] === "--database-history" || flow;
 const databaseEdit = args[0] === "--database-edit" || databaseHistory;
@@ -67,9 +69,10 @@ try {
   root = await mkdtemp(prefix);
   console.log(JSON.stringify({ stage: "browser-fixture-owned-root", root }));
   if (databaseReview) {
-    reviewDatabase = createReviewBrowserDatabase(root, admission ? "ADMISSION" : databaseHistory ? "HISTORY" : databaseEdit ? "EDIT" : "REVIEW");
+    reviewDatabase = createReviewBrowserDatabase(root, settlement ? "SETTLEMENT" : admission ? "ADMISSION" : databaseHistory ? "HISTORY" : databaseEdit ? "EDIT" : "REVIEW");
     await reviewDatabase.start();
   }
+  if (settlementCheck) { await reviewDatabase.verifySettlement(); await cleanup(); process.exit(0); }
   await copy("src/lib", "src/lib"); await copy("src/components", "src/components");
   await copy("src/app/ai-documents/communication-note/jobs", "src/app/ai-documents/communication-note/jobs");
   await copy("src/app/ai-documents/communication-note/documents", "src/app/ai-documents/communication-note/documents");
@@ -96,6 +99,8 @@ try {
     .replaceAll('"../../src/lib/', '"./').replace('"./communication-note-self-review.fixture"', '"./__review-database-fixture"'));
   if (admission) await emit("src/lib/__admission-fixture.ts", (await readFile(join(app, "scripts/browser-e2e/communication-note-admission.fixture.ts"), "utf8"))
     .replaceAll('"../../src/lib/', '"./').replace('"./communication-note-self-review.fixture"', '"./__review-database-fixture"'));
+  if (settlement) await emit("src/lib/__settlement-fixture.ts", (await readFile(join(app, "scripts/browser-e2e/communication-note-settlement.fixture.ts"), "utf8"))
+    .replace('"./communication-note-admission.fixture"', '"./__admission-fixture"').replace('"./communication-note-self-review.fixture"', '"./__review-database-fixture"'));
   if (edit) await emit("src/lib/__edit-fixture.ts", (await readFile(join(app, "scripts/browser-e2e/communication-note-edit.fixture.ts"), "utf8")).replaceAll('"../../src/lib/', '"./'));
   await symlink(join(app, "node_modules"), join(root, "node_modules"), "dir");
   await emit("package.json", JSON.stringify({ name: "careslink-local-browser-fixture", private: true,
@@ -215,7 +220,7 @@ ${methods.map(method => `export async function ${method}(request:Request,context
   if (admission) {
     const layout = await readFile(join(root, "src/app/layout.tsx"), "utf8");
     await emit("src/app/layout.tsx", layout.replace("{children}", `<aside role="note" style={{padding:12,borderBottom:"1px solid #bacbc3"}}>
-Local synthetic test / 本地合成测试：Real local queue and Points reservation. No AI, real money, payload vault or KMS. Jobs remain queued; no result is generated. <a href="/">Test balance and instructions</a>
+Local synthetic test / 本地合成测试：Real local queue and Points reservation. No AI, real money, payload vault or KMS. ${settlement ? "Fixed operator-driven synthetic terminal outcomes; not AI-generated content." : "Jobs remain queued; no result is generated."} <a href="/">Test balance and instructions</a>
 </aside>{children}`));
     await emit("src/app/page.tsx", `import { assertAdmissionFixture, ADMISSION_FACTS, readAdmissionPoints } from "@/lib/__admission-fixture";
 export const dynamic="force-dynamic";
@@ -223,7 +228,7 @@ export default async function AdmissionInstructions() { assertAdmissionFixture()
 <h1>Communication Note — local queue and Points test</h1>
 <p>Only fixed synthetic facts. Starts with 30 synthetic Points; admission reserves 20. No welcome grant, purchase or actual charge.</p>
 <p>The first successful database admission deliberately returns an unavailable response. Use Retry on the composer: the same key must recover the same queued task without a second reservation.</p>
-<p>Jobs stay queued: no worker, AI, payload encryption or result is exercised. All local test data is deleted on shutdown.</p>
+<p>${settlement ? "The local operator can settle one queued job with fixed synthetic success, failure or cancellation, then replay it. No terminal authority is exposed over HTTP. Success consumes the reservation; failure/cancellation releases it. A successful result is authored synthetic test content, not AI output." : "Jobs stay queued: no worker, AI, payload encryption or result is exercised."} All local test data is deleted on shutdown.</p>
 <p role="status">{points.status==="AVAILABLE" ? "Available: "+points.availablePoints+" Points · Reserved: "+points.reservedPoints+" Points" : "Points unavailable"}</p>
 <dl>{Object.entries(ADMISSION_FACTS).map(([key,value])=><div key={key}><dt>{key}</dt><dd>{Array.isArray(value)?value.join("; "):value}</dd></div>)}</dl>
 <a href="/ai-documents/communication-note?lang=en">Start fixed English admission</a></main>; }`);
@@ -247,6 +252,9 @@ export async function GET(request:Request,context:{params:Promise<{jobId:string}
 export const dynamic="force-dynamic";
 export async function GET(){assertAdmissionFixture();return Response.json({status:"NOT_FOUND"},{status:404,headers:{"Cache-Control":"private, no-store"}});}
 export { GET as POST };`);
+    if (settlement) await emit("src/app/api/ai-documents/communication-note/documents/[documentId]/route.ts", `import { readSettlementDocument } from "@/lib/__settlement-fixture";
+export const dynamic="force-dynamic"; export const runtime="nodejs";
+export async function GET(request:Request,context:{params:Promise<{documentId:string}>}) {return readSettlementDocument(request,(await context.params).documentId);}`);
   }
   await emit("src/app/auth/login/page.tsx", `export default function LoginFixture() { return <main style={{padding:32}}>
 <h1>Sign-in required</h1><p>Local synthetic login boundary. No real credentials are accepted.</p><a href="/">Test controls</a></main>; }
@@ -272,14 +280,14 @@ export { GET as POST };`);
   if (stopped) process.exit(0);
   const completion = launch([...(built ? ["start"] : ["dev", "--webpack"]), "--hostname", host, "--port", String(port)]);
   console.log(JSON.stringify({ stage: "browser-fixture-start", root, url: `http://${host}:${port}`, built,
-    syntheticOnly: true, hostedVerified: false, databaseReview, databaseEdit, databaseHistory, flow, admission }));
+    syntheticOnly: true, hostedVerified: false, databaseReview, databaseEdit, databaseHistory, flow, admission, settlement }));
   if (reviewDatabase) {
     controls = createInterface({ input: process.stdin, crlfDelay: Infinity });
     let queue = Promise.resolve();
     controls.on("line", line => { queue = queue.then(() => reviewDatabase.command(line.trim())).catch(async () => {
       console.error("Fixed local database control failed"); await stopAndExit();
     }); });
-    console.log(`Local database controls: status | advance | revoke | restore${databaseHistory ? " | history-off | history-on" : ""} (stdin only)`);
+    console.log(`Local database controls: status${admission ? "" : " | advance"} | revoke | restore${databaseHistory ? " | history-off | history-on" : ""}${settlement ? " | settle-failure | settle-cancel | settle-success | settle-replay" : ""} (stdin only)`);
   }
   await completion;
   await cleanup();

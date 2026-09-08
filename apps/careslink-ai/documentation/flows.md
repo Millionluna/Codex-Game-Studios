@@ -74,8 +74,20 @@ stays unchanged on retry. No worker runs, so no result route is available and no
 terminal charge/release is claimed. Synthetic policy receipts are not vault/KMS
 evidence. The owned database is removed on shutdown; formal runtime remains off.
 See [local admission evidence and next terminal-settlement slice](communication-note-product-integration-m1y.md#communication-note-real-local-admission-and-points-browser-gate-2026-09-08).
-Real task admission/reservation, worker output and Hosted activation are not
-proved by this fixture.
+Real provider/model output and Hosted activation are not proved by this fixture.
+
+### Communication Note real local terminal settlement fixture (2026-09-08)
+
+The separate `--settlement` mode joins real local admission to fixed stdin-only
+terminal RPCs: queued → failed/cancelled releases 20 Points; queued → claimed →
+synthetic payload-consumption receipt → fenced → succeeded saves a canonical
+draft and commits 20 Points. Exact terminal replay changes no ledger/document
+state. The browser opens only the actual new result and rechecks owner/session;
+self-review/export-history mutation is not enabled in this mode. The success
+wording and provider evidence are synthetic; no real worker, model, vault or
+KMS runs. The separate `--settlement-check` matrix needs no browser. All test
+data is destroyed at shutdown and formal activation stays off.
+See [terminal settlement evidence and next review/export slice](communication-note-product-integration-m1y.md#communication-note-real-local-terminal-settlement-browser-gate-2026-09-08).
 
 ## 4. Save, history and delete
 

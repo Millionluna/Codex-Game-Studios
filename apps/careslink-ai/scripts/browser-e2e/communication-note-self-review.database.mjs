@@ -10,6 +10,7 @@ import { verifySelfReviewScenarios } from "../preview-e2e/communication-note-sel
 import { verifyWordingEditScenarios } from "../preview-e2e/communication-note-edit-local-scenarios.mjs";
 import { verifyExportHistoryScenarios } from "../preview-e2e/communication-note-export-history-local-scenarios.mjs";
 import { installAdmissionBrowserDatabase, verifyAdmissionBrowserDatabase } from "./communication-note-admission.database.mjs";
+import { installSettlementBrowserController, verifySettlementBrowserController } from "./communication-note-settlement.database.mjs";
 
 const exec = promisify(execFile), childEnv = { PATH: "/usr/bin:/bin", LANG: "C", LC_ALL: "C" };
 const OWNER = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", SESSION = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
@@ -30,11 +31,12 @@ async function bounded(promise, milliseconds) {
  * and removes it only after stop() proves this child exited. */
 export function createReviewBrowserDatabase(root, mode = "REVIEW") {
   assert.match(root, /^\/private\/tmp\/cl-job-browser-[a-zA-Z0-9]{6}$/u);
-  assert.ok(mode === "REVIEW" || mode === "EDIT" || mode === "HISTORY" || mode === "ADMISSION");
-  const admission = mode === "ADMISSION", admissionPassword = randomBytes(32).toString("hex");
+  assert.ok(mode === "REVIEW" || mode === "EDIT" || mode === "HISTORY" || mode === "ADMISSION" || mode === "SETTLEMENT");
+  const settlement = mode === "SETTLEMENT", admission = mode === "ADMISSION" || settlement, admissionPassword = randomBytes(32).toString("hex");
   const history = mode === "HISTORY", edit = mode === "EDIT" || history;
   const base = join(root, "pg"), data = join(base, "data"), socket = join(base, "socket");
   let server, exited, owner, bootstrapMayBeRunning = false, closing = false;
+  let terminalController;
   const clients = [], password = randomBytes(32).toString("hex");
   const open = async (user = "review_test_bootstrap", secret = "") => {
     const client = new pg.Client({ host: socket, port: PORT, user, password: secret, database: "postgres", ssl: false,
@@ -47,6 +49,7 @@ export function createReviewBrowserDatabase(root, mode = "REVIEW") {
   return {
     env: { CARESLINK_LOCAL_REVIEW_DATABASE: "OWNED_UNIX_SOCKET_ONLY", CARESLINK_LOCAL_REVIEW_PASSWORD: password,
       ...(admission ? { CARESLINK_LOCAL_ADMISSION_DATABASE: "OWNED_UNIX_SOCKET_ONLY", CARESLINK_LOCAL_ADMISSION_PASSWORD: admissionPassword } : {}),
+      ...(settlement ? { CARESLINK_LOCAL_SETTLEMENT_DATABASE: "OWNED_UNIX_SOCKET_ONLY" } : {}),
       ...(edit ? { CARESLINK_LOCAL_EDIT_DATABASE: "OWNED_UNIX_SOCKET_ONLY" } : {}),
       ...(history ? { CARESLINK_LOCAL_HISTORY_DATABASE: "OWNED_UNIX_SOCKET_ONLY" } : {}) },
     async start() {
@@ -109,10 +112,11 @@ export function createReviewBrowserDatabase(root, mode = "REVIEW") {
       await owner.query("update public.ai_documents set current_revision_id=$2,current_revision_number=1 where id=$1", [REVIEW_DOC, REV]);
       await owner.query("delete from public.ai_document_revisions where id=$1 and document_id=$2", [REV2, REVIEW_DOC]);
       if (admission) {
-        await installAdmissionBrowserDatabase(owner, await open(), root, admissionPassword);
+        await installAdmissionBrowserDatabase(owner, await open(), root, admissionPassword, settlement);
         const admissionRuntime = await open("cl_admission_browser_runtime", admissionPassword);
         await verifyAdmissionBrowserDatabase(owner, admissionRuntime);
         await admissionRuntime.end();
+        if (settlement) terminalController = await installSettlementBrowserController(owner, open, root);
       }
       if (history) {
         // Only this owned, disposable database receives the opt-in capability.
@@ -144,9 +148,18 @@ export function createReviewBrowserDatabase(root, mode = "REVIEW") {
       console.log(JSON.stringify({ stage: "review-database-ready", postgresMajor: 16, matrixPassed: passed.length,
         unixOnly: true, runtimePrivileged: false, authSynthetic: true, hostedVerified: false, edit, history }));
     },
+    async verifySettlement() {
+      assert.ok(settlement && terminalController); assert.equal(closing, false);
+      const runtime = await open("cl_admission_browser_runtime", admissionPassword);
+      try { await verifySettlementBrowserController(owner, runtime, terminalController); }
+      finally { await runtime.end(); }
+    },
     async command(command) {
       assert.ok(owner); assert.equal(closing, false);
-      if (command === "advance" && edit) {
+      if (settlement && command.startsWith("settle-")) {
+        assert.ok(terminalController); await terminalController.run(command);
+      } else if (admission && command === "advance") throw new Error("FIXED_LOCAL_COMMAND_ONLY");
+      else if (command === "advance" && edit) {
         // Simulate a second editor through the real narrow RPC, not a direct
         // document-pointer UPDATE. The stdin operator never accepts user SQL.
         await owner.query("begin");await owner.query("set local role authenticated");

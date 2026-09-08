@@ -4715,6 +4715,25 @@ See [full-flow scope and remaining real-admission gate](communication-note-produ
   security Advisors returned no findings; all owned roots/port were cleaned.
 - [Detailed scope, synthetic receipts and cleanup evidence](communication-note-product-integration-m1y.md#communication-note-real-local-admission-and-points-browser-gate-2026-09-08).
 
+### Communication Note real local terminal settlement gate (2026-09-08)
+
+- `node scripts/browser-e2e/communication-note-recovery.mjs --settlement-check`
+  proves 9 terminal cases after 14 review and 8 admission cases in an owned,
+  disposable Unix-only PG16. It never starts a web server.
+- `--settlement` adds a production-built browser fixture. Terminal commands and
+  six-RPC runtime authority stay in parent/stdin only, outside Next. Fixed
+  success uses explicitly synthetic grant consumption/provider evidence; no AI,
+  vault or KMS runs. No migration or formal activation changes.
+- Real browser admission → failure/cancel/success and exact terminal replay:
+  releases return 30/0; success leaves 10/0 and one new saved draft. Its exact
+  version opens/reopens, remains review-required with exports disabled, and
+  revoked-session reload shows sign-in without further Points changes.
+- 21 new tests; full **4,711 passed / 12 skipped**, 289 files. Typecheck,
+  zero-warning lint, 64/64-page Turbopack build, 32-chunk client boundary and
+  73-file adapter checks passed. Local security Advisors found no issues.
+  The owned browser tab and all seven owned database roots were cleaned.
+- [Synthetic limits, authority boundary and next application slice](communication-note-product-integration-m1y.md#communication-note-real-local-terminal-settlement-browser-gate-2026-09-08).
+
 ### Current live/read-only evidence
 
 - Supabase migrations, tables, RLS flags, policies, grants, function grants and aggregate row counts were checked read-only.

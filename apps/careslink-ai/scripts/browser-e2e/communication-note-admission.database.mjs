@@ -20,7 +20,8 @@ const MIGRATIONS = [
   "20260906233034_add_v1_communication_note_job_status_reader.sql",
 ];
 
-export async function installAdmissionBrowserDatabase(owner, actor, root, password) {
+export async function installAdmissionBrowserDatabase(owner, actor, root, password, settlement = false) {
+  assert.equal(typeof settlement, "boolean");
   assert.match(root, /^\/private\/tmp\/cl-job-browser-[a-zA-Z0-9]{6}$/u);
   assert.match(password, /^[a-f0-9]{64}$/u);
   assert.deepEqual((await owner.query(`select current_setting('data_directory') as data,
@@ -47,8 +48,8 @@ export async function installAdmissionBrowserDatabase(owner, actor, root, passwo
   // Fixed synthetic policy receipts, NOT encryption/provider attestation.
   // No worker is started or given credentials. All row constraints remain on.
   const worker = { kind: "careslink.v1.note-generation-worker-policy", version: "worker.local-browser.v1", status: "APPROVED",
-    maxQueueAgeMs: 1800000, minimumPayloadRemainingAtClaimMs: 1000, leaseDurationMs: 500,
-    heartbeatIntervalMs: 100, heartbeatSafetyMarginMs: 50, attemptDeadlineMs: 1000,
+    maxQueueAgeMs: 1800000, minimumPayloadRemainingAtClaimMs: settlement ? 10000 : 1000, leaseDurationMs: settlement ? 5000 : 500,
+    heartbeatIntervalMs: 100, heartbeatSafetyMarginMs: 50, attemptDeadlineMs: settlement ? 10000 : 1000,
     providerDeadlineMs: 600, commitSafetyMarginMs: 100, maxAttempts: 1, retryDelayMsAfterAttempt: [],
     retryableOutcomes: [], recoveryBatchLimit: 10, jitter: { mode: "NONE" } };
   const payload = { policyVersion: "payload.local-browser.v1", encryptionProfileVersion: "encryption.synthetic-no-kms.v1",
@@ -76,7 +77,7 @@ export async function installAdmissionBrowserDatabase(owner, actor, root, passwo
     minimum_payload_remaining_at_claim_ms,lease_duration_ms,heartbeat_interval_ms,heartbeat_safety_margin_ms,
     attempt_deadline_ms,provider_deadline_ms,commit_safety_margin_ms,max_attempts,retry_delay_ms_after_attempt,
     retryable_outcomes,recovery_batch_limit,jitter_mode,jitter_max_ms,policy_digest,shadow_only)
-    values($1,'APPROVED',1800000,1000,500,100,50,1000,600,100,1,'{}','{}',10,'NONE',null,$2,true)`, [worker.version, workerDigest]);
+    values($1,'APPROVED',1800000,$5,$3,100,50,$4,600,100,1,'{}','{}',10,'NONE',null,$2,true)`, [worker.version, workerDigest, worker.leaseDurationMs, worker.attemptDeadlineMs, worker.minimumPayloadRemainingAtClaimMs]);
   await owner.query(`insert into careslink_v1_generation.payload_policies(policy_version,status,encryption_profile_version,
     backup_disposition_version,policy_digest,kms_key_version_resource_hash,shadow_only) values($1,'APPROVED',$2,$3,$4,$5,true)`,
   [payload.policyVersion, payload.encryptionProfileVersion, payload.backupDispositionVersion, payloadDigest, "b".repeat(64)]);
