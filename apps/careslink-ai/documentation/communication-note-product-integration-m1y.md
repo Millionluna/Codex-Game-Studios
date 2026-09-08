@@ -2799,3 +2799,80 @@ adapter/composition** behind the same default-off gate, binding authenticated
 document and purpose-scoped task reads to one user/session. Keep credentials,
 Hosted grants, feature activation, generation and deployment outside that local
 implementation until separately authorized and verified.
+
+## Communication Note read-only workspace database adapter (2026-09-08)
+
+`createCommunicationNoteWorkspaceDurableRuntime` now assembles the real Cookie
+principal resolver, existing strict document RPC parser and fixed task-list
+repository. It is a server-only, lazy factory: no connection at import/factory
+time, ambient secret lookup, broad Product API runtime, write method or Points
+operation. The formal runtime export **remains undefined** and the actual GET
+still returns metadata-free 503 even when environment flags are set.
+
+The adapter requires the existing workspace/Product API opt-ins, exact matching
+Preview Supabase/Vercel targets and publishable keys; Production, malformed or
+drifting configuration is denied. One Cookie client and user/session identity
+are scoped to each request. An authenticated context cannot be transferred to
+another request or used to construct readers twice. The document reader permits
+only `list_v1_shadow_documents`, fixed page size 20 and the validated position
+cursor. Its other Product API methods never escape or reach the Cookie client.
+
+The task reader requires an explicit server-installed port for
+`COMMUNICATION_NOTE_JOB_LIST_READ` and
+`careslink_v1_generation_job_list_caller`. It receives only the seven repository
+parameters and an abort signal, never browser SQL or identity fields. The
+single-job status, admission and worker ports are not substitutes. Wrong target,
+purpose, role, extra properties, accessors and proxies fail closed. The port's
+labels are **not physical-connection or credential-custody attestation**; the
+provider must settle only after its own connection/lease cleanup. No such
+Hosted provider, credential issuer, runtime membership or grant was installed.
+
+The same Cookie client rechecks claims, current session and user before either
+list and after task completion. Changed/revoked identity suppresses both lists.
+The shared HTTP handler now bounds the whole read to 30 seconds, propagates an
+abort signal and discards late results without retry. The signal is closed on
+every outcome. Underlying transports remain responsible for cancellation and
+cleanup; a timeout is not evidence that a remote statement was terminated.
+This follows the existing strict session boundary and [Supabase session
+guidance](https://supabase.com/docs/guides/auth/sessions#how-to-ensure-an-access-token-jwt-cannot-be-used-after-a-user-signs-out).
+
+Verification:
+
+- **5,078 passed / 12 skipped**, 300 files (299 passed / one skipped), 51 new
+  tests. The focused adapter/HTTP/fixture set passed 111 cases. TypeScript,
+  zero-warning lint, formal Next build (63 generated entries), 32-chunk client
+  boundary, 73-file adapter sync and diff checks passed. The client scan now
+  includes the workspace target and purpose markers.
+- Initial test fixtures used an invalid lifecycle enum and an outdated request
+  identity assertion; those were corrected, not the response validation. The
+  existing current-session importer allowlist explicitly gained this one
+  default-off server adapter. No privileged-client importer was allowed.
+- The unchanged `--workspace-task-check` passed **118 existing local PostgreSQL
+  scenarios**, then stopped and removed `/private/tmp/cl-job-browser-jrYyUh`.
+  No SQL migration/candidate, role, permission or Hosted manifest was edited.
+- The owned browser copy now uses the actual new adapter with synthetic target
+  configuration and fixed Unix-socket ports. Startup passed 74 SQL preflight
+  cases. Browser: English workspace with two version-1 seed drafts / no tasks
+  → Traditional workspace → exact current draft (review REQUIRED, exports
+  disabled) → same-language return → parent-only session revocation → refresh
+  → login with both lists cleared. A separate fixed foreign-cookie **HTTP**
+  request returned both lists empty with private headers. No browser account
+  switching, mobile, native offline or >20-row browser run is claimed.
+- Browser warnings/errors were empty; the owned build passed the expanded
+  client scan across 39 chunks. Exact-socket Security Advisors found no issues.
+  Final readback: 30 available / 0 reserved Points, zero admissions/jobs/reserve
+  or terminal events, zero review/edit/sync/export events; seed revision remains
+  1. No composer submit, model/provider, KMS/vault, real payment or real data.
+- `/private/tmp/cl-job-browser-Kdx2vn` was stopped and removed with source hashes
+  unchanged, owned tab 33 closed and port 3395 released. No push, PR, deployment
+  or external environment change. Existing green design/Logo were not changed.
+
+Supabase/Next guidance kept request-local authentication and narrow server
+capabilities; browser guidance required checking the actual source-routed copy.
+This is local adapter evidence, not Hosted activation or completion of all five
+Notes, live AI generation or credit billing.
+
+**Next bounded implementation:** implement and locally verify the task-list
+purpose port's physical connection, cancellation and cleanup boundary. Keep
+credential issuance, Hosted grants, runtime binding, feature activation and any
+Preview/Production deployment separate and explicitly authorized.

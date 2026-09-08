@@ -33,6 +33,7 @@ const copy = async (source, target) => {
 };
 const emit = async (path, source) => { await mkdir(join(root, path, ".."), { recursive: true }); await writeFile(join(root, path), source); };
 const tracked = ["src/lib/supabase-server.ts", "src/app/ai-documents/communication-note/jobs/[jobId]/page.tsx",
+  "src/lib/communication-note-workspace-durable.server.ts", "src/lib/communication-note-workspace.server.ts",
   "src/app/ai-documents/page.tsx", "src/app/ai-documents/communication-note-workspace-page.tsx",
   "src/app/api/ai-documents/communication-note/documents/route.ts", "src/lib/communication-note-workspace-runtime.server.ts",
   "src/app/ai-documents/communication-note/page.tsx", "src/app/ai-documents/communication-note/communication-note-composer.tsx",

@@ -47,7 +47,10 @@ describe("shared workspace HTTP composition",()=>{
   it("binds both metadata readers to the same fresh server principal and fixed page size",async()=>{
     const r=request(),response=await run(r);expect(response.status).toBe(200);
     expect(await response.json()).toEqual({status:"AVAILABLE",documents:[],documentsCursor:null,taskPage:tasks});
-    expect(create).toHaveBeenCalledWith({principal:identity,request:r});expect(listTasks).toHaveBeenCalledWith(null);expect(listDocuments).toHaveBeenCalledWith({limit:20});
+    expect(create).toHaveBeenCalledWith({principal:identity,request:expect.any(Request)});
+    expect(create.mock.calls[0][0].request.url).toBe(r.url);expect(create.mock.calls[0][0].request.headers.get("cookie")).toBe("opaque");
+    expect(create.mock.calls[0][0].request.signal.aborted).toBe(true);expect(r.signal.aborted).toBe(false);
+    expect(listTasks).toHaveBeenCalledWith(null);expect(listDocuments).toHaveBeenCalledWith({limit:20});
   });
   it.each<RequestInit>([{method:"POST"},{headers:{"sec-fetch-site":"cross-site"}},{headers:{"sec-fetch-site":"same-origin",authorization:"Bearer opaque"}},
     {headers:{"sec-fetch-site":"same-origin",origin:"https://outside.invalid"}}])("denies transport %# before auth",async init=>{

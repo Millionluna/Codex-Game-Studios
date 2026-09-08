@@ -19,6 +19,7 @@ export type CommunicationNoteWorkspaceRuntime = Readonly<{
   createReaders(input: Readonly<{ principal: CommunicationNoteGenerationProviderPrincipal; request: Request }>): Readers | Promise<Readers>;
 }>;
 const unavailable = () => new Error("Workspace unavailable");
+export const COMMUNICATION_NOTE_WORKSPACE_READ_TIMEOUT_MS = 30_000;
 function exact(value: unknown, keys: readonly string[]) {
   if (types.isProxy(value)) throw unavailable();
   return taskListRecord(value, keys);
@@ -42,7 +43,7 @@ function response(body: unknown, status = 200) {
 export function createCommunicationNoteWorkspaceHandler(options: Readonly<{
   enabled(): boolean; runtime?: CommunicationNoteWorkspaceRuntime;
 }>) {
-  return async (request: Request) => {
+  const read = async (request: Request) => {
     try {
       // Disabled or unbound means no request parsing, auth, connection or IO.
       if (options.enabled() !== true || !options.runtime) throw unavailable();
@@ -83,6 +84,30 @@ export function createCommunicationNoteWorkspaceHandler(options: Readonly<{
       if ((error instanceof CaresLinkV1ContractError || error instanceof CaresLinkV1ProductApiError) &&
         ["AUTH_REQUIRED", "SESSION_REVOKED"].includes(error.code)) return response({ status: "AUTH_REQUIRED" }, 401);
       return response({ status: "UNAVAILABLE" }, 503);
+    }
+  };
+  return async (request: Request) => {
+    let controller: AbortController | undefined;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let abort: (() => void) | undefined;
+    try {
+      // Keep the disabled/unbound path completely free of request inspection.
+      if (options.enabled() !== true || !options.runtime) throw unavailable();
+      if (request.signal.aborted) throw unavailable();
+      controller = new AbortController();
+      const signal = controller.signal;
+      const stopped = new Promise<Response>(resolve => {
+        abort = () => { controller!.abort(); resolve(response({ status: "UNAVAILABLE" }, 503)); };
+        timer = setTimeout(abort, COMMUNICATION_NOTE_WORKSPACE_READ_TIMEOUT_MS);
+        request.signal.addEventListener("abort", abort, { once: true });
+      });
+      const result = await Promise.race([read(new Request(request, { signal })), stopped]);
+      return signal.aborted ? response({ status: "UNAVAILABLE" }, 503) : result;
+    } catch { return response({ status: "UNAVAILABLE" }, 503); }
+    finally {
+      if (timer !== undefined) clearTimeout(timer);
+      if (abort) request.signal.removeEventListener("abort", abort);
+      controller?.abort();
     }
   };
 }

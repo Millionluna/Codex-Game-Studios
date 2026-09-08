@@ -1335,6 +1335,8 @@ describe("V1 shadow runtime boundary", () => {
           process.cwd(),
           "src/lib/communication-note-self-review-durable.server.ts",
         ),
+        // Read-only, default-off workspace adapter; formal runtime stays absent.
+        join(process.cwd(), "src/lib/communication-note-workspace-durable.server.ts"),
       ].sort(),
     );
     expect(principalCompositionSource).toMatch(/^import "server-only";/);

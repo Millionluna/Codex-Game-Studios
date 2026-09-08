@@ -2,9 +2,11 @@ import { readFileSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const mocks=vi.hoisted(()=>({guard:vi.fn(),resolve:vi.fn(),query:vi.fn(),list:vi.fn()}));
 vi.mock("server-only",()=>({}));
-vi.mock("./communication-note-admission.fixture",()=>({assertAdmissionFixture:mocks.guard,principal:()=>mocks.resolve,queryAdmissionFixture:mocks.query}));
-vi.mock("./communication-note-self-review.fixture",()=>({readReviewDatabaseList:mocks.list}));
-import { CaresLinkV1ContractError } from "../../src/lib/v1/shared-contracts";
+vi.mock("./communication-note-admission.fixture",()=>({assertAdmissionFixture:mocks.guard,queryAdmissionFixture:mocks.query}));
+vi.mock("./communication-note-self-review.fixture",()=>({createReviewDatabaseAuthClient:async()=>({rpc:mocks.list})}));
+// The actual Cookie/claims/session composition is covered without this mock in
+// communication-note-workspace-durable.server.test.ts and by the owned PG app.
+vi.mock("../../src/lib/communication-note-generation-principal.server",()=>({createCommunicationNoteGenerationPrincipalResolver:()=>mocks.resolve}));
 import { readWorkspaceTask } from "./communication-note-workspace-task.fixture";
 const JOB="11111111-1111-4111-8111-111111111111",OWNER="aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",SESSION="cccccccc-cccc-4ccc-8ccc-cccccccccccc",TIME="2026-09-08T01:00:00.000000Z";
 const task={jobId:JOB,status:"QUEUED",createdAt:TIME,updatedAt:TIME};
@@ -15,7 +17,7 @@ const request=(query="")=>new Request("http://127.0.0.1:3395/api/ai-documents/co
 beforeEach(()=>{
   vi.resetAllMocks();vi.stubEnv("CARESLINK_LOCAL_TASK_ENTRY","OWNER_TASK_LIST");vi.stubEnv("CARESLINK_LOCAL_TASK_ENTRY_JOB_ID",undefined);
   mocks.resolve.mockResolvedValue({ok:true,principal:{userId:OWNER,sessionId:SESSION,transport:"COOKIE"}});
-  mocks.list.mockResolvedValue({documents:[],nextCursor:null,hasMore:false});
+  mocks.list.mockResolvedValue({data:{documents:[],nextCursor:null,hasMore:false},error:null});
   mocks.query.mockResolvedValue({rows:[{data:page}]});
 });
 afterEach(()=>vi.unstubAllEnvs());
@@ -25,12 +27,12 @@ describe("owned multi-task workspace bridge",()=>{
     expect(response.headers.get("cache-control")).toContain("no-store");expect(response.headers.get("vary")).toBe("Cookie, Authorization");
     expect(mocks.query).toHaveBeenCalledWith(expect.stringContaining("list_v1_communication_note_jobs"),[OWNER,SESSION,null,null,20,"1.0.0-shadow.1","2026-08-09.v1-shadow"]);
     expect(mocks.resolve.mock.invocationCallOrder[0]).toBeLessThan(mocks.list.mock.invocationCallOrder[0]);
-    expect(mocks.list).toHaveBeenCalledWith(expect.any(Request),{limit:20},{userId:OWNER,sessionId:SESSION,transport:"COOKIE"});
+    expect(mocks.list).toHaveBeenCalledWith("list_v1_shadow_documents",{p_after_document_id:null,p_limit:20});
   });
   it("is genuinely empty before admission",async()=>{mocks.query.mockResolvedValue({rows:[{data:{tasks:[],nextCursor:null}}]});
     expect(await(await readWorkspaceTask(request())).json()).toEqual({status:"AVAILABLE",documents:[],documentsCursor:null,taskPage:{tasks:[],nextCursor:null}});});
   it.each([[401,"AUTH_REQUIRED"],[503,"UNAVAILABLE"]] as const)("list %s denies task lookup",async(status,value)=>{
-    mocks.list.mockRejectedValue(value==="AUTH_REQUIRED"?new CaresLinkV1ContractError("AUTH_REQUIRED","unavailable"):new Error("private"));expect((await readWorkspaceTask(request())).status).toBe(status);expect(mocks.query).not.toHaveBeenCalled();
+    mocks.list.mockResolvedValue({data:null,error:{code:"P0001",message:value==="AUTH_REQUIRED"?"AUTH_REQUIRED":"private"}});expect((await readWorkspaceTask(request())).status).toBe(status);expect(mocks.query).not.toHaveBeenCalled();
   });
   it.each([401,403,503])("principal failure %s clears the whole surface",async status=>{
     mocks.resolve.mockResolvedValue({ok:false,status,reason:status===401?"session_revoked":status===403?"forbidden_transport":"unavailable"});
@@ -47,13 +49,13 @@ describe("owned multi-task workspace bridge",()=>{
     mocks.query.mockResolvedValue({rows:[{data:{tasks:[],nextCursor:null}}]});
     expect((await readWorkspaceTask(request("?before="+encodeURIComponent(TIME+"~"+JOB)))).status).toBe(200);
     expect(mocks.query.mock.calls[0][1]).toEqual([OWNER,SESSION,TIME,JOB,20,"1.0.0-shadow.1","2026-08-09.v1-shadow"]);
-    expect(mocks.list.mock.calls[0][1]).toEqual({limit:20});expect(mocks.list.mock.calls[0][0].headers.get("cookie")).toBe("cl_browser_fixture=owner");
+    expect(mocks.list.mock.calls[0][1]).toEqual({p_after_document_id:null,p_limit:20});expect(mocks.resolve.mock.calls[0][0].headers.get("cookie")).toBe("cl_browser_fixture=owner");
   });
   it("keeps the two cursors independent and sends no owner or size from the browser",async()=>{
     const cursor="document.v1:"+JOB;
     mocks.query.mockResolvedValue({rows:[{data:{tasks:[],nextCursor:null}}]});
     expect((await readWorkspaceTask(request("?before="+encodeURIComponent(TIME+"~"+JOB)+"&draftAfter="+encodeURIComponent(cursor)))).status).toBe(200);
-    expect(mocks.list.mock.calls[0][1]).toEqual({limit:20,cursor});
+    expect(mocks.list.mock.calls[0][1]).toEqual({p_after_document_id:JOB,p_limit:20});
     expect(mocks.query.mock.calls[0][1].slice(0,5)).toEqual([OWNER,SESSION,TIME,JOB,20]);
   });
   it.each(["?draftAfter=private","?draftAfter=&draftAfter=bad","?noteType=handover"])("rejects draft query %s before either read",async query=>{

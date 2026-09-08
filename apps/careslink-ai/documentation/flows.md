@@ -211,6 +211,22 @@ page/API files. No source credential, hosted role or writer is activated.
 The next slice is a default-off read-only runtime adapter, not deployment or
 generation activation. See [formal route scope](communication-note-product-integration-m1y.md#communication-note-default-off-formal-workspace-route-2026-09-08).
 
+### Communication Note read-only workspace database adapter (2026-09-08)
+
+The default-off adapter now binds one request-local Cookie client and verified
+user/session to the existing document-list RPC and task-list repository. Both
+reads stay fixed to 20 rows and independent position cursors. Reauthorization
+before reads and after completion rejects identity changes/revocation; the
+30-second handler deadline discards late results without retry or partial data.
+
+Task reads require a separate list-purpose server port, not a single-job status
+or generation credential. The formal runtime is still undefined: configuration
+cannot install a physical connection, role grant or credential issuer. The
+owned source-routed browser copy passed real local reads, current-draft return
+and revoked-session clearing without any admission, Points or review writes.
+Next is local task-port connection/cancellation/cleanup implementation, not
+Hosted activation. See [adapter evidence](communication-note-product-integration-m1y.md#communication-note-read-only-workspace-database-adapter-2026-09-08).
+
 ## 4. Save, history and delete
 
 ### Current flow

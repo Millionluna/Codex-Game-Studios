@@ -4894,6 +4894,30 @@ See [full-flow scope and remaining real-admission gate](communication-note-produ
   environment, actual AI, Production, push or deployment change.
 - [Source route wiring, evidence and next read-only composition](communication-note-product-integration-m1y.md#communication-note-default-off-formal-workspace-route-2026-09-08).
 
+### Communication Note read-only workspace database adapter (2026-09-08)
+
+- Actual Cookie principal/document RPC/task repository assembly is implemented,
+  default-off and still absent from the formal runtime binding. A flag alone
+  cannot create database privileges or credentials.
+- Full **5,078 passed / 12 skipped**, 300 files, 51 new tests; focused 111 passed.
+  Covers request identity isolation, same-client reauthorization, fixed readers,
+  target drift, malformed/excessive ports, safe errors, 30-second timeout, abort,
+  discarded late results and the actual unbound formal GET.
+- TypeScript, zero-warning lint, formal build, 32-chunk client scan and 73-file
+  adapter sync pass. Current-session importer allowlist expanded by one exact
+  default-off server module; privileged-client imports remain forbidden.
+- Existing SQL matrix: 118 passed; browser startup: 74 passed. The source-routed
+  owned app uses the new adapter. English/Traditional navigation, current saved
+  draft and revoked refresh/login passed; a foreign-cookie HTTP request returned
+  empty lists. Review remained REQUIRED and export controls disabled.
+- No browser warning/error; owned build's 39 chunks also passed the new marker
+  scan. Exact-socket Advisors: no issues. Browser reads left 30/0 Points, zero
+  jobs/admissions/reserves/settlements/reviews/edits/sync/export reports.
+- Both owned roots and tab 33 cleaned. No SQL, permission, Hosted, environment,
+  actual AI, push or deployment change. Physical task-port cleanup is the next
+  local implementation, not attested by a runtime port's labels.
+- [Adapter scope and evidence](communication-note-product-integration-m1y.md#communication-note-read-only-workspace-database-adapter-2026-09-08).
+
 ### Current live/read-only evidence
 
 - Supabase migrations, tables, RLS flags, policies, grants, function grants and aggregate row counts were checked read-only.

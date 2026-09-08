@@ -54,6 +54,12 @@ const forbiddenMarkers = [
   "record_communication_note_export_report",
   "list_communication_note_export_reports",
   "careslink_communication_history_executor",
+  // Workspace Cookie identity and purpose-scoped database assembly stay server-only.
+  "CARESLINK_COMMUNICATION_NOTE_WORKSPACE_EXPECTED_SUPABASE_REF",
+  "CARESLINK_COMMUNICATION_NOTE_WORKSPACE_EXPECTED_VERCEL_PROJECT_ID",
+  "COMMUNICATION_NOTE_JOB_LIST_READ",
+  "careslink_v1_generation_job_list_caller",
+  "list_v1_communication_note_jobs",
 ];
 
 if (!existsSync(buildIdPath) || !existsSync(chunksRoot)) {
