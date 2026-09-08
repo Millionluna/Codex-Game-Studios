@@ -12,6 +12,11 @@ export function parseSettlementResultBinding(value: unknown) {
       /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(record[k] as string))) throw new Error("Local result unavailable");
   return {canonicalId:record.canonicalId as string,revisionId:record.revisionId as string};
 }
+export async function readSettlementResultBinding(root: string) {
+  const path=root+"/settlement-result.json";
+  if(await realpath(root)!==root || await realpath(path)!==path) throw new Error("Local result unavailable");
+  return parseSettlementResultBinding(JSON.parse(await readFile(path,"utf8")));
+}
 export async function readSettlementDocument(request: Request, documentId: string) {
   const root=assertAdmissionFixture();
   if(process.env.CARESLINK_LOCAL_SETTLEMENT_DATABASE!=="OWNED_UNIX_SOCKET_ONLY") throw new Error("Local settlement fixture unavailable");
@@ -20,9 +25,7 @@ export async function readSettlementDocument(request: Request, documentId: strin
   if(request.method!=="GET" || request.headers.get("host")!=="127.0.0.1:3395" ||
     request.headers.get("sec-fetch-site")!=="same-origin" || request.headers.has("authorization")) return absent();
   try {
-    const path=root+"/settlement-result.json";
-    if(await realpath(root)!==root || await realpath(path)!==path) return absent();
-    const binding=parseSettlementResultBinding(JSON.parse(await readFile(path,"utf8")));
+    const binding=await readSettlementResultBinding(root);
     if(binding.canonicalId!==documentId || (url.searchParams.has("revisionId") && url.searchParams.get("revisionId")!==binding.revisionId)) return absent();
   } catch {return absent();}
   // Fresh auth/current session and owner access are still checked by real SQL.

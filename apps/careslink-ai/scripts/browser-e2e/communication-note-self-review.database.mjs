@@ -11,6 +11,7 @@ import { verifyWordingEditScenarios } from "../preview-e2e/communication-note-ed
 import { verifyExportHistoryScenarios } from "../preview-e2e/communication-note-export-history-local-scenarios.mjs";
 import { installAdmissionBrowserDatabase, verifyAdmissionBrowserDatabase } from "./communication-note-admission.database.mjs";
 import { installSettlementBrowserController, verifySettlementBrowserController } from "./communication-note-settlement.database.mjs";
+import { verifySettledReviewScenarios } from "./communication-note-settled-review.database.mjs";
 
 const exec = promisify(execFile), childEnv = { PATH: "/usr/bin:/bin", LANG: "C", LC_ALL: "C" };
 const OWNER = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", SESSION = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
@@ -31,9 +32,10 @@ async function bounded(promise, milliseconds) {
  * and removes it only after stop() proves this child exited. */
 export function createReviewBrowserDatabase(root, mode = "REVIEW") {
   assert.match(root, /^\/private\/tmp\/cl-job-browser-[a-zA-Z0-9]{6}$/u);
-  assert.ok(mode === "REVIEW" || mode === "EDIT" || mode === "HISTORY" || mode === "ADMISSION" || mode === "SETTLEMENT");
-  const settlement = mode === "SETTLEMENT", admission = mode === "ADMISSION" || settlement, admissionPassword = randomBytes(32).toString("hex");
-  const history = mode === "HISTORY", edit = mode === "EDIT" || history;
+  assert.ok(["REVIEW", "EDIT", "HISTORY", "ADMISSION", "SETTLEMENT", "SETTLEMENT_REVIEW"].includes(mode));
+  const settledReview = mode === "SETTLEMENT_REVIEW";
+  const settlement = mode === "SETTLEMENT" || settledReview, admission = mode === "ADMISSION" || settlement, admissionPassword = randomBytes(32).toString("hex");
+  const history = mode === "HISTORY" || settledReview, edit = mode === "EDIT" || mode === "HISTORY";
   const base = join(root, "pg"), data = join(base, "data"), socket = join(base, "socket");
   let server, exited, owner, bootstrapMayBeRunning = false, closing = false;
   let terminalController;
@@ -50,6 +52,7 @@ export function createReviewBrowserDatabase(root, mode = "REVIEW") {
     env: { CARESLINK_LOCAL_REVIEW_DATABASE: "OWNED_UNIX_SOCKET_ONLY", CARESLINK_LOCAL_REVIEW_PASSWORD: password,
       ...(admission ? { CARESLINK_LOCAL_ADMISSION_DATABASE: "OWNED_UNIX_SOCKET_ONLY", CARESLINK_LOCAL_ADMISSION_PASSWORD: admissionPassword } : {}),
       ...(settlement ? { CARESLINK_LOCAL_SETTLEMENT_DATABASE: "OWNED_UNIX_SOCKET_ONLY" } : {}),
+      ...(settledReview ? { CARESLINK_LOCAL_SETTLED_REVIEW: "EXACT_SETTLED_RESULT_ONLY" } : {}),
       ...(edit ? { CARESLINK_LOCAL_EDIT_DATABASE: "OWNED_UNIX_SOCKET_ONLY" } : {}),
       ...(history ? { CARESLINK_LOCAL_HISTORY_DATABASE: "OWNED_UNIX_SOCKET_ONLY" } : {}) },
     async start() {
@@ -151,7 +154,14 @@ export function createReviewBrowserDatabase(root, mode = "REVIEW") {
     async verifySettlement() {
       assert.ok(settlement && terminalController); assert.equal(closing, false);
       const runtime = await open("cl_admission_browser_runtime", admissionPassword);
-      try { await verifySettlementBrowserController(owner, runtime, terminalController); }
+      try {
+        await verifySettlementBrowserController(owner, runtime, terminalController);
+        if (settledReview) {
+          const actor = await open(RUNTIME, password);
+          try { await verifySettledReviewScenarios(owner, actor, root, terminalController); }
+          finally { await actor.end(); }
+        }
+      }
       finally { await runtime.end(); }
     },
     async command(command) {

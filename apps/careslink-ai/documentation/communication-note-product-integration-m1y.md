@@ -2189,3 +2189,77 @@ already tested durable self-review and export-history path, so the actual new
 document can complete the local application flow. Keep fixed synthetic facts,
 no model calls and formal/Hosted activation closed. Five-Note launch completion,
 real provider/vault integration and billing remain separate work.
+
+## Communication Note settled draft review and export integration (2026-09-08)
+
+The new opt-in `--settlement-review` joins actual local admission and terminal
+settlement to the existing durable self-review/export-history adapters. It does
+not alter `--settlement`, formal product routes, green components/Logo, SQL
+migrations/candidates or Hosted/Production activation.
+
+### Implementation and scope
+
+- One server-only bridge accepts only the newly settled document identified by
+  the existing exclusive-created, mode-0600 metadata file. The owned-root,
+  realpath, exact-key and UUID checks are shared with the original result GET.
+  No pre-seeded document is exposed through this bridge.
+- Three independent mode guards, exact route/method selection, loopback Host,
+  same-origin transport and POST Origin checks precede dispatch. Only document
+  GET, self-review POST and export-history GET/POST are connected. The untouched
+  request goes to the existing bounded parser, current-session/provider/owner
+  checks and transaction-level current-revision/review checks.
+- The owned local database installs the existing history candidate and its
+  narrow temporary capability. It does not install or enable wording editing.
+  No terminal password or parent operator enters Next; no process-memory history
+  fallback is added. Review/history operations cannot settle or charge Points.
+- The fixed success content, payload-consumption receipt and provider evidence
+  remain synthetic. Browser confirmation simulates a test user's interaction;
+  it is not an actual person's review or professional approval of care content.
+
+### Verification
+
+`--settlement-review-check` passed **61 database scenarios**: 14 review,
+21 history, 8 admission, 9 terminal and 9 newly settled-draft integration cases.
+The new cases cover required review/empty durable history, unreviewed report
+denial, exact review/report replay, changed replay denial, foreign access,
+revocation, history-switch closure/recovery and unchanged Points/jobs/revisions/
+content. Only one review event and one synthetic report are added. The initial
+run stopped on a test expectation: the existing document SQL emits
+`SESSION_REVOKED`, while review/history emit `AUTH_REQUIRED`. The assertion was
+corrected without changing the authorization contract; that root was cleaned.
+
+The independent browser run submitted the fixed facts, recovered the deliberately
+lost admission acknowledgement, settled success once and replayed it unchanged.
+The new version opened with review required and all four export buttons disabled.
+After the three simulated confirmations, the actual database returned CONFIRMED.
+Clicking TXT yielded `DOWNLOAD_INITIATED` and exactly one durable history entry.
+Full page reload preserved review status; explicit history refresh recovered the
+same entry. Disabling history cleared the displayed list and explained that the
+user should refresh later, not export again; re-enabling restored the one entry.
+Session revocation plus reload removed private content and showed sign-in.
+The final browser counts stayed **1 job, 1 RESERVE, 1 COMMIT, 1 review, 1 TXT
+report, 10 available / 0 reserved**. No extra generation, revision or charge was
+created by review/history operations. Verified loaded pages had no warning/error
+logs; the intentional history-off request returned 503 as expected.
+
+This browser evidence covers initiation/reporting, not confirmed OS file saving,
+opening or clipboard delivery. No native export compatibility is newly claimed.
+The draft remains a draft after confirmation. Editing and version-isolation for
+this newly generated result are not enabled by this slice.
+
+The 20 new bridge tests passed; full suite **4,731 passed / 12 skipped** across
+290 files (289 passed / 1 skipped). Typecheck, zero-warning lint, 64/64-page
+Turbopack build, 32-chunk client-boundary scan and 73-file adapter check passed.
+Local security Advisors found no issues. Owned `/private/tmp` roots
+`cl-job-browser-5iz33E`, `cl-job-browser-8hZ1bi` and `cl-job-browser-IsOkPN` were
+stopped/removed and independently checked absent; port 3395 had no listener.
+Only the owned browser tab was closed. No push, deployment, model call or Hosted/
+Production mutation occurred. Supabase/Postgres guidance preserved narrow roles
+and fresh transactions; Next/browser guidance kept the bridge server-only and
+required actual navigation, refresh and access-denial checks.
+
+**Next bounded implementation:** connect wording edits for this new local draft,
+then verify a new version requires a new self-review and retains the old
+version's separate export history. Keep synthetic inputs, AI calls off and
+formal activation closed. Real provider/vault integration, remaining Note types
+and billing are not completed by this local flow.

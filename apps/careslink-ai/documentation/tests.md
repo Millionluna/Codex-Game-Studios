@@ -4734,6 +4734,24 @@ See [full-flow scope and remaining real-admission gate](communication-note-produ
   The owned browser tab and all seven owned database roots were cleaned.
 - [Synthetic limits, authority boundary and next application slice](communication-note-product-integration-m1y.md#communication-note-real-local-terminal-settlement-browser-gate-2026-09-08).
 
+### Communication Note settled-draft review/export gate (2026-09-08)
+
+- `node scripts/browser-e2e/communication-note-recovery.mjs --settlement-review-check`
+  passed 61 real local database scenarios: 14 review, 21 history, 8 admission,
+  9 terminal and 9 new settled-result integration scenarios. Review/report replay
+  records once, foreign/revoked access is denied, history closes safely, and
+  Points, jobs, revisions and draft content are unchanged by these operations.
+- `--settlement-review` browser run: actual admission and terminal success → new
+  draft → simulated self-review → TXT initiation → one durable history report.
+  Page reload preserves review; history refresh recovers the same record. The
+  history-off/on and session-revocation paths passed. Final Points remain 10/0.
+  No new native file-delivery or real human-review claim is made.
+- 20 new tests; full **4,731 passed / 12 skipped**, 290 files. Typecheck, lint,
+  64-page build, 32-chunk client boundary, 73-file adapter check and local security
+  Advisors passed. Three owned roots and the dedicated browser tab were cleaned.
+  Formal routes, migrations, production and model/provider activation unchanged.
+- [Scope, exact-result boundary and next editing slice](communication-note-product-integration-m1y.md#communication-note-settled-draft-review-and-export-integration-2026-09-08).
+
 ### Current live/read-only evidence
 
 - Supabase migrations, tables, RLS flags, policies, grants, function grants and aggregate row counts were checked read-only.

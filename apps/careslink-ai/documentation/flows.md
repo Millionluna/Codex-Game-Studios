@@ -89,6 +89,19 @@ KMS runs. The separate `--settlement-check` matrix needs no browser. All test
 data is destroyed at shutdown and formal activation stays off.
 See [terminal settlement evidence and next review/export slice](communication-note-product-integration-m1y.md#communication-note-real-local-terminal-settlement-browser-gate-2026-09-08).
 
+### Communication Note settled draft review/export fixture (2026-09-08)
+
+The new `--settlement-review` mode continues the real-local successful task:
+new canonical draft → required review → three test-user confirmations → durable
+self-review → TXT download initiation → durable report → refresh/readback of
+the same review and history. Review/history add no Points events. Only the new
+settled document can reach these routes; editing remains closed. History-off
+clears the visible list, recovery reads it without another export, and revoked
+sessions cannot read private content. This uses synthetic content/identity and
+does not attest human content quality or OS file delivery. The separate
+`--settlement-review-check` runs 61 database scenarios and cleans its cluster.
+See [the settled-draft review/export evidence](communication-note-product-integration-m1y.md#communication-note-settled-draft-review-and-export-integration-2026-09-08).
+
 ## 4. Save, history and delete
 
 ### Current flow
