@@ -3121,7 +3121,82 @@ password expiry blocks future password login but does not guarantee cleanup if
 the issuer process dies. No Hosted grants, Production, live AI, KMS/vault,
 payments, push/PR or deployment changed; this is not five-Note launch approval.
 
-**Next bounded implementation:** extract the verified single-read lease lifecycle
+**Next bounded implementation at that checkpoint (completed below):** extract the verified single-read lease lifecycle
 into a default-off formal server adapter with typed issue/revoke receipts and
 failure tests. Keep the local Unix operator outside that adapter; actual managed
 custody, Hosted permissions and runtime activation remain separately gated.
+
+### Communication Note default-off server task lease adapter (2026-09-09)
+
+Added `communication-note-workspace-task-lease.server.ts`; the owned bridge now
+calls this actual application-source lifecycle instead of maintaining its own.
+It is lazy, single-use and server-only. Absent/false enablement does no I/O.
+Explicit constructor binding accepts only a non-Production project and trusted
+Cookie principal. `COMMUNICATION_NOTE_TASK_LEASE_READY` remains false and
+`COMMUNICATION_NOTE_WORKSPACE_FORMAL_RUNTIME` remains undefined; no environment
+flag installs an issuer or activates the formal route.
+
+Issue and revoke bind to the same frozen random request ID, exact project,
+owner/session, list-only purpose and caller role. Exact receipt shapes reject
+extras, getters/proxies and mismatched scopes. The source opens only after
+validating the list-specific role, 43-character password and 20–90-second delivery
+validity. The port exposes only its existing four fields; the existing repository
+still parses the returned rows and metadata. No SQL, operator, network endpoint
+or model client was added to this adapter.
+
+Issue/read/revoke have independent 8/15/8-second asynchronous deadlines.
+Cancellation aborts issue/read but never independent revoke. Ambiguous issuance
+is revoked by the known scope. No metadata is released without a matching
+REVOKED receipt, active caller signal and wall-clock/monotonic freshness.
+Falsy exceptions are failures. Only the physical source's exact SESSION_REVOKED
+error survives after successful cleanup; other errors are sanitized. Clearing
+the adapter's own password reference is not secure JavaScript memory erasure.
+
+A trusted custody provider must make its revoke receipt a terminal fence:
+pending issuance cannot later deliver a usable credential, future issuance for
+that ID is denied, the password is disabled, sessions are removed and a durable
+tombstone exists. Shape/binding validation does not prove the provider performed
+those operations. Promise deadlines suppress late results but do not kill an
+external process or preempt a blocked event loop. External expiry supervision
+and restart reconciliation remain necessary. Local IPC envelope translation is
+test-only, not Hosted attestation; the parent retains its own bounded Unix
+operations, privileged SQL and expiry timer outside Next.
+
+Verification:
+
+- New lifecycle **84 passed**; with the bridge **102 passed**. Scope substitution
+  on both receipts, malformed credentials/inputs, one-use concurrency,
+  ambiguous/falsy failures, cancellation in each phase, pending cleanup,
+  all three deadlines, late fulfillment/rejection, expiry/clock rollback and
+  formal non-installation are covered.
+- Full **5,232 passed / 34 skipped**, 305 files (302 passed, three opt-in).
+  TypeScript/full lint passed; formal webpack build generated 63 entries and
+  the updated client-boundary scan passed 117 static chunks. Adapter sync
+  checked 73 files; diff checks passed.
+- The existing owned PG16 suite now exercises this actual adapter: **10 passed**
+  with its 118 setup/settlement/catalog checks. Real reads, replay rejection,
+  role/password revocation, two-session termination, zero locks with a canary,
+  blocked-read cancellation, real 60-second orphan expiry and failed-DROP
+  receipt withholding passed. Business snapshot unchanged; fixture stopped and
+  removed, with no matching test/database process or port-3395 listener left.
+- No page was reopened in this source-only batch. Earlier browser results are
+  historical evidence, not a new same-revision browser run.
+
+Workspace recovery preceded validation: the temporary worktree's Git pointer
+and 1,167 old tracked files were missing; commit `cd29787` and the new adapter
+survived. Only missing files were restored, without overwriting survivors.
+The worktree moved intact to
+`/Users/milliohusky/Documents/ChatGPT/Careslink/worktrees/ai-points-ui-v1`.
+Dependencies were replenished from the unchanged frozen lock with install
+scripts disabled. Build tracing is pinned to this app's directory so the nested
+worktree does not infer the unrelated parent main site.
+
+Supabase/Next.js guidance informed the server-only credential boundary and
+continued default-off wiring. No TSX/green design/Logo, SQL migration, Hosted
+permissions, Production, live model/provider, KMS/vault, payment, push/PR or
+deployment changed. This is not five-Note launch approval.
+
+**Next bounded step:** implement and verify local custody recovery after issuer
+interruption/restart, with supervised expiry and pending-receipt reconciliation.
+Use only disposable local databases; managed custody, Hosted PG17/TLS and formal
+activation still require separate evidence/authority.

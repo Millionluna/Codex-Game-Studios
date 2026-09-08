@@ -272,9 +272,23 @@ Uncertain cleanup withholds data and closes further issuance for that fixture.
 The built page passed 20/5 pagination, three locales, cancellation/recovery and
 session-revocation clearing, ending with seven REVOKED receipts and no active
 task roles/connections/locks. The formal binding is still undefined. Next is a
-typed default-off server lease adapter, not copying the local database operator
+typed default-off server lease adapter (completed below), not copying the local database operator
 into the app. Managed custody, crash/restart cleanup, Hosted grants and live AI
 remain separate. See [local lifecycle evidence](communication-note-product-integration-m1y.md#communication-note-local-single-use-task-credentials-2026-09-08).
+
+### Communication Note default-off server task lease adapter (2026-09-09)
+
+The local bridge now calls the actual application-source lifecycle:
+validated Cookie/query scope → bounded issue → validate credential/source →
+bounded read → independent bounded revoke → exact receipt/freshness/cancellation
+check → release metadata. Missing or uncertain revocation never returns data;
+late responses cannot turn a timed-out read into success. Formal wiring remains
+undefined; the local database operator stays outside the application.
+
+84 new unit tests and 10 real owned-PG tests passed. Typed receipt validation is
+not managed custody evidence: the trusted provider must enforce a terminal fence.
+Next: local issuer interruption/restart and supervised orphan reconciliation.
+See [adapter evidence and limits](communication-note-product-integration-m1y.md#communication-note-default-off-server-task-lease-adapter-2026-09-09).
 
 ## 4. Save, history and delete
 

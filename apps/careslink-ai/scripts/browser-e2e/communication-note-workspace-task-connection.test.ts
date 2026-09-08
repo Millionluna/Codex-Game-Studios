@@ -14,7 +14,8 @@ const parameters = [principal.userId, principal.sessionId, null, null, 20, "1.0.
 beforeEach(() => {
   vi.resetAllMocks(); vi.stubEnv("CARESLINK_LOCAL_TASK_ENTRY", "OWNER_TASK_LIST");
   vi.stubEnv("CARESLINK_LOCAL_TASK_BROKER_CAPABILITY", capability); h.guard.mockReturnValue(root);
-  h.open.mockReturnValue({ execute: h.execute }); h.execute.mockResolvedValue({ rows: [] });
+  h.open.mockReturnValue({ projectRef: "abcdefghijklmnopqrst", purpose: "COMMUNICATION_NOTE_JOB_LIST_READ",
+    callerRole: "careslink_v1_generation_job_list_caller", execute: h.execute }); h.execute.mockResolvedValue({ rows: [] });
   h.ipc.mockImplementation(async (_root, _capability, operation, body) => operation === "issue"
     ? { leaseId: body.requestId, credential: { role, password, deliveryExpiresAt: new Date(Date.now() + 60000).toISOString() } }
     : { leaseId: body.leaseId, revoked: true });
@@ -33,7 +34,8 @@ describe("owned workspace single-delivery task credential", () => {
     expect(h.ipc).toHaveBeenNthCalledWith(2, root, capability, "revoke", { leaseId: id });
     expect(h.open).toHaveBeenCalledWith({ projectRef: "abcdefghijklmnopqrst", principal, socket: root + "/pg/socket", port: 15437,
       credential: { role, password: "", deliveryExpiresAt: expect.any(String) } });
-    expect(h.execute).toHaveBeenCalledWith(parameters, ctx);
+    expect(h.execute).toHaveBeenCalledWith(parameters, { signal: expect.any(AbortSignal) });
+    expect(h.execute.mock.calls[0][1].signal).not.toBe(ctx.signal);
     expect(h.execute.mock.invocationCallOrder[0]).toBeLessThan(h.ipc.mock.invocationCallOrder[1]);
   });
   it.each([
@@ -73,7 +75,7 @@ describe("owned workspace single-delivery task credential", () => {
       if (mode === "lost-response") throw new Error("private diagnostic");
       return { leaseId: mode === "wrong-id" ? "f".repeat(32) : args[3].leaseId, revoked: mode !== "false", ...(mode === "extra-field" ? { password } : {}) };
     });
-    await expect(createWorkspaceTaskReadPort(principal).execute(parameters, context())).rejects.toThrow("Local task connection unavailable");
+    await expect(createWorkspaceTaskReadPort(principal).execute(parameters, context())).rejects.toThrow("Task list credential lifecycle unavailable");
     expect(console.log).toHaveBeenCalledWith(expect.stringContaining('"returned":false'));
   });
   it("revokes after source construction failure", async () => {
@@ -96,6 +98,7 @@ describe("owned workspace single-delivery task credential", () => {
     const runner = readFileSync(new URL("./communication-note-recovery.mjs", import.meta.url), "utf8");
     expect(runner).toContain('emit("src/lib/__task-credential-fixture.ts"');
     expect(runner).not.toMatch(/emit\([^\n]+task-credential\.database/);
+    expect(readFileSync(new URL("../../next.config.ts", import.meta.url), "utf8")).toContain("outputFileTracingRoot: __dirname");
     const db = readFileSync(new URL("./communication-note-self-review.database.mjs", import.meta.url), "utf8");
     expect(db).not.toMatch(/CARESLINK_LOCAL_TASK_READ_ROLE|CARESLINK_LOCAL_TASK_READ_PASSWORD/);
     expect(readFileSync(new URL("./communication-note-admission.fixture.ts", import.meta.url), "utf8")).not.toMatch(/JOB_LIST_SQL|job_list_caller/);

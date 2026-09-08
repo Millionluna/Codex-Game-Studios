@@ -5004,6 +5004,24 @@ See [full-flow scope and remaining real-admission gate](communication-note-produ
   Crash recovery, external expiry supervision, managed custody and Hosted
   activation are not established by this local evidence.
 
+### Communication Note default-off server task lease adapter (2026-09-09)
+
+- New lifecycle **84 passed**; with owned bridge **102 passed**. Full suite:
+  **5,232 passed / 34 skipped**, 305 files. Covers exact receipts and credentials,
+  input tampering, one-use concurrency, falsy failures, independent cancellation,
+  deadlines/late replies, reference clearing, clock freshness and non-installation.
+- Existing opt-in real PG16 suite now calls the actual adapter: **10 passed**,
+  with 118 setup scenarios. Real cancellation, lock/session removal, old-password
+  denial, 60-second orphan expiry and failed-revoke withholding passed. Business
+  snapshot unchanged; fixture stopped/removed. No new browser/Hosted claim.
+- TypeScript/full lint, formal webpack build (63 entries), client boundary
+  (117 chunks), 73-file adapter sync and diff checks passed. No migration,
+  production activation, model call, push/PR or deployment.
+- Recovered missing temporary worktree files without overwriting survivors;
+  development now uses the persistent project worktree, with the same dependency
+  lock and build tracing pinned to the AI app's own directory.
+- [Evidence and custody obligations](communication-note-product-integration-m1y.md#communication-note-default-off-server-task-lease-adapter-2026-09-09).
+
 ### Current live/read-only evidence
 
 - Supabase migrations, tables, RLS flags, policies, grants, function grants and aggregate row counts were checked read-only.
