@@ -3700,5 +3700,34 @@ temporary environment was needed; the existing same-source browser evidence is
 retained. Commit scope is the six implementation/test files and three evidence
 documents only, with no push or deployment.
 
-Next: independently verify native refresh/tab-close prompts. Do not repeat the
-now-passing in-app dialog flow or activate any runtime for that separate check.
+The next independent native check is recorded below; the in-app flow was not repeated.
+
+### Safari native composer departure acceptance (2026-09-09)
+
+Product source `6ff5871` passed the separate native boundary in one new Safari
+tab on the local Simplified Chinese composer. Actual field click/keyboard input
+preceded Cmd+R and Cmd+W; no synthetic beforeunload dispatch or forced tab-close
+API was used. Both actions displayed Safari's origin-labelled confirmation.
+For each, 留在页面 retained the exact synthetic text and original URL. Accepting
+离开页面 after refresh reloaded an empty composer; accepting it after tab-close
+removed only the owned test tab. The original two tabs and active tab were restored.
+Native accessibility output and screenshots agree on these outcomes. An initial
+Chinese automation input did not enter the field; verified ASCII synthetic input
+was used before testing. This does not establish the input-tool failure's cause.
+
+The existing fixed fixture `XFKQII` passed its 54 review/edit/history, 12 admission
+and eight catalog scenarios, owned webpack build/typecheck and 40-chunk client
+scan. Browser generation/review submission was never invoked; displayed Points
+stayed 30 available / zero reserved. No task seed or runtime activation was added.
+After parent/child ownership checks, parent 11007's fixed cleanup exited zero,
+reported zero active leases, PostgreSQL stopped, root removed and source unchanged.
+Independent checks found the owned root, all three processes and port 3395 absent.
+Only disposable local synthetic data was removed; it can be recreated by the runner.
+
+This is desktop Safari / dirty-input evidence only, not Chrome/Edge/mobile,
+force-quit, or pending-request acceptance. Browser-native prompts require prior
+interaction and are not guaranteed for every lifecycle exit; see
+[MDN beforeunload limitations](https://developer.mozilla.org/en-US/docs/Web/API/Window/beforeunload_event#usage_notes).
+No product edit, model call, hosted/Production change, commit, push or deployment.
+Next: review and locally commit this evidence-only update; do not repeat passing
+composer leave tests or expand runtime authority.

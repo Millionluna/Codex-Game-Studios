@@ -391,12 +391,16 @@ Escape retains inputs/checks/retry bytes and restores focus. Only explicit disca
 assigns the destination. Initial focus and both Tab wrap directions are covered.
 Real browser cancel/accept/Back flows and 390px dialogs passed in all three locales;
 the English input-readout discrepancy was resolved with visible-field screenshots.
-The final fixture, database, tabs and viewport override were cleaned. Native
-refresh/tab-close prompts remain separately unverified. Local pre-commit review,
+The final fixture, database, tabs and viewport override were cleaned. Local pre-commit review,
 full tests/typecheck/lint and adapter checks passed without another product edit.
-Next: independent native refresh/tab-close acceptance, not another identical
-in-app dialog retry or runtime activation. No push or deployment is included.
+Independent desktop Safari acceptance on `6ff5871` then passed dirty-input native
+refresh/tab-close: cancel retains text; accepted refresh clears it; accepted close
+removes only the test tab. The owned fixture was cleaned and original tabs restored.
+This does not attest other browsers, mobile force-quit or pending requests.
+Next: review/local commit of the evidence only, not another passing-dialog retry
+or runtime activation. No push or deployment is included.
 See [page-owned confirmation repair](communication-note-product-integration-m1y.md#page-owned-composer-leave-confirmation-repair-2026-09-09).
+See [Safari native acceptance](communication-note-product-integration-m1y.md#safari-native-composer-departure-acceptance-2026-09-09).
 
 ## 4. Save, history and delete
 

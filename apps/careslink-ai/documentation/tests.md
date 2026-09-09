@@ -5194,14 +5194,29 @@ new cancel/accept evidence; do not repeat the unchanged native-dialog test.
   tracked source. Their roots/processes/listener are absent; owned tabs are closed
   and viewport reset. Final seed counters stayed 10/0 with no browser generation,
   new business writes or model calls. No hosted/Production change or deployment.
-- Native refresh/tab-close beforeunload acceptance remains a separate open item.
-  Next: independent acceptance of that native boundary, not another in-app retry.
+- Native refresh/tab-close acceptance was separate from this repair run; see the
+  subsequent desktop Safari evidence below.
 - Local pre-commit review re-ran the same product source: 5,316 passed / 41 skipped,
   typecheck, full ESLint, 73-file adapter sync and whitespace checks passed. No
   blocking finding or new product edit; existing browser evidence was retained.
   The local-only commit includes six implementation/test files and these three
   evidence documents. No push, deployment or new temporary environment is in scope.
 - [Detailed repair and cleanup evidence](communication-note-product-integration-m1y.md#page-owned-composer-leave-confirmation-repair-2026-09-09).
+
+### Safari native composer departure acceptance (2026-09-09)
+
+- On `6ff5871`, native Cmd+R / Cmd+W each showed Safari's confirmation after actual
+  synthetic field input. Cancel retained exact input; accepted refresh cleared it;
+  accepted close removed only the owned tab. AX and screenshots corroborated results.
+- Fixed local fixture matrices 54/12/8, build/typecheck and 40-chunk scan passed.
+  Browser Points stayed 30/0; no generation or review was submitted. Cleanup exited
+  zero with no leases, PostgreSQL stopped, root removed and tracked source unchanged;
+  independent root/process/3395 checks passed. Original Safari tabs were restored.
+- Scope: desktop Safari dirty input only, not other browsers/mobile, force-quit or
+  pending requests. Product code and existing 5,316-test evidence are unchanged;
+  the full suite was not rerun for this documentation-only addition.
+- Next: review and local evidence commit; no push, deployment or runtime activation.
+- [Detailed native acceptance](communication-note-product-integration-m1y.md#safari-native-composer-departure-acceptance-2026-09-09).
 
 ### Current live/read-only evidence
 
