@@ -118,4 +118,11 @@ describe("isolated real-browser fixture preflight", () => {
     expect(observer).toContain('sequence >= 64');
     expect(observer).not.toMatch(/dispatchEvent|localStorage|sessionStorage|document\.cookie|innerHTML|globalThis\.fetch\s*=/);
   });
+  it("exercises the actual Points page with only the UI flag, not a synthetic wallet binding", () => {
+    expect(runner).toContain('await copy("src/app/plan-and-usage/page.tsx", "src/app/plan-and-usage/page.tsx")');
+    expect(runner).toContain('CARESLINK_V1_POINTS_UI_ENABLED: "true"');
+    expect(runner).not.toContain('CARESLINK_V1_PRODUCT_API_POINTS_READ_ENABLED: "true"');
+    expect(runner).not.toMatch(/emit\("src\/lib\/v1\/(?:points-page-data|product-api-runtime)\.server\.ts/);
+    expect(runner).toContain('"src/lib/communication-note-points-navigation.ts"');
+  });
 });

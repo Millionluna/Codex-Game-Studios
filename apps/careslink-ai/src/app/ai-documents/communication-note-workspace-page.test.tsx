@@ -1,19 +1,27 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("server-only",()=>({}));
-const mocks=vi.hoisted(()=>({client:vi.fn(),account:vi.fn(),redirect:vi.fn()}));
+const mocks=vi.hoisted(()=>({client:vi.fn(),account:vi.fn(),redirect:vi.fn(),pointsEnabled:vi.fn()}));
+vi.mock("../../lib/points-ui-feature.server",()=>({isCaresLinkV1PointsUiEnabled:mocks.pointsEnabled}));
 vi.mock("../../lib/supabase-server",()=>({createCareslinkServerSupabaseClient:mocks.client}));
 vi.mock("../../lib/referral-workspace-session",()=>({resolveWorkspaceAccountFromSupabaseSession:mocks.account}));
 vi.mock("next/navigation",()=>({redirect:mocks.redirect}));
 vi.mock("../../components/communication-note-saved-drafts",()=>({CommunicationNoteSavedDrafts:()=>null}));
 import { renderCommunicationNoteWorkspacePage } from "./communication-note-workspace-page";
 const client={auth:{getUser:vi.fn()}};
-beforeEach(()=>{vi.resetAllMocks();mocks.client.mockResolvedValue(client);mocks.account.mockResolvedValue({id:"owner",role:"provider"});
+beforeEach(()=>{vi.resetAllMocks();mocks.pointsEnabled.mockReturnValue(false);mocks.client.mockResolvedValue(client);mocks.account.mockResolvedValue({id:"owner",role:"provider"});
   mocks.redirect.mockImplementation(href=>{throw new Error("redirect:"+href);});});
 describe("formal Communication workspace shell",()=>{
   it.each(["en","zh-Hans","zh-Hant"])("passes only safe serializable loader props for %s",async locale=>{
     const view=await renderCommunicationNoteWorkspacePage({lang:locale});
-    expect(view?.props).toEqual({locale,includeTask:"MULTI",loginHref:`/auth/login?lang=${locale==="zh-Hant"?"en":locale}&next=${encodeURIComponent("/ai-documents?lang="+locale)}`});
+    expect(view?.props).toEqual({locale,includeTask:"MULTI",pointsNavigationEnabled:false,loginHref:`/auth/login?lang=${locale==="zh-Hant"?"en":locale}&next=${encodeURIComponent("/ai-documents?lang="+locale)}`});
     expect(mocks.account).toHaveBeenCalledWith(client);expect(JSON.stringify(view?.props)).not.toContain("owner");
+  });
+  it("passes only the server Points UI opt-in, not a balance or query override",async()=>{
+    mocks.pointsEnabled.mockReturnValue(true);
+    const view=await renderCommunicationNoteWorkspacePage({lang:"en"});
+    expect(view?.props.pointsNavigationEnabled).toBe(true);
+    expect(Object.keys(view!.props)).toEqual(["locale","includeTask","loginHref","pointsNavigationEnabled"]);
+    await expect(renderCommunicationNoteWorkspacePage({lang:"en",pointsNavigationEnabled:"true"})).rejects.toThrow("redirect:/ai-documents?lang=en");
   });
   it("requires server auth before canonicalization and never accepts a demo account",async()=>{
     mocks.account.mockResolvedValue(undefined);

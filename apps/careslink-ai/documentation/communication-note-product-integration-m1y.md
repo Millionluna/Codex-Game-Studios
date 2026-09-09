@@ -3406,3 +3406,61 @@ using the established green design. Reuse the existing balance/NOT_READY/
 UNAVAILABLE states; do not fabricate a balance, duplicate the wallet, add
 purchasing, or activate the formal runtime. Keep implementation and synthetic
 verification local; managed custody/Hosted activation remain separately gated.
+
+## Communication Note workspace to Points navigation (2026-09-09)
+
+Implemented the preceding app-facing slice on top of `821bc66`. The authenticated
+multi-task workspace now offers a read-only Points entry only when the existing
+server Points UI switch is enabled. The client receives one boolean, not a
+balance or account identifier. Existing green branding, Logo and typography
+remain unchanged; no new wallet, mutation route or purchase control was added.
+
+`communicationLang` accepts exactly one of `en`, `zh-Hans`, `zh-Hant`. It is
+navigation context, never a return URL or access authority. The Points page
+preserves that context through reload, its language switcher and safe pending
+login/register links. Its primary return link performs a full navigation to the
+fixed workspace path, where access and metadata are checked afresh. Unknown,
+duplicate and URL-shaped context is ignored; demo accounts cannot use it to
+authenticate or read Points. The legacy Credits branch is unchanged.
+
+The existing Points shell supports English and Simplified Chinese only.
+Traditional Chinese entry explicitly says “英文”, opens English Points with an
+explanation, and returns to the Traditional Chinese workspace even after a
+Points-page language change. This is an explicit fallback, not a claim of a
+translated Traditional Chinese Points page. Existing AVAILABLE (including real
+zero), NOT_READY, AUTH_REQUIRED and UNAVAILABLE balance handling remains intact.
+
+Verification:
+
+- Final complete suite: 5,291 passed, 41 skipped; 304 passing files and four
+  opt-in skipped files. Full ESLint and TypeScript checks passed. Existing
+  Points-markup import mocks and the audited server flag-importer list were
+  updated; both sides of the importer comparison are now sorted consistently.
+- Owned built fixture copied the actual workspace and Points pages unchanged.
+  Only its Points UI flag was enabled; the Product API/Points runtime remained
+  closed. Webpack build and the 40-chunk client-boundary scan passed.
+- In temporary browser tab 38, all three workspace languages entered Points
+  and returned correctly. Traditional Chinese context survived Points reload
+  and English → Simplified Chinese switching. At 390px, both pages had no
+  horizontal overflow; entry/return controls measured 44px high. Return loaded
+  the two existing synthetic draft entries. Browser warning/error logs: empty.
+- The Points page correctly displayed UNAVAILABLE, not the fixture admission
+  balance. Unit/markup tests cover all four balance states and login context;
+  this run does not attest real sign-in or a live Points read.
+- Independent fixed status: synthetic Points stayed 30 available / 0 reserved;
+  one setup ledger entry, no admissions/reserves/terminals/jobs/review/edit/sync
+  events. Six task-read receipts were REVOKED, runtime roles/sessions/locks zero.
+- Reset the temporary viewport and closed only tab 38. Verified parent 93210
+  was stopped; cleanup reported active leases zero, PostgreSQL stopped and
+  `removed:true, sourceUnchanged:true`. Independent checks found owned root
+  `/private/tmp/cl-job-browser-ItEfIw` absent and port 3395 free. Disposable
+  synthetic data was removed; user tabs 1 and 12 were left untouched.
+
+Formal workspace/runtime activation, Hosted custody/Auth and release gates are
+still open. No push, PR, deployment, cloud resource, real AI call, payment or
+Production operation occurred.
+
+**Next proposed app-facing slice:** add a Points-page route from the composer’s
+insufficient/not-ready balance guidance, with an explicit warning before leaving
+unsubmitted facts. Reuse this navigation and current balance handling; do not
+put facts in URLs/storage, imply that purchase is available, or activate runtime.

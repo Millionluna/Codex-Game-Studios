@@ -25,6 +25,9 @@ vi.mock("@/lib/v1/points-page-data.server", () => ({
 vi.mock("@/lib/points-ui-feature.server", () => ({
   isCaresLinkV1PointsUiEnabled: mocks.isPointsUiEnabled,
 }));
+vi.mock("@/lib/communication-note-points-navigation", async () =>
+  import("../../lib/communication-note-points-navigation"),
+);
 vi.mock("@/lib/referral-workspace-auth", async () =>
   import("../../lib/referral-workspace-auth"),
 );
@@ -104,6 +107,65 @@ describe("Plan & Usage page", () => {
       recentLimit: 16,
     });
     expect(mocks.resolvePoints).not.toHaveBeenCalled();
+  });
+
+  it.each(["en", "zh-Hans", "zh-Hant"])("returns to the original %s workspace and preserves context through refresh/language links", async communicationLang => {
+    mocks.isPointsUiEnabled.mockReturnValue(true);
+    const element = await PlanAndUsagePage({ searchParams: Promise.resolve({ lang: "en", communicationLang,
+      next: "https://outside.invalid", owner: "private-owner", returnTo: "https://outside.invalid" }) });
+    const markup = renderToStaticMarkup(element);
+    expect(markup).toContain(`href="/ai-documents?lang=${communicationLang}"`);
+    expect(markup).toContain("Back to workspace");
+    expect(markup).toContain(`/plan-and-usage?lang=en&amp;communicationLang=${communicationLang}`);
+    expect(markup).toContain(`/plan-and-usage?lang=zh-Hans&amp;communicationLang=${communicationLang}`);
+    expect(markup.includes("Return to the workspace in Traditional Chinese.")).toBe(communicationLang === "zh-Hant");
+    expect(markup).not.toMatch(/outside\.invalid|private-owner/);
+    expect(mocks.resolvePoints).toHaveBeenCalledTimes(1);
+    expect(mocks.getUsage).not.toHaveBeenCalled();
+  });
+
+  it.each(["AVAILABLE", "NOT_READY", "AUTH_REQUIRED", "UNAVAILABLE"])("keeps navigation independent of balance state %s", async status => {
+    mocks.isPointsUiEnabled.mockReturnValue(true);
+    mocks.resolvePoints.mockResolvedValue({ status, unit: "POINTS", availablePoints: 0, reservedPoints: 0,
+      serverTime: "2026-09-04T06:10:00.000Z", contractVersion: "1.0.0-shadow.1" });
+    const markup = renderToStaticMarkup(await PlanAndUsagePage({ searchParams: Promise.resolve({ lang: "zh-Hans", communicationLang: "zh-Hant" }) }));
+    expect(markup).toContain("返回工作台");
+    expect(markup).toContain('href="/ai-documents?lang=zh-Hant"');
+    expect(markup).toContain("返回后将恢复繁体中文工作台");
+    if (status === "AUTH_REQUIRED") expect(markup).toContain("next=%2Fplan-and-usage%3Flang%3Dzh-Hans%26communicationLang%3Dzh-Hant");
+    if (status !== "AVAILABLE") expect(markup).not.toContain('>0<');
+    expect(mocks.getUsage).not.toHaveBeenCalled();
+  });
+
+  it.each(["https://outside.invalid", ["en"], ["en", "zh-Hant"]])("ignores invalid or duplicate return context %#", async communicationLang => {
+    mocks.isPointsUiEnabled.mockReturnValue(true);
+    const markup = renderToStaticMarkup(await PlanAndUsagePage({ searchParams: Promise.resolve({ lang: "en", communicationLang }) }));
+    expect(markup).not.toContain("Back to workspace");
+    expect(markup).not.toContain("communicationLang");
+    expect(markup).not.toContain("outside.invalid");
+  });
+
+  it("does not use context to activate Points or authenticate a demo account", async () => {
+    const params = { lang: "en", communicationLang: "zh-Hant" };
+    const legacy = renderToStaticMarkup(await PlanAndUsagePage({ searchParams: Promise.resolve(params) }));
+    expect(legacy).not.toContain("communicationLang");
+    expect(mocks.resolvePoints).not.toHaveBeenCalled();
+    mocks.isPointsUiEnabled.mockReturnValue(true);
+    mocks.getGate.mockResolvedValue({status:"signed_in", account:provider, source:"demo"});
+    const demo = renderToStaticMarkup(await PlanAndUsagePage({ searchParams: Promise.resolve(params) }));
+    expect(demo).not.toContain("Back to workspace");
+    expect(mocks.resolvePoints).not.toHaveBeenCalled();
+  });
+
+  it("preserves only safe context in the signed-out gate, without reading a balance", async () => {
+    mocks.isPointsUiEnabled.mockReturnValue(true);
+    mocks.getGate.mockResolvedValue({status:"signed_out"});
+    const view = await PlanAndUsagePage({ searchParams: Promise.resolve({lang:"en", communicationLang:"zh-Hant", next:"https://outside.invalid"}) });
+    expect(view.props.languageSwitcherHref).toBe("/plan-and-usage?lang=en&communicationLang=zh-Hant");
+    expect(view.props.loginHref).toBe("/auth/login?next=%2Fplan-and-usage%3Flang%3Den%26communicationLang%3Dzh-Hant");
+    expect(view.props.registerHref).toBe("/auth/register?next=%2Fplan-and-usage%3Flang%3Den%26communicationLang%3Dzh-Hant");
+    expect(mocks.resolvePoints).not.toHaveBeenCalled();
+    expect(mocks.getUsage).not.toHaveBeenCalled();
   });
 
   it("renders natural Chinese credit rules", async () => {

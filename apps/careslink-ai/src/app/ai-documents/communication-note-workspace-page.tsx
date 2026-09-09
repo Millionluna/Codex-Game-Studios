@@ -4,6 +4,7 @@ import { CommunicationNoteSavedDrafts } from "../../components/communication-not
 import { resolveCommunicationNoteDocumentLocale } from "../../lib/communication-note-document-i18n";
 import { resolveWorkspaceAccountFromSupabaseSession } from "../../lib/referral-workspace-session";
 import { createCareslinkServerSupabaseClient } from "../../lib/supabase-server";
+import { isCaresLinkV1PointsUiEnabled } from "../../lib/points-ui-feature.server";
 
 /** Authenticated shell only. Private metadata is fetched by the separate
  * fresh-session reader, never embedded in server props or demo accounts. */
@@ -19,5 +20,6 @@ export async function renderCommunicationNoteWorkspacePage(query: Record<string,
   const values = query.lang === undefined ? [] : Array.isArray(query.lang) ? query.lang : [query.lang];
   if (Object.keys(query).some(k => k !== "lang") || values.length !== 1 || unsupported || values[0] !== locale)
     redirect(next);
-  return <CommunicationNoteSavedDrafts locale={locale} includeTask="MULTI" loginHref={loginHref} />;
+  return <CommunicationNoteSavedDrafts locale={locale} includeTask="MULTI" loginHref={loginHref}
+    pointsNavigationEnabled={isCaresLinkV1PointsUiEnabled()} />;
 }

@@ -339,6 +339,23 @@ navigation, reusing the green design and current readiness states, without
 wallet duplication, purchases or formal-runtime activation.
 See [completed tail evidence](communication-note-product-integration-m1y.md#communication-note-supervised-browser-recovery-tail--passed-2026-09-09).
 
+### Communication Note workspace ↔ Points navigation (2026-09-09)
+
+Authenticated multi-task workspace → server-gated “View Points” → existing
+read-only Points page → full-navigation return to the original workspace locale.
+Only the three-value `communicationLang` context is accepted; no arbitrary
+return URL, owner or document ID is propagated. Reload, language switching and
+pending login retain this safe context. Traditional Chinese explicitly enters
+English Points and returns to Traditional Chinese; the Points shell itself is
+not newly translated. Balance state/auth checks and legacy Credits are unchanged.
+
+All three return paths and 390px layout passed in an owned built local fixture.
+Points runtime stayed closed and displayed unavailable honestly; navigation
+created no business writes. The temporary environment was fully removed.
+Next: composer balance guidance → Points entry with unsubmitted-facts leave
+warning, without purchases or runtime activation.
+See [navigation evidence](communication-note-product-integration-m1y.md#communication-note-workspace-to-points-navigation-2026-09-09).
+
 ## 4. Save, history and delete
 
 ### Current flow

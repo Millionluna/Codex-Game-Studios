@@ -142,7 +142,7 @@ describe("V1 shadow runtime boundary", () => {
       (file) =>
         file !== featureModule &&
         readFileSync(file, "utf8").includes("points-ui-feature.server"),
-    );
+    ).sort();
     const pointsPageDataImporters = sourceFiles.filter(
       (file) =>
         file !== pointsPageDataModule &&
@@ -155,6 +155,7 @@ describe("V1 shadow runtime boundary", () => {
     expect(featureImporters).toEqual(
       [
         "src/app/ai-documents/communication-note/page.tsx",
+        "src/app/ai-documents/communication-note-workspace-page.tsx",
         "src/app/ai-documents/page.tsx",
         "src/app/api/template-companion/events/route.ts",
         "src/app/api/template-companion/ndis-case-note/route.ts",

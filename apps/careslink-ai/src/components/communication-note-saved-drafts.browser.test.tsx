@@ -15,6 +15,31 @@ beforeEach(()=>{(globalThis as typeof globalThis&{IS_REACT_ACT_ENVIRONMENT:boole
 afterEach(async()=>{await act(async()=>root.unmount());container.remove();vi.useRealTimers();vi.restoreAllMocks();});
 const render=()=>act(async()=>root.render(<CommunicationNoteSavedDrafts locale="en" loginHref={LOGIN}/>));
 const hasEntry=()=>Boolean(container.querySelector('a[href*="/documents/"]'));
+describe("workspace Points entry",()=>{
+  it.each([
+    ["en","View Points","en"], ["zh-Hans","查看 Points","zh-Hans"], ["zh-Hant","查看 Points（英文）","en"],
+  ] as const)("renders an explicit language-safe entry for %s even when the list is unavailable",(locale,label,pointsLocale)=>{
+    container.innerHTML=renderToStaticMarkup(<CommunicationNoteSavedDraftsView locale={locale} includeTask="MULTI"
+      pointsNavigationEnabled result={{status:"UNAVAILABLE"}} onRefresh={()=>{}}/>);
+    const link=container.querySelector('a[href^="/plan-and-usage"]');
+    expect(link?.textContent).toBe(label);
+    expect(link?.getAttribute("href")).toBe(`/plan-and-usage?lang=${pointsLocale}&communicationLang=${locale}`);
+    expect(link?.className).toContain("min-h-11");
+    expect(container.querySelector('img[alt="CaresLink AI"]')).not.toBeNull();
+    expect(mocks.load).not.toHaveBeenCalled();
+  });
+  it.each([
+    {includeTask:"MULTI" as const}, {includeTask:false,pointsNavigationEnabled:true}, {includeTask:true,pointsNavigationEnabled:true},
+  ])("does not enable the entry by default or on another surface %#",props=>{
+    const markup=renderToStaticMarkup(<CommunicationNoteSavedDraftsView locale="en" onRefresh={()=>{}} {...props}/>);
+    expect(markup).not.toContain("/plan-and-usage");
+  });
+  it("forwards the safe flag through the client without another read",async()=>{
+    await act(async()=>root.render(<CommunicationNoteSavedDrafts locale="en" includeTask="MULTI" loginHref={LOGIN} pointsNavigationEnabled/>));
+    expect(container.querySelector('a[href^="/plan-and-usage"]')).not.toBeNull();
+    expect(mocks.load).toHaveBeenCalledTimes(1);
+  });
+});
 describe("saved draft revisit surface",()=>{
   it.each(["en","zh-Hans","zh-Hant"] as const)("renders current-version link and locale %s without raw IDs/review claims",locale=>{
     const markup=renderToStaticMarkup(<CommunicationNoteSavedDraftsView locale={locale} result={result} onRefresh={()=>{}}/>);

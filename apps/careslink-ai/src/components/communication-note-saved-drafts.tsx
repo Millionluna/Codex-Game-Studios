@@ -9,6 +9,7 @@ import { COMMUNICATION_NOTE_DOCUMENT_LOCALES, formatCommunicationNoteDocumentDat
   getCommunicationNoteDocumentCopy, type CommunicationNoteDocumentLocale } from "../lib/communication-note-document-i18n";
 import { loadCommunicationNoteSavedDrafts, type CommunicationNoteSavedDraftsResult } from "../lib/communication-note-saved-drafts";
 import type { CommunicationNoteTaskCursor } from "../lib/communication-note-task-list";
+import { buildCommunicationNotePointsHref, COMMUNICATION_NOTE_POINTS_ENTRY } from "../lib/communication-note-points-navigation";
 
 type VisibleResult = Exclude<CommunicationNoteSavedDraftsResult, { status: "AUTH_REQUIRED" }>;
 const COPY = {
@@ -63,8 +64,9 @@ const DRAFT_PAGE_COPY = {
 } as const;
 
 /** Reusable surface; this slice connects it only in the owned local fixture. */
-export function CommunicationNoteSavedDrafts({ locale, loginHref, unsupportedLocale = false, includeTask = false }: Readonly<{
+export function CommunicationNoteSavedDrafts({ locale, loginHref, unsupportedLocale = false, includeTask = false, pointsNavigationEnabled = false }: Readonly<{
   locale: CommunicationNoteDocumentLocale; loginHref: string; unsupportedLocale?: boolean; includeTask?: boolean | "MULTI";
+  pointsNavigationEnabled?: boolean;
 }>) {
   const [state, setState] = useState<{ loginHref: string; includeTask: boolean | "MULTI"; result?: VisibleResult; before?: CommunicationNoteTaskCursor | null; draftAfter?: string | null }>();
   const refreshRef = useRef<(before?: CommunicationNoteTaskCursor | null, draftAfter?: string | null) => void>(() => undefined);
@@ -119,14 +121,16 @@ export function CommunicationNoteSavedDrafts({ locale, loginHref, unsupportedLoc
   }, [loginHref, includeTask]);
   const current = state?.loginHref === loginHref && state.includeTask === includeTask ? state : undefined;
   return <CommunicationNoteSavedDraftsView locale={locale} unsupportedLocale={unsupportedLocale} includeTask={includeTask}
+    pointsNavigationEnabled={pointsNavigationEnabled}
     olderPage={!!current?.before} laterDraftPage={!!current?.draftAfter}
     onPage={cursor => refreshRef.current(cursor, current?.draftAfter)}
     onDraftPage={cursor => refreshRef.current(current?.before, cursor)}
     result={current?.result} onRefresh={() => refreshRef.current()} />;
 }
 
-export function CommunicationNoteSavedDraftsView({ locale, result, onRefresh, unsupportedLocale = false, includeTask = false, olderPage = false, onPage, laterDraftPage = false, onDraftPage }: Readonly<{
+export function CommunicationNoteSavedDraftsView({ locale, result, onRefresh, unsupportedLocale = false, includeTask = false, olderPage = false, onPage, laterDraftPage = false, onDraftPage, pointsNavigationEnabled = false }: Readonly<{
   locale: CommunicationNoteDocumentLocale; result?: VisibleResult; onRefresh: () => void; unsupportedLocale?: boolean; includeTask?: boolean | "MULTI";
+  pointsNavigationEnabled?: boolean;
   olderPage?: boolean; onPage?: (cursor: CommunicationNoteTaskCursor | null) => void;
   laterDraftPage?: boolean; onDraftPage?: (cursor: string | null) => void;
 }>) {
@@ -143,12 +147,18 @@ export function CommunicationNoteSavedDraftsView({ locale, result, onRefresh, un
         <a href={`/ai-documents?lang=${locale}`} aria-label="CaresLink AI" className="rounded-sm focus-visible:ring-2 focus-visible:ring-[#9fe1ca]">
           <Image src="/careslink-ai-logo-reverse.svg" alt="CaresLink AI" width={190} height={46} priority className="h-auto w-[166px]" />
         </a>
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+        {includeTask === "MULTI" && pointsNavigationEnabled ?
+          <a href={buildCommunicationNotePointsHref(locale)}
+            className="inline-flex min-h-11 items-center rounded px-3 py-2 text-sm font-semibold underline underline-offset-4 focus-visible:ring-2 focus-visible:ring-[#9fe1ca]">
+            {COMMUNICATION_NOTE_POINTS_ENTRY[locale]}</a> : null}
         <nav aria-label={documentCopy.languageLabel} className="flex flex-wrap gap-2">
           {COMMUNICATION_NOTE_DOCUMENT_LOCALES.map(language => <a key={language} href={`/ai-documents?lang=${language}`}
             lang={language} aria-current={locale === language ? "page" : undefined}
             className="rounded px-3 py-2 text-sm underline-offset-4 hover:underline focus-visible:ring-2 focus-visible:ring-[#9fe1ca]">
             {documentCopy.localeLabels[language]}</a>)}
         </nav>
+        </div>
       </div>
     </header>
     <section className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10" aria-labelledby="saved-drafts-title">

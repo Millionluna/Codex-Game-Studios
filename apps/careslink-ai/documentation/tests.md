@@ -5096,6 +5096,28 @@ See [full-flow scope and remaining real-admission gate](communication-note-produ
   open; no deployment, real model, payment or Production action.
 - [Completed recovery tail and next app navigation slice](communication-note-product-integration-m1y.md#communication-note-supervised-browser-recovery-tail--passed-2026-09-09).
 
+### Communication Note workspace ↔ Points navigation (2026-09-09)
+
+- Full suite: 5,291 passed / 41 skipped, 304 passing / four opt-in skipped files;
+  full lint/typecheck, owned webpack build and 40-chunk client scan passed.
+- Locale-only navigation helper, safe pending-auth roundtrip, server boolean
+  opt-in, default-off/non-multi entry, all four Points states, real-zero versus
+  unavailable, query injection/duplicates, demo isolation and legacy behavior
+  have regression coverage. Exact server importer allowlist remains enforced.
+- Actual source workspace and Points pages in owned local PG16/Next fixture:
+  English/Simplified/Traditional Chinese roundtrips; Traditional Chinese
+  explicit English fallback survives refresh and language switching. At 390px,
+  no horizontal overflow and 44px entry/return targets. Return freshly loaded
+  two synthetic drafts; browser warning/error logs were empty.
+- Points runtime was deliberately not bound: browser showed UNAVAILABLE, not
+  fabricated zero or the separate synthetic admission wallet. No real Auth,
+  live Points balance, Hosted gate or full formal-app build is claimed here.
+- Final database counters: 30/0 synthetic Points, one setup ledger entry,
+  zero admissions/reservations/terminals/jobs/reviews/edits/sync; six revoked
+  read receipts, zero runtime roles/sessions/locks. Owned root/server/PG/tab 38
+  removed and viewport reset; source isolation verified. No Production changes.
+- [Implementation and next composer entry](communication-note-product-integration-m1y.md#communication-note-workspace-to-points-navigation-2026-09-09).
+
 ### Current live/read-only evidence
 
 - Supabase migrations, tables, RLS flags, policies, grants, function grants and aggregate row counts were checked read-only.

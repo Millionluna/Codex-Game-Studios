@@ -30,6 +30,8 @@ import {
   type CaresLinkV1PointsPageData,
 } from "@/lib/v1/points-page-data.server";
 import { isCaresLinkV1PointsUiEnabled } from "@/lib/points-ui-feature.server";
+import { buildCommunicationNotePointsHref, resolveCommunicationNotePointsLocale } from "@/lib/communication-note-points-navigation";
+import type { CommunicationNoteDocumentLocale } from "@/lib/communication-note-document-i18n";
 
 type SearchParams = Record<string, string | string[] | undefined>;
 
@@ -56,6 +58,13 @@ export default async function PlanAndUsagePage({
   const copy = getPlanUsageCopy(locale);
   const workspaceCopy = getReferralWorkspaceCopy(locale);
   const pointsUiEnabled = isCaresLinkV1PointsUiEnabled();
+  const pendingWorkspaceLocale = pointsUiEnabled
+    ? resolveCommunicationNotePointsLocale(params?.communicationLang) : undefined;
+  const pendingPointsHref = pendingWorkspaceLocale
+    ? withLocale(buildCommunicationNotePointsHref(pendingWorkspaceLocale), locale)
+    : "/plan-and-usage";
+  const authHref = (path: "/auth/login" | "/auth/register", next: string) =>
+    `${path}?next=${encodeURIComponent(next)}`;
   const gate = await getWorkspaceAccessGateWithServerSession(params);
 
   if (gate.status === "signed_out") {
@@ -67,9 +76,9 @@ export default async function PlanAndUsagePage({
             : workspaceCopy
         }
         locale={locale}
-        languageSwitcherHref="/plan-and-usage"
-        loginHref="/auth/login?next=%2Fplan-and-usage"
-        registerHref="/auth/register?next=%2Fplan-and-usage"
+        languageSwitcherHref={pendingPointsHref}
+        loginHref={authHref("/auth/login", pendingPointsHref)}
+        registerHref={authHref("/auth/register", pendingPointsHref)}
       />
     );
   }
@@ -83,6 +92,8 @@ export default async function PlanAndUsagePage({
     withWorkspaceAccount(withLocale(path, locale), accountParam);
 
   if (pointsUiEnabled) {
+    const workspaceLocale = gate.source === "supabase" ? pendingWorkspaceLocale : undefined;
+    const pointsHref = workspaceLocale ? pendingPointsHref : "/plan-and-usage";
     const points =
       gate.source === "supabase"
         ? await resolveCaresLinkV1PointsPageData()
@@ -92,7 +103,7 @@ export default async function PlanAndUsagePage({
       <AppShell
         balanceNavigation="points"
         locale={locale}
-        languageSwitcherHref="/plan-and-usage"
+        languageSwitcherHref={pointsHref}
         workspaceAccountId={accountParam}
         workspaceRole="provider"
         workspaceSessionSource={gate.source}
@@ -101,9 +112,10 @@ export default async function PlanAndUsagePage({
           data={points}
           locale={locale}
           openDocumentsHref={href("/ai-documents")}
-          refreshHref={href("/plan-and-usage")}
+          workspaceLocale={workspaceLocale}
+          refreshHref={href(pointsHref)}
           signInHref={withLocale(
-            "/auth/login?next=%2Fplan-and-usage",
+            authHref("/auth/login", pointsHref),
             locale,
           )}
         />
@@ -248,12 +260,14 @@ function PointsPreviewSurface({
   openDocumentsHref,
   refreshHref,
   signInHref,
+  workspaceLocale,
 }: {
   data: CaresLinkV1PointsPageData;
   locale: Locale;
   openDocumentsHref: string;
   refreshHref: string;
   signInHref: string;
+  workspaceLocale?: CommunicationNoteDocumentLocale;
 }) {
   const copy = getPointsPreviewCopy(locale);
 
@@ -270,17 +284,28 @@ function PointsPreviewSurface({
             <p className="mt-4 max-w-2xl text-sm leading-6 text-muted sm:text-base">
               {copy.description}
             </p>
+            {workspaceLocale === "zh-Hant" ? <p className="mt-3 max-w-2xl text-sm leading-6 text-muted">
+              {locale === "zh-Hans"
+                ? "Points 页目前支持英文和简体中文；返回后将恢复繁体中文工作台。"
+                : "Points is currently available in English and Simplified Chinese. Return to the workspace in Traditional Chinese."}
+            </p> : null}
             <span className="workspace-status-pill workspace-status-pill--locked mt-4">
               {copy.previewStatus}
             </span>
           </div>
-          <Link
+          {workspaceLocale ? <a
+            href={`/ai-documents?lang=${workspaceLocale}`}
+            className="jade-action w-full sm:w-auto"
+          >
+            <FileText className="size-4" aria-hidden="true" />
+            {locale === "zh-Hans" ? "返回工作台" : "Back to workspace"}
+          </a> : <Link
             href={openDocumentsHref}
             className="jade-action w-full sm:w-auto"
           >
             <FileText className="size-4" aria-hidden="true" />
             {copy.openDocuments}
-          </Link>
+          </Link>}
         </div>
       </header>
 

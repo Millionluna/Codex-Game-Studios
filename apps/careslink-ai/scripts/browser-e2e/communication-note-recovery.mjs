@@ -33,6 +33,7 @@ const copy = async (source, target) => {
 };
 const emit = async (path, source) => { await mkdir(join(root, path, ".."), { recursive: true }); await writeFile(join(root, path), source); };
 const tracked = ["src/lib/supabase-server.ts", "src/app/ai-documents/communication-note/jobs/[jobId]/page.tsx",
+  "src/app/plan-and-usage/page.tsx", "src/lib/communication-note-points-navigation.ts", "src/components/communication-note-saved-drafts.tsx",
   "src/lib/communication-note-workspace-task-postgres.server.ts",
   "src/lib/communication-note-workspace-task-lease.server.ts",
   "scripts/browser-e2e/communication-note-workspace-task.fixture.ts", "scripts/browser-e2e/communication-note-workspace-task-connection.fixture.ts",
@@ -309,6 +310,7 @@ export async function signOutAction() { throw new Error("Local fixture denies Au
 `);
     await copy("src/app/ai-documents/page.tsx", "src/app/ai-documents/page.tsx");
     await copy("src/app/ai-documents/communication-note-workspace-page.tsx", "src/app/ai-documents/communication-note-workspace-page.tsx");
+    await copy("src/app/plan-and-usage/page.tsx", "src/app/plan-and-usage/page.tsx");
     await copy("src/app/api/ai-documents/communication-note/documents/route.ts", "src/app/api/ai-documents/communication-note/documents/route.ts");
     await emit("src/lib/communication-note-workspace-runtime.server.ts", `// TEST ONLY, owned disposable copy.
 export { workspaceFixtureRuntime as COMMUNICATION_NOTE_WORKSPACE_FORMAL_RUNTIME } from "./__workspace-task-fixture";
@@ -325,7 +327,9 @@ export { workspaceFixtureRuntime as COMMUNICATION_NOTE_WORKSPACE_FORMAL_RUNTIME 
 `);
   const env = { PATH: process.env.PATH, TMPDIR: process.env.TMPDIR, NODE_ENV: built ? "production" : "development",
     NEXT_TELEMETRY_DISABLED: "1", CARESLINK_LOCAL_BROWSER_FIXTURE: "SYNTHETIC_LOOPBACK_ONLY", ...reviewDatabase?.env,
-    ...(workspaceTask ? { CARESLINK_COMMUNICATION_NOTE_WORKSPACE_ENABLED: "true" } : {}),
+    // UI navigation only; Product API/Points runtime stays closed and must
+    // render unavailable, never the fixture's synthetic admission balance.
+    ...(workspaceTask ? { CARESLINK_COMMUNICATION_NOTE_WORKSPACE_ENABLED: "true", CARESLINK_V1_POINTS_UI_ENABLED: "true" } : {}),
     ...(flow ? { CARESLINK_LOCAL_FLOW_FIXTURE: "FIXED_SYNTHETIC_ONLY" } : {}),
     ...(edit ? { CARESLINK_LOCAL_EDIT_FIXTURE: "PROCESS_MEMORY_ONLY" } : {}) };
   const launch = (arguments_) => {
