@@ -3731,3 +3731,52 @@ interaction and are not guaranteed for every lifecycle exit; see
 No product edit, model call, hosted/Production change, commit, push or deployment.
 Next: review and locally commit this evidence-only update; do not repeat passing
 composer leave tests or expand runtime authority.
+
+### Traditional Chinese Points page (2026-09-09)
+
+The Points-only page body, shell, entry labels, four balance states and number/UTC
+date formatting now support `zh-Hant`. Three-language switching and reload retain
+the original Communication Note workspace locale; its Points entry no longer
+falls back to English. Login/register and untranslated legacy destinations remain
+explicitly labelled English, with the Traditional Chinese Points return preserved.
+Legacy Credits locale parsing and the static page title are unchanged. The fixed
+green identity is retained; only Points language controls wrap and gain 44px targets.
+
+Verification: 5,334 tests passed / 41 skipped (305 passing / four skipped files),
+typecheck, full ESLint, 73-file adapter sync, owned webpack build and the 40-chunk
+client boundary scan passed. Tests cover all four states, actual zero, formatting,
+nine display/return-locale combinations, signed-out links and strict invalid-locale
+fallback. An initial full-suite failure exposed changed en/zh-Hans auth `next`
+links; their original contract was restored without loosening the fixed probe.
+
+Final in-app browser tab 45 passed language switching, reload, workspace return
+and re-entry. The Traditional Chinese unavailable state stayed honest: formal
+Points runtime was not enabled. Widths 320, 390, 700, 768, 899, 1024, 1366 and 1440
+had no horizontal overflow; the 390px menu language targets measured 44px. Captured
+warning/error logs were empty. Other balance states and auth return links have
+rendered-test coverage, not live authentication acceptance. This is focused
+localization/responsive evidence, not a full accessibility or launch certification.
+
+Both owned fixtures (`Ap3P4i`, parent 12348; `TITG1Q`, parent 12877) were cleaned
+through their fixed handlers after ownership checks. The first stopped before
+browser testing to restore the auth-link contract. Final observations had zero
+generation/review/edit/sync/admission/reserve/terminal events, zero runtime
+sessions/locks/roles/task rows, the 30/0 synthetic seed balance and one revoked
+list-read credential receipt. Cleanup exited zero with no active leases,
+PostgreSQL stopped, roots removed and tracked source unchanged. Independent checks
+confirmed the owned roots/processes and port 3395 absent; tab 45 was closed and
+the viewport reset. Only disposable synthetic data was removed and is recreatable
+with the runner. No real care data, model calls, hosted/Production writes, runtime
+activation, commit, push or deployment occurred.
+
+Pre-commit review (2026-09-09) found a pre-existing clock race in the task-list
+factory test: its expiry was only 1ms beyond the 90-second limit, so real elapsed
+time could move it into the accepted interval before validation. The invalid-input
+test now freezes time using the existing fake-timer facility; all rejection/no-I/O
+assertions and product expiry/security logic remain unchanged. Its 51 tests and
+the full suite then passed (5,334 passed / 41 skipped), as did typecheck, full ESLint,
+adapter sync and whitespace checks. React/Next.js review found no blocking issue
+or need to change product source, so the same-source browser evidence above is
+retained without another fixture. This local commit contains the 11 localization
+implementation/test files, the two-line clock stabilization and three evidence
+documents. No push, deployment or runtime activation is included.

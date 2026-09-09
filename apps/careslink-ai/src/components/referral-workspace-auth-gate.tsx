@@ -6,6 +6,7 @@ import { withWorkspaceAccount } from "@/lib/referral-workspace-auth";
 import {
   withLocale,
   type Locale,
+  type NavigationLocale,
   type ReferralWorkspaceCopy,
 } from "@/lib/referral-workspace-i18n";
 
@@ -15,27 +16,31 @@ export function ReferralWorkspaceLoginGate({
   languageSwitcherHref = "/referral-workspace",
   loginHref = "/auth/login",
   registerHref = "/auth/register",
+  balanceNavigation,
+  authLocale = locale === "zh-Hant" ? "en" : locale,
 }: {
   copy: ReferralWorkspaceCopy;
-  locale: Locale;
+  locale: NavigationLocale;
   languageSwitcherHref?: string;
   loginHref?: string;
   registerHref?: string;
+  balanceNavigation?: "points";
+  authLocale?: Locale;
 }) {
   return (
-    <AppShell locale={locale} languageSwitcherHref={languageSwitcherHref}>
+    <AppShell locale={locale} languageSwitcherHref={languageSwitcherHref} balanceNavigation={balanceNavigation}>
       <PageHeader
         eyebrow={copy.auth.gate.eyebrow}
         title={copy.auth.gate.title}
         description={copy.auth.gate.description}
         actions={
           <>
-            <ButtonLink href={withLocale(loginHref, locale)}>
+            <ButtonLink href={withLocale(loginHref, authLocale)}>
               <LogIn className="size-4" aria-hidden="true" />
               {copy.auth.gate.loginCta}
             </ButtonLink>
             <ButtonLink
-              href={withLocale(registerHref, locale)}
+              href={withLocale(registerHref, authLocale)}
               variant="secondary"
             >
               <UserPlus className="size-4" aria-hidden="true" />

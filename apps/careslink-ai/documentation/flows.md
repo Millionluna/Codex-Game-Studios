@@ -402,6 +402,17 @@ or runtime activation. No push or deployment is included.
 See [page-owned confirmation repair](communication-note-product-integration-m1y.md#page-owned-composer-leave-confirmation-repair-2026-09-09).
 See [Safari native acceptance](communication-note-product-integration-m1y.md#safari-native-composer-departure-acceptance-2026-09-09).
 
+Points localization update (2026-09-09): the Points-only page and Communication
+Note entry now support Traditional Chinese directly, superseding the earlier
+English fallback. Three-language switching/reload retain the workspace return
+locale; login/register remain explicitly English and preserve the Points return.
+Green branding, legacy Credits parsing and read-only/default-off runtime remain
+unchanged. Local tests and browser navigation/narrow-screen checks passed; owned
+fixtures were cleaned. Pre-commit review and full checks passed after freezing an
+unrelated 1ms test-clock boundary; product source and browser evidence are unchanged.
+The local-only commit includes this test stabilization, with no push or deployment.
+See [Traditional Chinese Points evidence](communication-note-product-integration-m1y.md#traditional-chinese-points-page-2026-09-09).
+
 ## 4. Save, history and delete
 
 ### Current flow

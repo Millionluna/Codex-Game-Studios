@@ -5218,6 +5218,26 @@ new cancel/accept evidence; do not repeat the unchanged native-dialog test.
 - Next: review and local evidence commit; no push, deployment or runtime activation.
 - [Detailed native acceptance](communication-note-product-integration-m1y.md#safari-native-composer-departure-acceptance-2026-09-09).
 
+### Traditional Chinese Points page (2026-09-09)
+
+- 5,334 tests passed / 41 skipped, typecheck, full ESLint, 73-file adapter sync,
+  owned webpack build and 40-chunk client scan passed. Coverage includes four
+  balance states, zero/formatting, nine locale pairs, auth returns and invalid input.
+- In-app browser switching/reload/workspace return and re-entry passed. The new
+  Traditional Chinese page replaces the prior English fallback; the unavailable
+  state remains honest. Eight widths from 320 to 1440px had no overflow; mobile
+  language targets were 44px and captured warning/error logs were empty. Other
+  balance/auth states have rendered-test coverage, not live auth acceptance.
+- Both disposable fixtures were cleaned with no leases and unchanged source;
+  owned roots/processes/listener are absent, tab closed and viewport reset. No
+  runtime activation, model call, hosted/Production write, push or deployment.
+- Pre-commit review exposed a pre-existing 1ms expiry-test clock race. Freezing
+  the invalid-factory test clock preserves the rejection/no-I/O assertions without
+  changing product expiry logic. Its 51 tests and the full 5,334-test suite passed,
+  followed by typecheck/lint/adapter checks. Same-product browser evidence stands;
+  the local commit includes this two-line stabilization and no new fixture.
+- [Detailed localization evidence](communication-note-product-integration-m1y.md#traditional-chinese-points-page-2026-09-09).
+
 ### Current live/read-only evidence
 
 - Supabase migrations, tables, RLS flags, policies, grants, function grants and aggregate row counts were checked read-only.

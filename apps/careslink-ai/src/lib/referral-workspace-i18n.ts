@@ -2,6 +2,10 @@ export const SUPPORTED_LOCALES = ["en", "zh-Hans"] as const;
 
 export type Locale = (typeof SUPPORTED_LOCALES)[number];
 
+// URL formatting may preserve an explicitly supported feature locale without
+// enabling that locale across the legacy workspace or authentication pages.
+export type NavigationLocale = Locale | "zh-Hant";
+
 export const DEFAULT_LOCALE: Locale = "en";
 
 type EntityTypeKey = "individual" | "organisation";
@@ -3130,7 +3134,7 @@ export function getLocaleLabel(locale: Locale): string {
   return localeLabels[locale];
 }
 
-export function withLocale(href: string, locale: Locale): string {
+export function withLocale(href: string, locale: NavigationLocale): string {
   const [hrefWithoutHash, hash] = href.split("#", 2);
   const [pathname, query = ""] = hrefWithoutHash.split("?", 2);
   const queryParams = new URLSearchParams(query);

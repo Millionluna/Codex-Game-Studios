@@ -58,6 +58,13 @@ describe("referral workspace i18n", () => {
     expect(isSupportedLocale("zh-Hans")).toBe(true);
     expect(isSupportedLocale("zh")).toBe(false);
     expect(isSupportedLocale("fr")).toBe(false);
+    expect(isSupportedLocale("zh-Hant")).toBe(false);
+    expect(getLocaleFromSearchParams({ lang: "zh-Hant" })).toBe("en");
+  });
+
+  it("formats a feature-owned Traditional Chinese URL without widening legacy locale support", () => {
+    expect(withLocale("/plan-and-usage?communicationLang=zh-Hant&lang=en#balance", "zh-Hant"))
+      .toBe("/plan-and-usage?communicationLang=zh-Hant&lang=zh-Hant#balance");
   });
 
   it("provides complete shell and boundary copy for every supported locale", () => {

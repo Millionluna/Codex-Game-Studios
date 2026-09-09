@@ -630,7 +630,9 @@ describe("composer Points navigation and leave boundary", () => {
     const copy = COMMUNICATION_NOTE_COMPOSER_NAVIGATION_COPY[locale];
     await renderComposer(false, { status: "UNAVAILABLE", unit: "POINTS" }, locale);
     expect(pointsLink().href).toContain(`communicationLang=${locale}`);
-    expect(pointsLink().textContent).toContain(locale === "zh-Hant" ? "英文" : "Points");
+    expect(pointsLink().textContent).toContain("Points");
+    expect(pointsLink().href).toContain(`lang=${locale}&`);
+    expect(pointsLink().textContent).not.toContain("英文");
     expect(await clickWithoutLeaving(pointsLink())).toBe(true);
     expect(confirm).not.toHaveBeenCalled(); expect(unload()).toBe(false);
     await input();

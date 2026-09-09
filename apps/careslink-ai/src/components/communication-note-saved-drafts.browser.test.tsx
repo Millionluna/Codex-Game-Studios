@@ -17,7 +17,7 @@ const render=()=>act(async()=>root.render(<CommunicationNoteSavedDrafts locale="
 const hasEntry=()=>Boolean(container.querySelector('a[href*="/documents/"]'));
 describe("workspace Points entry",()=>{
   it.each([
-    ["en","View Points","en"], ["zh-Hans","查看 Points","zh-Hans"], ["zh-Hant","查看 Points（英文）","en"],
+    ["en","View Points","en"], ["zh-Hans","查看 Points","zh-Hans"], ["zh-Hant","查看 Points","zh-Hant"],
   ] as const)("renders an explicit language-safe entry for %s even when the list is unavailable",(locale,label,pointsLocale)=>{
     container.innerHTML=renderToStaticMarkup(<CommunicationNoteSavedDraftsView locale={locale} includeTask="MULTI"
       pointsNavigationEnabled result={{status:"UNAVAILABLE"}} onRefresh={()=>{}}/>);

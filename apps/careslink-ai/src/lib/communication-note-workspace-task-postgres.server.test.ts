@@ -96,6 +96,8 @@ describe("task-list physical connection and independent cleanup", () => {
     expect(h.clients[1].config.ssl).toMatchObject({ ca: Buffer.from("synthetic-CA") });
   });
   it.each(["production", "bad-ref", "bad-ca", "bad-hash", "privileged", "status-purpose", "password", "expiry", "long-expiry", "principal", "extra", "getter", "proxy"])("rejects invalid factory %s before I/O", kind => {
+    // Keep the +1ms expiry boundary from becoming valid before factory validation.
+    vi.useFakeTimers();
     const v = input();
     if (kind === "production") v.projectRef = CARESLINK_PRODUCTION_SUPABASE_REF;
     if (kind === "bad-ref") v.projectRef = "example.invalid";

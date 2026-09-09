@@ -9,12 +9,11 @@ export function resolveCommunicationNotePointsLocale(
 }
 
 export function buildCommunicationNotePointsHref(locale: CommunicationNoteDocumentLocale) {
-  const pointsLocale = locale === "zh-Hant" ? "en" : locale;
-  return `/plan-and-usage?lang=${pointsLocale}&communicationLang=${locale}`;
+  return `/plan-and-usage?lang=${locale}&communicationLang=${locale}`;
 }
 
 export const COMMUNICATION_NOTE_POINTS_ENTRY = {
   en: "View Points",
   "zh-Hans": "查看 Points",
-  "zh-Hant": "查看 Points（英文）",
+  "zh-Hant": "查看 Points",
 } as const;
