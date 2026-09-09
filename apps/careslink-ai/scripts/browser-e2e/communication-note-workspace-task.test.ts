@@ -83,6 +83,6 @@ describe("owned multi-task workspace bridge",()=>{
     expect(fixture).not.toMatch(/PASSWORD|new Client|enqueue\(|globalThis|writeFile|localStorage/);
     expect(readFileSync(new URL("../../src/app/ai-documents/page.tsx",import.meta.url),"utf8")).not.toContain("CommunicationNoteSavedDrafts");
     expect(runner).toContain('await copy("src/app/api/ai-documents/communication-note/documents/route.ts"');
-    expect(readFileSync(new URL("../../src/lib/communication-note-workspace-runtime.server.ts",import.meta.url),"utf8")).toContain("undefined as CommunicationNoteWorkspaceRuntime");
+    expect(readFileSync(new URL("../../src/lib/communication-note-workspace-runtime.server.ts",import.meta.url),"utf8")).toContain("HOSTED_WORKSPACE_READ_BINDING = undefined as CommunicationNoteWorkspacePreviewBinding");
   });
 });

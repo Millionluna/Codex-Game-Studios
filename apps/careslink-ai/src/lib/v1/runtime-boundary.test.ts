@@ -917,16 +917,26 @@ describe("V1 shadow runtime boundary", () => {
     );
   });
 
-  it("keeps the new task physical reader server-only and absent from formal runtime imports", () => {
+  it("confines the task physical reader to the unbound Preview composition", () => {
     const file = join(process.cwd(), "src/lib/communication-note-workspace-task-postgres.server.ts");
     const source = readFileSync(file, "utf8");
     expect(source).toMatch(/^import "server-only";/);
     expect(source).toContain("COMMUNICATION_NOTE_TASK_POSTGRES_READY = false as const");
     expect(source).not.toMatch(/process\.env|import\.meta\.env|connectionString\s*:|\bnew\s+(?:\w+\.)?Pool\s*\(|fetch\s*\(|console\.|job-status-(?:custody|purpose|postgres)|pg_signal_backend\s+to/i);
     expect(walkAllScriptFiles("src").filter(path => !/\.test\.[cm]?[jt]sx?$/.test(path) &&
-      /(?:from\s+|import\s*\()["'][^"']*communication-note-workspace-task-postgres\.server["']/.test(readFileSync(path, "utf8")))).toEqual([]);
+      /(?:from\s+|import\s*\()["'][^"']*communication-note-workspace-task-postgres\.server["']/.test(readFileSync(path, "utf8")))).toEqual([
+        join(process.cwd(), "src/lib/communication-note-workspace-preview.server.ts"),
+      ]);
     expect(readFileSync(join(process.cwd(), "src/lib/communication-note-workspace-runtime.server.ts"), "utf8"))
-      .toMatch(/COMMUNICATION_NOTE_WORKSPACE_FORMAL_RUNTIME\s*=\s*undefined/);
+      .toMatch(/HOSTED_WORKSPACE_READ_BINDING\s*=\s*undefined/);
+    const composition = readFileSync(join(process.cwd(), "src/lib/communication-note-workspace-preview.server.ts"), "utf8");
+    expect(composition).toMatch(/^import "server-only";/);
+    // Buffer.from copies the pinned CA; a database table/read builder is not a composition capability.
+    expect(composition).not.toMatch(/process\.env|import\.meta\.env|globalThis|createTestOnly|connectionString|new Client|(?<!Buffer)\.from\(|\.select\(|console\./);
+    expect(walkAllScriptFiles("src").filter(path => !/\.test\.[cm]?[jt]sx?$/.test(path) &&
+      /(?:from\s+|import\s*\()["'][^"']*communication-note-workspace-preview\.server["']/.test(readFileSync(path, "utf8")))).toEqual([
+        join(process.cwd(), "src/lib/communication-note-workspace-runtime.server.ts"),
+      ]);
   });
 
   it("quarantines the M1s Product runtime identities to its own test and forbids ambient authority", () => {

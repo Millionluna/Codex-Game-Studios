@@ -62,6 +62,8 @@ const forbiddenMarkers = [
   "list_v1_communication_note_jobs",
   "Task list PostgreSQL dependency unavailable",
   "Task list credential lifecycle unavailable",
+  "Workspace Preview composition unavailable",
+  "HOSTED_WORKSPACE_READ_BINDING",
   "careslink_v1_job_list_runtime_",
   "cl-task-read-",
   "cl-task-clean-",

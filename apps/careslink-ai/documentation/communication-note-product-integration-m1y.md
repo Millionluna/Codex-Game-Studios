@@ -3858,3 +3858,58 @@ The local commit is limited to these seven implementation/test/evidence files.
 No push, PR mutation, deployment, hosted database, Production access or AI model
 call is included. Next: publish to the existing Draft PR #37 in
 `Millionluna/Codex-Game-Studios` after user confirmation; do not merge or deploy.
+
+### PR #37 successor: Preview read-only workspace composition (2026-09-10)
+
+The new local development branch `codex/careslink-workspace-preview-readonly`
+starts at the merged development baseline `0da677c`. The server-only Preview
+composition now joins the existing request-local Cookie/current-session reader,
+document-list RPC, fixed task-list repository, one-use credential lease and
+pinned-TLS direct PG17 reader. These are the actual source implementations, not
+an additional process-memory data store or a replacement UI.
+
+Installation requires an explicit server binding for the exact Supabase ref and
+Vercel project, copied CA bytes with their matching digest, and dedicated
+list-purpose custody issue/revoke functions. It accepts no arbitrary SQL/open
+callback, operator credential, environment-discovered password, status-purpose
+reuse or local-Unix fallback. The existing Preview configuration guard is shared
+with the durable adapter; it is rechecked before issuance and opening the reader.
+Request cancellation, configuration drift and logout never disable the independent
+revocation phase. Each request retains its own authenticated identity and lease;
+metadata is withheld until physical cleanup, the terminal revocation receipt and
+the final current-session check succeed.
+
+The formal runtime now invokes that guarded factory, but its immutable
+`HOSTED_WORKSPACE_READ_BINDING` remains `undefined`. Importing the actual route
+with every Preview flag enabled still creates no Cookie client, credential or
+database connection and returns `503 UNAVAILABLE`. No readiness latch was opened.
+The green design/Logo, generation, write/self-review/export-history installation,
+Points spending and payment behavior are unchanged.
+
+Verification: **59 new deterministic composition tests**, **5,415 full-suite
+tests passed / 41 skipped** (308 passing / four skipped files), TypeScript and
+full ESLint passed. The local Next.js 16.2.9 webpack build completed 63/63 generated
+entries; the expanded client-boundary scan passed across 117 static chunk files.
+Adapter synchronization (73 files) and whitespace checks passed. Coverage includes
+two simultaneous identities, cursor/transport rejection, CA/target mismatch,
+configuration drift, revoked sessions, failed/incorrect revocation receipts,
+physical cleanup failure, abort, stalled issuance/revocation and a late driver
+result after the read deadline. Old textual assertions were updated to the new
+unbound-installation shape; behavioral default-off checks were retained and an
+all-flags-enabled fresh module import was added.
+
+External Cookie transport, custody and the `pg` driver are mocked in the new
+composition matrix; real TLS, hosted SQL/roles, certificate provenance and durable
+custody supervision are **not** established by these tests. No database fixture,
+schema/grant change, cloud resource, hosted migration, deployment, real care data,
+AI call or Points operation was performed. Supabase [session](https://supabase.com/docs/guides/auth/sessions)
+and [SSR](https://supabase.com/docs/guides/auth/server-side/creating-a-client?queryGroups=framework&framework=nextjs)
+guidance informed request-local verified authentication; Next.js guidance kept
+the assembly server-only.
+
+**Next bounded implementation:** supply the dedicated task-list Preview custody
+adapter, including terminal fencing and independently owned recovery after issuer
+interruption. Reuse the reviewed lifecycle contract, not a static password or the
+single-job status credential. Any hosted grant/issuer installation, disposable
+Preview creation and actual runtime activation remain separate authorization and
+verification gates.

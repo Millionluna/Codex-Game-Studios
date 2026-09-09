@@ -103,6 +103,6 @@ describe("owned workspace single-delivery task credential", () => {
     expect(db).not.toMatch(/CARESLINK_LOCAL_TASK_READ_ROLE|CARESLINK_LOCAL_TASK_READ_PASSWORD/);
     expect(readFileSync(new URL("./communication-note-admission.fixture.ts", import.meta.url), "utf8")).not.toMatch(/JOB_LIST_SQL|job_list_caller/);
     expect(readFileSync(new URL("../../src/lib/communication-note-workspace-runtime.server.ts", import.meta.url), "utf8"))
-      .toContain("undefined as CommunicationNoteWorkspaceRuntime");
+      .toContain("HOSTED_WORKSPACE_READ_BINDING = undefined as CommunicationNoteWorkspacePreviewBinding");
   });
 });
