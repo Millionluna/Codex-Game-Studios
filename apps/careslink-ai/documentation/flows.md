@@ -323,6 +323,22 @@ Next: repeat only the remaining local cancellation/recovery tail with
 final business/cleanup checks. No formal runtime or Hosted activation.
 See [partial acceptance evidence](communication-note-product-integration-m1y.md#communication-note-supervised-browser-acceptance--partial-2026-09-09).
 
+### Communication Note supervised recovery tail — passed (2026-09-09)
+
+The corrected local sequence passed without application changes: cancel read
+→ observe physical cleanup (253 ms) → complete `task-unlock` → refresh → same
+ordered task IDs. Fixed synthetic session revoke → refresh cleared both lists
+and reached the locale-preserving login URL. Fixture identity restoration then
+recovered the same tasks and three drafts. Points remained 10 available / 0
+reserved with no new business writes; six leases were REVOKED and residual
+roles/sessions/locks were zero. Owned PG/server/root and tab 37 were disposed.
+This completes the interrupted local gate, not real Auth/Hosted activation.
+
+Next proposed app-facing slice: workspace ↔ existing `/plan-and-usage` Points
+navigation, reusing the green design and current readiness states, without
+wallet duplication, purchases or formal-runtime activation.
+See [completed tail evidence](communication-note-product-integration-m1y.md#communication-note-supervised-browser-recovery-tail--passed-2026-09-09).
+
 ## 4. Save, history and delete
 
 ### Current flow

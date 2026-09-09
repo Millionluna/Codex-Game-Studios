@@ -3344,7 +3344,7 @@ process. Only the newly created browser tab 36 was closed; user tabs 1 and 12
 were left unchanged. Final post-fault business counters and session-revocation
 UI recovery were not reached and are not claimed.
 
-**Next bounded step:** repeat only the interrupted cancellation/recovery tail
+**Next bounded step at this checkpoint (completed below):** repeat only the interrupted cancellation/recovery tail
 in a fresh owned synthetic fixture. Observe cancellation via the existing
 catalog-only monitor, then issue `task-unlock` and wait for its release marker
 before `task-status` or business `status`; refresh and verify recovered task
@@ -3352,3 +3352,57 @@ metadata, unchanged Points and zero residual roles/sessions/locks. Finish the
 fixed synthetic session-revoke/re-authentication boundary and cleanup. Do not
 raise timeouts, weaken locks, alter business code, enable the formal runtime,
 deploy, or call a model to compensate for the operator ordering mistake.
+
+### Communication Note supervised browser recovery tail — passed (2026-09-09)
+
+Completed the preceding interrupted tail at source `4d80230`. Its application
+and test scripts are unchanged from `2a20b15`; only the preceding acceptance
+documentation differs. No implementation, lock, timeout or permission change
+was needed. The corrected operator sequence was sufficient.
+
+Ran the existing `--workspace-task` built fixture in newly owned
+`/private/tmp/cl-job-browser-d4wlG9`, PG16 Unix-only and Next on 127.0.0.1:3395,
+using temporary in-app browser tab 37. Dedicated browser CLI remained absent;
+no software was installed. Initial green UI/Logo, meaningful content and empty
+browser warning/error logs passed. The fixed parent seed alone produced 25
+synthetic tasks, three saved drafts, 10 available / 0 reserved Points, seven
+ledger entries and three admissions/reserves/terminal events.
+
+| Boundary | Result and evidence |
+| --- | --- |
+| Browser cancellation → PG cleanup | Refresh followed by English → Simplified Chinese navigation while the owned jobs blocker was held. Old reader and locks disappeared in 253 ms; log: `returned:false, revoked:true, aborted:true`. |
+| Lock timeout → safe UI | Replacement read timed out in 1,003 ms under the still-held blocker, revoked its credential and returned no data. UI showed unavailable with no task/draft links, not a stale successful list. |
+| Unlock → status → refresh recovery | Issued `task-unlock` alone and observed `workspace-task-lock-released` before querying status. Refresh recovered the same ordered 20 first-page task IDs as the pre-fault baseline. No diagnostic failure or automatic shutdown occurred. |
+| Recovered read → business state | Completed read logged `returned:true, revoked:true`; five receipts were REVOKED, zero runtime roles/sessions/locks, 25 tasks. Points and all business counters matched the seed baseline. |
+| Session revoke → auth boundary | Fixed parent `revoke` removed only the owned synthetic session. Refresh observed session REVOKED and navigated to `/auth/login?lang=zh-Hans&next=%2Fai-documents%3Flang%3Dzh-Hans`; task and draft link counts were both zero. No additional task credential was issued (receipt count stayed five). |
+| Synthetic identity restore → fresh read | Fixed parent `restore`, then reopening the known workspace URL, recovered exactly the same ordered task IDs and three draft links. This is fixture session restoration, not a real password/OAuth/GoTrue sign-in test. |
+| Final state → disposal | Six receipts, all REVOKED; roles/sessions/locks 0; Points 10/0; seven ledger entries, three admissions/reserves/terminals, 25 jobs, review/export events 0, setup-only edit receipt/sync change 1/1. Test balance UI independently showed 10/0. |
+
+The copied webpack build and 39-chunk client-boundary scan passed. Startup
+reported the 54-check review/history/edit, 12-check admission and eight-check
+draft catalog matrices; seed reported nine terminal checks. No new full-suite,
+formal-build or Security Advisors result is claimed. Supabase changelog and
+current session documentation were consulted; this run continues to validate
+the active session row, not just a still-valid JWT. No relevant hosted changelog
+change required an adjustment to this fixed local test.
+
+Closed only tab 37, leaving user tabs 1 and 12 untouched. After rechecking the
+owned runner PID/cwd, sent SIGTERM to that parent only. Cleanup-only supervisor
+reconciliation reported active leases 0, PG stopped and
+`stopped:true, removed:true, sourceUnchanged:true`. Independent checks confirmed
+the exact root absent, port 3395 free, no owned runner/issuer/PG process and no
+application source changes. All disposable synthetic data was removed.
+
+Together with the preceding partial run, this closes the bounded local built
+workspace/result/review/Points and cancellation/recovery acceptance at the same
+application revision. It does not enable the still-undefined formal workspace
+runtime, prove Hosted PG17/TLS/custody or real Auth, perform a real generation,
+or approve the five-Note release. No push, PR, deployment, Production operation,
+real care data, model call, payment or new cloud resource occurred.
+
+**Next proposed app-facing slice:** connect the Communication Note workspace
+to the existing `/plan-and-usage` Points page and verify the return navigation,
+using the established green design. Reuse the existing balance/NOT_READY/
+UNAVAILABLE states; do not fabricate a balance, duplicate the wallet, add
+purchasing, or activate the formal runtime. Keep implementation and synthetic
+verification local; managed custody/Hosted activation remain separately gated.

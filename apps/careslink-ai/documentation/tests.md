@@ -5072,6 +5072,30 @@ See [full-flow scope and remaining real-admission gate](communication-note-produ
   and final unchanged-business/zero-residual checks on fresh synthetic data.
 - [Evidence and corrected sequence](communication-note-product-integration-m1y.md#communication-note-supervised-browser-acceptance--partial-2026-09-09).
 
+### Communication Note supervised browser recovery tail — passed (2026-09-09)
+
+- Source `4d80230`, same application/scripts as `2a20b15`; existing built
+  `--workspace-task` fixture, owned root `cl-job-browser-d4wlG9`, tab 37.
+- Old read cancellation removed locks in 253 ms, revoked and returned no data.
+  Replacement read timed out under the intentional blocker in 1,003 ms and
+  safely cleared both lists. Unlock completed before any table-count status
+  command; refresh recovered the identical ordered 20-item first page.
+- Fixed synthetic session revoke then refresh produced the Simplified Chinese
+  login URL with the correct next path, zero task/draft links and no new lease.
+  Fixed fixture session restoration recovered the same tasks and three drafts;
+  no real sign-in or credential entry is claimed.
+- Final database baseline unchanged: 10/0 Points, seven ledger entries, three
+  admissions/reserves/terminals, 25 tasks, zero reviews/exports, setup-only
+  edit/sync 1/1. Six receipts all REVOKED; roles/sessions/locks zero. Final test
+  balance UI agreed. Browser warning/error logs remained empty.
+- Owned webpack/39-chunk scan passed; no new full-suite/formal-build/advisors
+  claim. Safe parent termination and independent checks confirmed root gone,
+  3395 free, owned processes absent and source unchanged. Only tab 37 closed.
+- Previous interrupted local acceptance is now complete at the same app
+  revision. Formal runtime, live Auth/custody, Hosted and release gates remain
+  open; no deployment, real model, payment or Production action.
+- [Completed recovery tail and next app navigation slice](communication-note-product-integration-m1y.md#communication-note-supervised-browser-recovery-tail--passed-2026-09-09).
+
 ### Current live/read-only evidence
 
 - Supabase migrations, tables, RLS flags, policies, grants, function grants and aggregate row counts were checked read-only.
