@@ -148,8 +148,8 @@ begin
   -- Serialize the owner/key across documents as well as same-document retries.
   -- The unique event key remains the authoritative deduplication constraint.
   perform pg_advisory_xact_lock(hashtextextended(v_owner::text || ':' || p_mutation_id::text, 0));
-  -- Every potentially blocking lock is now held. Check real time again, not
-  -- transaction-start now(); expiry while waiting must not permit a receipt.
+  -- Recheck after document/advisory waits. Event reads/inserts can still block,
+  -- so the final guard below must also cover both insert and replay paths.
   if v_exp <= extract(epoch from clock_timestamp())
     or not careslink_v1_generation.fresh_session_is_active(v_owner,v_session,clock_timestamp())
   then raise exception using errcode='P0001', message='AUTH_REQUIRED'; end if;
@@ -166,6 +166,11 @@ begin
       facts_confirmed,wording_confirmed,missing_facts_reviewed,mutation_id,created_at)
     values (p_document_id,p_revision_id,v_owner,'CONFIRMED',true,true,true,p_mutation_id::text,clock_timestamp());
   end if;
+  -- Event relation/index/FK waits may outlive JWT or session expiry. Check wall
+  -- clock time after all event work; raising here rolls back any new insert.
+  if v_exp <= extract(epoch from clock_timestamp())
+    or not careslink_v1_generation.fresh_session_is_active(v_owner,v_session,clock_timestamp())
+  then raise exception using errcode='P0001', message='AUTH_REQUIRED'; end if;
   return jsonb_build_object('status','CONFIRMED','canonicalId',p_document_id,
     'revisionId',p_revision_id,'mutationId',p_mutation_id,'saveState','SERVER_ACKNOWLEDGED',
     'draftNotice','Draft – review required');

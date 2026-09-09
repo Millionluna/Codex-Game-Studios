@@ -3780,3 +3780,45 @@ or need to change product source, so the same-source browser evidence above is
 retained without another fixture. This local commit contains the 11 localization
 implementation/test files, the two-line clock stabilization and three evidence
 documents. No push, deployment or runtime activation is included.
+
+### PR #37 self-review late-lock expiry fix (2026-09-09)
+
+Review found that the self-review candidate checked JWT/session expiry before
+reading or inserting `self_review_events`, but those operations could still wait
+on a relation/index/FK lock. The candidate now repeats the wall-clock JWT and
+locked active-session checks after all event work, before returning a receipt.
+Failure raises `AUTH_REQUIRED` in the same transaction, rolling back a new event
+and denying an expired replay. This retains the existing strict session contract;
+see [Supabase session validation](https://supabase.com/docs/guides/auth/sessions#how-to-ensure-an-access-token-jwt-cannot-be-used-after-a-user-signs-out).
+Privileges, RLS, owner/revision checks, lock order and default-off gates are unchanged.
+The SQL remains an unpromoted candidate; no approved hosted manifest was changed.
+
+The fixed local PG16 runner now has three additional regressions: JWT expiry
+during a late event-table wait before insertion, session `not_after` expiry at
+the same point, and JWT expiry during replay. Each observes the actual blocked
+event-table lock after the document lock, then releases it after confirmed
+database-clock expiry. Independent readback proves the event rows are unchanged;
+valid-session replay still succeeds afterwards. The first regression failed
+against the original SQL before the fix; all **17 scenario groups** passed after
+the fix using `node scripts/preview-e2e/communication-note-self-review-local-pg16.mjs`.
+Both owned Unix-socket-only synthetic clusters were stopped and removed.
+
+Full verification: **5,334 tests passed / 41 skipped**, TypeScript and ESLint
+passed. Existing database least-privilege/default-off ACL assertions also passed.
+The initial Supabase CLI advisor scan was blocked because even its help command
+required a persistent telemetry configuration write in the user's directory.
+After the user explicitly authorized that local configuration write, CLI 2.115.0
+version/help checks succeeded without upgrading or using alternate configuration.
+The existing fixed runner was then rerun with `--history`, exercising **38 scenario
+groups** (17 self-review and 21 export-history) and security advisors against only
+its owned Unix-socket database. All groups passed; advisors was available and
+returned `results: []`. The synthetic cluster `/private/tmp/cl-export-history-kJXgiX`
+was stopped and removed, with its absence independently checked. This removes
+only recreatable test data and is not hosted/Production advisor clearance.
+The full 5,334-test suite, TypeScript and ESLint passed again on the same source.
+
+The reviewed local commit is limited to the candidate SQL, local regression
+scenarios and this evidence record. No push, PR mutation, deployment, runtime
+activation, AI call, real care data or Production access is included. Next:
+publish the fix to the existing Draft PR #37 in `Millionluna/Codex-Game-Studios`
+only after user confirmation; do not merge or deploy.

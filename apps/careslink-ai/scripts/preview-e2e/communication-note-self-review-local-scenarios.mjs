@@ -223,6 +223,57 @@ export async function verifySelfReviewScenarios(owner, actor, peer, passed, onSc
     await owner.query("insert into auth.sessions(id,user_id) values($1,$2)",[SESSION,OWNER]);
     assert.equal(await count(),4);
   });
+  for(const [name,sessionExpiry,key] of [
+    ["jwt-expiry-during-event-insert-lock-wait-rolls-back",false,"12345678-1111-4111-8111-111111111111"],
+    ["session-expiry-during-event-insert-lock-wait-rolls-back",true,"12345678-2222-4222-8222-222222222222"],
+    ["jwt-expiry-during-event-replay-lock-wait-denies-receipt",false,KEY],
+  ]) await scenario(name,async()=>{
+    // Warm the function before taking the late relation lock. The blocking
+    // query must already hold the document lock, not wait during initial auth.
+    await auth(actor);
+    assert.deepEqual(await call(actor),expected());
+    const before=(await owner.query("select * from public.self_review_events order by id")).rows;
+    const lockTimeout=(await actor.query("show lock_timeout")).rows[0].lock_timeout;
+    await actor.query("set lock_timeout='3000ms'");
+    let locking=false, pending;
+    try {
+      const exp=Number((await owner.query("select extract(epoch from clock_timestamp())+1.2 as exp")).rows[0].exp);
+      if(sessionExpiry) await owner.query("update auth.sessions set not_after=to_timestamp($1) where id=$2",[exp,SESSION]);
+      else await auth(actor,claims({exp}));
+      await owner.query("begin"); locking=true;
+      await owner.query("lock table public.self_review_events in access exclusive mode");
+      // Capture the outcome immediately so an early failure cannot become an
+      // unhandled rejection while the independent connection observes locks.
+      pending=call(actor,args(DOC,REV,key)).then(value=>({value}),error=>({error}));
+      let observed=false;
+      for(let attempt=0;attempt<60;attempt++){
+        const row=(await owner.query(`select
+          exists(select 1 from pg_locks where pid=$1 and relation='public.self_review_events'::regclass
+            and not granted) as waiting,
+          exists(select 1 from pg_locks where pid=$1 and relation='public.ai_documents'::regclass
+            and mode='RowShareLock' and granted) as document_locked`,[actor.processID])).rows[0];
+        if(row.waiting && row.document_locked){observed=true;break;}
+        await delay(10);
+      }
+      assert.equal(observed,true,"EXPECTED_POST_AUTH_EVENT_LOCK_NOT_OBSERVED");
+      await delay(1300);
+      assert.equal((await owner.query("select extract(epoch from clock_timestamp())>$1 as expired",[exp])).rows[0].expired,true);
+      await owner.query("commit"); locking=false;
+      const result=await pending;
+      assert.equal(result.error?.code,"P0001");
+      assert.equal(result.error?.message,"AUTH_REQUIRED");
+      // Independent readback proves new inserts rolled back and old immutable
+      // receipts were neither changed nor duplicated by an expired replay.
+      assert.deepEqual((await owner.query("select * from public.self_review_events order by id")).rows,before);
+    } finally {
+      if(locking) await owner.query("rollback");
+      await pending;
+      await owner.query("update auth.sessions set not_after=null where id=$1",[SESSION]);
+      await auth(actor);
+      await actor.query("select set_config('lock_timeout',$1,false)",[lockTimeout]);
+    }
+    assert.deepEqual(await call(actor),expected());
+  });
   await scenario("no-points-jobs-or-document-completion-side-effects",async()=>{
     for(const table of ["public.point_ledger_entries","public.generation_jobs","careslink_v1_generation.jobs"]){
       assert.equal((await owner.query("select count(*)::int as n from "+table)).rows[0].n,0);
