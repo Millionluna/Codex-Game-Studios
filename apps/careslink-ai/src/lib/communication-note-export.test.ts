@@ -55,7 +55,7 @@ describe("fresh revision authorization for each export", () => {
     const args = { saved, signal, load, now: () => EXPORT_NOW };
     expect(await prepareCommunicationNoteRecordCopy(args)).toEqual(renderCommunicationNoteRecordCopy(saved, EXPORT_NOW));
     await prepareCommunicationNoteRecordCopy(args);
-    expect(load).toHaveBeenCalledTimes(2); expect(load).toHaveBeenLastCalledWith({ canonicalId: EXPORT_DOC, revisionId: EXPORT_REV, signal });
+    expect(load).toHaveBeenCalledTimes(2); expect(load).toHaveBeenLastCalledWith({ canonicalId: EXPORT_DOC, revisionId: EXPORT_REV, signal: expect.any(AbortSignal) });
     expect(saved).toEqual(before);
   });
   it.each(["AUTH_REQUIRED", "NOT_FOUND", "UNAVAILABLE"] as const)("propagates only sanitized %s", async status => {

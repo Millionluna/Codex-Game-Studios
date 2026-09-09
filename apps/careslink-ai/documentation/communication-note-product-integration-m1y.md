@@ -3822,3 +3822,39 @@ scenarios and this evidence record. No push, PR mutation, deployment, runtime
 activation, AI call, real care data or Production access is included. Next:
 publish the fix to the existing Draft PR #37 in `Millionluna/Codex-Game-Studios`
 only after user confirmation; do not merge or deploy.
+
+### PR #37 client save/export request deadlines (2026-09-09)
+
+Local follow-up fixes the two review findings where an edit save or export
+reauthorization could remain pending indefinitely. Both now use one 30-second
+deadline covering the request and response body. A child AbortController cancels
+only that operation; a promise race settles even if transport ignores abort.
+Timers and parent listeners are cleaned after completion, failure or cancellation.
+There is no automatic retry and cancellation does not imply server rollback.
+
+An edit timeout returns `UNAVAILABLE`, retaining all three edited texts and the
+existing unknown-save warning/current-version recovery link. Save remains locked
+against resubmission; discard is available. Export preflight timeout returns a
+sanitized `UNAVAILABLE`, unblocks controls and creates no export-history report.
+Late reads/ACKs cannot trigger navigation, copy or download. A fresh user action
+gets an independent request and must reauthorize its exact revision again.
+Existing green UI, Cookie transport, strict receipts, version/self-review checks
+and default-off gates are unchanged; no component or server contract was changed.
+
+Verification: 12 new real-component/client jsdom regressions first failed against
+the original source, then passed with the fix. The final 22 added tests also cover
+cleanup, parent cancellation, late resolution/rejection and a new explicit export
+while the previous read finishes late. Both stalled fetch and stalled JSON are
+covered for edit, TXT/DOCX/PDF and both clipboard paths. Browser APIs are mocked;
+this is deterministic behavior coverage, not live Safari/clipboard acceptance.
+Full suite: **5,356 passed / 41 skipped** (307 passing / four skipped files).
+TypeScript, full ESLint, adapter sync and whitespace checks passed.
+
+Pre-commit review (2026-09-09) found no blocking issue in this bounded diff.
+The same-source full suite, TypeScript, full ESLint, 73-file adapter sync and
+whitespace checks passed again. Next.js client-boundary review confirmed the
+deadline helper adds no server-only imports or changed component boundaries.
+The local commit is limited to these seven implementation/test/evidence files.
+No push, PR mutation, deployment, hosted database, Production access or AI model
+call is included. Next: publish to the existing Draft PR #37 in
+`Millionluna/Codex-Game-Studios` after user confirmation; do not merge or deploy.

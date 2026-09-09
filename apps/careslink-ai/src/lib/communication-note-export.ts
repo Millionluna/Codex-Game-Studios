@@ -1,5 +1,6 @@
 import type { CommunicationNoteAvailableDocument } from "./communication-note-document-contract";
 import { loadCommunicationNoteDocument } from "./communication-note-document-client";
+import { withCommunicationNoteRequestDeadline } from "./communication-note-request-deadline";
 
 export const COMMUNICATION_NOTE_TEXT_TEMPLATE = "communication-record-text.2026-09-08.1";
 export type CommunicationNoteTextExport = Readonly<{
@@ -60,9 +61,10 @@ export async function prepareCommunicationNoteRecordCopy(input: Readonly<{
   if (!saved.isCurrentRevision) throw new CommunicationNoteExportError("STALE_REVISION");
   if (saved.selfReviewStatus !== "CONFIRMED") throw new CommunicationNoteExportError("REVIEW_REQUIRED");
   try {
-    const fresh = await (input.load ?? loadCommunicationNoteDocument)({
-      canonicalId: saved.canonicalId, revisionId: saved.revision.revisionId, signal: input.signal,
-    });
+    const fresh = await withCommunicationNoteRequestDeadline(input.signal, signal =>
+      (input.load ?? loadCommunicationNoteDocument)({
+        canonicalId: saved.canonicalId, revisionId: saved.revision.revisionId, signal,
+      }));
     assertExportActive(input.signal);
     if (fresh.status === "AUTH_REQUIRED" || fresh.status === "NOT_FOUND") throw new CommunicationNoteExportError(fresh.status);
     if (fresh.status !== "AVAILABLE") throw new CommunicationNoteExportError("UNAVAILABLE");
