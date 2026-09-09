@@ -1,0 +1,6 @@
+{
+  "src/lib/v1/communication-note-job-status-repository.server.ts": "7e154045b0f4374271e24a804042c2a189519eecee0b69c11a142b7c3d18855d",
+  "src/lib/v1/communication-note-job-status-purpose-caller.server.ts": "625c6db510f2912111cd7229522fca9bedd8d2e17011c92254d05d0f22c3061a",
+  "src/lib/communication-note-generation-principal.server.ts": "8a33df09ff50d62b6355478b65d4e9228599e6c1dc80fa79565ceca930762c62",
+  "src/lib/communication-note-generation-current-session.server.ts": "5aac9805f69f1116e46321674e98d74ee7b41058c3254bb857387dc4f925258b"
+}

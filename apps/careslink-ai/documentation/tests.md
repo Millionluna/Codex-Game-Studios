@@ -1,7 +1,7 @@
 # CaresLink AI Test Evidence
 
 > Evidence date: 2026-08-26, with source/local-only evidence updated through
-> 2026-09-03. This document separates **Existing**, **Proposed**, and **Gaps**.
+> 2026-09-08. This document separates **Existing**, **Proposed**, and **Gaps**.
 > Passing current tests does not mean Product Baseline V1.0 is implemented.
 
 ## Existing
@@ -3777,6 +3777,1467 @@ real-care-data or model-call evidence. Both M2d readiness latches and the M2c
 store readiness remain `false`; formal exports remain `undefined`. See
 `documentation/communication-note-secure-submission-gcs-private-authority-m2d.md`.
 
+### Communication Note saved result page — local source/build evidence
+
+The canonical result route and terminal-success entry now have local evidence.
+The page requires the real Supabase provider gate before mounting a
+same-origin, no-store document loader. Tests cover strict response parsing,
+canonical/revision binding, current-versus-history self-review semantics,
+three independent locale surfaces, missing translations, content-free
+auth/not-found/unavailable states, response headers, session-lifecycle
+rechecks, late-response rejection, malformed-identifier blocking, safe query
+canonicalization and replace navigation from an exact terminal success result.
+The result surface never renders generated disclaimer text as a trusted
+boundary and does not simulate edit, self-review mutation, Copy or export.
+
+The focused gate passed **115/115 tests across 8 files**. The complete local
+Vitest suite passed **3,779/3,779 tests across 251 files**. TypeScript, full
+zero-warning ESLint and the Next.js 16.2.9 Webpack production build with 64/64
+generated pages passed. The client-boundary scan passed across 105 static
+chunks. A temporary synthetic local route received a desktop browser and
+accessibility-tree check, returned HTTP 200 without a framework overlay or
+server error, and was deleted after inspection.
+
+This is not Preview, deployment, hosted Supabase, Production, real-care-data or
+model-call evidence. At that checkpoint, owner-authorized generation job
+recovery after reload, editing, persisted self-review, saved-document indexing
+and revision-bound Copy/TXT/DOCX/PDF export remained unimplemented. The next
+section records the later source-only known-job recovery slice.
+
+### Communication Note owner job recovery page — local source/build evidence
+
+The composer now replaces a validated admission with the canonical
+`/ai-documents/communication-note/jobs/{jobId}?lang={locale}` route, clears its
+in-memory request bytes and idempotency key, and stops using POST as a status
+poll. While the initial admission response is still uncertain in the mounted
+composer, one manual action can replay the exact original bytes and key. No
+facts, request key or content hash are written to URLs, history, browser
+storage, beacons or client caches.
+
+The independent provider-gated job page performs same-origin, no-store GET
+reads. Its shared strict parser validates the exact Communication job state,
+timestamp ordering, terminal result shape and canonical UUID binding. Browser
+tests cover queued/running polling, the 40-check bound, terminal stop, manual
+checks, focus/visibility/storage/online/BFCache reauthorization, pagehide and
+unmount cleanup, abort and late-response rejection, session-loss clearing,
+three explicit locales, safe canonical redirects, exact saved-revision links
+and content-free forbidden/not-found/unavailable states. The status live region
+contains only the concise status text, not timestamps, controls or the job UUID.
+
+The server read port accepts only `get({jobId})`. Source tests prove auth before
+identifier interpretation, fixed 401/403/404/503 mappings, unknown and
+wrong-owner `NOT_FOUND` equivalence, wrong-Note hiding, response hardening,
+canonical UUID output, accessor rejection and default failure before request,
+Auth or repository access. Its formal reader remains exactly `undefined` with
+readiness `false`; no environment variable can install a database caller.
+
+The focused gate passed **218/218 tests across 15 files**. The complete local
+Vitest suite passed **3,883/3,883 tests across 260 files**. TypeScript, full
+zero-warning ESLint and the Next.js 16.2.9 Webpack production build with 64/64
+generated pages passed; the build lists both the job page and GET API as
+dynamic routes. The client-boundary scan passed across 107 static chunks, the
+Codex adapter check passed across 73 files and `git diff --check` passed. A
+temporary synthetic local route received a desktop browser, accessibility-tree,
+console and framework-overlay check, returned HTTP 200 with the approved green
+CaresLink identity, and was deleted immediately afterward.
+
+This is source/build evidence only. It does not install the required
+Communication-only purpose-scoped database reader, exercise Hosted Auth/RLS,
+create a Preview, deploy, mutate Production or real care data, reserve Points,
+or call a model. It recovers only a job whose UUID reached the browser. If the
+initial POST response is lost before that UUID arrives and the page is then
+refreshed, recovery still requires a separately reviewed owner-scoped recent-job
+or admission-receipt boundary.
+
+### Communication Note job-status database reader — local evidence (2026-09-07)
+
+The private Communication-only status wrapper, dedicated executor/caller roles,
+strict Cookie-principal repository and independent `COMMUNICATION_NOTE_JOB_STATUS_READ`
+session adapter are now source-complete. Formal recovery reader/adapter
+installation remains absent. The migration manifests now pin 47 SQL files;
+preflight and dependent coordinator policy digests were recomputed without
+changing their blocked activation states or historical Hosted claims.
+
+New repository/adapter tests passed **58/58 across 2 files**. They cover exact
+five-parameter SQL, owner/job binding, Cookie-only identity, expanded capability
+rejection, wrong purpose/role/Note/RPC, strict metadata parsing, fixed driver
+errors, request cancellation, acquisition/query/cleanup timeouts, late-response
+rejection, unique simultaneous acquisition identities and destruction/revocation
+failure. The real recovery handler was also exercised over the new repository.
+The related source/manifest gate passed **151/151 across 7 files**, and the full
+suite passed **3,941/3,941 across 262 files**. TypeScript, zero-warning full lint,
+the 64-page Webpack production build and 107-static-chunk client-boundary scan
+passed. No browser/UI changes were made in this batch.
+
+The fixed local PostgreSQL 16 runner applied **10 actual dependency migrations**
+with a non-superuser migration actor and passed **9 database scenarios**: role
+posture, exact function ACLs and empty search path, zero table/public-definer
+access, all five statuses without read mutations, foreign/missing equivalence,
+other four Note types hidden, expired/mismatched sessions, generic/write access
+denial and expiry during a proven Auth row lock wait. The reader caller was
+tested as a non-superuser session identity. All fixture queries used an isolated
+Unix-socket-only cluster created by the runner, and the cluster and temporary
+files were removed after process-exit confirmation.
+
+The local fixture bypasses FK triggers only during synthetic metadata setup;
+CHECK constraints, the actual reader functions and forced owner RLS remain in
+effect. This evidence does not cover paid admission, Hosted Auth, PostgreSQL 17,
+TLS, a real credential issuer, Supabase Hosted advisors or formal route
+activation. No Preview, deployment, Production or real care data, Points
+mutation or model call was involved. Next is a same-revision no-data Preview
+gate for the exact reader and its dedicated runtime credentials, followed by
+independent read composition in the existing job route.
+
+### Fixed job-status Preview gate — preparation evidence (2026-09-07)
+
+The new [batch contract](communication-note-job-status-preview-batch.md) has a
+runnable check-only/live-separated harness, strict disposable target/CA/source
+pins and a probe-only physical credential lifecycle. Its **20 offline tests**
+verify exact source/SQL parity, one-consumer memory input, Production/default/
+copied-data/persistent/mismatched/stale/future target rejection, scope/argument
+closure and safe output. The full suite passed **3,961 tests across 263 files**;
+TypeScript and full zero-warning lint passed. Codex adapters remain in sync
+(73 files). No application component or route was changed; a new UI/build
+claim is not made for this script-only slice.
+
+The fixed local PG16 runner now passes **14 real database scenarios**: the prior
+nine reader tests plus the exact Preview ACL gate, real per-read LOGIN/SET-role
+and NOLOGIN revocation, cleanup after read failure, cleanup after connection
+failure and rejection of a network error as successful revocation evidence.
+The final role is removed even when the denial proof fails. Every local run
+confirmed its owned cluster stopped and its temporary directory removed.
+Local trust authentication does not prove SCRAM authentication, Hosted Auth or
+TLS. The original synthetic FK-bypassing setup stays local and is not used by
+the Hosted script.
+
+**No remote Preview was created or run in this slice.** Live missing-job/session
+and credential checks, control-plane deletion, populated Hosted owner RLS,
+Cookie composition and the source adapter's real issuer/transport remain
+separate evidence requirements. All formal activation flags stay false.
+
+### Job-status Hosted r1 — partial checks passed, overall failed (2026-09-07)
+
+The subsequent execution at `5e365b1` created exactly one authorized no-data
+PG17 Preview. All 47 pinned migrations passed in one transaction through the
+existing-history lock path. Exact reader ACLs, real Auth claims/session/user,
+active missing-job and mismatched-owner denial, three physical credential
+issuance/revocation/role-removal paths and actual session revocation with old-JWT
+read rejection completed. Before execution, the two focused suites passed
+81/81 tests. No application source changed during this run.
+
+The probe's final account-cleanup block returned `authCleanup:false`, hence
+`ok:false`, despite `credentialCleanup:true` and `databaseClosed:true`. Its
+coarse final stage cannot identify the failed Auth-cleanup substep. Per-account
+deletion/absence is **not** a pass. The exact Preview was deleted on failure;
+three consecutive CLI absence checks, an independent MCP listing and a NotFound
+project lookup confirmed removal. No second branch was created. See the
+[complete r1 record](communication-note-job-status-preview-batch.md#r1-hosted-execution--2026-09-07).
+
+At r1 completion, local cleanup diagnostics/regressions and a new authorized
+full replay remained required. Source-adapter transport, populated Hosted job RLS, browser Cookie
+composition, Hosted advisors and formal activation are still unproved. No
+Production SQL, deployment, real care data, model or Points operation occurred.
+
+### Job-status Auth cleanup — local correction evidence (2026-09-07)
+
+Batch `2026-09-07.job-status-read-preview.2` adds 36 cleanup tests and an old
+`.1` input-rejection vector. The full 264-file / 3,998-test suite passes. Tests
+cover exact fixture target binding, already-absent and active sessions, every
+cleanup I/O failure checkpoint, fixed safe error categories, no error-body
+leaks, account/session persistence, foreign sessions, timeout/late completion
+and refusal to claim cleanup from a lost create with no known account ID.
+
+An actual pinned Supabase SDK test uses only intercepted synthetic HTTP. It
+reproduces old cleanup rejecting a repeated logout's `401 session_expired`,
+then proves the corrected helper deletes the account without repeating logout
+when fresh SQL proves no sessions. The historical r1 error was not retained;
+this test does not establish its exact root cause or retroactively pass r1.
+
+The local PG16 gate passes 17/17 scenarios and confirms owned-cluster cleanup.
+Its three new cleanup scenarios use real local tables with explicitly simulated
+Auth ports: already revoked, active session and real `23503` foreign-key denial.
+The initial foreign-key fixture hit `42P16` because a temporary table cannot
+reference a permanent table; its rolled-back ordinary-table replacement passed.
+Neither local SQL nor synthetic HTTP is evidence of Hosted GoTrue cleanup.
+
+Check-only verifies `.2`, unchanged 47 migrations and no Hosted execution.
+TypeScript, full zero-warning lint, 73-file adapter sync and diff checks passed.
+No new Preview, browser/build run, Production action, Points/model call or
+runtime/UI activation occurred. A fresh authorized `.2` Hosted replay with
+complete account/session cleanup and verified branch deletion remains required.
+
+### Job-status Hosted r2 — probe/cleanup pass, advisor collection failure (2026-09-07)
+
+The authorized single no-data Preview ran clean source `b8dcb40`, fixed batch
+`.2`, CLI 2.115.0 and PG17. Precreate check-only and 118 focused tests passed.
+The exact 47-migration transaction, 19-row baseline/history locks, manifest and
+postchecks passed; history initialization was not needed. The actual read/Auth
+probe returned `ok:true`, with exact wrapper/TLS/ACL checks, real synthetic Auth
+identity, missing/mismatched read denial, three short-lived read-role lifecycles,
+session revocation and old-JWT rejection all verified.
+
+`authCleanupEvidence` reported `complete`, `already-absent`, account deletion
+acknowledged, account absent and sessions absent, all true; credential cleanup
+and database close were true. This is Hosted proof for the corrected cleanup,
+not a reconstructed cause of r1. The subsequent CLI security-advisor collection
+failed before usable evidence was emitted; raw error detail was not retained.
+The subsequent local correction below confirms the missing-`--linked` command
+error without reconstructing report contents. No advisor pass or specific finding
+is claimed. The enclosing
+lifecycle returned `ok:false` for that distinct step.
+
+The exact Preview was deleted after that failure. Three CLI absence checks,
+independent MCP listing and a NotFound project lookup confirmed removal; one
+create, no retry, no replacement. The
+[r2 record](communication-note-job-status-preview-batch.md#r2-hosted-execution--2026-09-07)
+contains its identity, timestamps and pins. No Production SQL, deployment,
+real care data, Points/model operation, UI/flag change or new source fix occurred.
+Real read transport/Cookie composition and populated Hosted status flow remain
+unproved. Advisor evidence must be included in the next integration gate; this
+partial lifecycle result is not an application release or all-five-Note pass.
+
+### Independent job recovery composition and advisor correction — local source evidence (2026-09-07)
+
+The new default-off server composition connects the real Cookie principal,
+job-status purpose adapter and fixed repository implementation. It requires
+server-owned injected database dependencies, independent read gating and exact
+Preview identity; it does not borrow the generation/Points gate or privileged
+generic credentials. The default Cookie factory uses the existing Next.js SSR
+client. Each request checks claims, actual current-session status and user
+identity before resolving the read-only database port.
+
+The 37 composition tests use synthetic Auth, credential issuance, SQL transport
+and cleanup receipts. They verify all five job status envelopes, fixed owner /
+session / job / contract / schema SQL parameters, strict transport and auth
+ordering, invalid config/target/query, revoked sessions, per-request freshness,
+safe failures, cleanup gating, 30-second timeout, abort, config drift and private
+cache headers. They execute the actual principal/adapter/repository code, not
+mocked versions of those modules. They do **not** prove a physical connection,
+actual issuer, Hosted populated owner-RLS flow or browser Cookie transport.
+
+The 23 advisor collector tests verify bounded read-only before/after target
+checks, exact report/MCP shapes, redacted lint/remediation output, no retry, no
+empty-output false pass and no resume after timeout. Pinned CLI 2.115.0 source
+inspection plus a local argument-validation replay confirmed that r2 omitted
+required `--linked`; merely adding it may mint a login role. The new collector
+therefore uses injected Management API / MCP read ports, not CLI connection
+initialization. No new Hosted report is claimed; r2 remains a failed enclosing
+lifecycle with a passed core probe and verified deletion.
+
+The focused reader/composition/advisor/runtime-boundary gate passed **110/110**.
+The full suite passed **4,059/4,059 across 266 files**; TypeScript, ESLint with
+zero warnings, the webpack production build (64/64 static pages), the post-build
+client-boundary scan (107 chunks, including new read-composition markers), adapter
+sync and whitespace checks passed.
+The fixed Preview check-only command passed the unchanged 47-migration manifest
+with `hostedExecuted:false`. Formal reader/composition readiness remains false,
+the actual GET remains fixed 503, and the approved green UI/Logo was untouched.
+No Preview, database role, Production mutation, deployment, Points or model call
+was created/performed during this local batch. Physical issuer/connection work
+is the next implementation step, not completed evidence.
+
+### Job-status physical issuer — local engine passed (2026-09-07)
+
+This batch adds 19 passing source tests for dedicated read issuance,
+exclusive fixed-query execution, TLS/version/config rejection, malformed requests,
+abort, cleanup failure and unsafe local paths. They use mocked pg/broker ports;
+they are not physical connection or durable SQL proof. Full Vitest:
+**4,078 passed, 9 skipped, 268 files (267 passed / 1 skipped)**. TypeScript,
+zero-warning ESLint and the webpack build (64/64 static pages) passed.
+The post-build client-boundary scan passed all 107 static chunks, including the
+new issuer markers; the runtime source audit limits references to tests only.
+The unchanged 47-migration Preview check-only gate also passed, with no Hosted
+execution. Adapter sync and whitespace checks passed.
+
+The nine new physical tests are only selected by the owned local cluster runner
+and passed **9/9** separately; they remain intentionally skipped by plain Vitest.
+The runner was changed to require SCRAM for generated runtime LOGINs while
+retaining trust only for the two local bootstrap/operator identities. The gate
+exercises the actual source issuer, exclusive physical client, SQL reader,
+durable revocation and composition; Auth and PG17/TLS target metadata remain
+synthetic fixtures, with an explicitly TestOnly PG16/Unix connector.
+
+The real gate passed **18 scenario groups**, including the earlier exact
+non-superuser migration/ACL/status/owner/session/cleanup checks and the added
+source-issuer suite. It reported `sourceIssuerTests:9`, `hostedVerified:false`,
+and `cleanup:{stopped:true,removed:true}`. Replay and no-lease cancellation
+tombstones, a separately committed login fence, real SCRAM authentication,
+privilege denial and authoritative zero-residue cleanup were verified locally.
+
+Initial `initdb` attempts were blocked by all 32 local shared-memory slots being
+occupied. Following explicit authorization and an exact identity/owner/zero-use/
+absent-creator recheck, only old segments `3866624` and `3932161` were removed.
+The setup's restricted-setting attestation was moved to the existing bootstrap
+identity, with DDL still executed as the non-superuser operator and no added
+privilege. Test-result parsing now requires structured Vitest JSON rather than
+ANSI display text. All failed runs reported their owned temporary directories
+removed. See the [local proof record](communication-note-product-integration-m1y.md#job-status-physical-issuer-local-proof--2026-09-07).
+
+The new SQL broker is a guarded local fixture, not a migration. The batch is
+locally verified; a deployable broker migration, dedicated management connection
+and independent trusted binding to the Preview project/control-plane evidence
+remain open. The strict real PG17/TLS opener has source tests only, not Hosted
+engine/TLS proof. Actual browser Cookie and GoTrue integration also remain open.
+No cloud resource, Production SQL, deployment, model/Points operation, UI/Logo
+change or formal reader activation occurred.
+
+### Dedicated Preview issuer candidate — local proof (2026-09-07)
+
+The new server dependency factory has **25 tests** for authenticated fixed
+branch-list transport, same-project/pinned-CA connection construction, target
+HMAC, wrong-parent/default/persistent/copied-data/unhealthy/deletion denial,
+duplicate/missing rows, bounded responses, no redirects/retries, cancellation and
+fresh observation per request. These tests mock HTTPS and credential custody;
+they do not claim live OAuth or Hosted identity proof.
+
+The exclusive control connector has **10 tests** with a mocked PG client for
+fresh project-bound custody, direct PG17/TLS/operator checks, one fixed
+autocommit RPC per physical connection, rejection of generic SQL and hard close
+on cancellation. Three source tests guard the CLI-generated candidate's placement
+outside automatic migrations, its invoker-only authority and durable fencing.
+
+The actual owned PG16 runner now applies the exact migration candidate and
+passed **12/12 physical issuer tests**, including three real two-connection
+acquire/cancellation races, non-superuser installation, no product-schema usage
+grant and extra-field denial. All 18 scenario groups passed; runtime roles,
+sessions and memberships were removed, and the cluster reported stopped/removed.
+Its Auth and PG17/TLS descriptor fixtures are still synthetic, with an explicit
+TestOnly PG16/Unix runtime connector. The new PG17 control connector has unit,
+not real-engine, proof. No cloud resource was created or retained.
+
+Full regression: **4,116 passed, 12 skipped across 270 files (269 passed / 1
+skipped)**. The 12 skips are intentionally run only by the owned real-engine
+runner and passed separately. TypeScript, zero-warning ESLint, webpack build
+(64/64 pages), client-boundary scan (107 chunks), adapter sync and whitespace
+checks passed. The existing Preview check-only gate still covers exactly 47
+migrations with `hostedExecuted:false`; the candidate is not silently included.
+
+Readiness remains false and the formal GET remains fixed 503. Real secret-custody
+wiring, Hosted PG17/TLS, browser/GoTrue and security-advisor checks remain open;
+no Production action, deployment, Points/model operation or UI/Logo change was
+performed. See the [implementation record](communication-note-product-integration-m1y.md#dedicated-issuer-candidate-and-bound-preview-service--2026-09-07).
+
+### Managed custody recovery wiring — local proof (2026-09-07)
+
+The recovery composition now has server-owned source wiring to the existing M1u
+workload/source-manifest verifier, managed HMAC and callback-only OAuth/CA/static
+password custody interfaces. This replaces the earlier raw credential-return
+ports and locally held project-ref HMAC key; it does not connect a live GCP
+factory or install the formal reader. Static-source password revocation remains
+branch deletion/password reset, not the 60-second delivery lifetime.
+
+- 13 new actual-M1u-adapter wiring cases use synthetic external WIF/KMS/Secret
+  Manager/branch HTTP responses. They cover target resolution, new cleanup
+  identity after cancellation, custody/scope/integrity failures, context reuse
+  denial and HTTP auth/session ordering before custody access.
+- 8 ownership-helper cases cover zero/duplicate/unawaited callbacks, cancellation,
+  late secrets, custody failure and late physical-result disposal. The issuer's
+  source suite is now 26 tests. PG17/TLS control tests still mock the PG client.
+- Full regression: **4,138 passed, 12 skipped, 271 files (270 passed / 1 skipped)**.
+  The separate owned real PG16 runner passed all 18 scenario groups and all
+  12 source issuer tests; its cluster was stopped and removed. No new real-GCP,
+  real-GoTrue, browser-to-database or Hosted PG17/TLS evidence is claimed.
+- TypeScript, zero-warning ESLint, webpack (64/64 pages), client-boundary scan,
+  adapter sync, whitespace and the unchanged 47-migration check-only gate passed.
+
+No cloud resource, Production mutation, model/Points call, UI/Logo change,
+deployment or push occurred. The candidate migration was not promoted and the
+formal GET still returns fixed 503. The next local browser/recovery scenario
+matrix and separate Hosted requirements are recorded in the
+[prepared integration gate](communication-note-product-integration-m1y.md#exact-next-recovery-integration-gate-prepared-not-executed).
+
+### Green Communication Note recovery — real local browser (2026-09-07)
+
+The local runner `scripts/browser-e2e/communication-note-recovery.mjs` stages
+the actual green job/document UI and recovery composition in its own loopback
+Next copy, using synthetic Auth, credential receipts and SQL ports. Its 13
+fixture preflight tests passed. The browser was driven separately through the
+in-app browser; this is not an automated GoTrue/Hosted end-to-end suite.
+
+- Real browser: same-job reload and close/reopen; queued/running/succeeded
+  polling without reload; exact saved-document/revision navigation and reload;
+  failed/cancelled/unavailable/foreign-owner views; revoked/anonymous login
+  redirects and second-tab reload; English and both Chinese task views.
+- The saved draft displayed synthetic English content, both Chinese review
+  versions, version 1 and the human-review requirement. See the
+  [actual screenshot](evidence/communication-note-recovery-2026-09-07.png).
+- Browser checks discovered and verified the fix for `html lang` on Traditional
+  Chinese job/document pages. Seven new regression cases compare the real
+  initial bootstrap against the React synchronizer and preserve other-route
+  fallback. No green UI/Logo redesign or new client dependency was introduced.
+- Full regression: **4,158 passed, 12 skipped, 272 files**. The 12 separately
+  selected real-engine cases were not rerun this batch. TypeScript, zero-warning
+  lint, 64/64-page webpack build, 107-chunk client scan, adapter sync and
+  whitespace checks passed. The Hosted check-only manifest remains exactly
+  47 migrations with `hostedExecuted:false`.
+- The owned test process stopped and its temporary copy was removed with
+  `sourceUnchanged:true`; only this batch's browser tabs were closed.
+
+The 503 fixture is not real network-offline evidence. Offline/restored-network
+browser behavior and real GoTrue/custody/Hosted PG17/TLS remain open. Formal GET
+activation remains off; no Production, AI, Points, cloud-resource creation,
+deployment or push occurred. Details and reproducible runner instructions are
+in the [local browser record](communication-note-product-integration-m1y.md#green-recovery-flow--local-real-browser-evidence-2026-09-07).
+
+### Connection interruption — partial local browser result (2026-09-07)
+
+Stopping only the owned synthetic server produced real connection refusal while
+the job page was polling. The actual browser displayed the unavailable view,
+hid the prior job result and kept a retry button. Retrying before restoration
+stayed unavailable. After the server was restored, a new tab at the same job URL
+read queued/succeeded states and opened the exact synthetic saved revision.
+
+**Not passed:** browser Offline/Online and same-document automatic recovery.
+The available browser has no network-emulation API; its development page reached
+an error document during interruption, so the successful reopen is not evidence
+of an `online` event. One concurrent fixture request also reported an
+unclassified 503. The gate remains partial, with no runtime activation.
+
+Focused loader/jsdom, client and fixture regression: **40/40 passed**. Source
+files were unchanged; full-suite/build/real-engine checks were not rerun. Both
+owned temporary services/copies were cleaned up. No system-network changes,
+Production, cloud creation, AI, Points or deployment occurred. See the
+[attempt record and screenshots](communication-note-product-integration-m1y.md#connection-interruption-attempt--partial-evidence-2026-09-07)
+for exact limitations and the required supported-browser/non-HMR rerun.
+
+### Offline/online handoff preparation — acceptance pending (2026-09-07)
+
+The synthetic browser runner's `--built` mode now serves a strictly checked
+local `next build`/`next start` copy, excluding HMR reloads from the observation.
+Its content-free observer records bounded network/UI event codes and page-instance
+identity only; it never simulates offline, alters app state, or captures private
+text. It and its loopback report route are absent from the formal app.
+
+Fixture/diagnostic preflight passed **23/23**, including 300 concurrent successful
+reads, cancelled-request classification and malformed/cross-site report denial.
+Full regression passed **4,168 tests, 12 skipped, 272 files**. TypeScript, lint,
+64/64-page formal build, 107-chunk client scan and adapter sync passed. The
+separate built fixture produced 6/6 pages and loaded the queued UI and test panel
+in the real browser without a dev overlay or console error. The historical
+unclassified 503 cannot be conclusively explained from the older logs.
+
+The owner agreed to the manual browser Offline/Online step. The test service is
+retained locally for that immediate handoff, not yet cleaned up or accepted as
+a successful network-recovery gate. No application code, Production, auth/DB
+permission, AI, Points, cloud resource, deployment or push changed. Follow the
+[handoff checklist](communication-note-product-integration-m1y.md#non-hmr-browser-handoff-and-cancellation-diagnostics-2026-09-07)
+to verify same-page automatic recovery and then stop/remove the owned fixture.
+
+### Safari saved-draft/review surface — read-only result (2026-09-07)
+
+- In native Safari, followed the synthetic succeeded job's saved-draft link to
+  the exact document/revision, version 1; English draft, both Chinese review
+  versions, save acknowledgement and persistent draft/review requirement rendered.
+- Expanded source facts and switched English/Simplified/Traditional Chinese;
+  the selected document/revision did not change. The current history entry kept
+  version 1. No second/historical fixture revision was exercised.
+- The green page rendered without a visible error overlay. Native Safari
+  console/network capture was not available in this run; no all-console-clean
+  or document-HTTP-status claim is made.
+- **Not complete:** review submission/persistence. The existing page is read-only
+  and has no confirmation control; viewing it did not constitute human review.
+  Browser Offline/Online recovery remains deferred and unpassed after the owner
+  confirmed Safari-only availability. No browser installation or system-network
+  change was performed.
+- Focused view, loader/jsdom and navigation regression: **15/15 in 3 files**.
+  No application code changed; full regression/build/real-engine were not rerun.
+- The retained local built fixture was stopped and its owned temporary copy
+  removed, with `sourceUnchanged:true` and an independent absence check. User
+  tabs were left open; local reload requires restarting the fixture. No cloud,
+  Production, AI, Points, deployment or push occurred.
+
+Next: implement the revision-bound self-review confirmation interaction and its
+server-acknowledged success/failure states within the existing default-off
+boundaries. See the [Safari acceptance record](communication-note-product-integration-m1y.md#safari-saved-draft-review-surface--bounded-acceptance-2026-09-07).
+
+### Self-review form and transport — local synthetic only (2026-09-07)
+
+- Added three required, initially unchecked review confirmations in all three UI
+  languages, exact-version binding, duplicate-click suppression, manual-only
+  idempotent retry and fixed error states. No body text or principal IDs leave
+  the form; there is no browser storage or automatic review submission.
+- Client ACK validation and a fresh document read control success. The form is
+  removed for historical/confirmed revisions, auth/not-found clears private text,
+  and access-generation changes reset checkboxes and ignore late writes. A test
+  caught React preserving checks across a batched re-read; the generation key
+  fixes this without weakening the existing reauthorization behavior.
+- The HTTP route has no installed durable writer and remains fixed 503. Injected
+  adapter tests cover body/transport/receipt validation; the guarded loopback
+  writer only uses synthetic process memory, with no permission or flag changes.
+- Real Safari: two checks remained disabled, three enabled submission; the final
+  POST returned 200 and the reader showed confirmed status, still Draft. Refresh
+  retained the test server's status. An initial 400 from Next's internal fixture
+  URL was diagnosed and fixed only under exact loopback Host/Origin guards.
+- Focused: **83/83**. Full: **4,223 passed, 12 skipped, 273 files**. TypeScript,
+  zero-warning lint, 64/64-page formal webpack build, 108-chunk client boundary,
+  6/6-page built fixture and 73-file adapter sync passed.
+- All three owned temporary services/copies were removed with source-isolation
+  receipts and independent absence checks. No Production, real data, cloud, AI,
+  Points, deployment or push occurred.
+
+Remaining: durable review writer/permissions and same-revision integration proof;
+real Auth/database persistence; browser Offline/Online automatic recovery. See
+the [self-review slice record](communication-note-product-integration-m1y.md#revision-bound-self-review-interaction--local-slice-2026-09-07).
+
+### Self-review durable writer and database — local candidate (2026-09-07)
+
+- `communication-note-self-review-durable.server.test.ts`: 27 new cases; with
+  the existing transport/client suite, 67/67 focused tests. Gates reject missing
+  self-review permission, Production/mismatched targets and read/write flag
+  substitution before clients; one Cookie client verifies the principal/current
+  session and sends only six RPC arguments. Wrong-principal, malformed response,
+  fixed database errors, abort/lost ACK and no-retry boundaries remain closed.
+- `scripts/preview-e2e/communication-note-self-review-local-pg16.mjs`: 14 real
+  PG16 scenario groups pass. Eight dependency migrations plus the CLI-generated
+  candidate are applied by non-superuser `postgres`. Real RLS/FK/CHECK constraints,
+  valid synthetic privacy proofs and independent database connections test
+  persisted readback, immutable event shape, rollback, owner/type/lifecycle
+  rejection, stale versions, concurrent first/repeated submissions and same-key
+  collisions. Edit/revocation lock winners and session/JWT expiry while waiting
+  are tested, with no document completion, job or ledger mutation.
+- Every run uses its own `/private/tmp/cl-self-review-*` private Unix socket
+  cluster, no TCP/external target or environment URL. All runs reported
+  `cleanup:{stopped:true,removed:true}`, including earlier failed test-seed and
+  ACL iterations. No database constraint was disabled to obtain the result.
+- Final full suite: 4,250 passed / 12 skipped, 274 files (273 passed / 1 skipped).
+  TypeScript and zero-warning lint pass; webpack build is 64/64 pages and the
+  client-boundary scan is 108 chunks.
+
+The formal route remains unbound/503 and no runtime flag is enabled. The new SQL
+is in `supabase/migration-candidates/`, not the approved 47-migration directory.
+This is not complete-chain Hosted, GoTrue/PostgREST, PG17/TLS, security-advisor or
+browser-to-database evidence. Next is a local browser/database roundtrip using
+this real writer. Offline/Online and all Hosted activation gates remain pending.
+
+### Self-review browser / real local database roundtrip (2026-09-07)
+
+- Opt-in command: `node scripts/browser-e2e/communication-note-recovery.mjs --database-review`.
+  It owns one built, no-HMR loopback app and one private Unix-socket PG16 cluster;
+  no external URL, credentials, data or installation is accepted.
+- `communication-note-self-review.test.ts`: 17 new adapter/guard tests; together
+  with recovery and durable-writer suites, 74/74 pass. Fixed RPC names/keys,
+  parameterized SQL, owned-root/env gates, unprivileged LOGIN, fresh transactions,
+  rollback, sanitized failures, writer binding and the closed formal route are
+  checked. The runtime importer test allows this exact test-only file.
+- Startup reruns 14 real SQL scenario groups and validates the reset synthetic
+  document using the real read RPC. Safari then proves stale form → 409/no event,
+  latest form → 200/one event → independent readback, refresh → still confirmed,
+  and actual test-session deletion → 401/login/no extra event. The draft label
+  remains; Points and generation-job aggregate counts stay zero.
+- Two initial browser attempts failed closed on a restricted setting read
+  (42501); the fixture was corrected without granting elevated settings access.
+  One further build was stopped before browser testing to fix the seed's current
+  revision consistency. The final build passed the browser sequence. All four
+  owned fixture roots were removed after both children stopped; port 3395 was
+  released and only the dedicated Safari tab was closed.
+- Full regression: **4,267 passed / 12 skipped**, 275 files (274 passed / 1
+  skipped); TypeScript and zero-warning lint pass. The final local fixture build
+  generated 6/6 pages; full webpack build generated 64/64 pages, the client-boundary
+  scan passed 108 chunks and adapter sync checked 73 files. Skipped gates were
+  not counted as passes.
+
+Identity issuance remains synthetic; database identity/session metadata, RLS,
+transactions and persisted readback are real. This is not Hosted Auth,
+PostgREST/TLS, whole-chain migration, security-advisor, native console-clean or
+Offline/Online evidence. No formal write binding or runtime activation occurred.
+See the [roundtrip record](communication-note-product-integration-m1y.md#self-review-page--local-database-roundtrip-2026-09-07)
+for reproduction and the next local edit/save-revision slice.
+
+### Communication Note wording edit / local memory roundtrip (2026-09-07)
+
+- New edit contract/client/server tests and document-loader browser tests pass
+  **65/65** together. They cover exact request/receipt fields, text/body bounds,
+  Cookie-only DOCUMENT_WRITE authentication before body reads, same-origin
+  rejection, unchanged source facts/history, stale base, privacy-pattern
+  rejection, double/concurrent submission and malformed/lost acknowledgements.
+- UI tests cover explicit three-text confirmation, reset on further typing,
+  no optimistic save, frozen uncertain/stale results, fresh acknowledged-version
+  navigation, access abort/private-content cleanup and unsaved-change warnings.
+  A synchronous unload event during successful navigation is not blocked.
+- `node scripts/browser-e2e/communication-note-recovery.mjs --edit` composes the
+  real handlers with the existing memory Product API and synthetic identity.
+  It explicitly reports `PROCESS_MEMORY_ONLY`; this is not the separate
+  `--database-review` fixture and does not exercise PostgreSQL editing.
+- The final built dedicated in-app tab proved reviewed revision 1 → three-text
+  edit → saved revision 2 with review reset → fresh confirmation → refresh
+  still confirmed. Historical revision 1 kept its original texts and no editing
+  controls. Viewports 390×844, 768×1024 and 1280×900 had no horizontal overflow;
+  normal viewport screenshots were inspected and scoped warning/error logs
+  were empty. Successful navigation raised no unload dialog.
+- Safari initially submitted successfully, but after its active tab changed,
+  a broad accessibility read was denied. No retry inspected unrelated pages;
+  only the dedicated in-app tab supplied the final end-to-end evidence. Its
+  viewport was reset and it was closed; the old Safari local tab was untouched.
+  Both exact temporary roots were removed after shutdown and port 3395 released.
+- Full regression: **4,319 passed / 12 skipped**, 276 files (275 passed / 1
+  skipped); TypeScript, zero-warning lint, 64/64-page webpack build, 109-chunk
+  client-boundary scan and 73-file adapter check passed. Fixture builds generated
+  6/6 pages. No skipped gate was represented as passed.
+
+The formal edit route remains unbound/503; no ACL, migration, database write,
+Hosted flag, real data, model call, Points operation, push or deployment occurred.
+Next is an independently scoped durable edit writer with real local PostgreSQL
+concurrency/security tests, not activation of the existing generic append RPC.
+See the [wording-editor record](communication-note-product-integration-m1y.md#wording-editor--new-revision--fresh-review-2026-09-07).
+
+### Durable Communication Note wording edit / PostgreSQL (2026-09-07)
+
+- `communication-note-edit-durable.server.test.ts` adds 42 cases; together with
+  the existing edit contract/handler tests, **86/86** pass. Dedicated edit/write
+  gates, exact Preview target, same Cookie principal, current-session rejection,
+  three-text privacy scanning, strict receipts, uncertain/aborted responses and
+  no retries are covered. The formal route still has no binding and returns 503
+  without reading its body. The candidate stays outside the migration manifest.
+- `node scripts/preview-e2e/communication-note-self-review-local-pg16.mjs --edit`
+  passes **33 real PG16 groups (14 existing + 19 edit)**. Eight exact dependency
+  migrations plus the two candidates apply as non-superuser `postgres` on an
+  owned Unix-only cluster. No external connection arguments are accepted.
+- Database checks cover no default caller grants, private RLS-constrained
+  definer/invoker facade, default-off flags, exact bounded text, unchanged source
+  facts/history, committed revision + pointer + sync + receipt, independent read
+  and review reset, transaction rollback, same-key replay/first-submit races,
+  stale base, cross-document key races, owner/type/lifecycle/current Provider
+  checks, revoked sessions and proof binding. Session/JWT/privacy expiry and
+  revocation/disable lock-winner tests use observed real database blocking;
+  successful transactions retain relevant locks until commit.
+- Initial harness errors (migration-entry schema USAGE, an unused synthetic
+  next revision, and the exact 30-minute proof constraint) were fixed without
+  turning off FK/CHECK/RLS or elevating the runtime executor. All runs stopped
+  and removed their owned roots. The last exact root was checked absent.
+- Local CLI security advisors returned an empty `results` list using
+  `--db-url` pinned to the same Unix socket and `--output-format json`; the
+  earlier non-JSON parse failure is not a pass. This is not a Hosted advisor
+  claim or full-chain deployment approval.
+- Full regression: **4,361 passed / 12 skipped**, 277 files (276 passed / 1
+  skipped). TypeScript, zero-warning lint, 64/64-page webpack build, 109-chunk
+  client-boundary scan and 73-file adapter check passed.
+
+No product route installation, browser/database edit roundtrip, Hosted ACL,
+Production, real care data, AI call, Points mutation, push or deployment was
+performed. Next is the guarded local browser/database editor roundtrip. See the
+[durable edit record](communication-note-product-integration-m1y.md#durable-wording-edit-writer--local-postgresql-2026-09-07).
+
+### Communication Note editor / browser-to-PostgreSQL roundtrip (2026-09-08)
+
+- Explicit durable-write injection adds 13 handler cases and the extra guarded
+  local edit RPC adds five adapter cases: **121/121 focused tests** across the
+  edit, durable writer and database adapter suites. Invalid/uncertain receipts,
+  rejected transport/Auth/base, aborted writes and exceptions never fall back
+  to generic append or memory. The formal route remains unbound/503.
+- `node scripts/browser-e2e/communication-note-recovery.mjs --database-edit`
+  builds 6/6 pages and passes **33 real PG16 startup groups (14 review + 19
+  edit)**. Only its owned Unix-socket fixture gets the extra edit switch and
+  temporary narrow caller grant; review-only and memory modes stay separate.
+- A dedicated browser tab proved confirmed revision 1 → edit three texts →
+  HTTP 200 / persisted revision 2 / review REQUIRED → fresh review → reload
+  CONFIRMED. Historical revision 1 retained its original texts and no edit
+  controls. Independent aggregate reads showed one receipt/sync per edit.
+- Fixed stdin `advance` committed revision 3 through the real RPC. The stale
+  revision-2 form received 409 and disabled its inputs without overwriting the
+  newer text. A separate scoped tab independently read the new revision.
+- The stale form's “open current version” native unsaved-change confirmation
+  caused browser-control timeouts; that dialog/navigation is **not verified**.
+  The second dedicated local tab continued the revoked-session check: actual
+  synthetic session deletion → save 401 → private fields cleared / sign-in,
+  without a navigation dialog. Final counts stayed revision 3, two receipts,
+  two sync entries and two review events; Points/jobs remained zero.
+- Normal desktop screenshots were inspected with the approved green UI
+  unchanged. Scoped warning/error logs were empty on the normal flow and final
+  sign-in tab. Both owned tabs closed. The sole owned root
+  `/private/tmp/cl-job-browser-V9PNag` was stopped/removed, with independent
+  absent-root/closed-port checks and unchanged formal source hashes.
+- Full regression: **4,379 passed / 12 skipped**, 277 files (276 passed / 1
+  skipped). TypeScript, zero-warning lint, 64/64-page webpack build, 109-chunk
+  client-boundary scan and 73-file adapter check passed.
+
+Real PostgreSQL RLS/transactions/readback do not imply real Auth issuance,
+GoTrue/PostgREST/TLS, Hosted activation or a new Offline/Online pass. No candidate
+SQL or approved migration changed; no Hosted/Production, real data, AI, Points,
+push or deployment occurred. Copy/TXT export is the next separate product slice.
+See the [database editor record](communication-note-product-integration-m1y.md#wording-editor--real-local-database-roundtrip-2026-09-08).
+
+### Communication Note Copy / TXT Record copy (2026-09-08)
+
+- Shared template `communication-record-text.2026-09-08.1` renders only the
+  English Note and fixed version/time/language/draft/static-copy notices. Safe
+  filenames use type/date/short ID/revision. Review translations, facts,
+  privacy/missing prompts, Points, model metadata and full internal IDs stay out.
+- **88/88 focused tests** prove Copy/TXT byte parity for fixed inputs/time,
+  Unicode preservation, conservative formatting rejection, exact-revision fresh
+  Cookie read, stale/revoked/not-found/reset-review rejection, no stale fallback,
+  duplicate-click suppression, clipboard denial, promise-backed ClipboardItem,
+  abort/cleanup/60-second Blob TTL, three locales and editor/review integration.
+  The initial FileReader/fake-timer test failure was fixed and rerun successfully.
+- Final full regression: **4,446 passed / 12 skipped**, 279 files (278 passed /
+  1 skipped); TypeScript, zero-warning lint, 64/64-page webpack build, 109-chunk
+  client scan and 73-file adapter check passed.
+- One 6/6-page built synthetic **memory-only** browser fixture proved disabled
+  unreviewed export, review → clipboard API success and TXT-start feedback. At
+  390×844, 768×1024 and 1280×900 there was no horizontal overflow; screenshots,
+  44-pixel button targets, keyboard focus and three-locale copy were inspected.
+  Scoped warning/error logs were empty. Final extra formatting-rejection vectors
+  postdated this browser run and passed the final regression/build.
+- Native delivery is **not passed**: the in-app browser emitted no download
+  event/file, and its separate virtual clipboard could not paste the page-written
+  copy. Actual Safari cross-app paste and TXT save/open remain acceptance items;
+  a download-start message is not a saved-file acknowledgement.
+- The only owned root `/private/tmp/cl-job-browser-QX92oH` was stopped/removed,
+  source hashes unchanged, port closed, viewport reset and owned tab closed.
+  No database, Hosted, real-data, AI, Points, Auth/ACL, migration, push or deployment
+  operation occurred. Historical export stays disabled until its review binding
+  exists; export events are not yet durable.
+
+See the [Copy/TXT implementation record](communication-note-product-integration-m1y.md#communication-note-copy--txt-record-copy-2026-09-08).
+
+### Communication Note DOCX Record copy (2026-09-08)
+
+- Current reviewed revision only, reusing the exact fresh Cookie read, minimal
+  English Record copy and template shared with Copy/TXT. The new dependency
+  `docx@9.7.1` is lazy-loaded after authorization; invalid XML text is rejected
+  consistently. No public URL, export API, persistent bytes or business write.
+- **110 focused tests** cover independent ZIP/DEFLATE/XML parsing, shared text
+  order, Unicode/tabs/spaces, long text, no internal fields/author identity or
+  external relationships, safe filename/MIME, denial/abort/retry, duplicate
+  clicks, historical disablement and 60-second Blob URL cleanup.
+- Final full regression: **4,468 passed / 12 skipped**, 280 files (279 passed /
+  1 skipped). TypeScript, zero-warning lint, 64/64-page webpack build, 111-chunk
+  private-client scan and 73-file adapter check passed. The final historical
+  test assertion postdated the build and changed no production source.
+- Actual product-code DOCX samples passed independent CRC and python-docx
+  paragraph parity checks. Packaged LibreOffice rendered one Unicode page and
+  three long-record pages; all final pages were inspected. Task-local Fontconfig
+  exposed existing system CJK/emoji fonts after the initial render omitted
+  Chinese glyphs. PDF text extraction confirmed Chinese, all 30 long-record
+  paragraphs and the draft notice on each page. These QA PDFs are not a product
+  PDF export feature or a native Word compatibility pass.
+- Built synthetic memory fixture `/private/tmp/cl-job-browser-euLBVO` passed
+  unreviewed disablement, review → real DOCX-start feedback, three locales,
+  390/768/1280-width layout, 44-pixel buttons and keyboard focus; console warnings
+  and errors were empty. Owned tab/viewport/server/root were cleaned, source
+  hashes unchanged and port closed. No real database/Hosted/AI/Points operation.
+- Native Safari Copy/TXT/DOCX delivery and Microsoft Word opening remain
+  **unpassed**, alongside earlier discard-confirmation and real Offline/Online
+  items. Next implementation: PDF; bilingual/historical/batch exports, durable
+  history, native sharing and Hosted activation remain open.
+
+See the [DOCX implementation record](communication-note-product-integration-m1y.md#communication-note-docx-record-copy-2026-09-08).
+
+### Communication Note PDF Record copy (2026-09-08)
+
+- Copy/TXT/DOCX/PDF now share the same minimal current-reviewed English revision
+  profile and exact fresh Cookie access check. PDF generation and font loading
+  are lazy and local to the browser; no export API or business-state write.
+- **141 focused tests**; final **4,499 passed / 12 skipped** in 283 files
+  (282 passed / 1 skipped). TypeScript, zero-warning lint, 64/64-page webpack
+  build, 115-chunk private-client scan and 73-file adapter check passed.
+- Actual one-page Unicode and three-page long-record PDFs passed independent
+  pypdf content/order/header/font/active-content checks; all four Poppler-rendered
+  pages were visually inspected without exposing installed system fonts. The
+  initial old-fontkit CJK rendering failures were fixed with pinned Fontkit 2
+  and its tested serialization bridge; initial failures are not passes.
+- Tests cover unknown glyphs, 200-page cap, pinned-font size/hash/HTTP failures,
+  long-word wrapping, cancellation during loading/rendering, privacy/access/
+  revision denial, duplicate clicks/retry and Blob byte/MIME/TTL cleanup.
+- Built synthetic-memory fixture `/private/tmp/cl-job-browser-hTKmpQ` passed
+  disabled-before-review → client PDF-start feedback, three locales, responsive
+  390/768/1280 layouts, 44-pixel buttons, focus and empty warning/error logs.
+  Owned tab, viewport, server and fixture root were cleaned; source unchanged
+  and port closed. No real database, Hosted, AI or Points call was made.
+- Native Safari clipboard and actual TXT/DOCX/PDF save/open, native Microsoft
+  Word compatibility, discard-confirmation and real Offline/Online remain
+  **unpassed**. No PDF/A/tagged-PDF or universal Unicode/emoji claim is made.
+
+See the [PDF implementation record](communication-note-product-integration-m1y.md#communication-note-pdf-record-copy-2026-09-08).
+
+### Communication Note native Safari export acceptance (2026-09-08)
+
+- Source `609cb4f`, disposable built PROCESS_MEMORY_ONLY fixture only. Native
+  Safari passed four disabled exports before review, synthetic review and four
+  enabled exports afterward, with the draft warning retained.
+- Actual Safari Copy → Command-V into an empty TextEdit document passed with
+  complete minimal English Record copy text and no private facts/translations.
+- Safari's download list and filesystem confirmed completed TXT (534 bytes),
+  DOCX (10,076 bytes) and PDF (8,673 bytes). Existing DOCX files were preserved;
+  the new download used Safari's `-2` filename suffix.
+- Those downloaded TXT/DOCX files opened in TextEdit; the PDF opened in Preview
+  as one readable page. This closes native Safari save/open delivery, not actual
+  Microsoft Word compatibility or a general native-reader certification.
+- Independent UTF-8/OOXML/pypdf format parity, required field order, internal
+  field exclusion, DOCX ZIP/header and PDF embedded-font/no-active-content
+  checks passed. Both actual DOCX/PDF one-page render outputs were inspected
+  using packaged tools. Hashes and exact scope are in the linked record.
+- Owned test tab/windows and fixture were closed; exact fixture root absent,
+  source unchanged and port 3395 closed. Three synthetic Downloads files remain
+  available; pre-existing files were not changed. No database, Hosted, AI or
+  Points call occurred. This documentation-only batch does not rerun or inflate
+  the preceding 4,499-test implementation baseline.
+- Native Microsoft Word compatibility, discard-confirmation navigation and real
+  Offline/Online remain **unpassed**. No export history was implemented in that
+  acceptance batch; the subsequent local slice is recorded below.
+
+See the [native Safari acceptance record](communication-note-product-integration-m1y.md#communication-note-native-safari-export-acceptance-2026-09-08).
+
+### Communication Note revision-bound export history local slice (2026-09-08)
+
+- **135 focused tests** in three files; final full regression **4,590 passed /
+  12 skipped**, 285 files (284 passed / 1 skipped). New coverage checks strict
+  minimal metadata, receipt/list scope, format/outcome combinations, exact
+  revision, duplicate/changed replay, foreign/revoked/deleted access, review
+  reset, newest-20 bounds, malformed/cross-origin/bearer requests, hard-off
+  formal routes, timeout/access abort and late responses. UI tests verify all
+  four formats report after reauthorization, inaccessible attempts create no
+  event and failed logging never changes export success or re-exports.
+- TypeScript, zero-warning lint, 64/64-page webpack build and the 116-chunk
+  private-client boundary scan passed, as did the 73-file adapter check and
+  `git diff --check`. The initial list-parser test found an
+  accidental spread of caller-only fields; explicit response projection fixed
+  it before the final regression and build.
+- Built 6/6-page fixture `/private/tmp/cl-job-browser-znk7Ik` passed empty
+  history/unreviewed disablement → synthetic review → actual TXT initiation →
+  one version-1 report → page reload → independent server readback. Saving
+  wording version 2 produced empty version-2 history; reopening version 1
+  returned its original report without enabling historical export.
+- English, Simplified and Traditional Chinese history wording passed browser
+  checks. Inspected 390/768/1280 layouts had no horizontal overflow; all five
+  export/history buttons measured 44 pixels high, keyboard focus was visible,
+  and captured browser warnings/errors and framework overlays were absent.
+- The fixture was PROCESS_MEMORY_ONLY, not durable or cross-device proof. Its
+  owned tab closed, viewport reset, source hashes unchanged, exact directory
+  removed and port 3395 independently confirmed closed. No real care data,
+  database/schema operation, AI call, Points write, push or deployment occurred.
+
+See the [implementation and remaining durable gate](communication-note-product-integration-m1y.md#communication-note-revision-bound-export-history-local-slice-2026-09-08).
+
+### Communication Note durable export history candidate (2026-09-08)
+
+- **123 focused tests** (42 new durable-adapter tests plus 81 existing contract
+  and synthetic-fixture tests) passed with TypeScript and focused zero-warning
+  lint. The new cases cover dedicated Preview-only gates, no borrowed document
+  authority, one verified Cookie client per request, active-session failure,
+  exact minimal RPC arguments, response binding, durable-storage assertions,
+  sanitized failures, abort/lost receipt and formal-route hard-off checks.
+- `node scripts/preview-e2e/communication-note-self-review-local-pg16.mjs --history`
+  passed **35 real PostgreSQL scenarios**: 14 dependency regressions and 21
+  history groups. The non-superuser DDL/application role matrix, private schema,
+  RLS/column privileges, concurrent first-write and cross-document key collision,
+  rollback, current/reviewed revision, owner/deletion/session boundaries,
+  expiry/revocation/edit lock winners and retained locks all passed. A separate
+  connection read committed records; the bounded latest-20 query used the
+  candidate's composite index in a forced-index eligibility plan, not a claimed
+  production performance benchmark.
+- The first cluster stopped at an incorrect test column-count assertion and
+  was removed. The corrected test checks the exact 12 database columns. The
+  complete run at `/private/tmp/cl-export-history-258NVC` passed and was removed,
+  as was the earlier `/private/tmp/cl-export-history-To6HDW`. Both directory
+  absences were independently checked. Only synthetic temporary state existed.
+- Supabase CLI 2.115.0 security advisors against that attested Unix-only cluster
+  returned an empty results list. This is local catalog evidence, not Hosted
+  Supabase ACL/Auth/PostgREST/TLS or durable browser integration evidence.
+- Full regression: **4,632 passed / 12 skipped**, 286 files (285 passed /
+  1 skipped). The exact current-session importer list now names the new
+  server-only candidate; no wildcard allowance or formal route binding was
+  added. No UI/browser flow changed or was re-certified in this database batch.
+  Final TypeScript, zero-warning lint, 64/64-page webpack build, strengthened
+  116-chunk client-boundary scan, 73-file adapter check and `git diff --check`
+  passed.
+
+See the [durable candidate scope and remaining gate](communication-note-product-integration-m1y.md#communication-note-durable-export-history-candidate-2026-09-08).
+
+### Communication Note durable history browser roundtrip (2026-09-08)
+
+- `node scripts/browser-e2e/communication-note-recovery.mjs --database-history`
+  creates an owned Unix-only PostgreSQL 16 / built loopback app, runs **54**
+  dependency/history/edit scenario groups, and exposes only narrow guarded
+  test bindings. Formal routes, migration candidates and product UI are unchanged.
+- An isolated browser tab proved empty history/review gate, Copy/TXT/DOCX/PDF
+  reports, full-page reload/readback, version isolation, history-switch failure
+  without changing the export result or automatically retrying, and real local
+  session revocation clearing all private content. Simplified/Traditional
+  Chinese readback passed; no browser warnings/errors were returned.
+- Independent final database observation: 5 version-bound reports, 2 reviews,
+  1 wording receipt, 1 sync change, zero Points entries/generation jobs. Local
+  security advisors returned `results: []`. This attests browser reports, not
+  new native saved-file/Word compatibility, real Hosted identity or AI results.
+- **147 focused / 4,644 full tests passed; 12 skipped**, 286 files (285 passed /
+  1 skipped). TypeScript, zero-warning lint, 64/64-page webpack build,
+  116-chunk client boundary, 73-file adapters and diff checks passed. The
+  standalone built fixture generated 6/6 static pages.
+- Bootstrap readback initially omitted synthetic JWT expiry; the SQL correctly
+  refused it. The probe was corrected without weakening auth. Every attempted
+  owned cluster was stopped/removed. All three logged roots, including final
+  `/private/tmp/cl-job-browser-yvfpV6`, were independently absent; port 3395 was
+  closed. No retained DB, push, deployment, Production change or model call.
+
+See [the complete local scope and cleanup evidence](communication-note-product-integration-m1y.md#communication-note-export-history--real-local-browser-roundtrip-2026-09-08).
+
+### Communication Note fixed synthetic full-flow gate (2026-09-08)
+
+- The owned `--flow` mode joins the unchanged composer → task page → real local
+  saved result → review → TXT export/history. Persistent on-page notices identify
+  simulated task progress, a pre-seeded result and display-only Points. It only
+  accepts one exact English synthetic fixture; it is not real model generation.
+- Real form/schema/privacy checks and Cookie/current-session checks remain in
+  the path. Unit coverage includes guard/transport/owner rejection, mismatched
+  source facts, concurrent admission replay, duplicate-key conflict, read-only
+  synthetic progress, pre-completion result denial and revoked-session replay.
+- Browser acceptance proved five empty-field errors, successful confirmed
+  submission, queued/running/succeeded states, reload without resubmission,
+  exact result/fact binding, pre-review export denial, post-review TXT history
+  write/read/reload and private-content clearing after local session revocation.
+  No browser warnings/errors were returned; the approved green UI was reused.
+- **23 new / 57 bridge-focused / 44 boundary-focused tests passed.** Final full
+  regression: **4,667 passed / 12 skipped**, 287 files (286 passed / 1 skipped).
+  TypeScript, full zero-warning lint, 64-page build, 116-chunk client boundary,
+  73-file adapters and diff checks passed. The temporary app built 5 static
+  pages plus the dynamic flow and passed 54 local database scenario groups.
+- Independent final SQL counts: one review, one TXT report, zero edit/sync
+  receipts, **zero database generation jobs and zero Points ledger entries**.
+  Task state was only process memory, not a durable admission/worker. Root
+  `/private/tmp/cl-job-browser-uhNRAL` and its tab were removed after child exit;
+  directory absence and closed port 3395 were independently confirmed.
+
+See [full-flow scope and remaining real-admission gate](communication-note-product-integration-m1y.md#communication-note-fixed-synthetic-full-flow-integration-2026-09-08).
+
+### Communication Note real local admission / Points gate (2026-09-08)
+
+- `node scripts/browser-e2e/communication-note-recovery.mjs --admission`
+  creates an owned Unix-only PG16 and production-built local fixture. Only the
+  fixed synthetic facts are accepted; no worker/model/KMS runs.
+- Real database: 14 existing review scenarios plus 8 admission scenarios;
+  admission is the existing policy-bound 19-parameter RPC, not a table insert.
+- Browser: first successful response deliberately hidden, original exact retry
+  returns the same queued job. Independent before/after counts remain 1 job,
+  1 admission, 1 reservation event, 20 reserved / 10 available from 30 seeded.
+  Refresh reads without resubmission; balance insufficiency and revoked-session
+  sign-in boundary are verified. No terminal settlement is claimed here.
+- 23 new tests; full **4,690 passed / 12 skipped**, 288 files. Typecheck, lint,
+  production build, client-bundle boundary and adapter checks passed. Local
+  security Advisors returned no findings; all owned roots/port were cleaned.
+- [Detailed scope, synthetic receipts and cleanup evidence](communication-note-product-integration-m1y.md#communication-note-real-local-admission-and-points-browser-gate-2026-09-08).
+
+### Communication Note real local terminal settlement gate (2026-09-08)
+
+- `node scripts/browser-e2e/communication-note-recovery.mjs --settlement-check`
+  proves 9 terminal cases after 14 review and 8 admission cases in an owned,
+  disposable Unix-only PG16. It never starts a web server.
+- `--settlement` adds a production-built browser fixture. Terminal commands and
+  six-RPC runtime authority stay in parent/stdin only, outside Next. Fixed
+  success uses explicitly synthetic grant consumption/provider evidence; no AI,
+  vault or KMS runs. No migration or formal activation changes.
+- Real browser admission → failure/cancel/success and exact terminal replay:
+  releases return 30/0; success leaves 10/0 and one new saved draft. Its exact
+  version opens/reopens, remains review-required with exports disabled, and
+  revoked-session reload shows sign-in without further Points changes.
+- 21 new tests; full **4,711 passed / 12 skipped**, 289 files. Typecheck,
+  zero-warning lint, 64/64-page Turbopack build, 32-chunk client boundary and
+  73-file adapter checks passed. Local security Advisors found no issues.
+  The owned browser tab and all seven owned database roots were cleaned.
+- [Synthetic limits, authority boundary and next application slice](communication-note-product-integration-m1y.md#communication-note-real-local-terminal-settlement-browser-gate-2026-09-08).
+
+### Communication Note settled-draft review/export gate (2026-09-08)
+
+- `node scripts/browser-e2e/communication-note-recovery.mjs --settlement-review-check`
+  passed 61 real local database scenarios: 14 review, 21 history, 8 admission,
+  9 terminal and 9 new settled-result integration scenarios. Review/report replay
+  records once, foreign/revoked access is denied, history closes safely, and
+  Points, jobs, revisions and draft content are unchanged by these operations.
+- `--settlement-review` browser run: actual admission and terminal success → new
+  draft → simulated self-review → TXT initiation → one durable history report.
+  Page reload preserves review; history refresh recovers the same record. The
+  history-off/on and session-revocation paths passed. Final Points remain 10/0.
+  No new native file-delivery or real human-review claim is made.
+- 20 new tests; full **4,731 passed / 12 skipped**, 290 files. Typecheck, lint,
+  64-page build, 32-chunk client boundary, 73-file adapter check and local security
+  Advisors passed. Three owned roots and the dedicated browser tab were cleaned.
+  Formal routes, migrations, production and model/provider activation unchanged.
+- [Scope, exact-result boundary and next editing slice](communication-note-product-integration-m1y.md#communication-note-settled-draft-review-and-export-integration-2026-09-08).
+
+### Communication Note settled-draft wording edit/version gate (2026-09-08)
+
+- `node scripts/browser-e2e/communication-note-recovery.mjs --settlement-edit-check`
+  passed 89 real local database scenarios: 14 review, 21 history, 19 edit,
+  8 admission, 9 terminal, 9 settled-review and 9 settled-edit. New cases prove
+  exactly-once revision save, replay/stale/auth denials, unchanged source facts,
+  fresh review, separated histories and unchanged generation anchor/Points.
+- `--settlement-edit` browser run: actual new draft → version-1 simulated review
+  and TXT initiation → wording save as version 2 → required fresh review/empty
+  history → old version's original wording and report → version-2 review/TXT →
+  reload/readback. Each version has exactly one report. Revoked-session reload
+  clears private content; terminal replay adds no charge. Final Points: 10/0.
+  Human review, model output and OS file delivery are not attested.
+- Eight new tests; full **4,739 passed / 12 skipped**, 290 files. Typecheck,
+  zero-warning lint, 64-page build, 32-chunk client boundary, 73-file adapter
+  check and local security Advisors passed. Both owned roots and the dedicated
+  browser tab were cleaned; port 3395 had no listener. No formal route/schema,
+  green UI/Logo, Hosted, provider or Production activation changed.
+- [Scope, exact-document revision binding and next revisit entry](communication-note-product-integration-m1y.md#communication-note-settled-draft-wording-edit-and-version-history-integration-2026-09-08).
+
+### Communication Note saved-list/revisit gate (2026-09-08)
+
+- `node scripts/browser-e2e/communication-note-recovery.mjs --settlement-list-check`
+  passed 94 real local database scenarios, including five new list cases:
+  edited current-version metadata, content exclusion, foreign/revoked denial
+  and unchanged Points/history on repeated reads. No new migration or SQL grant.
+- `--settlement-list` browser: empty → actual generation admission/settlement →
+  leave task → list/open new draft → edit version 2 → Logo/list/reload → open
+  current version 2 with review required. All three locales and manual refresh
+  passed. Revocation plus list refresh removed metadata and showed sign-in.
+  Final balance 10/0, one job/reserve/commit; no list-induced review/export.
+- 55 new unit/DOM tests cover strict metadata, fixed transport/document binding,
+  empty vs failure, stale responses, timeout, lifecycle clearing and offline
+  feedback. Native offline and cross-device recovery are not newly attested.
+- Full **4,794 passed / 12 skipped**, 293 files; typecheck, zero-warning lint,
+  64-page build, 32-chunk client boundary and local security Advisors passed.
+  Both owned roots and the dedicated tab were cleaned; no port 3395 listener.
+  Formal workspace and routes remain unchanged; only the owned fixture is wired.
+- [List scope, current-version navigation and next task-revisit slice](communication-note-product-integration-m1y.md#communication-note-saved-draft-list-and-revisit-integration-2026-09-08).
+
+### Communication Note in-progress workspace task gate (2026-09-08)
+
+- `node scripts/browser-e2e/communication-note-recovery.mjs --workspace-task-check`
+  passed 98 real local database scenarios, including four new exact-task cases:
+  pre-admission NOT_FOUND, foreign/revoked denial and repeated queued-task reads.
+  The existing purpose reader is reused; no migration or grant is added.
+- `--workspace-task` browser: empty → real admission with intentionally lost
+  response → leave **without retrying** → find the same queued task → reload and
+  three locales → open task → synthetic settlement → saved task/draft → current
+  version still requires review → revoked-session refresh clears both entries.
+  Final counts: one job/admission/reserve/commit, 10/0 Points, zero review/reports.
+- 57 new tests cover opt-in minimal task parsing, locator binding, whole-surface
+  auth clearing, remount/lifecycle recovery, stale mode responses and all locale
+  states. The fixed local candidate is not a general catalog or cross-device
+  recovery system. No new native offline or real AI/human-review claim.
+- Full **4,851 passed / 12 skipped**, 294 files; typecheck, zero-warning lint,
+  64-page build, 32-chunk client boundary, 73-file adapter check and local security
+  Advisors passed. Both owned roots and the dedicated tab were cleaned.
+- [Implementation limits, readback and next navigation slice](communication-note-product-integration-m1y.md#communication-note-in-progress-task-workspace-entry-2026-09-08).
+
+### Communication Note workspace navigation gate (2026-09-08)
+
+- Task and draft Logo/return links now target the fixed same-language workspace,
+  including unresolved/invalid-ID states. The explicit new-note action remains
+  separate; exact task/revision links and all writes are unchanged.
+- 45 new view cases passed. Full **4,896 passed / 12 skipped**, 294 files;
+  typecheck/build, zero-warning lint, 64 static pages, 32-chunk boundary and
+  73-file adapter checks passed. Existing local database preflight: 66 scenarios
+  per independent run, with no new schema, permission or harness mode.
+- Browser: lost admission reply → workspace → task → synthetic success → exact
+  draft → return → reopen current draft → Logo/workspace → task → revoked-session
+  return → sign-in. Traditional locale is retained. Final ledger remains one
+  job/reserve/commit and 10/0; self-review required, TXT disabled, zero reports.
+- Both owned roots/tabs were cleaned. Local security Advisors found no issues.
+  No Hosted activation, real provider, human review or native offline claim.
+- [Navigation evidence and next multi-task read slice](communication-note-product-integration-m1y.md#communication-note-workspace-navigation-loop-2026-09-08).
+
+### Communication Note owner-isolated multi-task list gate (2026-09-08)
+
+- `--workspace-task` now uses a purpose-scoped PostgreSQL task list instead of
+  the fixed candidate. The SQL is a local migration candidate, not part of the
+  unchanged Hosted manifest. No formal workspace/API or Production activation.
+- `--workspace-task-check`: **110 real local database scenarios**, including 12
+  new owner/session/type isolation, 25-task keyset pagination, bounds, ACL,
+  index and read-only Points checks. All extra catalog probes are rolled back.
+- Full **4,942 passed / 12 skipped**, 296 files; typecheck, changed-file lint,
+  64-page build, 32-chunk client boundary and 73-file adapter checks passed.
+- Browser: lost response → find original task without retry → synthetic failure
+  → independent second admission → both tasks → synthetic success → Traditional
+  saved draft → workspace → revoked refresh → sign-in. Two reserves, one
+  RELEASE/COMMIT, 10/0 Points; no human review or export, no extra generation.
+- The desktop UI, actual two-task flow and no-console-error check passed.
+  >20-row pagination is SQL/DOM evidence, not a native-browser pagination claim.
+  Exact-socket Security Advisors found no issues; all owned fixtures and tab 30
+  were cleaned. No Hosted/real-AI/native-offline/cross-device claims.
+- [Implementation boundaries and next saved-draft catalog](communication-note-product-integration-m1y.md#communication-note-owner-isolated-multi-task-workspace-2026-09-08).
+
+### Communication Note current-owner saved-draft catalog gate (2026-09-08)
+
+- The owned workspace now reads the current owner's Communication Note catalog
+  through the existing Product API/RPC, with 20-row keyset pages and no new
+  migration or permission. Task/draft positions are independent, and an empty
+  filtered page keeps its continuation. Current-version links reauthorize.
+- Full **4,979 passed / 12 skipped**, 297 files; 37 new contract, bridge and DOM
+  cases. TypeScript, zero-warning lint, 64-page build, 32-chunk client boundary
+  and 73-file adapter check passed.
+- `--workspace-task-check`: **118 local SQL scenarios**, with eight new cases
+  covering 25 drafts across 20/5 pages, minimal metadata, other types/deletion,
+  current-version changes, owner/session/cursor boundaries and no table SELECT.
+  All added SQL probe rows roll back; existing settlement/review/edit tests pass.
+- Browser: two separate current-version entries, English/Traditional document
+  reads, same-language returns, all three workspace locales, revoked-session
+  refresh → empty surface/sign-in. No warnings/errors, no self-review/export,
+  zero generation jobs or reservations, unchanged synthetic 30/0 Points.
+  SQL/DOM tests cover >20-row paging; no claim of browser paging or real AI.
+- Exact owned-socket Security Advisors found no issues. Both temporary roots
+  and owned tab 31 were cleaned. Formal app bindings and all external state
+  remain unchanged; non-settled fixture document writes remain denied.
+- [Catalog implementation, evidence and next default-off app binding](communication-note-product-integration-m1y.md#communication-note-current-owner-saved-draft-catalog-2026-09-08).
+
+### Communication Note default-off formal workspace route gate (2026-09-08)
+
+- Formal page/API source wiring now exists. Exact server-side opt-in selects
+  the authenticated three-language shell; default/off retains legacy behavior
+  and admins keep their original workspace. Actual formal GET stays fixed 503
+  without IO even with UI opt-in, because its runtime remains source-unbound.
+- Full **5,027 passed / 12 skipped**, 299 files; 48 new gate/auth/route/port/abort
+  cases. TypeScript, zero-warning lint, Next build (63 prerendered entries plus
+  the dynamic workspace API), 32-chunk boundary and 73-file adapter check pass.
+- Browser runner copies the actual page/shell/API unchanged and substitutes only
+  a guarded temporary Unix-socket runtime plus an unused deny-only sign-out
+  stub. Two starts passed 74 existing SQL preflight cases each; the first build
+  stopped on the missing legacy action import and cleaned safely before serving.
+- Browser: source workspace → lost-ack admission → original task → cancellation
+  → workspace → Traditional saved draft → same-language return → Simplified
+  workspace → revoked refresh/sign-in. One reserve/release, no commit; 30/0
+  Points, no human review, edit or export. Three locales and actual private page
+  headers verified; no browser warnings/errors. Exact-socket Advisors: no issues.
+- Both owned roots/tab 32 cleaned. No SQL/permission/Hosted manifest, external
+  environment, actual AI, Production, push or deployment change.
+- [Source route wiring, evidence and next read-only composition](communication-note-product-integration-m1y.md#communication-note-default-off-formal-workspace-route-2026-09-08).
+
+### Communication Note read-only workspace database adapter (2026-09-08)
+
+- Actual Cookie principal/document RPC/task repository assembly is implemented,
+  default-off and still absent from the formal runtime binding. A flag alone
+  cannot create database privileges or credentials.
+- Full **5,078 passed / 12 skipped**, 300 files, 51 new tests; focused 111 passed.
+  Covers request identity isolation, same-client reauthorization, fixed readers,
+  target drift, malformed/excessive ports, safe errors, 30-second timeout, abort,
+  discarded late results and the actual unbound formal GET.
+- TypeScript, zero-warning lint, formal build, 32-chunk client scan and 73-file
+  adapter sync pass. Current-session importer allowlist expanded by one exact
+  default-off server module; privileged-client imports remain forbidden.
+- Existing SQL matrix: 118 passed; browser startup: 74 passed. The source-routed
+  owned app uses the new adapter. English/Traditional navigation, current saved
+  draft and revoked refresh/login passed; a foreign-cookie HTTP request returned
+  empty lists. Review remained REQUIRED and export controls disabled.
+- No browser warning/error; owned build's 39 chunks also passed the new marker
+  scan. Exact-socket Advisors: no issues. Browser reads left 30/0 Points, zero
+  jobs/admissions/reserves/settlements/reviews/edits/sync/export reports.
+- Both owned roots and tab 33 cleaned. No SQL, permission, Hosted, environment,
+  actual AI, push or deployment change. Physical task-port cleanup is the next
+  local implementation, not attested by a runtime port's labels.
+- [Adapter scope and evidence](communication-note-product-integration-m1y.md#communication-note-read-only-workspace-database-adapter-2026-09-08).
+
+### Communication Note task-list physical cancellation and cleanup (2026-09-08)
+
+- New server-only list-purpose PostgreSQL port: one use, fixed seven parameters,
+  owner/session binding, PG17 direct/pinned TLS or explicit owned PG16 Unix test
+  constructor. No ambient credentials, generic query, pool or status-purpose
+  reuse. Formal runtime remains undefined; readiness remains false.
+- Same low-privilege LOGIN has at most two connections. Its independent cleanup
+  connection checks exact own-backend termination/absence before metadata can
+  return. Read deadline 10 seconds; cleanup deadline 4.5 seconds survives abort.
+  Cleanup failure/late result is unavailable, not partial success.
+- Full **5,130 passed / 24 skipped**, 302 files. Added 51 unit cases and one
+  boundary case. Two exact pg importer allowlists gained only this server file;
+  no formal source importer or privileged fallback was allowed.
+- Explicit `CARESLINK_TASK_POSTGRES_LOCAL=OWNED_UNIX_ONLY` opt-in: **12 passed**
+  actual-source PG16 cases after 118 existing fixture cases. Owner metadata,
+  microsecond pagination, owner isolation, revoked/expired sessions, real lock
+  cancellation/timeout, lost cleanup connection, unrelated-session survival,
+  extra membership/table denial and HTTP-core composition pass. HTTP Cookie
+  Auth/document replies are mocked; task SQL and session locks are real.
+- Every transport case leaves zero runtime sessions and unchanged ledger,
+  reservations, jobs, reviews and edits. Cancelled read has zero PID locks while
+  the blocker remains alive. Owned test LOGINs and both temporary databases were
+  removed after shutdown; this is not production credential revocation evidence.
+- TypeScript, zero-warning lint, webpack build (63 generated entries), expanded
+  117-chunk client scan, 73-file adapter sync and diff checks pass. No new browser
+  evidence or PG17/Hosted TLS execution is claimed. No migration, online role,
+  binding, deployment or actual model/payment change.
+- Delivery expiry is not source-password revocation. Issuance/custody/Hosted
+  activation remain separate. Next: wire this port into the owned workspace
+  browser fixture and verify actual page reads/cancellation.
+- [Physical read boundary and evidence](communication-note-product-integration-m1y.md#communication-note-task-list-physical-cancellation-and-cleanup-2026-09-08).
+
+### Communication Note dedicated task port in the local workspace (2026-09-08)
+
+- Owned page now uses the actual source physical port through an isolated local
+  delivery module. The admission bridge no longer accepts list SQL and its
+  disposable LOGIN no longer has list-caller membership. Formal binding stays
+  undefined; no Hosted grants, production component or design changes.
+- Full **5,143 passed / 24 skipped**, 303 files; 13 new delivery tests; focused
+  fixture set **98 passed**. Existing real PG16 matrix **118 passed** with the
+  dedicated role guards. TypeScript, zero-warning lint, formal webpack build,
+  117/39-chunk formal/owned client scans, adapter sync and diff checks pass.
+- Actual page: empty initial tasks → 25 synthetic rows → English **20/5** pages,
+  25 unique links, identical latest-page return and refresh; Traditional **20/5**
+  and Simplified recovered **20**. Open FAILED task → same-language workspace →
+  current seed draft v1 REQUIRED / exports disabled; no confirmation/export.
+- Real locked task read + language navigation: backend disappeared in ~480 ms,
+  zero locks while blocker stayed held, source port `aborted:true`. Fault-time
+  new read failed closed; explicit unlock/refresh recovered. Session revocation
+  and refresh cleared lists and displayed sign-in. Browser warnings/errors [].
+- Security Advisors: no issues on exact owned Unix database. Browser reads left
+  post-seed synthetic Points/events unchanged (10/0 Points, three admissions,
+  seven ledger entries, 25 jobs, zero reviews/exports; setup receipt/sync = 1/1).
+  Twenty-two extra catalog rows did not generate or reserve anything.
+- Roots `2dTRkQ` and `tCDbP2` stopped/removed, tracked source unchanged, tab 34
+  closed. The latter SIGINT run could not confirm individual LOGIN cleanup;
+  whole-cluster disposal was confirmed. No Hosted credential revocation claim.
+- Next local slice: dedicated task credential issuance/revocation. Existing
+  fixture-lifetime source password reuse is not production custody evidence.
+- [UI integration scope and evidence](communication-note-product-integration-m1y.md#communication-note-dedicated-task-port-in-the-local-workspace-2026-09-08).
+
+### Communication Note local single-use task credentials (2026-09-08)
+
+- Replaces the previous fixture-lifetime task password with per-read issuance
+  and verified revocation. Parent-only Unix issuer, private RLS tombstones,
+  exactly list-purpose privileges; no operator in Next, no formal activation.
+- Full **5,148 passed / 34 skipped**, 304 files. Bridge **18 tests**, bridge plus
+  projection **44 passed**. Explicit real-PG credential suite **10 passed** plus
+  the existing **118** setup scenarios; opt-in command:
+  `CARESLINK_TASK_CREDENTIAL_LOCAL=OWNED_UNIX_ONLY npx vitest run scripts/browser-e2e/communication-note-task-credential.local.test.mjs`.
+- Covers concurrent one-time delivery/replay rejection, live Auth checks, scope
+  and capacity limits, two-session revoke/zero locks, old-password rejection,
+  real source-read cancellation, real 60-second orphan expiry, failed-revoke
+  receipt withholding and issuance shutdown. Business-state snapshot unchanged.
+- Actual browser: English 20/5 and 25 unique links; locked navigation cancellation
+  ~273 ms, zero locks, confirmed revoke; Simplified/Traditional recovery to 20;
+  revoked session clears lists. Final seven revoked receipts, zero roles,
+  sessions and locks. Console errors/warnings empty, security Advisors clean.
+- TypeScript, full lint, webpack build, 117/39 client chunks and adapter sync
+  pass. Owned PG/process/root removed, tab 35 closed, port 3395 free. No push,
+  deploy, model call or Production modification. Early SQL parameter ambiguity
+  was fixed and its failed fixtures cleaned; not counted as a passing attempt.
+- [Lifecycle limits and next formal adapter](communication-note-product-integration-m1y.md#communication-note-local-single-use-task-credentials-2026-09-08).
+  Crash recovery, external expiry supervision, managed custody and Hosted
+  activation are not established by this local evidence.
+
+### Communication Note default-off server task lease adapter (2026-09-09)
+
+- New lifecycle **84 passed**; with owned bridge **102 passed**. Full suite:
+  **5,232 passed / 34 skipped**, 305 files. Covers exact receipts and credentials,
+  input tampering, one-use concurrency, falsy failures, independent cancellation,
+  deadlines/late replies, reference clearing, clock freshness and non-installation.
+- Existing opt-in real PG16 suite now calls the actual adapter: **10 passed**,
+  with 118 setup scenarios. Real cancellation, lock/session removal, old-password
+  denial, 60-second orphan expiry and failed-revoke withholding passed. Business
+  snapshot unchanged; fixture stopped/removed. No new browser/Hosted claim.
+- TypeScript/full lint, formal webpack build (63 entries), client boundary
+  (117 chunks), 73-file adapter sync and diff checks passed. No migration,
+  production activation, model call, push/PR or deployment.
+- Recovered missing temporary worktree files without overwriting survivors;
+  development now uses the persistent project worktree, with the same dependency
+  lock and build tracing pinned to the AI app's own directory.
+- [Evidence and custody obligations](communication-note-product-integration-m1y.md#communication-note-default-off-server-task-lease-adapter-2026-09-09).
+
+### Communication Note supervised local credential recovery (2026-09-09)
+
+- Policy suite **26 passed**; full suite **5,258 passed / 41 skipped**, 307 files.
+- Opt-in recovery suite **7 passed**, repeated after final process-exit/reason
+  assertions. Real SIGKILL at issuance commit/revoke barrier/uncommitted DROP;
+  real SIGSTOP; 60-second expiry with the issuer timers suppressed; singleton
+  rejection; changed-OID startup failure without harming a same-prefix canary.
+  Command:
+  `CARESLINK_TASK_CREDENTIAL_RECOVERY_LOCAL=OWNED_UNIX_ONLY pnpm exec vitest run scripts/browser-e2e/communication-note-task-credential-recovery.local.test.mjs --bail 1`.
+- Existing real credential suite **10 passed**, with 118 setup scenarios.
+  Business snapshot unchanged, all owned databases and processes disposed.
+- TypeScript/full lint, webpack (63 entries), client boundary (117 chunks),
+  73-file adapter sync and diff checks passed. Security Advisors on the exact
+  owned Z693AB Unix socket found no issues.
+- No new browser, Hosted, supervisor-host-crash or PG-crash claim. Formal
+  runtime stays off; no product migration, model call, push/PR or deployment.
+- [Detailed limits and next built-page acceptance](communication-note-product-integration-m1y.md#communication-note-supervised-local-credential-recovery-2026-09-09).
+
+### Communication Note supervised browser acceptance — partial (2026-09-09)
+
+- Source `2a20b15`; owned PG16 fixture `cl-job-browser-2d1fYR`, built Next on
+  127.0.0.1:3395, temporary browser tab 36. No application source changes.
+- Browser passed initial empty tasks, 20 + 5 disjoint pagination for 25 tasks,
+  successful job → exact saved revision, three-locale review page and return
+  navigation. Green Logo unchanged; console warnings/errors empty.
+- Review boxes stayed unchecked and all four exports stayed disabled. No
+  browser edit, export, review confirmation or new admission was submitted.
+- Fixed parent seed alone produced 10 available / 0 reserved Points; actual
+  composer agreed and displayed insufficient balance for a 20-Point admission.
+  Pre-fault business observations matched the seed baseline: 7 ledger entries,
+  3 admissions/reserves/terminals, 25 jobs, 0 review/export events, setup-only
+  edit/sync counts 1/1. Completed task reads revoked; snapshots had zero runtime
+  roles/sessions/locks. Owned client-boundary check passed 39 chunks.
+- Under the intentional jobs lock, page-leave cancellation removed the reader
+  and locks in 258 ms and logged `aborted:true, revoked:true, returned:false`.
+  The replacement read timed out under the same blocker in 993 ms, revoked and
+  rendered a safe unavailable message without stale tasks/drafts.
+- **Incomplete:** operator sent `task-status` before `task-unlock`; its jobs
+  count conflicts with the test lock, while serial stdin ordering prevents the
+  later unlock from running first. Generic control failure triggered disposal.
+  Underlying SQLSTATE was not exposed; this is a source-supported orchestration
+  diagnosis, not a new application defect or a completed recovery gate.
+- Stop rule honored. Cleanup proved active leases 0, PG stopped, exact root
+  removed, source unchanged; independent port/process checks were empty and
+  only tab 36 was closed. Post-fault business snapshot/session-revoke recovery
+  and a full-suite rerun are not claimed.
+- Next: unlock-before-status, refresh recovery, fixed session-revoke boundary
+  and final unchanged-business/zero-residual checks on fresh synthetic data.
+- [Evidence and corrected sequence](communication-note-product-integration-m1y.md#communication-note-supervised-browser-acceptance--partial-2026-09-09).
+
+### Communication Note supervised browser recovery tail — passed (2026-09-09)
+
+- Source `4d80230`, same application/scripts as `2a20b15`; existing built
+  `--workspace-task` fixture, owned root `cl-job-browser-d4wlG9`, tab 37.
+- Old read cancellation removed locks in 253 ms, revoked and returned no data.
+  Replacement read timed out under the intentional blocker in 1,003 ms and
+  safely cleared both lists. Unlock completed before any table-count status
+  command; refresh recovered the identical ordered 20-item first page.
+- Fixed synthetic session revoke then refresh produced the Simplified Chinese
+  login URL with the correct next path, zero task/draft links and no new lease.
+  Fixed fixture session restoration recovered the same tasks and three drafts;
+  no real sign-in or credential entry is claimed.
+- Final database baseline unchanged: 10/0 Points, seven ledger entries, three
+  admissions/reserves/terminals, 25 tasks, zero reviews/exports, setup-only
+  edit/sync 1/1. Six receipts all REVOKED; roles/sessions/locks zero. Final test
+  balance UI agreed. Browser warning/error logs remained empty.
+- Owned webpack/39-chunk scan passed; no new full-suite/formal-build/advisors
+  claim. Safe parent termination and independent checks confirmed root gone,
+  3395 free, owned processes absent and source unchanged. Only tab 37 closed.
+- Previous interrupted local acceptance is now complete at the same app
+  revision. Formal runtime, live Auth/custody, Hosted and release gates remain
+  open; no deployment, real model, payment or Production action.
+- [Completed recovery tail and next app navigation slice](communication-note-product-integration-m1y.md#communication-note-supervised-browser-recovery-tail--passed-2026-09-09).
+
+### Communication Note workspace ↔ Points navigation (2026-09-09)
+
+- Full suite: 5,291 passed / 41 skipped, 304 passing / four opt-in skipped files;
+  full lint/typecheck, owned webpack build and 40-chunk client scan passed.
+- Locale-only navigation helper, safe pending-auth roundtrip, server boolean
+  opt-in, default-off/non-multi entry, all four Points states, real-zero versus
+  unavailable, query injection/duplicates, demo isolation and legacy behavior
+  have regression coverage. Exact server importer allowlist remains enforced.
+- Actual source workspace and Points pages in owned local PG16/Next fixture:
+  English/Simplified/Traditional Chinese roundtrips; Traditional Chinese
+  explicit English fallback survives refresh and language switching. At 390px,
+  no horizontal overflow and 44px entry/return targets. Return freshly loaded
+  two synthetic drafts; browser warning/error logs were empty.
+- Points runtime was deliberately not bound: browser showed UNAVAILABLE, not
+  fabricated zero or the separate synthetic admission wallet. No real Auth,
+  live Points balance, Hosted gate or full formal-app build is claimed here.
+- Final database counters: 30/0 synthetic Points, one setup ledger entry,
+  zero admissions/reservations/terminals/jobs/reviews/edits/sync; six revoked
+  read receipts, zero runtime roles/sessions/locks. Owned root/server/PG/tab 38
+  removed and viewport reset; source isolation verified. No Production changes.
+- [Implementation and next composer entry](communication-note-product-integration-m1y.md#communication-note-workspace-to-points-navigation-2026-09-09).
+
+### Composer Points entry and leave guard: browser tail pending (2026-09-09)
+
+- 5,308 tests passed, 41 skipped (305 passing / four skipped files); full lint,
+  typecheck, 73-file adapter sync, owned webpack and 40-chunk boundary scan pass.
+- Added all-field dirty detection and three-locale discard/uncertain-request
+  tests; cancellation preserves exact retry bytes/key, accepted links avoid
+  double prompts, ACK navigation is allowed, and pagehide/persisted return clear
+  page-only state without another request. Existing I/O-free client checks pass.
+- Browser confirmed sufficient balance hides the new entry and fixed-seed
+  insufficiency displays it. Clicking after synthetic input stalled the browser
+  connection; dialog handle and screenshot could not establish the outcome.
+  Actual cancel/accept, Back/refresh and narrow-layout tail are **not passed**.
+- Final seed counters unchanged: 10/0 Points, seven ledger entries, three
+  admissions/reserves/terminals, 25 jobs; review/export zero, setup edit/sync 1/1.
+  Runtime roles/sessions/locks/receipts zero. Owned PG/server/root removed and
+  source isolation verified, but a fresh inventory still listed test tab 39.
+- [Pending supervised browser tail](communication-note-product-integration-m1y.md#communication-note-composer-points-entry-and-leave-guard-2026-09-09).
+
+Follow-up on `96603be`: old tab 39 was cleared and closed. A fresh owned fixture
+passed startup matrices/build/client scan and all three locale empty-form Points
+round trips. Screenshots and DOM measurements confirmed 390px document width
+and 44px link height in all three languages; Traditional Chinese retained its
+explicit English fallback and original workspace return language. This does
+not cover dirty-input dismissal. No full-suite rerun or product edit occurred.
+
+Later browser-control timeouts stopped the session. Native cancel/accept, dirty
+refresh and post-discard Back are still pending; tab 40 close and viewport
+restore are unconfirmed. Parent 1275 cleanup removed the owned PG/server/root
+`/private/tmp/cl-job-browser-iBrg48`, with source isolation and zero active leases
+verified. Database counters stayed at the same 10/0 seed baseline. See
+[exact follow-up evidence and remaining cleanup](communication-note-product-integration-m1y.md#composer-points-browser-follow-up-2026-09-09).
+
+Supervised handoff: tab 40 is now absent and default viewport reset succeeded.
+The unmodified fixture at `/private/tmp/cl-job-browser-BcF6NH` is running for
+visible tab 41, with one synthetic contact-channel input. Startup matrices,
+build/client scan and unchanged seed counters passed again. Native Cancel is
+awaiting user observation; do not mark it passed or claim this new fixture
+cleaned. Cleanup ownership is recorded in the integration handoff note.
+
+Interruption/retry update: that stopped fixture was subsequently removed and
+tab 41 was absent. The user-requested retry retained tab 42 on the new unchanged
+`/private/tmp/cl-job-browser-CZRJ8M` fixture (parent 6713, terminal 3371).
+Its startup/build/client scan and fixed seed counters passed. An actual dirty-
+input Points click timed out, with no dialog handle. Subsequently, the synthetic
+input was refilled and visually confirmed; the user manually reported no dialog,
+and browser inspection confirmed direct navigation to Points. **Dirty-input leave
+warning: failed on the observed path**, not merely pending automation support.
+The precise cause remains undetermined; cancel preservation, dirty refresh and
+post-discard Back remain unproved. No product code was changed in this observation.
+Verification stopped and fixed cleanup passed (zero active leases, PostgreSQL
+stopped, owned root removed, source hashes unchanged). Independent checks found
+the owned root/processes/3395 listener absent; owned tab 42 was closed. Final
+pre-cleanup counters remained 10/0 with zero runtime roles/sessions/locks and four
+REVOKED task receipts. Proposed next step is an in-page confirmation repair and
+new cancel/accept evidence; do not repeat the unchanged native-dialog test.
+
+### Page-owned composer leave confirmation repair (2026-09-09)
+
+- 5,316 passed / 41 skipped tests, typecheck and targeted ESLint passed; adapter
+  sync checks 73 files. Owned webpack build and 40-chunk boundary scan passed.
+- Replaced native confirm mocks with dialog opening/cancel/accept assertions,
+  initial/return focus, Escape cancellation, exact locked retry preservation,
+  single navigation, modifier/new-tab exclusions and Tab/Shift+Tab wrapping.
+- Final browser build passed dirty-input cancel/accept/Back for English, Simplified
+  Chinese and Traditional Chinese. The latter retains the explicit English Points
+  fallback and original return locale. All 390px dialogs fit at 352px with 44px
+  buttons. Actual Enter/Escape and both focus-wrap directions passed; warning/error
+  logs were empty. This does not claim screen-reader certification.
+- The first keyboard check found a focus-wrap defect; it was fixed and rebuilt.
+  An English DOM/AX readout returned empty despite visible retained input; before/
+  after screenshots established retention and actual clearing after discard.
+  Do not use that inconsistent empty readout alone as evidence of data loss.
+- Both local-only fixtures were cleaned with zero active leases and unchanged
+  tracked source. Their roots/processes/listener are absent; owned tabs are closed
+  and viewport reset. Final seed counters stayed 10/0 with no browser generation,
+  new business writes or model calls. No hosted/Production change or deployment.
+- Native refresh/tab-close acceptance was separate from this repair run; see the
+  subsequent desktop Safari evidence below.
+- Local pre-commit review re-ran the same product source: 5,316 passed / 41 skipped,
+  typecheck, full ESLint, 73-file adapter sync and whitespace checks passed. No
+  blocking finding or new product edit; existing browser evidence was retained.
+  The local-only commit includes six implementation/test files and these three
+  evidence documents. No push, deployment or new temporary environment is in scope.
+- [Detailed repair and cleanup evidence](communication-note-product-integration-m1y.md#page-owned-composer-leave-confirmation-repair-2026-09-09).
+
+### Safari native composer departure acceptance (2026-09-09)
+
+- On `6ff5871`, native Cmd+R / Cmd+W each showed Safari's confirmation after actual
+  synthetic field input. Cancel retained exact input; accepted refresh cleared it;
+  accepted close removed only the owned tab. AX and screenshots corroborated results.
+- Fixed local fixture matrices 54/12/8, build/typecheck and 40-chunk scan passed.
+  Browser Points stayed 30/0; no generation or review was submitted. Cleanup exited
+  zero with no leases, PostgreSQL stopped, root removed and tracked source unchanged;
+  independent root/process/3395 checks passed. Original Safari tabs were restored.
+- Scope: desktop Safari dirty input only, not other browsers/mobile, force-quit or
+  pending requests. Product code and existing 5,316-test evidence are unchanged;
+  the full suite was not rerun for this documentation-only addition.
+- Next: review and local evidence commit; no push, deployment or runtime activation.
+- [Detailed native acceptance](communication-note-product-integration-m1y.md#safari-native-composer-departure-acceptance-2026-09-09).
+
+### Traditional Chinese Points page (2026-09-09)
+
+- 5,334 tests passed / 41 skipped, typecheck, full ESLint, 73-file adapter sync,
+  owned webpack build and 40-chunk client scan passed. Coverage includes four
+  balance states, zero/formatting, nine locale pairs, auth returns and invalid input.
+- In-app browser switching/reload/workspace return and re-entry passed. The new
+  Traditional Chinese page replaces the prior English fallback; the unavailable
+  state remains honest. Eight widths from 320 to 1440px had no overflow; mobile
+  language targets were 44px and captured warning/error logs were empty. Other
+  balance/auth states have rendered-test coverage, not live auth acceptance.
+- Both disposable fixtures were cleaned with no leases and unchanged source;
+  owned roots/processes/listener are absent, tab closed and viewport reset. No
+  runtime activation, model call, hosted/Production write, push or deployment.
+- Pre-commit review exposed a pre-existing 1ms expiry-test clock race. Freezing
+  the invalid-factory test clock preserves the rejection/no-I/O assertions without
+  changing product expiry logic. Its 51 tests and the full 5,334-test suite passed,
+  followed by typecheck/lint/adapter checks. Same-product browser evidence stands;
+  the local commit includes this two-line stabilization and no new fixture.
+- [Detailed localization evidence](communication-note-product-integration-m1y.md#traditional-chinese-points-page-2026-09-09).
+
 ### Current live/read-only evidence
 
 - Supabase migrations, tables, RLS flags, policies, grants, function grants and aggregate row counts were checked read-only.
@@ -3849,7 +5310,7 @@ The following suites are required before the corresponding V1 slice can be calle
 1. The native App exists in a separate repository and is outside this task; this AI repository does not execute or attest its iOS/Android, offline, purchase or store gates.
 2. The OpenAPI/TypeScript contract and default-off durable `/v1` route adapter now exist, but there is no Preview- or Production-served Product API, generated client package, schema registry or previous-version compatibility fixture.
 3. The registration-retention source worktree passed its historical 1,381 tests across 125 files and all three focused migration contracts 39/39, with the `r21` 1,377-test / 124-file result, the `r9` 1,337-test / 122-file result and earlier baselines retained. The strict-local harness batch subsequently passed 1,400 tests across the same 125 files. All five Note types share a Production-unapplied private metadata/RPC layer with nine worker RPC identities, three newer owner RPC identities and one separately owned graceful-retirement control identity, but no caller execute grant. Deleted PostgreSQL 17.6 disposable `r9` proved the exact 14-migration, seven-suite and independent postcheck gate; deleted `r20` closed the PostgreSQL 17.6 true two-session claim/session/privacy race gate; deleted `r21` closed Attempt 1 historical replay across Attempt 2 success and post-purge state; deleted `r22` closed the hosted registration historical-retention gate with the exact 15/15 manifest, 7/7 suites and independent postcheck. The earlier disposable local PostgreSQL 16.15 gate closed its recorded engine, serial and true-two-session path with 27/27 repository migrations, exact V1 15/15, 7/7 suites and 3/3 races. The later owner-runtime PG16.15 run passed the new owner, additive-aware worker and durable rollback suites, independent posture postcheck and auth-session lock-wait race; #1-#24 and #26-#28 applied non-super, including fresh exact final #28, while #25 remained an explicit bootstrap-superuser transition. Migration #29 supplies graceful retirement with 14 forced-RLS tables. Its local strict rollback assertion passed inside the final clean 29/29 migration, 9/9 aggregate, independent posture and two-ordering retirement/claim race gate. Deleted Hosted r5 subsequently passed the exact 30/30 migration manifest, all 11 rollback suites and the independent owner/role/RLS/ACL/hard-off/zero-fixture postcheck. No worker/owner Preview or local cluster is retained. The five types still lack emergency revocation, attempt listing, a deployed worker, nested exact-key database vectors, account-delete/purge and orphan recovery, provider-start binding, safe sequential numeric parsing, real vault/KMS/retention, caller credentials/grants/routes, hosted GoTrue/PostgREST, real provider/model/STT integration and complete per-type golden sets; runtime activation remains open.
-4. Canonical document/revision/checkpoint states exist as memory/domain contracts plus historical isolated schema/RPC evidence and a Production-unapplied mobile-sync migration draft that was clean-applied only on a deleted disposable branch; there is no retained schema activation, editor, renderer or cross-device recovery E2E.
+4. Canonical document/revision/checkpoint states exist as memory/domain contracts plus historical isolated schema/RPC evidence and a Production-unapplied mobile-sync migration draft that was clean-applied only on a deleted disposable branch. Communication Note now has a local result renderer, wording editor, real-local-PostgreSQL self-review/edit/export-history browser roundtrips, uninstalled durable wording-edit and export-history candidates, and a minimal current-reviewed-revision Copy/TXT/DOCX/PDF profile. The history UI has both explicitly process-memory-only and owned disposable real-database evidence, including refresh, revision isolation and session revocation. Native Safari cross-app paste and actual TXT/DOCX/PDF save/open passed the bounded 2026-09-08 synthetic gate; DOCX opened in TextEdit, so Microsoft Word compatibility remains pending alongside native discard-confirmation navigation. There is still no formal durable edit/history activation, retained schema activation, Hosted history browser roundtrip, bilingual/historical export or cross-device recovery E2E.
 5. Points lots/rates/reservations remain shadow-only. Communication Note now has
    local PG16 proof for fixed 20-Point atomic admission/reservation and terminal
    commit/release, including retry, replay, cancellation and recovery

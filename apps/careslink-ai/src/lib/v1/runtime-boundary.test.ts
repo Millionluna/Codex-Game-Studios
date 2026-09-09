@@ -142,7 +142,7 @@ describe("V1 shadow runtime boundary", () => {
       (file) =>
         file !== featureModule &&
         readFileSync(file, "utf8").includes("points-ui-feature.server"),
-    );
+    ).sort();
     const pointsPageDataImporters = sourceFiles.filter(
       (file) =>
         file !== pointsPageDataModule &&
@@ -155,6 +155,7 @@ describe("V1 shadow runtime boundary", () => {
     expect(featureImporters).toEqual(
       [
         "src/app/ai-documents/communication-note/page.tsx",
+        "src/app/ai-documents/communication-note-workspace-page.tsx",
         "src/app/ai-documents/page.tsx",
         "src/app/api/template-companion/events/route.ts",
         "src/app/api/template-companion/ndis-case-note/route.ts",
@@ -897,7 +898,11 @@ describe("V1 shadow runtime boundary", () => {
             readFileSync(file, "utf8"),
           ),
       ),
-    ).toEqual([modulePath]);
+    ).toEqual([
+      join(process.cwd(), "src/lib/communication-note-workspace-task-postgres.server.ts"),
+      join(process.cwd(), "src/lib/v1/communication-note-job-status-postgres.server.ts"),
+      modulePath,
+    ]);
     expect(source).toMatch(/^import "server-only";/);
     expect(source).toContain('import { Client as PgClient } from "pg";');
     expect(source).not.toMatch(
@@ -910,6 +915,18 @@ describe("V1 shadow runtime boundary", () => {
     expect(source).toContain(
       "SOURCE_PRODUCT_RUNTIME_COMPOSITION_NOT_ACTIVATED",
     );
+  });
+
+  it("keeps the new task physical reader server-only and absent from formal runtime imports", () => {
+    const file = join(process.cwd(), "src/lib/communication-note-workspace-task-postgres.server.ts");
+    const source = readFileSync(file, "utf8");
+    expect(source).toMatch(/^import "server-only";/);
+    expect(source).toContain("COMMUNICATION_NOTE_TASK_POSTGRES_READY = false as const");
+    expect(source).not.toMatch(/process\.env|import\.meta\.env|connectionString\s*:|\bnew\s+(?:\w+\.)?Pool\s*\(|fetch\s*\(|console\.|job-status-(?:custody|purpose|postgres)|pg_signal_backend\s+to/i);
+    expect(walkAllScriptFiles("src").filter(path => !/\.test\.[cm]?[jt]sx?$/.test(path) &&
+      /(?:from\s+|import\s*\()["'][^"']*communication-note-workspace-task-postgres\.server["']/.test(readFileSync(path, "utf8")))).toEqual([]);
+    expect(readFileSync(join(process.cwd(), "src/lib/communication-note-workspace-runtime.server.ts"), "utf8"))
+      .toMatch(/COMMUNICATION_NOTE_WORKSPACE_FORMAL_RUNTIME\s*=\s*undefined/);
   });
 
   it("quarantines the M1s Product runtime identities to its own test and forbids ambient authority", () => {
@@ -1017,7 +1034,7 @@ describe("V1 shadow runtime boundary", () => {
     );
   });
 
-  it("quarantines the M1u GCP provider adapters to its own test and forbids ambient cloud authority", () => {
+  it("quarantines M1u GCP provider adapters to audited server type wiring/tests and forbids ambient cloud authority", () => {
     const relativePath =
       "src/lib/v1/communication-note-preview-product-runtime-gcp-adapters.server.ts";
     const modulePath = join(process.cwd(), relativePath);
@@ -1037,6 +1054,7 @@ describe("V1 shadow runtime boundary", () => {
 
     expect(importers).toEqual([
       testPath,
+      join(process.cwd(), "src/lib/v1/communication-note-job-status-custody.server.ts"),
       join(
         process.cwd(),
         "src/lib/v1/communication-note-preview-product-runtime-provider-bridges-m1v.server.test.ts",
@@ -1269,7 +1287,19 @@ describe("V1 shadow runtime boundary", () => {
     expect(handlerSource).toContain(
       "communication-note-generation-principal-composition",
     );
-    expect(testOnlyFactoryImporters).toEqual([handlerTestPath]);
+    const flowFixturePath = join(process.cwd(), "scripts/browser-e2e/communication-note-flow.fixture.ts");
+    const admissionFixturePath = join(process.cwd(), "scripts/browser-e2e/communication-note-admission.fixture.ts");
+    expect(testOnlyFactoryImporters).toEqual([handlerTestPath, flowFixturePath, admissionFixturePath].sort());
+    const admissionFixtureSource = readFileSync(admissionFixturePath, "utf8");
+    expect(admissionFixtureSource).toContain('import "server-only"');
+    expect(admissionFixtureSource).toContain("assertReviewDatabaseFixture()");
+    expect(admissionFixtureSource).toContain('CARESLINK_LOCAL_ADMISSION_DATABASE !== "OWNED_UNIX_SOCKET_ONLY"');
+    expect(admissionFixtureSource).not.toMatch(/openai-communication-note-provider|service_role|globalThis\.fetch/);
+    const flowFixtureSource = readFileSync(flowFixturePath, "utf8");
+    expect(flowFixtureSource).toMatch(/^\/\*\*[\s\S]*?import "server-only";/);
+    expect(flowFixtureSource).toContain("assertReviewDatabaseFixture()");
+    expect(flowFixtureSource).toContain('CARESLINK_LOCAL_FLOW_FIXTURE !== "FIXED_SYNTHETIC_ONLY"');
+    expect(flowFixtureSource).not.toMatch(/openai-communication-note-provider|note-generation-owner-repository|service_role|\.query\(/);
     expect(principalCompositionImporters).toEqual(
       [handlerPath, handlerTestPath, principalCompositionTestPath].sort(),
     );
@@ -1288,6 +1318,15 @@ describe("V1 shadow runtime boundary", () => {
     expect(privilegedClientFactoryImporters).toEqual([]);
     expect(currentSessionImporters).toEqual(
       [
+        // Dedicated, default-off writer candidate; no formal route importer.
+        join(process.cwd(), "src/lib/communication-note-edit-durable.server.ts"),
+        // Dedicated history read/write candidate; both formal routes stay unbound.
+        join(process.cwd(), "src/lib/communication-note-export-history-durable.server.ts"),
+        // Fixed, server-only loopback fixture; no additional product importer.
+        join(
+          process.cwd(),
+          "scripts/browser-e2e/communication-note-self-review.fixture.ts",
+        ),
         join(
           process.cwd(),
           "src/lib/communication-note-generation-current-session.server.test.ts",
@@ -1302,6 +1341,16 @@ describe("V1 shadow runtime boundary", () => {
           process.cwd(),
           "src/lib/communication-note-generation-principal.server.test.ts",
         ),
+        join(
+          process.cwd(),
+          "src/lib/communication-note-job-recovery-composition.server.ts",
+        ),
+        join(
+          process.cwd(),
+          "src/lib/communication-note-self-review-durable.server.ts",
+        ),
+        // Read-only, default-off workspace adapter; formal runtime stays absent.
+        join(process.cwd(), "src/lib/communication-note-workspace-durable.server.ts"),
       ].sort(),
     );
     expect(principalCompositionSource).toMatch(/^import "server-only";/);
@@ -1334,6 +1383,71 @@ describe("V1 shadow runtime boundary", () => {
     expect(envExampleSource).not.toContain(
       "CARESLINK_COMMUNICATION_NOTE_SESSION_STATUS_PREVIEW_SECRET_KEY",
     );
+  });
+
+  it("keeps the independent job recovery composition server-only and uninstalled", () => {
+    const compositionPath = join(process.cwd(), "src/lib/communication-note-job-recovery-composition.server.ts");
+    const compositionTestPath = join(process.cwd(), "src/lib/communication-note-job-recovery-composition.server.test.ts");
+    const boundaryPath = join(process.cwd(), "src/lib/v1/runtime-boundary.test.ts");
+    const readerPath = join(process.cwd(), "src/lib/communication-note-generation-job-recovery.server.ts");
+    const source = readFileSync(compositionPath, "utf8");
+    expect(source).toMatch(/^import "server-only";/);
+    expect(source).toContain("COMMUNICATION_NOTE_JOB_RECOVERY_COMPOSITION_READY = false");
+    expect(source).not.toMatch(/process\.env|service_role|sb_secret_|from ["']pg["']|openai-communication-note-provider|createTestOnly|GENERATION_API_ENABLED|POINTS_UI_ENABLED/);
+    expect(walkControlledScriptFiles().filter(file =>
+      file !== compositionPath && file !== boundaryPath &&
+      readFileSync(file, "utf8").includes("communication-note-job-recovery-composition"),
+    )).toEqual([
+      join(process.cwd(), "scripts/browser-e2e/communication-note-recovery.fixture.ts"),
+      compositionTestPath,
+      join(process.cwd(), "src/lib/v1/communication-note-job-status-custody.server.ts"),
+      join(process.cwd(), "src/lib/v1/communication-note-job-status-postgres.local.test.ts"),
+    ]);
+    expect(walkControlledScriptFiles().filter(file =>
+      file !== readerPath && file !== boundaryPath &&
+      /createCommunicationNoteGenerationJobRecovery(?:Reader|Handler)/.test(readFileSync(file, "utf8")),
+    )).toEqual([compositionPath]);
+    const route = readFileSync(join(process.cwd(), "src/app/api/ai-documents/communication-note/jobs/[jobId]/route.ts"), "utf8");
+    expect(route).not.toContain("communication-note-job-recovery-composition");
+    const postgresPath = join(process.cwd(), "src/lib/v1/communication-note-job-status-postgres.server.ts");
+    const postgresSource = readFileSync(postgresPath, "utf8");
+    expect(postgresSource).toMatch(/^import "server-only";/);
+    expect(postgresSource).toContain("COMMUNICATION_NOTE_JOB_STATUS_POSTGRES_READY = false");
+    expect(postgresSource).not.toContain("process.env");
+    expect(walkControlledScriptFiles().filter(file =>
+      file !== postgresPath && file !== boundaryPath &&
+      readFileSync(file, "utf8").includes("communication-note-job-status-postgres.server"),
+    )).toEqual([
+      join(process.cwd(), "src/lib/v1/communication-note-job-status-custody.server.ts"),
+      join(process.cwd(), "src/lib/v1/communication-note-job-status-postgres.local.test.ts"),
+      join(process.cwd(), "src/lib/v1/communication-note-job-status-postgres.server.test.ts"),
+      join(process.cwd(), "src/lib/v1/communication-note-job-status-preview-issuer.server.test.ts"),
+      join(process.cwd(), "src/lib/v1/communication-note-job-status-preview-issuer.server.ts"),
+      // The other boundary audit names this module in its exact pg-import list.
+      join(process.cwd(), "src/lib/v1/communication-note-preview-product-runtime-composition.server.test.ts"),
+    ]);
+    const issuerPath=join(process.cwd(), "src/lib/v1/communication-note-job-status-preview-issuer.server.ts");
+    const issuerSource=readFileSync(issuerPath,"utf8");
+    expect(issuerSource).toMatch(/^import "server-only";/);
+    expect(issuerSource).toContain("JOB_STATUS_PREVIEW_ISSUER_READY = false");
+    expect(issuerSource).not.toContain("process.env");
+    expect(walkControlledScriptFiles().filter(file=>file!==issuerPath && file!==boundaryPath &&
+      readFileSync(file,"utf8").includes("communication-note-job-status-preview-issuer.server"))).toEqual([
+      join(process.cwd(), "src/lib/v1/communication-note-job-status-custody.server.ts"),
+      join(process.cwd(), "src/lib/v1/communication-note-job-status-preview-issuer.server.test.ts"),
+      join(process.cwd(), "src/lib/v1/communication-note-preview-product-runtime-gcp-adapters.server.test.ts"),
+    ]);
+    const custodyPath = join(process.cwd(), "src/lib/v1/communication-note-job-status-custody.server.ts");
+    const custody = readFileSync(custodyPath, "utf8");
+    expect(custody).toMatch(/^import "server-only";/);
+    expect(custody).toContain("JOB_STATUS_CUSTODIED_RECOVERY_READY = false");
+    expect(custody).toContain('import type { createTestOnlyCaresLinkV1CommunicationNotePreviewProductRuntimeGcpAdapters }');
+    expect(custody).not.toMatch(/process\.env|readFileSync|service_role|sb_secret_|projectRefHmacKey/);
+    expect(walkControlledScriptFiles().filter(file => file !== custodyPath && file !== boundaryPath &&
+      readFileSync(file, "utf8").includes("communication-note-job-status-custody.server"))).toEqual([
+      join(process.cwd(), "src/lib/v1/communication-note-preview-product-runtime-gcp-adapters.server.test.ts"),
+    ]);
+    expect(route).not.toContain("communication-note-job-status-custody");
   });
 
   it("keeps service-role repositories outside the client component tree", () => {

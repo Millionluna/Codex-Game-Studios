@@ -72,6 +72,7 @@
     "supabase/migrations/20260902121601_add_v1_communication_note_points_terminal_settlement.sql",
     "supabase/migrations/20260903041819_bind_v1_communication_note_encrypted_payload_admission.sql",
     "supabase/migrations/20260904054437_add_v1_points_wallet_read.sql",
+    "supabase/migrations/20260906233034_add_v1_communication_note_job_status_reader.sql",
     "tsconfig.json"
   ]
 }

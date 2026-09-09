@@ -12,14 +12,11 @@ import {
 } from "./communication-note-composer";
 import {
   COMMUNICATION_NOTE_GENERATION_API_PATH,
-  COMMUNICATION_NOTE_GENERATION_FAILURE_CODES,
   getCommunicationNoteGenerationErrorMessage,
   type CommunicationNoteGenerationAdmission,
-  type CommunicationNoteGenerationFailureCode,
   type CommunicationNoteGenerationFreshJob,
-  type CommunicationNoteGenerationJob,
-  type CommunicationNoteGenerationResult,
 } from "./communication-note-generation-contract";
+import { parseCommunicationNoteGenerationJob } from "./communication-note-generation-job";
 import { isCommunicationNoteGenerationApiEnabled } from "./communication-note-generation-feature";
 import { COMMUNICATION_NOTE_GENERATION_FORMAL_PRINCIPAL_COMPOSITION } from "./communication-note-generation-principal-composition.server";
 import {
@@ -30,7 +27,6 @@ import {
 import { COMMUNICATION_NOTE_GENERATION_FORMAL_SUBMITTER_COMPOSITION } from "./communication-note-generation-submitter-composition.server";
 import { scanCaresLinkV1CleanedFacts } from "./v1/privacy-review-scanner.server";
 import {
-  CARESLINK_V1_GENERATION_STATUSES,
   CARESLINK_V1_ERROR_CODES,
   CARESLINK_V1_LOCALES,
   CaresLinkV1ContractError,
@@ -50,8 +46,6 @@ const NOTE_TYPE = "communication" as const;
 const SERVICE_CODE = "note.communication.generate" as const;
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const SERVER_TIME_PATTERN =
-  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
 
 export type CommunicationNoteGenerationCommand = Readonly<{
   principal: CommunicationNoteGenerationProviderPrincipal;
@@ -303,21 +297,17 @@ function principalFailureResponse(
 function parsePrincipalResolution(
   value: unknown,
 ): CommunicationNoteGenerationPrincipalResolution {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    throw new Error("Communication Note principal resolution is unavailable");
-  }
-
-  const candidate = value as Record<string, unknown>;
-  if (candidate.ok === true) {
-    const success = exactDataRecord(candidate, ["ok", "principal"]);
+  const ok = ownEnumerableDataProperty(value, "ok");
+  if (ok === true) {
+    const success = exactDataRecord(value, ["ok", "principal"]);
     return Object.freeze({
       ok: true,
       principal: parseProviderPrincipal(success.principal),
     });
   }
 
-  if (candidate.ok === false) {
-    const rejected = exactDataRecord(candidate, ["ok", "reason", "status"]);
+  if (ok === false) {
+    const rejected = exactDataRecord(value, ["ok", "reason", "status"]);
     if (
       (rejected.reason === "auth_required" && rejected.status === 401) ||
       (rejected.reason === "session_revoked" && rejected.status === 401) ||
@@ -423,7 +413,7 @@ function parseAdmission(value: unknown): CommunicationNoteGenerationAdmission {
   try {
     const envelope = exactDataRecord(value, ["created", "job"]);
     if (typeof envelope.created !== "boolean") throw new Error();
-    const job = parseOwnerJob(envelope.job);
+    const job = parseCommunicationNoteGenerationJob(envelope.job);
     if (envelope.created) {
       if (
         job.status !== "QUEUED" ||
@@ -454,252 +444,6 @@ function parseAdmission(value: unknown): CommunicationNoteGenerationAdmission {
   } catch {
     throw new Error("Communication Note generation admission is unavailable");
   }
-}
-
-function parseOwnerJob(value: unknown): CommunicationNoteGenerationJob {
-  const job = dataRecordWithAllowedKeys(
-    value,
-    [
-      "attemptCount",
-      "createdAt",
-      "failureCode",
-      "finishedAt",
-      "jobId",
-      "noteType",
-      "result",
-      "serviceCode",
-      "startedAt",
-      "status",
-      "updatedAt",
-    ],
-    [
-      "attemptCount",
-      "createdAt",
-      "jobId",
-      "noteType",
-      "serviceCode",
-      "status",
-      "updatedAt",
-    ],
-  );
-  const status = expectEnum(job.status, CARESLINK_V1_GENERATION_STATUSES);
-  const attemptCount = expectNonnegativeSafeInteger(job.attemptCount);
-  const createdAt = expectServerTime(job.createdAt);
-  const updatedAt = expectServerTime(job.updatedAt);
-  const startedAt = optionalServerTime(job.startedAt);
-  const finishedAt = optionalServerTime(job.finishedAt);
-  const failureCode = optionalFailureCode(job.failureCode);
-  const result =
-    job.result === undefined ? undefined : parseGenerationResult(job.result);
-  if (
-    typeof job.jobId !== "string" ||
-    !UUID_PATTERN.test(job.jobId) ||
-    job.noteType !== NOTE_TYPE ||
-    job.serviceCode !== SERVICE_CODE
-  ) {
-    throw new Error("Communication Note generation admission is unavailable");
-  }
-  assertOwnerJobState({
-    status,
-    attemptCount,
-    createdAt,
-    updatedAt,
-    startedAt,
-    finishedAt,
-    failureCode,
-    result,
-  });
-  const base = {
-    jobId: job.jobId,
-    noteType: NOTE_TYPE,
-    serviceCode: SERVICE_CODE,
-    attemptCount,
-    createdAt,
-    updatedAt,
-  } as const;
-  switch (status) {
-    case "QUEUED":
-      return Object.freeze({
-        ...base,
-        status,
-        ...(startedAt === undefined ? {} : { startedAt }),
-      });
-    case "RUNNING":
-      return Object.freeze({
-        ...base,
-        status,
-        startedAt: requireParsedValue(startedAt),
-      });
-    case "SUCCEEDED":
-      return Object.freeze({
-        ...base,
-        status,
-        startedAt: requireParsedValue(startedAt),
-        finishedAt: requireParsedValue(finishedAt),
-        result: requireParsedValue(result),
-      });
-    case "FAILED":
-      return Object.freeze({
-        ...base,
-        status,
-        startedAt: requireParsedValue(startedAt),
-        finishedAt: requireParsedValue(finishedAt),
-        failureCode: requireParsedValue(failureCode),
-      });
-    case "CANCELLED":
-      return Object.freeze({
-        ...base,
-        status,
-        ...(startedAt === undefined ? {} : { startedAt }),
-        finishedAt: requireParsedValue(finishedAt),
-      });
-  }
-}
-
-function parseGenerationResult(
-  value: unknown,
-): CommunicationNoteGenerationResult {
-  const result = exactDataRecord(value, [
-    "baseRevisionId",
-    "canonicalId",
-    "contentHash",
-    "revisionId",
-    "revisionNumber",
-    "saveState",
-  ]);
-  if (
-    typeof result.canonicalId !== "string" ||
-    !UUID_PATTERN.test(result.canonicalId) ||
-    typeof result.revisionId !== "string" ||
-    !UUID_PATTERN.test(result.revisionId) ||
-    typeof result.contentHash !== "string" ||
-    !/^[a-f0-9]{64}$/.test(result.contentHash) ||
-    result.revisionNumber !== 1 ||
-    result.baseRevisionId !== null ||
-    result.saveState !== "SERVER_ACKNOWLEDGED"
-  ) {
-    throw new Error("Communication Note generation admission is unavailable");
-  }
-  return Object.freeze({
-    canonicalId: result.canonicalId,
-    revisionId: result.revisionId,
-    contentHash: result.contentHash,
-    revisionNumber: 1,
-    baseRevisionId: null,
-    saveState: "SERVER_ACKNOWLEDGED",
-  });
-}
-
-function assertOwnerJobState(input: Readonly<{
-  status: (typeof CARESLINK_V1_GENERATION_STATUSES)[number];
-  attemptCount: number;
-  createdAt: string;
-  updatedAt: string;
-  startedAt?: string;
-  finishedAt?: string;
-  failureCode?: CommunicationNoteGenerationFailureCode;
-  result?: CommunicationNoteGenerationResult;
-}>) {
-  const createdAt = Date.parse(input.createdAt);
-  const updatedAt = Date.parse(input.updatedAt);
-  const startedAt = input.startedAt ? Date.parse(input.startedAt) : undefined;
-  const finishedAt = input.finishedAt ? Date.parse(input.finishedAt) : undefined;
-  if (
-    (input.attemptCount === 0) !== (startedAt === undefined) ||
-    updatedAt < createdAt ||
-    (startedAt !== undefined &&
-      (startedAt < createdAt || startedAt > updatedAt)) ||
-    (finishedAt !== undefined &&
-      (finishedAt < createdAt ||
-        finishedAt > updatedAt ||
-        (startedAt !== undefined && finishedAt < startedAt)))
-  ) {
-    throw new Error("Communication Note generation admission is unavailable");
-  }
-  const queued =
-    input.status === "QUEUED" &&
-    finishedAt === undefined &&
-    input.failureCode === undefined &&
-    input.result === undefined;
-  const running =
-    input.status === "RUNNING" &&
-    input.attemptCount > 0 &&
-    startedAt !== undefined &&
-    finishedAt === undefined &&
-    input.failureCode === undefined &&
-    input.result === undefined;
-  const succeeded =
-    input.status === "SUCCEEDED" &&
-    input.attemptCount > 0 &&
-    startedAt !== undefined &&
-    finishedAt !== undefined &&
-    input.failureCode === undefined &&
-    input.result !== undefined;
-  const failed =
-    input.status === "FAILED" &&
-    input.attemptCount > 0 &&
-    startedAt !== undefined &&
-    finishedAt !== undefined &&
-    input.failureCode !== undefined &&
-    input.result === undefined;
-  const cancelled =
-    input.status === "CANCELLED" &&
-    finishedAt !== undefined &&
-    input.failureCode === undefined &&
-    input.result === undefined;
-  if (!queued && !running && !succeeded && !failed && !cancelled) {
-    throw new Error("Communication Note generation admission is unavailable");
-  }
-}
-
-const FAILURE_CODES = new Set<CommunicationNoteGenerationFailureCode>(
-  COMMUNICATION_NOTE_GENERATION_FAILURE_CODES,
-);
-
-function optionalFailureCode(value: unknown) {
-  if (value === undefined) return undefined;
-  if (
-    typeof value !== "string" ||
-    !FAILURE_CODES.has(value as CommunicationNoteGenerationFailureCode)
-  ) {
-    throw new Error("Communication Note generation admission is unavailable");
-  }
-  return value as CommunicationNoteGenerationFailureCode;
-}
-
-function expectNonnegativeSafeInteger(value: unknown) {
-  if (!Number.isSafeInteger(value) || (value as number) < 0) {
-    throw new Error("Communication Note generation admission is unavailable");
-  }
-  return value as number;
-}
-
-function expectServerTime(value: unknown) {
-  if (!isServerTime(value)) {
-    throw new Error("Communication Note generation admission is unavailable");
-  }
-  return value;
-}
-
-function optionalServerTime(value: unknown) {
-  return value === undefined ? undefined : expectServerTime(value);
-}
-
-function requireParsedValue<Value>(value: Value | undefined): Value {
-  if (value === undefined) {
-    throw new Error("Communication Note generation admission is unavailable");
-  }
-  return value;
-}
-
-function expectEnum<const Value extends string>(
-  value: unknown,
-  allowed: readonly Value[],
-) {
-  if (typeof value !== "string" || !allowed.includes(value as Value)) {
-    throw new Error("Communication Note generation admission is unavailable");
-  }
-  return value as Value;
 }
 
 function assertCookieMutationTransport(request: Request) {
@@ -936,48 +680,19 @@ function exactDataRecord(value: unknown, exactKeys: readonly string[]) {
   return value as Record<string, unknown>;
 }
 
-function dataRecordWithAllowedKeys(
-  value: unknown,
-  allowedKeys: readonly string[],
-  requiredKeys: readonly string[],
-) {
-  if (!isRecord(value)) {
-    throw new Error("Communication Note generation admission is unavailable");
+function ownEnumerableDataProperty(value: unknown, key: string) {
+  if (!isRecord(value)) throw validationError();
+  const descriptor = Object.getOwnPropertyDescriptor(value, key);
+  if (!descriptor || !("value" in descriptor) || !descriptor.enumerable) {
+    throw validationError();
   }
-  const names = Object.getOwnPropertyNames(value);
-  const allowed = new Set(allowedKeys);
-  if (
-    names.some((key) => !allowed.has(key)) ||
-    requiredKeys.some((key) => !names.includes(key)) ||
-    Object.getOwnPropertySymbols(value).length > 0
-  ) {
-    throw new Error("Communication Note generation admission is unavailable");
-  }
-  const descriptors = Object.getOwnPropertyDescriptors(value);
-  if (
-    names.some((key) => {
-      const descriptor = descriptors[key];
-      return !descriptor || !("value" in descriptor) || !descriptor.enumerable;
-    })
-  ) {
-    throw new Error("Communication Note generation admission is unavailable");
-  }
-  return value;
+  return descriptor.value;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
   const prototype = Object.getPrototypeOf(value);
   return prototype === Object.prototype || prototype === null;
-}
-
-function isServerTime(value: unknown): value is string {
-  return (
-    typeof value === "string" &&
-    SERVER_TIME_PATTERN.test(value) &&
-    Number.isFinite(Date.parse(value)) &&
-    new Date(value).toISOString() === value
-  );
 }
 
 function safelyCreateCorrelationId(factory: () => string) {

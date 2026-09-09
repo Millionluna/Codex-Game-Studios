@@ -128,6 +128,31 @@ describe("AppShell", () => {
     expect(markup).not.toContain("account=");
   });
 
+  it("renders a scoped Traditional Chinese Points shell with honest untranslated destinations", () => {
+    const markup = renderToStaticMarkup(<AppShell locale="zh-Hant" balanceNavigation="points"
+      languageSwitcherHref="/plan-and-usage?lang=zh-Hant&communicationLang=zh-Hant"
+      workspaceRole="provider" workspaceSessionSource="supabase"><div>Points 餘額</div></AppShell>);
+    expect(markup).toContain('lang="zh-Hant"');
+    expect(markup).toContain("繁體中文");
+    expect(markup).toContain("開啟導覽");
+    expect(markup).toContain("已儲存文件");
+    expect(markup).toContain("所有草稿均需使用者複核");
+    expect(markup).toContain('href="/ai-documents?lang=zh-Hant"');
+    expect(markup).toContain('href="/privacy?lang=en"');
+    expect(markup).toContain("隱私、收集與保留說明（英文）");
+    expect(markup).toContain('href="/referral-workspace/profile?lang=en"');
+    expect(markup).toContain("資料與轉介準備（英文）");
+    expect(markup).not.toContain("account=");
+    expect(markup).not.toContain("英文和简体中文");
+  });
+
+  it("does not advertise Traditional Chinese on another route just because its balance label is Points", () => {
+    const markup = renderToStaticMarkup(<AppShell locale="en" balanceNavigation="points"
+      languageSwitcherHref="/template-companion/ndis-case-note" workspaceRole="provider"><div>Legacy</div></AppShell>);
+    expect(markup).not.toContain("繁體中文");
+    expect(markup).not.toContain("lang=zh-Hant");
+  });
+
   it("shows pilot-safe provider navigation for demo query-param accounts", () => {
     delete process.env.NEXT_PUBLIC_CARESLINK_SHOW_LEGACY_DEMO_NAV;
 

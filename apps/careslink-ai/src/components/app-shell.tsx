@@ -22,7 +22,7 @@ import {
   DEFAULT_LOCALE,
   SUPPORTED_LOCALES,
   withLocale,
-  type Locale,
+  type NavigationLocale,
 } from "@/lib/referral-workspace-i18n";
 import type {
   WorkspaceAccountRole,
@@ -32,7 +32,7 @@ import type {
 type AppShellProps = {
   balanceNavigation?: "plan-usage" | "points";
   children: ReactNode;
-  locale?: Locale;
+  locale?: NavigationLocale;
   languageSwitcherHref?: string;
   workspaceAccountId?: string;
   workspaceRole?: WorkspaceAccountRole;
@@ -112,6 +112,9 @@ export function AppShell({
   const showSignOut =
     workspaceSessionSource === "supabase" && Boolean(workspaceRole);
   const currentPath = getPathname(languageSwitcherHref);
+  const isPointsPage = balanceNavigation === "points" && currentPath === "/plan-and-usage";
+  const supportedLocales = isPointsPage
+    ? [...SUPPORTED_LOCALES, "zh-Hant"] as const : SUPPORTED_LOCALES;
   const logoHref =
     workspaceRole === "admin"
       ? "/admin/access-requests"
@@ -123,7 +126,7 @@ export function AppShell({
     <div className="flex h-full min-h-0 flex-col">
       <Link
         href={withOptionalWorkspaceAccount(
-          withLocale(logoHref, locale),
+          withShellLocale(logoHref, locale),
           effectiveWorkspaceAccountId,
         )}
         className="inline-flex w-fit items-center rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-[#9fe1ca]"
@@ -179,7 +182,7 @@ export function AppShell({
               return (
                 <Link
                   key={item.href}
-                  href={withLocale(item.href, locale)}
+                  href={withShellLocale(item.href, locale)}
                   className="flex min-h-10 items-center gap-3 px-3 text-white/62 hover:bg-white/8 hover:text-white"
                 >
                   <Icon className="size-4" aria-hidden="true" />
@@ -194,7 +197,7 @@ export function AppShell({
       <div className="mt-auto border-t border-white/12 pt-5">
         {showSignOut ? (
           <form action={signOutAction} className="mb-5">
-            <input name="lang" type="hidden" value={locale} />
+            <input name="lang" type="hidden" value={locale === "zh-Hant" ? "en" : locale} />
             <input
               name="returnTo"
               type="hidden"
@@ -215,15 +218,17 @@ export function AppShell({
         </div>
         <p className="mt-2 text-xs leading-5 text-white/54">{copy.boundary}</p>
         <Link
-          href={withLocale("/privacy", locale)}
+          href={withShellLocale("/privacy", locale)}
           className="mt-3 inline-flex text-xs font-semibold text-white/68 hover:text-white"
         >
           {copy.privacyNotice}
         </Link>
-        <div className="mt-5 flex items-center gap-2 text-xs font-semibold text-white/54">
+        <div className={isPointsPage
+          ? "mt-5 flex flex-wrap items-center gap-2 text-xs font-semibold text-white/72"
+          : "mt-5 flex items-center gap-2 text-xs font-semibold text-white/54"}>
           <Languages className="size-4" aria-hidden="true" />
           <span className="sr-only">{copy.language}</span>
-          {SUPPORTED_LOCALES.map((supportedLocale, index) => (
+          {supportedLocales.map((supportedLocale, index) => (
             <span key={supportedLocale} className="contents">
               {index > 0 ? <span aria-hidden="true">/</span> : null}
               <Link
@@ -235,13 +240,10 @@ export function AppShell({
                   supportedLocale,
                 )}
                 aria-current={supportedLocale === locale ? "page" : undefined}
-                className={
-                  supportedLocale === locale
-                    ? "text-white"
-                    : "hover:text-white"
-                }
+                lang={supportedLocale}
+                className={`${isPointsPage ? "inline-flex min-h-11 items-center " : ""}${supportedLocale === locale ? "text-white" : "hover:text-white"}`}
               >
-                {supportedLocale === "zh-Hans" ? "简体中文" : "English"}
+                {supportedLocale === "zh-Hant" ? "繁體中文" : supportedLocale === "zh-Hans" ? "简体中文" : "English"}
               </Link>
             </span>
           ))}
@@ -251,7 +253,7 @@ export function AppShell({
   );
 
   return (
-    <div className="careslink-app-shell min-h-dvh min-w-0 text-foreground">
+    <div className="careslink-app-shell min-h-dvh min-w-0 text-foreground" lang={locale}>
       <aside className="careslink-shell-sidebar hidden lg:block">
         {sidebar}
       </aside>
@@ -259,7 +261,7 @@ export function AppShell({
       <header className="careslink-mobile-header lg:hidden">
         <Link
           href={withOptionalWorkspaceAccount(
-            withLocale(logoHref, locale),
+            withShellLocale(logoHref, locale),
             effectiveWorkspaceAccountId,
           )}
           aria-label="CaresLink AI"
@@ -296,7 +298,7 @@ function ShellNavSection({
 }: {
   label: string;
   items: ShellNavItem[];
-  locale: Locale;
+  locale: NavigationLocale;
   workspaceAccountId?: string;
   currentPath: string;
   emphasis: "primary" | "secondary";
@@ -314,7 +316,7 @@ function ShellNavSection({
             <Link
               key={item.href}
               href={withOptionalWorkspaceAccount(
-                withLocale(item.href, locale),
+                withShellLocale(item.href, locale),
                 workspaceAccountId,
               )}
               aria-current={isActive ? "page" : undefined}
@@ -411,7 +413,37 @@ function getNavigation(
   return { primary: [], secondary: [] };
 }
 
-function getShellCopy(locale: Locale): ShellCopy {
+function getShellCopy(locale: NavigationLocale): ShellCopy {
+  if (locale === "zh-Hant") {
+    return {
+      privacyNotice: "隱私、收集與保留說明（英文）",
+      signOut: "登出",
+      workspace: "工作區",
+      manage: "管理",
+      administration: "管理後台",
+      legacy: "舊版預覽（英文）",
+      aiDocuments: "AI 文件",
+      referrals: "轉介（英文）",
+      savedDocuments: "已儲存文件",
+      profileReadiness: "資料與轉介準備（英文）",
+      planUsage: "存取與使用量（英文）",
+      points: "Points",
+      accessRequests: "存取申請（英文）",
+      materialUsage: "材料使用情況（英文）",
+      language: "語言",
+      menu: "開啟導覽",
+      trustBoundary: "使用邊界",
+      boundary: "僅用於一般文件和營運支援。所有草稿均需使用者複核，不提供臨床、法律、照護、監管或合規建議。",
+      subtitle: "面向服務商的文件與轉介營運工作區。",
+      legacyLabels: {
+        demoHub: "舊版示範中心（英文）",
+        assessment: "舊版評估（英文）",
+        dashboard: "儀表板（英文）",
+        providerPortal: "服務商入口（英文）",
+        providers: "服務商（英文）",
+      },
+    };
+  }
   if (locale === "zh-Hans") {
     return {
       privacyNotice: "隐私、收集与保留说明",
@@ -473,6 +505,12 @@ function getShellCopy(locale: Locale): ShellCopy {
       providers: "Providers",
     },
   };
+}
+
+function withShellLocale(href: string, locale: NavigationLocale) {
+  const path = getPathname(href);
+  const supportsTraditionalChinese = path === "/plan-and-usage" || path === "/ai-documents" || path.startsWith("/ai-documents/");
+  return withLocale(href, locale === "zh-Hant" && !supportsTraditionalChinese ? "en" : locale);
 }
 
 function isNavItemActive(item: ShellNavItem, currentPath: string) {

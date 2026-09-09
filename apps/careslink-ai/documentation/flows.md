@@ -52,6 +52,367 @@
 
 **Conflict with V1**: current plan is 3 credits per monthly period and one credit per generation. V1 requires one-time 300 welcome Points, versioned service rates, point lots and no parallel legacy balance truth.
 
+### Communication Note owned local full-flow fixture (2026-09-08)
+
+The explicit `--flow` browser runner now joins facts entry → confirmed privacy
+review → one synthetic task → exact pre-seeded result → real local self-review
+and export history. The task and 100/20-Point display are clearly labelled
+simulations; progress does not write a database job, reserve Points or call AI.
+Only fixed English synthetic facts are accepted, matched against the existing
+local result. Refresh does not resubmit, and active-session checks protect task
+and result reads. The formal generation gates remain off.
+See [the bounded full-flow evidence](communication-note-product-integration-m1y.md#communication-note-fixed-synthetic-full-flow-integration-2026-09-08).
+
+### Communication Note real local admission fixture (2026-09-08)
+
+The separate `--admission` mode connects the unchanged composer to the existing
+real PostgreSQL policy-bound admission and Points preview RPCs. Fixed synthetic
+facts → current-session/privacy validation → atomic queued job + 20-Point
+reservation → deliberate lost acknowledgement → exact same-request retry → same
+queued job. Refresh never submits; the actual balance changes 30/0 → 10/20 and
+stays unchanged on retry. No worker runs, so no result route is available and no
+terminal charge/release is claimed. Synthetic policy receipts are not vault/KMS
+evidence. The owned database is removed on shutdown; formal runtime remains off.
+See [local admission evidence and next terminal-settlement slice](communication-note-product-integration-m1y.md#communication-note-real-local-admission-and-points-browser-gate-2026-09-08).
+Real provider/model output and Hosted activation are not proved by this fixture.
+
+### Communication Note real local terminal settlement fixture (2026-09-08)
+
+The separate `--settlement` mode joins real local admission to fixed stdin-only
+terminal RPCs: queued → failed/cancelled releases 20 Points; queued → claimed →
+synthetic payload-consumption receipt → fenced → succeeded saves a canonical
+draft and commits 20 Points. Exact terminal replay changes no ledger/document
+state. The browser opens only the actual new result and rechecks owner/session;
+self-review/export-history mutation is not enabled in this mode. The success
+wording and provider evidence are synthetic; no real worker, model, vault or
+KMS runs. The separate `--settlement-check` matrix needs no browser. All test
+data is destroyed at shutdown and formal activation stays off.
+See [terminal settlement evidence and next review/export slice](communication-note-product-integration-m1y.md#communication-note-real-local-terminal-settlement-browser-gate-2026-09-08).
+
+### Communication Note settled draft review/export fixture (2026-09-08)
+
+The new `--settlement-review` mode continues the real-local successful task:
+new canonical draft → required review → three test-user confirmations → durable
+self-review → TXT download initiation → durable report → refresh/readback of
+the same review and history. Review/history add no Points events. Only the new
+settled document can reach these routes; editing remains closed. History-off
+clears the visible list, recovery reads it without another export, and revoked
+sessions cannot read private content. This uses synthetic content/identity and
+does not attest human content quality or OS file delivery. The separate
+`--settlement-review-check` runs 61 database scenarios and cleans its cluster.
+See [the settled-draft review/export evidence](communication-note-product-integration-m1y.md#communication-note-settled-draft-review-and-export-integration-2026-09-08).
+
+### Communication Note settled draft edit/version fixture (2026-09-08)
+
+The separate `--settlement-edit` mode adds wording edits for only that newly
+settled document: reviewed version 1 with its own TXT report → save new wording
+as version 2 → review required and exports disabled → fresh review → independent
+version-2 report. Historical navigation preserves version 1's original wording
+and report without carrying over review/export authority. Reload restores the
+new version's saved content/review; history refresh reads the same report.
+Existing parsers and SQL enforce ownership, revision membership, active session,
+base revision and replay. The generation job keeps its original version anchor;
+editing/review/export and terminal replay do not charge Points. The opt-in
+`--settlement-edit-check` proves 89 local database scenarios. All test data is
+deleted; formal activation, real model calls and OS delivery claims stay closed.
+See [the settled-draft editing evidence and next revisit entry](communication-note-product-integration-m1y.md#communication-note-settled-draft-wording-edit-and-version-history-integration-2026-09-08).
+
+### Communication Note saved-list revisit fixture (2026-09-08)
+
+`--settlement-list` wires the new saved-list surface only in the disposable
+local workspace: empty → task/save → leave → list current-version metadata →
+open with fresh access/self-review checks → edit → return/reload → open latest
+version. The task's original result link remains revision-pinned. The list uses
+the existing owner-scoped metadata RPC, then filters to the exact newly settled
+document; it never fetches draft wording or grants review/export authority.
+Three locales, retryable failures, lifecycle clearing and eight-second timeout
+are supported. Revoked-session refresh removes the list. Reading generates no
+job/Points/review/export write. `--settlement-list-check` proves 94 database
+scenarios; the formal legacy workspace, general catalog/pagination, Hosted and
+real provider activation remain unchanged.
+See [saved-list evidence and the next in-progress task entry](communication-note-product-integration-m1y.md#communication-note-saved-draft-list-and-revisit-integration-2026-09-08).
+
+### Communication Note in-progress task entry fixture (2026-09-08)
+
+`--workspace-task` adds one server-preallocated local admission locator before
+Next starts. Empty → actual admission → lose response → leave without retry →
+workspace exact-task read → queued detail → operator synthetic success → saved
+task plus current draft → open with fresh review/access checks. No browser
+request key, facts storage, task enumeration or new SQL privileges are needed.
+The workspace reuses the green three-locale surface; auth failure clears both
+task and draft metadata. Refresh does not submit, settle or charge. A present or
+unknown task hides this fixed mode's new-generation link. The mode is one task
+per disposable run, not formal multi-task or cross-device recovery. The check
+mode passed 98 real local database scenarios. See [task-entry evidence and next
+navigation slice](communication-note-product-integration-m1y.md#communication-note-in-progress-task-workspace-entry-2026-09-08).
+
+### Communication Note direct workspace navigation (2026-09-08)
+
+Task and saved-draft headers now return directly to the same-language workspace
+through both Logo and labelled return link. Invalid-ID exits also remain on a
+fixed workspace path. A failed task's explicit new-note action stays separate;
+returning never submits generation. The local loop is workspace → task → exact
+saved version → workspace → current saved version. Existing reauthorization on
+each destination and exact-version/review rules remain in place. The final
+browser run confirmed Traditional Chinese no longer switches to English on
+draft return, and revoked-session return shows sign-in without private data.
+The general multi-task catalog and formal workspace activation remain open.
+See [navigation verification](communication-note-product-integration-m1y.md#communication-note-workspace-navigation-loop-2026-09-08).
+
+### Communication Note owner-isolated multi-task workspace (2026-09-08)
+
+This supersedes the singleton `--workspace-task` wiring above. Fresh cookie
+provider/session → private purpose RPC → current owner's Communication tasks
+(newest first, 20 per page) → exact task → saved version → same-language
+workspace. Cursor pagination carries position only, never owner identity.
+Refresh and lifecycle changes reauthorize from the latest page; pending/failed
+or revoked reads clear both sections. A separate create action can admit a new
+task, while status reads never submit/retry generation or charge Points.
+
+The real browser proved two independent tasks after a lost acknowledgement and
+a failure/release, followed by success/commit and revoked-session clearing.
+The new SQL remains an unactivated local candidate outside the pinned Hosted
+manifest. The reusable UI preserves the existing green identity and three
+languages. Formal workspace activation and the general saved-draft catalog are
+still pending; the draft section retains its exact-settled-document fixture.
+See [multi-task scope and verification](communication-note-product-integration-m1y.md#communication-note-owner-isolated-multi-task-workspace-2026-09-08).
+
+### Communication Note current-owner saved-draft catalog (2026-09-08)
+
+This supersedes the singleton saved-draft section above: fresh cookie/session
+→ existing Product API document list (20 metadata rows, stable UUID order)
+→ server-side live Communication Note filter → current-version document link
+→ existing fresh-session/owner reader → same-language workspace. Filtered empty
+pages retain their next cursor. Tasks and drafts have independent page controls;
+refresh or lifecycle reauthorization clears both and restarts at their first
+pages. Listing never shows wording, changes review state or charges Points.
+
+The browser proved two independent current-version reads, three workspace
+locales and revoked-session clearing. SQL proves 25 documents across 20/5 pages.
+No new migration or permissions were added; formal app activation remains off.
+Only catalog GET navigation was broadened in the owned fixture: editing,
+self-review and export/history still require the exact settled-document guard.
+The next slice is default-off formal workspace wiring with local validation.
+See [catalog scope and verification](communication-note-product-integration-m1y.md#communication-note-current-owner-saved-draft-catalog-2026-09-08).
+
+### Communication Note default-off formal workspace route (2026-09-08)
+
+The formal `/ai-documents` page now chooses the new workspace only with an
+exact server-side opt-in, preserving the legacy page by default and the admin
+branch. Server account auth precedes canonical locale routing; private metadata
+still loads through its own fresh-session HTTP boundary. Page/API responses
+are private/no-store/no-referrer/noindex. No demo/account query selects an owner.
+
+The actual formal list API uses a shared read-only composition but its source
+runtime remains undefined, so a UI flag alone always produces a safe 503 and no
+data IO. The owned local browser copy binds only the two narrow existing readers
+and verifies task/draft navigation and revoked-session clearing through the real
+page/API files. No source credential, hosted role or writer is activated.
+The next slice is a default-off read-only runtime adapter, not deployment or
+generation activation. See [formal route scope](communication-note-product-integration-m1y.md#communication-note-default-off-formal-workspace-route-2026-09-08).
+
+### Communication Note read-only workspace database adapter (2026-09-08)
+
+The default-off adapter now binds one request-local Cookie client and verified
+user/session to the existing document-list RPC and task-list repository. Both
+reads stay fixed to 20 rows and independent position cursors. Reauthorization
+before reads and after completion rejects identity changes/revocation; the
+30-second handler deadline discards late results without retry or partial data.
+
+Task reads require a separate list-purpose server port, not a single-job status
+or generation credential. The formal runtime is still undefined: configuration
+cannot install a physical connection, role grant or credential issuer. The
+owned source-routed browser copy passed real local reads, current-draft return
+and revoked-session clearing without any admission, Points or review writes.
+Next is local task-port connection/cancellation/cleanup implementation, not
+Hosted activation. See [adapter evidence](communication-note-product-integration-m1y.md#communication-note-read-only-workspace-database-adapter-2026-09-08).
+
+### Communication Note task-list physical cancellation and cleanup (2026-09-08)
+
+The local list-purpose port now opens an independent same-LOGIN cleanup
+connection before its single-use read connection. Both attest the narrow role
+and target; only the read session activates the list caller and fixed statement.
+Abort closes that transport, then independently bounded cleanup targets its
+random nonce plus known PID/start and checks that the backend is gone. Errors,
+timeouts and uncertain cleanup suppress metadata; no other session is targeted.
+
+Twelve actual-source PG16 transport tests (including blocked auth-row cancel,
+cleanup connection loss and HTTP-core composition) pass. This is not credential
+issuance/revocation or live binding: formal runtime remains undefined. The next
+local slice replaces the owned workspace browser fixture's broad test connection
+with this dedicated list-only port, then exercises actual-page refresh,
+pagination/navigation and cancellation without deploying. See
+[physical-port scope and evidence](communication-note-product-integration-m1y.md#communication-note-task-list-physical-cancellation-and-cleanup-2026-09-08).
+
+### Communication Note dedicated task port in the local workspace (2026-09-08)
+
+The owned workspace's server-resolved principal now reaches the real single-use
+task port via a separate local credential module; the admission bridge and LOGIN
+can no longer read task lists. Actual page tests cover 25 distinct tasks across
+20/5 pages, refresh/latest return, three locales, task/current-draft navigation,
+and revoked-session clearing. During locked-read navigation, the real backend
+and locks disappeared in ~480 ms; unlock/refresh recovered the new page.
+
+This historical checkpoint changed only the owned fixture, not the formal
+binding or green UI. Its fixture-lifetime password limitation is replaced by
+the following local credential slice, not by Hosted activation. See
+[owned integration evidence](communication-note-product-integration-m1y.md#communication-note-dedicated-task-port-in-the-local-workspace-2026-09-08).
+
+### Communication Note local single-use task credentials (2026-09-08)
+
+Owned Next read → private parent Unix issuer → fresh-session check → one new
+60-second/two-connection list LOGIN → actual source read + connection cleanup →
+NOLOGIN/password removal → exact owned-session termination → LOGIN removal +
+private revocation tombstone → only then release task metadata. Every refresh
+or page gets a distinct request/credential; duplicate delivery never returns a
+secret. Lost response or browser cancellation still triggers cleanup; an
+independent expiry timer handles abandonment while the parent remains alive.
+Uncertain cleanup withholds data and closes further issuance for that fixture.
+
+The built page passed 20/5 pagination, three locales, cancellation/recovery and
+session-revocation clearing, ending with seven REVOKED receipts and no active
+task roles/connections/locks. The formal binding is still undefined. Next is a
+typed default-off server lease adapter (completed below), not copying the local database operator
+into the app. Managed custody, crash/restart cleanup, Hosted grants and live AI
+remain separate. See [local lifecycle evidence](communication-note-product-integration-m1y.md#communication-note-local-single-use-task-credentials-2026-09-08).
+
+### Communication Note default-off server task lease adapter (2026-09-09)
+
+The local bridge now calls the actual application-source lifecycle:
+validated Cookie/query scope → bounded issue → validate credential/source →
+bounded read → independent bounded revoke → exact receipt/freshness/cancellation
+check → release metadata. Missing or uncertain revocation never returns data;
+late responses cannot turn a timed-out read into success. Formal wiring remains
+undefined; the local database operator stays outside the application.
+
+84 new unit tests and 10 real owned-PG tests passed. Typed receipt validation is
+not managed custody evidence: the trusted provider must enforce a terminal fence.
+Next at this checkpoint: local issuer interruption/restart and supervised orphan reconciliation (completed below).
+See [adapter evidence and limits](communication-note-product-integration-m1y.md#communication-note-default-off-server-task-lease-adapter-2026-09-09).
+
+### Communication Note supervised local credential recovery (2026-09-09)
+
+Owned parent supervisor → private issuer child → one-use source credential.
+Unexpected exit, lost heartbeat or overdue receipt → terminate only that child
+→ verify its PG backend gone → acquire issuer fence → reconcile unfinished
+receipts → open Unix IPC again. Any mismatch or failed cleanup stops issuance.
+No password is replayed and no role is selected by name-prefix alone.
+
+The supervisor's expiry check survives a lost child timer. Seven real process
+scenarios and ten existing real database scenarios passed; the production
+runtime remains unbound. This still depends on the supervisor and local PG
+surviving, not a durable Hosted custody service. Next: same-revision built-page
+workspace/result/review/Points acceptance on synthetic data.
+See [process recovery evidence](communication-note-product-integration-m1y.md#communication-note-supervised-local-credential-recovery-2026-09-09).
+
+### Communication Note supervised browser acceptance — partial (2026-09-09)
+
+At source `2a20b15`, the built owned PG16 fixture passed workspace empty state,
+25-task pagination (20 + 5, no duplicate), success → exact revision → three-locale
+review navigation, and displayed 10 available / 0 reserved Points after the
+fixed synthetic seed. Reading did not create review/export or Points events;
+all review confirmations and export buttons remained gated. Green design and
+Logo were unchanged. Physical page-leave cancellation revoked the one-use
+credential and removed waiting locks in 258 ms.
+
+Recovery acceptance stopped because the operator mistakenly requested a jobs
+table count before releasing the intentionally held jobs lock. The diagnostic
+timed out and the runner cleaned up safely; application failure is not inferred.
+Next: repeat only the remaining local cancellation/recovery tail with
+`task-unlock` completed before `task-status`, then fixed session revocation and
+final business/cleanup checks. No formal runtime or Hosted activation.
+See [partial acceptance evidence](communication-note-product-integration-m1y.md#communication-note-supervised-browser-acceptance--partial-2026-09-09).
+
+### Communication Note supervised recovery tail — passed (2026-09-09)
+
+The corrected local sequence passed without application changes: cancel read
+→ observe physical cleanup (253 ms) → complete `task-unlock` → refresh → same
+ordered task IDs. Fixed synthetic session revoke → refresh cleared both lists
+and reached the locale-preserving login URL. Fixture identity restoration then
+recovered the same tasks and three drafts. Points remained 10 available / 0
+reserved with no new business writes; six leases were REVOKED and residual
+roles/sessions/locks were zero. Owned PG/server/root and tab 37 were disposed.
+This completes the interrupted local gate, not real Auth/Hosted activation.
+
+Next proposed app-facing slice: workspace ↔ existing `/plan-and-usage` Points
+navigation, reusing the green design and current readiness states, without
+wallet duplication, purchases or formal-runtime activation.
+See [completed tail evidence](communication-note-product-integration-m1y.md#communication-note-supervised-browser-recovery-tail--passed-2026-09-09).
+
+### Communication Note workspace ↔ Points navigation (2026-09-09)
+
+Authenticated multi-task workspace → server-gated “View Points” → existing
+read-only Points page → full-navigation return to the original workspace locale.
+Only the three-value `communicationLang` context is accepted; no arbitrary
+return URL, owner or document ID is propagated. Reload, language switching and
+pending login retain this safe context. Traditional Chinese explicitly enters
+English Points and returns to Traditional Chinese; the Points shell itself is
+not newly translated. Balance state/auth checks and legacy Credits are unchanged.
+
+All three return paths and 390px layout passed in an owned built local fixture.
+Points runtime stayed closed and displayed unavailable honestly; navigation
+created no business writes. The temporary environment was fully removed.
+Next: composer balance guidance → Points entry with unsubmitted-facts leave
+warning, without purchases or runtime activation.
+See [navigation evidence](communication-note-product-integration-m1y.md#communication-note-workspace-to-points-navigation-2026-09-09).
+
+### Composer Points guidance and leave guard (2026-09-09)
+
+Insufficient/not-ready/unavailable composer balance → read-only Points entry →
+confirm discarding page-only inputs, or cancel and keep editing. Uncertain
+submissions explicitly retain server-task uncertainty and the existing exact
+retry path; successful admission bypasses the discard prompt. Actual departure
+clears local facts/checks/retry state. Points keeps the original workspace
+locale; no input is restored or persisted and purchasing remains unavailable.
+
+Implementation and automated tests pass. The follow-up closed old tab 39 and
+passed three-locale empty-form Points round trips plus 390px guidance layout.
+Native dirty-input cancel/accept, dirty refresh and post-discard Back remain
+pending. Browser control later timed out; new tab 40 closure and viewport reset
+are unconfirmed. The recreated local database/server/data were removed. Next
+is browser cleanup and supervised confirmation acceptance, not deployment or
+further runtime activation.
+Subsequent handoff: tab 40 removal and viewport reset are now confirmed. After
+an interruption, tab 41 and its stopped environment were cleared; a user-
+requested retry retained tab 42 and its local-only fixture for manual Cancel.
+After synthetic input was visually reconfirmed, the user reported no dialog;
+browser inspection confirmed direct navigation to Points. This observed dirty-
+input leave-warning path failed acceptance; its root cause is not established.
+Verification stopped. The fixed fixture was cleaned with source hashes unchanged,
+owned root/processes/listener absent, and tab 42 closed. Next proposed work is an
+accessible in-page confirmation and cancel/accept retest, not another identical
+native-dialog retry. No repair had been implemented at that point.
+See [partial guard acceptance](communication-note-product-integration-m1y.md#communication-note-composer-points-entry-and-leave-guard-2026-09-09).
+See [browser follow-up evidence](communication-note-product-integration-m1y.md#composer-points-browser-follow-up-2026-09-09).
+
+Repair update: the owned-link guard now uses a page-owned, three-locale HTML
+dialog instead of `window.confirm`. Opening blocks navigation; Keep editing or
+Escape retains inputs/checks/retry bytes and restores focus. Only explicit discard
+assigns the destination. Initial focus and both Tab wrap directions are covered.
+Real browser cancel/accept/Back flows and 390px dialogs passed in all three locales;
+the English input-readout discrepancy was resolved with visible-field screenshots.
+The final fixture, database, tabs and viewport override were cleaned. Local pre-commit review,
+full tests/typecheck/lint and adapter checks passed without another product edit.
+Independent desktop Safari acceptance on `6ff5871` then passed dirty-input native
+refresh/tab-close: cancel retains text; accepted refresh clears it; accepted close
+removes only the test tab. The owned fixture was cleaned and original tabs restored.
+This does not attest other browsers, mobile force-quit or pending requests.
+Next: review/local commit of the evidence only, not another passing-dialog retry
+or runtime activation. No push or deployment is included.
+See [page-owned confirmation repair](communication-note-product-integration-m1y.md#page-owned-composer-leave-confirmation-repair-2026-09-09).
+See [Safari native acceptance](communication-note-product-integration-m1y.md#safari-native-composer-departure-acceptance-2026-09-09).
+
+Points localization update (2026-09-09): the Points-only page and Communication
+Note entry now support Traditional Chinese directly, superseding the earlier
+English fallback. Three-language switching/reload retain the workspace return
+locale; login/register remain explicitly English and preserve the Points return.
+Green branding, legacy Credits parsing and read-only/default-off runtime remain
+unchanged. Local tests and browser navigation/narrow-screen checks passed; owned
+fixtures were cleaned. Pre-commit review and full checks passed after freezing an
+unrelated 1ms test-clock boundary; product source and browser evidence are unchanged.
+The local-only commit includes this test stabilization, with no push or deployment.
+See [Traditional Chinese Points evidence](communication-note-product-integration-m1y.md#traditional-chinese-points-page-2026-09-09).
+
 ## 4. Save, history and delete
 
 ### Current flow
@@ -89,15 +450,54 @@ First valid input creates a canonical document ID. Each mutation carries idempot
 
 ### Current reality
 
-Copy actions are available for current result/saved content. There is no DOCX, PDF or TXT renderer, revision-bound export job, artifact TTL, safe filename policy, export history or batch export.
+Legacy result/saved-content Copy actions remain separate. As of 2026-09-08,
+the source-only Communication Note result flow also supports Copy/TXT/DOCX/PDF
+for the current saved, self-reviewed revision. Each click rechecks access and
+that exact revision, then produces the minimal English Record copy with draft
+and static-copy notices. Editing hides exports; unreviewed/historical versions
+are disabled. Safe filenames and bounded browser Blob URL cleanup are present;
+DOCX/PDF renderers load lazily. There is no durable export job/event history,
+hosted artifact storage/download URL, batch export or Hosted activation.
+
+The local export-history slice now reports minimal version-bound browser events
+after an authorised export and explicitly reads the selected revision's latest
+20 reports. Outcomes are `COPY_REPORTED`, `DOWNLOAD_INITIATED` or `FAILED`, not
+legacy `DOWNLOADED`/`SHARED` or saved-file receipts. History failure does not
+change the export result or automatically retry/re-export. Its private GET/POST
+route remains hard-off without a dedicated trusted binding; only the owned
+synthetic memory fixture installs a process-memory binding and labels that limitation.
+An uninstalled durable read/write candidate now passes real disposable local
+PostgreSQL tests, including ownership/session checks and concurrent replay.
+Its private RLS table and private definer remain outside the approved migration
+manifest; API roles receive no candidate grants. There is no retained database
+installation or browser-persistent cache. The explicit owned `--database-history`
+mode additionally proves the existing page's real local PostgreSQL write/read
+roundtrip, reload, revision isolation, switch failure and session-revocation
+clearing. Its synthetic identity, database and caller grants are discarded at
+shutdown; it is not Hosted Auth or formal activation evidence.
+See the [local history evidence](communication-note-product-integration-m1y.md#communication-note-revision-bound-export-history-local-slice-2026-09-08).
+See also the [durable candidate evidence](communication-note-product-integration-m1y.md#communication-note-durable-export-history-candidate-2026-09-08).
+The [local durable browser evidence](communication-note-product-integration-m1y.md#communication-note-export-history--real-local-browser-roundtrip-2026-09-08)
+records all four formats and the independent version-bound row counts.
+
+The bounded native Safari synthetic gate passed real cross-app paste and actual
+TXT/DOCX/PDF saving/opening. DOCX opened in TextEdit, not Microsoft Word. See the
+[acceptance scope](communication-note-product-integration-m1y.md#communication-note-native-safari-export-acceptance-2026-09-08).
 
 ### Inactive shadow contract
 
 The schema draft separates `export_jobs` from append-only `export_events`, binds both to owner/document/revision and defines DOCX/PDF/TXT/COPY terminal states. It contains no renderer, artifact storage, download route or file bytes.
 
-### Intended runtime / not implemented
+### Intended runtime / remaining work
 
-Export must bind to a specific revision and shared renderer/template version. Record Copy excludes privacy findings, internal facts analysis, Points and model metadata by default. Portal downloads and App Share Sheet use the same artifact profile. External files are static snapshots and never sync changes back.
+All export paths must bind to a specific revision and shared renderer/template
+version. The local Communication Note Record copy already excludes privacy
+findings, internal facts analysis, Points and model metadata; external copies
+are static snapshots and never sync changes back. Hosted durable event history
+integration and separately gated activation,
+bilingual/historical/batch exports, artifact delivery controls and App Share
+Sheet integration remain separate work. A browser's download-start result must
+not be represented as proof that the user saved a file.
 
 ## 7. Points and entitlements
 

@@ -12,11 +12,11 @@ procedure.
   its deadline, retry or horizon rules, execute
   `assertDeploymentCleanupPolicyRegression()` before any filesystem, environment,
   CLI or network adapter, and lock the exact policy file hash.
-- This repository does not yet contain the live harness assembler. The module is
-  therefore the canonical policy API, not proof that a future generated helper
-  consumed it. Before another live run, the assembler must prove the exact import
-  or copied hash and test both observation call sites and the request-only retry
-  path for conformance.
+- This repository contains credential-free Points lifecycle composition, but no
+  live adapter host or live harness assembler. The policy API and offline call-site
+  tests are not proof that a future generated helper consumed them. Before another
+  live run, the assembler must prove the exact import or copied hash and test both
+  observation call sites and the request-only retry path for conformance.
 - Live harnesses, credentials, machine runtime manifests, ledgers, deployment
   manifests, requests and staging belong only in a newly created `0700` private
   temporary directory. They must never be committed or included in a Vercel
@@ -29,6 +29,205 @@ Run the offline policy gate with:
 ```sh
 pnpm test:preview:e2e:policy
 ```
+
+### Points fixture diagnostics (2026-09-06)
+
+The narrower Points UI verification has durable, credential-free offline modules:
+
+- `points-preview-identity-policy.mjs`: canonical Provider fixture app metadata,
+  a fixed parameterized SELECT, and fixed-field boolean diagnostics.
+- `points-preview-identity-invocation.mjs`: required, explicitly injected read-only
+  adapters; exact disposable-branch re-attestation before and after the query.
+- `points-preview-platform-contract.mjs`: Preview-only Vercel 59.5.0 argument
+  assembly and top-level deployment response parsing. No CLI execution.
+- `points-preview-lifecycle.mjs`: complete control-flow composition using those
+  imports, explicit adapter contracts, deadlines and `finally` cleanup. All cloud,
+  database and browser effects in its test suite are in-memory simulations.
+
+Run the dedicated offline gate from the app directory:
+
+```sh
+pnpm test:preview:points:offline
+```
+
+This command cannot create cloud resources or users. It tests injected synthetic
+adapters, including the existing migration invocation and cleanup policy. These
+modules are not a complete live harness assembler and do not independently prove
+the future generated harness imports them. Before any new authorized live run,
+lock their source digests and test their actual call sites; do not retype private
+variants of their predicates, CLI field mappings or deployment arguments.
+
+The identity invocation consumes an already-created synthetic Auth response in
+`{ status, body }` form and the pre-ledgered `expectedUserId`. Its
+`readCliOutput(argv)` callback returns pinned Supabase CLI output; the validated
+branch converter exposes `pipelineStatus`, not raw `status`. Its
+`readIdentityProof({ expectedBranchRef, text, values })` callback must execute the
+fixed SELECT once, on the already TLS-verified disposable connection, and return
+`{ projectRef, result: { rowCount, rows } }`. Derive `projectRef` from the verified
+connection descriptor, never echo the caller's expected ref as proof. The
+invocation provides no default CLI, network, connection or credential loader.
+
+Collect Auth and database diagnostics before rejecting an invalid Auth response;
+query only the pre-ledgered expected ID, never an ID supplied by that response.
+Any branch/connection mismatch, adapter exception or failed predicate stops this
+invocation without retries. The lifecycle owner must still clean up in `finally`.
+For predicate failures, `PointsPreviewIdentityError.diagnostics` contains only
+fixed field names and booleans. Never append the raw response, query arguments,
+database errors, email, ID or token. CLI/database transport failures carry only a
+fixed checkpoint and code, not fabricated field-level evidence.
+
+Time eligibility uses one materialized database `clock_timestamp()` sample for
+confirmation and ban predicates. Auth timestamp strings are checked for format,
+not compared with the controller's clock. All nine database fields must be
+strictly `true`, with exactly one row and the exact expected field shape. Missing,
+null, wrong-role, anonymous, banned or unconfirmed users remain rejected. Fixture
+metadata requires both authoritative `app_metadata.role=provider` and the legacy
+compatibility field `careslink_role=provider`; user metadata grants no authority.
+See the [Supabase Admin Auth contract](https://supabase.com/docs/reference/javascript/auth-admin-createuser)
+and [PostgreSQL clock semantics](https://www.postgresql.org/docs/17/functions-datetime.html#FUNCTIONS-DATETIME-CURRENT).
+
+Vercel argument assembly always uses `--target preview`; it never adds the
+production-only `--skip-domain` flag or changes to Production to accommodate it.
+Runtime/build environment flags contain names only, with values supplied privately
+by the owner. CLI output parsing returns private cleanup coordinates, not safe
+report data or ownership proof; REST project/team/run/time/protection attestation
+is still required. A malformed create response must never trigger another create.
+
+Offline qualification is not a successful Auth session. Subsequent password
+login, actual session/RPC proof, refresh/revoke/re-login and two-owner browser
+isolation remain unverified until a separately authorized hosted run passes.
+The previous second-account rejection had no per-field diagnostics, so clock
+skew is a demonstrated script risk, not a proven cause of that specific failure.
+
+### Points lifecycle offline composition (2026-09-07)
+
+`runPointsPreviewLifecycle({ configuration, adapters, clock, signal })` has no
+default adapters, credential loading, CLI entry point or automatic cloud action.
+The ordinary test command above also runs the lifecycle fault-injection matrix.
+It demonstrates orchestration, not actual migrations, session/RPC success, hosted
+browser coverage, remote resource deletion or readiness for Production.
+
+The lifecycle executes the canonical cleanup startup regression before its first
+adapter or clock call. Before preflight, it verifies the six imported dependency
+digests in `POINTS_PREVIEW_LIFECYCLE_SOURCE_PINS` and the caller-pinned digest of
+its own file. Configuration also requires a pinned commit/tree, distinct owner
+IDs, one run marker, exact project/team and a maximum ten-minute to two-hour
+window. Five minutes are reserved for cleanup. The future live host must verify
+the source/runtime/upload closure independently; a receipt echoing expected
+values is not evidence that the host actually performed the check.
+
+The business sequence is fixed: preflight and CLI version checks; durable private
+ledger; one dataless, nonpersistent branch; canonical inventory identity and ready
+state; fixed migration receipt; TLS-scoped connection and zero-data proof; two
+pre-ledgered user creations and the imported dual-source diagnostics; shadow
+balances 62/7; backend receipt; pre-ledgered Preview creation; REST ownership and
+URL binding; browser receipt; unchanged-points proof. Invalid identity diagnostics
+stop before Points seeding and deployment. Any uncertain create result stops
+business work and enters cleanup without a second create attempt.
+
+Every effect is an explicit function listed in `POINTS_PREVIEW_LIFECYCLE_ADAPTERS`.
+The host receives deeply frozen input and `{ deadlineMs, signal, timeoutMs? }`.
+It must perform real scoped checks when eventually authorized, not return
+synthetic receipts. Important contracts include:
+
+- `preflight`: verify commit/tree, upload pinning, protected Preview, disabled
+  models and Vercel CLI 59.5.0; the lifecycle separately checks Supabase 2.115.0.
+- `migrate`: invoke the reviewed fixed migration runner, returning 46 migrations
+  and the pinned manifest digest. The lifecycle does not execute SQL itself.
+- `openDatabase`: derive the project ref from the verified TLS connection.
+  `readIdentityProof` follows the exact-owner SELECT contract above.
+- `runBackendChecks`: require both accounts and all seven exported backend
+  checks. `runBrowserChecks`: require all eight exported browser checks.
+  Only the owned deployment's REST-attested URL may be visited.
+- `getDeployment` / `listDeployments`: return `{ status, body }` management API
+  responses, with complete pagination and exact project/team/time scope.
+  `deleteDeployment` must return the exact deleted UID. These functions never
+  translate HTTP or response-shape failures into transport exceptions.
+- `writeLedger`: atomically persist the private recovery record before each
+  creation, with no password, token or raw Auth response. IDs are retained only
+  in the private ledger, not the sanitized lifecycle result.
+- `quiesce`: join outstanding local work and attest a bounded remote acceptance
+  horizon. An aborted request alone does not establish that a remote create was
+  rejected. An unjoined operation prevents a successful cleanup result.
+
+The injected clock owns monotonic `now()`, bounded `sleep(ms)` and
+`arm(deadlineMs, callback)` (returning a timer cancellation function). Adapter
+calls are raced against these timers and aborted on timeout. External cancellation
+stops business calls; cleanup uses independent signals and the full hard deadline.
+A live adapter must honor cancellation and account for late remote acceptance.
+
+Cleanup closes the database gate and revokes sessions, resolves uncertain creates
+after the acceptance horizon, verifies deployment ownership, deletes the exact
+deployment and gathers three joint ID/marker/window absence observations. Both
+GET and paginated list observation calls use the canonical full deadline and
+30-second request cap. Only a locally classified `PointsPreviewTransportError`
+resets every sample and retries after five seconds; HTTP, scope, shape and
+ownership failures do not retry. Unknown create outcomes require either one
+owned marker match or a proven empty complete window, never a guessed target.
+
+The remaining independent cleanup steps delete fixture rows and exact users,
+verify global Auth/Points zero, close the connection, delete the guarded branch
+and observe branch absence three times. Failure in one cleanup step does not skip
+the other independent attempts. Private local artifacts may be deleted only when
+all cleanup steps and final ledger persistence pass; otherwise retain recovery
+evidence. The returned result contains only fixed stages, booleans, cleanup names
+and, if available, sanitized identity diagnostics.
+
+Before hosted verification: review and pin this composition, implement and test
+the private live adapter host, verify protection/environment/runtime boundaries,
+and obtain explicit authorization for the new bounded disposable run. Passing
+offline receipts does not authorize that run or resolve the prior hosted failure.
+
+### Prepared Points browser driver (2026-09-07)
+
+`points-preview-browser-checks.mjs` implements actual page interactions for the
+`runBrowserChecks` lifecycle adapter, not a callback that unconditionally returns
+success flags. `createPointsPreviewBrowserChecks` takes two caller-owned pages,
+two private synthetic credentials, the REST-attested deployment ID/URL, a clock
+and an exact-owner session revocation function. It returns a single-use adapter
+with the lifecycle's existing input/result shape. It does not launch a browser,
+load credentials, create users/deployments, acquire a protection bypass, save
+browser storage state, capture screenshots or write any report.
+
+The prepared flow opens the signed-out Points gates, logs A/B in via the actual
+password forms, reads the exact labelled 62/7 and zero-reserved metrics, rechecks A
+after B signs in, clicks both language links, follows the AI Documents/Points
+entry links, signs A out, proves B still works, revokes A's sessions, proves A's
+balance is hidden, proves B is unaffected, and logs A back in. Every content
+probe checks origin/path/language and rejects legacy credit content. The script
+returns only the eight fixed lifecycle booleans after every step passes. It closes
+both owned pages in `finally` and reports failures using fixed checkpoints only.
+
+The driver uses the standard Playwright Page/Locator interface available in the
+pinned local runtime. Semantic locators select exactly one visible control;
+the Documents return link is scoped to the main header because that page has
+two visible copies. Login submission is scoped to the password form, not OAuth.
+Credentials remain in memory and are never placed in argv, diagnostics or DOM
+probe arguments. Off-origin login navigation or form destinations stop before
+password entry. See the [Playwright Page API](https://playwright.dev/docs/api/class-page)
+and [Locator API](https://playwright.dev/docs/api/class-locator).
+
+The future private host must supply fresh, separate disposable contexts whose
+pages start at `about:blank`, with service workers blocked, protected-Preview
+access already authorized and egress constrained. Never pass normal user tabs.
+The host must independently pin the driver/runtime and deployment source, keep
+AI disabled, enforce scoped revocation and verify the final unchanged database
+state. Browser request interception alone is not proof of server-side egress
+isolation; redirects, service workers and popups need host-level consideration.
+No new bypass credential or project protection change is authorized here.
+
+All page operations receive a remaining-budget timeout capped at 30 seconds.
+Cancellation closes the owned pages and no subsequent business step starts.
+The outer lifecycle remains responsible for the hard deadline and for joining
+browser/context shutdown in `quiesce`, including factory or shutdown failures.
+
+Offline qualification consists of synthetic page-protocol fault injection plus
+the same serialized DOM probe evaluated against real Points/Documents component
+markup, with external data and the shell mocked. This catches selector/content
+drift but does not test real cookies, hydration, layout visibility, Vercel SSO,
+sessions, RPCs or hosted pages. Cloud/database/revocation/browser-context adapters
+and their private run manifest still need integration before a new authorized
+hosted run; this prepared page driver does not create that host automatically.
 
 ## Required preflight
 

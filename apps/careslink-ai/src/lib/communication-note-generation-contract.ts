@@ -2,10 +2,15 @@ import type { CommunicationNoteComposerSubmission } from "./communication-note-c
 import type {
   CaresLinkV1ErrorCode,
   CaresLinkV1GenerationStatus,
+  CaresLinkV1Locale,
 } from "./v1/shared-contracts";
 
 export const COMMUNICATION_NOTE_GENERATION_API_PATH =
   "/api/ai-documents/communication-note/generate" as const;
+export const COMMUNICATION_NOTE_GENERATION_JOB_API_PATH =
+  "/api/ai-documents/communication-note/jobs" as const;
+export const COMMUNICATION_NOTE_GENERATION_JOB_PAGE_PATH =
+  "/ai-documents/communication-note/jobs" as const;
 
 /** Browser-safe request body produced only after the local privacy review. */
 export type CommunicationNoteGenerationRequest =
@@ -132,6 +137,49 @@ export type CommunicationNoteGenerationAdmission =
 export type CommunicationNoteGenerationResponse =
   | CommunicationNoteGenerationAdmission
   | CommunicationNoteGenerationErrorResponse;
+
+export type CommunicationNoteGenerationJobReadResult =
+  | Readonly<{
+      status: "AVAILABLE";
+      job: CommunicationNoteGenerationJob;
+    }>
+  | Readonly<{ status: "AUTH_REQUIRED" }>
+  | Readonly<{ status: "FORBIDDEN" }>
+  | Readonly<{ status: "NOT_FOUND" }>
+  | Readonly<{ status: "UNAVAILABLE" }>;
+
+export function buildCommunicationNoteGenerationJobHref(input: Readonly<{
+  jobId: string;
+  locale: CaresLinkV1Locale;
+}>) {
+  const jobId = canonicalJobId(input.jobId);
+  if (!(["en", "zh-Hans", "zh-Hant"] as const).includes(input.locale)) {
+    throw invalidJobReference();
+  }
+  return `${COMMUNICATION_NOTE_GENERATION_JOB_PAGE_PATH}/${jobId}?lang=${encodeURIComponent(input.locale)}`;
+}
+
+export function buildCommunicationNoteGenerationJobApiHref(input: Readonly<{
+  jobId: string;
+}>) {
+  return `${COMMUNICATION_NOTE_GENERATION_JOB_API_PATH}/${canonicalJobId(input.jobId)}`;
+}
+
+function canonicalJobId(value: string) {
+  if (
+    typeof value !== "string" ||
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+      value,
+    )
+  ) {
+    throw invalidJobReference();
+  }
+  return value.toLowerCase();
+}
+
+function invalidJobReference() {
+  return new Error("Communication Note generation job reference is invalid");
+}
 
 /** One browser-safe message vocabulary shared by the route and its client. */
 export function getCommunicationNoteGenerationErrorMessage(

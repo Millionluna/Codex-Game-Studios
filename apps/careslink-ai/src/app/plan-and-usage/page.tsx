@@ -30,6 +30,8 @@ import {
   type CaresLinkV1PointsPageData,
 } from "@/lib/v1/points-page-data.server";
 import { isCaresLinkV1PointsUiEnabled } from "@/lib/points-ui-feature.server";
+import { buildCommunicationNotePointsHref, resolveCommunicationNotePointsLocale } from "@/lib/communication-note-points-navigation";
+import type { CommunicationNoteDocumentLocale } from "@/lib/communication-note-document-i18n";
 
 type SearchParams = Record<string, string | string[] | undefined>;
 
@@ -56,6 +58,18 @@ export default async function PlanAndUsagePage({
   const copy = getPlanUsageCopy(locale);
   const workspaceCopy = getReferralWorkspaceCopy(locale);
   const pointsUiEnabled = isCaresLinkV1PointsUiEnabled();
+  const pointsLocale = resolveCommunicationNotePointsLocale(params?.lang) ?? "en";
+  // Auth already restores en/zh-Hans from its display locale. Preserve the
+  // feature-only zh-Hant explicitly without changing those legacy next links.
+  const directPointsHref = pointsLocale === "zh-Hant"
+    ? withLocale("/plan-and-usage", pointsLocale) : "/plan-and-usage";
+  const pendingWorkspaceLocale = pointsUiEnabled
+    ? resolveCommunicationNotePointsLocale(params?.communicationLang) : undefined;
+  const pendingPointsHref = pendingWorkspaceLocale
+    ? withLocale(buildCommunicationNotePointsHref(pendingWorkspaceLocale), pointsLocale)
+    : pointsUiEnabled ? directPointsHref : "/plan-and-usage";
+  const authHref = (path: "/auth/login" | "/auth/register", next: string) =>
+    `${path}?next=${encodeURIComponent(next)}`;
   const gate = await getWorkspaceAccessGateWithServerSession(params);
 
   if (gate.status === "signed_out") {
@@ -63,13 +77,14 @@ export default async function PlanAndUsagePage({
       <ReferralWorkspaceLoginGate
         copy={
           pointsUiEnabled
-            ? getPointsLoginWorkspaceCopy(workspaceCopy, locale)
+            ? getPointsLoginWorkspaceCopy(workspaceCopy, pointsLocale)
             : workspaceCopy
         }
-        locale={locale}
-        languageSwitcherHref="/plan-and-usage"
-        loginHref="/auth/login?next=%2Fplan-and-usage"
-        registerHref="/auth/register?next=%2Fplan-and-usage"
+        locale={pointsUiEnabled ? pointsLocale : locale}
+        balanceNavigation={pointsUiEnabled ? "points" : undefined}
+        languageSwitcherHref={pendingPointsHref}
+        loginHref={authHref("/auth/login", pendingPointsHref)}
+        registerHref={authHref("/auth/register", pendingPointsHref)}
       />
     );
   }
@@ -83,6 +98,10 @@ export default async function PlanAndUsagePage({
     withWorkspaceAccount(withLocale(path, locale), accountParam);
 
   if (pointsUiEnabled) {
+    const workspaceLocale = gate.source === "supabase" ? pendingWorkspaceLocale : undefined;
+    const pointsHref = workspaceLocale ? pendingPointsHref : directPointsHref;
+    const pointsRouteHref = (path: string) =>
+      withWorkspaceAccount(withLocale(path, pointsLocale), accountParam);
     const points =
       gate.source === "supabase"
         ? await resolveCaresLinkV1PointsPageData()
@@ -91,20 +110,21 @@ export default async function PlanAndUsagePage({
     return (
       <AppShell
         balanceNavigation="points"
-        locale={locale}
-        languageSwitcherHref="/plan-and-usage"
+        locale={pointsLocale}
+        languageSwitcherHref={pointsHref}
         workspaceAccountId={accountParam}
         workspaceRole="provider"
         workspaceSessionSource={gate.source}
       >
         <PointsPreviewSurface
           data={points}
-          locale={locale}
-          openDocumentsHref={href("/ai-documents")}
-          refreshHref={href("/plan-and-usage")}
+          locale={pointsLocale}
+          openDocumentsHref={pointsRouteHref("/ai-documents")}
+          workspaceLocale={workspaceLocale}
+          refreshHref={pointsRouteHref(pointsHref)}
           signInHref={withLocale(
-            "/auth/login?next=%2Fplan-and-usage",
-            locale,
+            authHref("/auth/login", pointsHref),
+            pointsLocale === "zh-Hant" ? "en" : pointsLocale,
           )}
         />
       </AppShell>
@@ -248,12 +268,14 @@ function PointsPreviewSurface({
   openDocumentsHref,
   refreshHref,
   signInHref,
+  workspaceLocale,
 }: {
   data: CaresLinkV1PointsPageData;
-  locale: Locale;
+  locale: CommunicationNoteDocumentLocale;
   openDocumentsHref: string;
   refreshHref: string;
   signInHref: string;
+  workspaceLocale?: CommunicationNoteDocumentLocale;
 }) {
   const copy = getPointsPreviewCopy(locale);
 
@@ -274,13 +296,19 @@ function PointsPreviewSurface({
               {copy.previewStatus}
             </span>
           </div>
-          <Link
+          {workspaceLocale ? <a
+            href={`/ai-documents?lang=${workspaceLocale}`}
+            className="jade-action w-full sm:w-auto"
+          >
+            <FileText className="size-4" aria-hidden="true" />
+            {copy.backToWorkspace}
+          </a> : <Link
             href={openDocumentsHref}
             className="jade-action w-full sm:w-auto"
           >
             <FileText className="size-4" aria-hidden="true" />
             {copy.openDocuments}
-          </Link>
+          </Link>}
         </div>
       </header>
 
@@ -330,7 +358,7 @@ function PointsPreviewState({
 }: {
   copy: ReturnType<typeof getPointsPreviewCopy>;
   data: CaresLinkV1PointsPageData;
-  locale: Locale;
+  locale: CommunicationNoteDocumentLocale;
   refreshHref: string;
   signInHref: string;
 }) {
@@ -401,14 +429,14 @@ function PointsMetric({
   value,
 }: {
   label: string;
-  locale: Locale;
+  locale: CommunicationNoteDocumentLocale;
   value: number;
 }) {
   return (
     <div className="border-b border-line px-5 py-5 last:border-b-0 sm:border-b-0 sm:border-r sm:last:border-r-0 sm:px-6">
       <dt className="text-sm font-semibold text-[#405b52]">{label}</dt>
       <dd className="mt-3 text-3xl font-semibold tabular-nums text-foreground">
-        {value.toLocaleString(locale === "zh-Hans" ? "zh-CN" : "en-AU")}
+        {value.toLocaleString(getPointsIntlLocale(locale))}
       </dd>
     </div>
   );
@@ -452,12 +480,16 @@ function PointsStateMessage({
 
 function getPointsLoginWorkspaceCopy(
   workspaceCopy: ReferralWorkspaceCopy,
-  locale: Locale,
+  locale: CommunicationNoteDocumentLocale,
 ): ReferralWorkspaceCopy {
   const pointsCopy = getPointsPreviewCopy(locale);
 
   return {
     ...workspaceCopy,
+    common: {
+      ...workspaceCopy.common,
+      trustBoundary: pointsCopy.boundaryTitle,
+    },
     auth: {
       ...workspaceCopy.auth,
       gate: {
@@ -473,15 +505,48 @@ function getPointsLoginWorkspaceCopy(
   };
 }
 
-function formatPointsTimestamp(value: string, locale: Locale) {
-  return new Intl.DateTimeFormat(locale === "zh-Hans" ? "zh-CN" : "en-AU", {
+function getPointsIntlLocale(locale: CommunicationNoteDocumentLocale) {
+  return locale === "zh-Hant" ? "zh-TW" : locale === "zh-Hans" ? "zh-CN" : "en-AU";
+}
+
+function formatPointsTimestamp(value: string, locale: CommunicationNoteDocumentLocale) {
+  return new Intl.DateTimeFormat(getPointsIntlLocale(locale), {
     dateStyle: "medium",
     timeStyle: "short",
     timeZone: "UTC",
   }).format(new Date(value));
 }
 
-function getPointsPreviewCopy(locale: Locale) {
+function getPointsPreviewCopy(locale: CommunicationNoteDocumentLocale) {
+  if (locale === "zh-Hant") {
+    return {
+      eyebrow: "Points 預覽",
+      title: "Points 餘額",
+      description: "顯示目前已驗證服務商帳戶的唯讀 Points 餘額。",
+      previewStatus: "預覽 · 尚未啟用",
+      openDocuments: "開啟 AI 文件",
+      backToWorkspace: "返回工作台",
+      balanceTitle: "餘額快照",
+      balanceDescription: "伺服器會根據目前有效的登入狀態重新核驗此餘額。",
+      availablePoints: "預覽 Points 餘額",
+      reservedPoints: "已預留 Points",
+      readOnly: "這是唯讀預覽，此餘額目前無法使用。",
+      checkedAt: (date: string) => `核驗時間：${date} UTC。`,
+      notReadyTitle: "Points 預覽尚未就緒",
+      notReadyDetail: "此帳戶目前沒有可顯示的預覽餘額，請稍後再試。",
+      unavailableTitle: "暫時無法載入 Points 預覽",
+      unavailableDetail: "此頁面沒有預留或使用 Points，請重試。",
+      authTitle: "需要已驗證的登入狀態",
+      authDetail: "請使用服務商帳戶登入，以查看 Points 預覽。登入頁目前以英文顯示，完成後會返回此頁。",
+      tryAgain: "重新載入 Points",
+      signIn: "登入查看 Points（英文登入頁）",
+      signInTitle: "登入查看 Points 預覽",
+      signInDescription: "使用已驗證的服務商帳戶查看目前唯讀 Points 餘額。登入與註冊頁目前以英文顯示，完成後會返回此頁。",
+      register: "建立服務商帳戶（英文註冊頁）",
+      boundaryTitle: "預覽邊界",
+      boundary: "此頁面只讀取伺服器核驗的餘額快照，無法發放、購買、預留、使用或轉換 Points。",
+    };
+  }
   if (locale === "zh-Hans") {
     return {
       eyebrow: "Points 预览",
@@ -489,6 +554,7 @@ function getPointsPreviewCopy(locale: Locale) {
       description: "显示当前已验证服务商账户的只读 Points 余额。",
       previewStatus: "预览 · 尚未启用",
       openDocuments: "打开 AI 文档",
+      backToWorkspace: "返回工作台",
       balanceTitle: "余额快照",
       balanceDescription: "服务器会根据当前有效会话重新核验此余额。",
       availablePoints: "预览 Points 余额",
@@ -519,6 +585,7 @@ function getPointsPreviewCopy(locale: Locale) {
       "Read-only balance information for the current verified provider account.",
     previewStatus: "Preview · not active",
     openDocuments: "Open AI Documents",
+    backToWorkspace: "Back to workspace",
     balanceTitle: "Balance snapshot",
     balanceDescription:
       "The server verifies this balance for the current active session.",

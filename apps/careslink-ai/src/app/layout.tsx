@@ -11,6 +11,9 @@ const DOCUMENT_LANGUAGE_BOOTSTRAP = `(() => {
     const pathname = window.location.pathname.replace(/\\/+$/, "");
     const supportedLocales = new Set(
       pathname === "/ai-documents/communication-note"
+        || (pathname.split("/").length === 5 &&
+          ["/ai-documents/communication-note/jobs/", "/ai-documents/communication-note/documents/"]
+            .some(prefix => pathname.startsWith(prefix)))
         ? ["en", "zh-Hans", "zh-Hant"]
         : ["en", "zh-Hans"],
     );

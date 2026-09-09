@@ -75,7 +75,7 @@ describe("Communication Note M1l activation preflight", () => {
     expect(
       CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_ACTIVATION_PREFLIGHT_POLICY_DIGEST,
     ).toBe(
-      "4ca5243f264f3e202f629f8ec0b30d984b372325acc42125cebdca06ab4694cb",
+      "2c963ccdc6dbfe07ba7b107296d883d52d5b87d695de5f504e15c8616e308c16",
     );
     expect(
       CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_ACTIVATION_PREFLIGHT_POLICY,
@@ -180,7 +180,7 @@ describe("Communication Note M1l activation preflight", () => {
       ),
     );
     expect(result.candidate.database).toMatchObject({
-      migrationCount: 46,
+      migrationCount: 47,
       runtimeCredentialBrokerMigrationSha256:
         CARESLINK_V1_COMMUNICATION_NOTE_PREVIEW_DATABASE_EVIDENCE_PINS
           .runtimeCredentialBrokerMigrationSha256,
@@ -244,7 +244,7 @@ describe("Communication Note M1l activation preflight", () => {
     }
   });
 
-  it("pins 46 migration sources while activation stays blocked and Hosted evidence remains unclaimed", () => {
+  it("pins 47 migration sources while activation stays blocked and Hosted evidence remains unclaimed", () => {
     const migrationsDirectory = join(process.cwd(), "supabase/migrations");
     const migrationNames = readdirSync(migrationsDirectory)
       .filter((name) => name.endsWith(".sql"))

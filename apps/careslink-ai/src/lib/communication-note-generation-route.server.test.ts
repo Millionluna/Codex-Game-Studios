@@ -250,6 +250,38 @@ describe("Communication Note generation server route", () => {
     expect(submit).not.toHaveBeenCalled();
   });
 
+  it("rejects a principal-resolution accessor without invoking it", async () => {
+    const getter = vi.fn(() => true);
+    const resolution = {
+      principal: {
+        userId: PROVIDER_ID,
+        sessionId: SESSION_ID,
+        transport: "COOKIE",
+      },
+    };
+    Object.defineProperty(resolution, "ok", {
+      enumerable: true,
+      get: getter,
+    });
+    const submit = vi.fn();
+    const handler = createTestOnlyCommunicationNoteGenerationHandler({
+      capability: "TEST_ONLY_M1X_COMMUNICATION_NOTE_GENERATION_ROUTE",
+      runtimeEnabled: true,
+      submitter: { submit },
+      resolvePrincipal: vi.fn().mockResolvedValue(resolution),
+      createCorrelationId: () => CORRELATION_ID,
+    });
+
+    const response = await handler(validRequest());
+
+    expect(response.status).toBe(503);
+    expect(await response.json()).toMatchObject({
+      error: { code: "PRODUCT_API_DISABLED" },
+    });
+    expect(getter).not.toHaveBeenCalled();
+    expect(submit).not.toHaveBeenCalled();
+  });
+
   it.each([
     {
       name: "non-JSON media type",

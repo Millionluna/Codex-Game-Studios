@@ -13,6 +13,7 @@
     "test:local:communication-note-preview-history-lock": "node scripts/preview-e2e/communication-note-preview-history-lock-local-pg16.mjs",
     "test:local:portal-follow-up-concurrency": "node scripts/preview-e2e/portal-referral-follow-up-concurrency-local-pg16.mjs",
     "test:preview:e2e:policy": "vitest run scripts/preview-e2e",
+    "test:preview:points:offline": "vitest run scripts/preview-e2e/points-preview-identity-policy.test.mjs scripts/preview-e2e/points-preview-identity-invocation.test.mjs scripts/preview-e2e/points-preview-platform-contract.test.mjs scripts/preview-e2e/points-preview-lifecycle.test.mjs scripts/preview-e2e/points-preview-browser-checks.test.mjs scripts/preview-e2e/points-preview-browser-markup.test.mjs scripts/preview-e2e/communication-note-preview-transactional-invocation.test.mjs scripts/preview-e2e/deployment-cleanup-policy.test.mjs",
     "test:preview:e2e:worker-rpc": "node scripts/preview-e2e/note-worker-rpc-concurrency.mjs"
   },
   "dependencies": {
@@ -22,17 +23,21 @@
     "@supabase/supabase-js": "2.108.2",
     "@vercel/analytics": "^2.0.1",
     "@vercel/oidc": "3.8.5",
+    "docx": "9.7.1",
     "fast-crc32c": "2.0.0",
+    "fontkit": "2.0.4",
     "google-auth-library": "11.0.2",
     "jose": "6.2.10",
     "lucide-react": "^1.21.0",
     "next": "16.2.9",
     "pg": "8.23.0",
+    "pdf-lib": "1.17.1",
     "react": "19.2.4",
     "react-dom": "19.2.4"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@types/fontkit": "2.0.9",
     "@types/node": "^20",
     "@types/pg": "8.23.0",
     "@types/react": "^19",
