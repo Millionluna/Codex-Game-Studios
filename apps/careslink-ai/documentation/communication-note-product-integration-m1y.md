@@ -3464,3 +3464,65 @@ Production operation occurred.
 insufficient/not-ready balance guidance, with an explicit warning before leaving
 unsubmitted facts. Reuse this navigation and current balance handling; do not
 put facts in URLs/storage, imply that purchase is available, or activate runtime.
+
+## Communication Note composer Points entry and leave guard (2026-09-09)
+
+Implemented the next local UI slice on `174128d`. The composer offers the
+existing read-only Points route when its snapshot is NOT_READY, UNAVAILABLE or
+insufficient, and after a server `POINTS_INSUFFICIENT` response even when the
+page-load snapshot was sufficient. No balance is changed on the client. The
+entry is withheld while a generation request is pending. It reuses the fixed
+locale-only URL and explicit Traditional Chinese → English Points label; the
+Points page returns to the workspace, not to a restored unsent composer.
+
+Owned full-page links (Points, Logo, workspace, language and privacy) now warn
+before discarding any entered field. Pending/uncertain submissions use separate
+copy: leaving does not cancel a server task and loses the page-only retry
+request, so check the workspace before another generation. Cancelling preserves
+facts, privacy checks and exact retry bytes/key. Confirming an owned link
+suppresses a second generic unload prompt; successful admission also permits
+the existing job redirect without an inappropriate discard warning.
+
+`beforeunload` is registered only while input or a locked request exists.
+`pagehide` and persisted `pageshow` clear page-only inputs, checks and request
+state, abort the local request and ignore its late result. No persistent storage,
+fact-bearing URL, server cancellation, new auth authority or purchase was added.
+This is not an autosave guarantee: browsers control unload prompts and may not
+fire lifecycle events when a mobile process is killed. See the current
+[beforeunload documentation](https://developer.mozilla.org/en-US/docs/Web/API/Window/beforeunload_event).
+Existing green styling, typography and Logo are preserved.
+
+Verification and remaining boundary:
+
+- Complete suite: 5,308 passed, 41 skipped; 305 passing and four opt-in skipped
+  files. Full lint/typecheck, 73-file adapter sync and diff checks passed.
+  Unit/jsdom coverage includes all seven dirty fields, three locale prompts,
+  cancellation, allowed departure without double prompt, refresh warning,
+  lifecycle reset, late ACK suppression, unchanged exact retry, sufficient /
+  insufficient / unavailable / not-ready states and server insufficient errors.
+- Owned `--workspace-task` webpack fixture and 40-chunk client scan passed.
+  Browser tab 39 initially rendered the unchanged green composer without
+  warning/error logs. At 30/0 synthetic Points no entry was shown. The fixed
+  parent seed produced the standard 10/0 baseline; reload visibly showed the
+  new entry and explanation with generation still disabled.
+- **Browser acceptance is partial.** After entering one synthetic follow-up
+  and clicking View Points, browser control timed out. The dialog API returned
+  no handle; subsequent screenshot/AX access also timed out. Native Codex-app
+  automation was denied and was not bypassed. Thus neither the rendered native
+  confirmation nor its cancel/accept, real Back/refresh and narrow-layout tail
+  is claimed as passed. No product changes were made just to bypass this test
+  limitation. The browser-verification stop condition was respected.
+- Database counters stayed at the seed baseline: 10 available / 0 reserved,
+  seven ledger entries, three admissions/reserves/terminals, 25 tasks, reviews /
+  exports zero, setup edit/sync 1/1. Runtime roles/sessions/locks and receipts zero.
+- Verified parent 97923 was stopped. Cleanup reported active leases zero,
+  PostgreSQL stopped and `removed:true, sourceUnchanged:true`; independent checks
+  confirmed `/private/tmp/cl-job-browser-1xbHZA` absent, port 3395 free and owned
+  processes gone. The temporary database and all synthetic database data are
+  removed. Tab close timed out; a fresh inventory still listed temporary tab 39
+  alongside untouched user tabs 1 and 12. Do not claim browser cleanup complete.
+
+Next: manually dismiss/close the remaining temporary test page, then recreate
+the same local fixture for supervised cancel/accept, refresh/Back and three-
+locale narrow-layout acceptance. Keep these gates pending until observed.
+No push, PR, deployment, Production data, real AI, payment or hosted change.

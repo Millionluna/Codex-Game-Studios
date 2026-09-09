@@ -70,6 +70,8 @@ const LOCAL_CLIENT_MODULE_PATHS = [
   "src/app/ai-documents/communication-note/communication-note-composer.tsx",
   "src/lib/communication-note-composer.ts",
   "src/lib/communication-note-points-preview.ts",
+  "src/lib/communication-note-composer-navigation.ts",
+  "src/lib/communication-note-points-navigation.ts",
 ] as const;
 
 const FIELD_NAMES = [
@@ -392,6 +394,9 @@ describe("Communication Note composer browser boundary", () => {
     expect(navigationMocks.replaceLocation).toHaveBeenCalledExactlyOnceWith(
       expectedHref,
     );
+    const unload = new Event("beforeunload", { cancelable: true });
+    window.dispatchEvent(unload);
+    expect(unload.defaultPrevented).toBe(false);
     expect(expectedHref).not.toMatch(
       /observable_facts|idempotency|contentHash|revisionId|participant/i,
     );
@@ -476,7 +481,7 @@ describe("Communication Note composer browser boundary", () => {
     vi.stubGlobal("fetch", fetcher);
     await prepareConnectedSubmission(copy.locale);
     const points = container.querySelector('[aria-labelledby="communication-note-points-title"]');
-    const initialBalance = points?.textContent;
+    const initialBalance = points?.querySelector("h3 + p")?.textContent;
     const submit = container.querySelector<HTMLButtonElement>('button[type="submit"]')!;
     expect(submit.disabled).toBe(false);
     await act(async () => submit.click());
@@ -486,7 +491,13 @@ describe("Communication Note composer browser boundary", () => {
     expect(alert?.textContent).toContain(copy.snapshot);
     expect(alert?.textContent).toContain(copy.generic);
     expect(alert?.textContent).toContain(copy.replay);
-    expect(points?.textContent).toBe(initialBalance);
+    expect(points?.querySelector("h3 + p")?.textContent).toBe(initialBalance);
+    const pointsLink = points?.querySelector<HTMLAnchorElement>('a[href^="/plan-and-usage"]');
+    expect(pointsLink?.getAttribute("href")).toContain(`communicationLang=${copy.locale}`);
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
+    await act(async () => pointsLink?.click());
+    expect(confirm).toHaveBeenCalledTimes(1);
+    expect(getField("observable_facts").value).toContain("requested an update");
     expect(submit.disabled).toBe(true);
     for (const field of FIELD_NAMES) expect(getField(field).disabled).toBe(true);
     expect(vi.getTimerCount()).toBe(0);
@@ -501,7 +512,7 @@ describe("Communication Note composer browser boundary", () => {
     expect(replayRequest?.headers).toEqual(firstRequest?.headers);
     expect(uuid).toHaveBeenCalledTimes(1);
     expect(submit.disabled).toBe(true);
-    expect(points?.textContent).toBe(initialBalance);
+    expect(points?.querySelector("h3 + p")?.textContent).toBe(initialBalance);
     expect(vi.getTimerCount()).toBe(0);
   });
 
@@ -573,6 +584,104 @@ describe("Communication Note composer browser boundary", () => {
     expect(submit?.disabled).toBe(true);
     await act(async () => submit?.click());
     expect(fetcher).not.toHaveBeenCalled();
+  });
+});
+
+describe("composer Points navigation and leave boundary", () => {
+  const input = async (value = "SYNTHETIC UNSUBMITTED FACT") => act(async () => {
+    setNativeValue(getField("follow_up"), value);
+    getField("follow_up").dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  const pointsLink = () => container.querySelector<HTMLAnchorElement>('a[href^="/plan-and-usage"]')!;
+  const unload = () => {
+    const event = new Event("beforeunload", { cancelable: true });
+    window.dispatchEvent(event); return event.defaultPrevented;
+  };
+  // Observe whether the React guard allowed the native link, then suppress
+  // jsdom's unimplemented page navigation. Real navigation is browser-tested.
+  async function clickWithoutLeaving(anchor: HTMLAnchorElement, init: MouseEventInit = {}) {
+    let allowed = false;
+    const preventNavigation = (event: MouseEvent) => { allowed = true; event.preventDefault(); };
+    anchor.addEventListener("click", preventNavigation);
+    await act(async () => anchor.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, ...init })));
+    anchor.removeEventListener("click", preventNavigation);
+    return allowed;
+  }
+  it.each(["en", "zh-Hans", "zh-Hant"] as const)("protects %s input, cancels loss and permits a confirmed departure once", async locale => {
+    const io = installBrowserIoSpies();
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
+    await renderComposer(false, { status: "UNAVAILABLE", unit: "POINTS" }, locale);
+    expect(pointsLink().href).toContain(`communicationLang=${locale}`);
+    expect(pointsLink().textContent).toContain(locale === "zh-Hant" ? "英文" : "Points");
+    expect(await clickWithoutLeaving(pointsLink())).toBe(true);
+    expect(confirm).not.toHaveBeenCalled(); expect(unload()).toBe(false);
+    await input();
+    expect(await clickWithoutLeaving(pointsLink())).toBe(false);
+    expect(confirm.mock.calls[0][0]).toContain(locale === "en" ? "unsubmitted facts" : locale === "zh-Hans" ? "未提交" : "未提交");
+    expect(getField("follow_up").value).toBe("SYNTHETIC UNSUBMITTED FACT");
+    expect(unload()).toBe(true);
+    confirm.mockReturnValue(true);
+    expect(await clickWithoutLeaving(pointsLink())).toBe(true);
+    expect(unload()).toBe(false); // No second browser prompt.
+    expectNoBrowserIo(io);
+    expect(pointsLink().href).not.toContain("SYNTHETIC");
+    await act(async () => window.dispatchEvent(new PageTransitionEvent("pagehide")));
+    await act(async () => window.dispatchEvent(new PageTransitionEvent("pageshow", { persisted: true })));
+    expect(FIELD_NAMES.every(field => getField(field).value === "")).toBe(true);
+    expect(container.querySelector('input[type="checkbox"]')).toBeNull();
+    expect(unload()).toBe(false);
+    await input("NEW SYNTHETIC INPUT"); expect(unload()).toBe(true);
+  });
+  it.each([
+    { status: "NOT_READY", unit: "POINTS", serviceCode: "note.communication.generate", catalogVersion: "fixture", generationCostPoints: 20 },
+    { ...AVAILABLE_POINTS_PREVIEW, availablePoints: 0, canAfford: false },
+  ] as const)("offers Points without enabling generation for $status", async preview => {
+    const io = installBrowserIoSpies(); await renderComposer(true, preview);
+    expect(pointsLink()).not.toBeNull(); expect(getDisabledGenerationButton().disabled).toBe(true);
+    expect(text()).toContain("Purchasing is not available"); expectNoBrowserIo(io);
+  });
+  it("does not add a Points detour when the snapshot is sufficient", async () => {
+    await renderComposer(true); expect(pointsLink()).toBeNull();
+  });
+  it("protects logo, workspace and locale links, but not same-page validation or modified clicks", async () => {
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
+    await renderComposer(); await input();
+    for (const anchor of container.querySelectorAll<HTMLAnchorElement>("a[data-composer-navigation]")) {
+      expect(await clickWithoutLeaving(anchor)).toBe(false);
+    }
+    confirm.mockClear();
+    const anchor = container.querySelector<HTMLAnchorElement>('a[data-composer-navigation]')!;
+    expect(await clickWithoutLeaving(anchor, { ctrlKey: true })).toBe(true);
+    expect(confirm).not.toHaveBeenCalled(); expect(unload()).toBe(true);
+    await submitLocalReview();
+    expect(container.querySelector('[role="alert"]')).not.toBeNull();
+    expect(confirm).not.toHaveBeenCalled();
+  });
+  it("removes the warning when all entered content is cleared", async () => {
+    await renderComposer(); await input(); expect(unload()).toBe(true);
+    await input("  \n"); expect(unload()).toBe(false);
+  });
+  it("warns about uncertain requests and clears only on actual departure, ignoring a late ACK", async () => {
+    let resolveResponse: (value: unknown) => void = () => {};
+    const fetcher = vi.fn().mockImplementation(() => new Promise(resolve => { resolveResponse = resolve; }));
+    vi.stubGlobal("fetch", fetcher);
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
+    await prepareConnectedSubmission();
+    await act(async () => container.querySelector<HTMLButtonElement>('button[type="submit"]')!.click());
+    const original = getField("observable_facts").value;
+    const back = container.querySelector<HTMLAnchorElement>('a[data-composer-navigation]')!;
+    expect(await clickWithoutLeaving(back)).toBe(false);
+    expect(confirm).toHaveBeenCalledWith(expect.stringContaining("does not cancel a server task"));
+    expect(getField("observable_facts").value).toBe(original);
+    expect(fetcher.mock.calls[0][1].signal.aborted).toBe(false);
+    await act(async () => window.dispatchEvent(new PageTransitionEvent("pagehide")));
+    expect(fetcher.mock.calls[0][1].signal.aborted).toBe(true);
+    expect(getField("observable_facts").value).toBe("");
+    await act(async () => resolveResponse({ status: 202, json: async () => ({ created: true,
+      job: generationJob("QUEUED") }) }));
+    expect(navigationMocks.replaceLocation).not.toHaveBeenCalled();
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(unload()).toBe(false);
   });
 });
 

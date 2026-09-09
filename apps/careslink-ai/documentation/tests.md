@@ -5118,6 +5118,24 @@ See [full-flow scope and remaining real-admission gate](communication-note-produ
   removed and viewport reset; source isolation verified. No Production changes.
 - [Implementation and next composer entry](communication-note-product-integration-m1y.md#communication-note-workspace-to-points-navigation-2026-09-09).
 
+### Composer Points entry and leave guard: browser tail pending (2026-09-09)
+
+- 5,308 tests passed, 41 skipped (305 passing / four skipped files); full lint,
+  typecheck, 73-file adapter sync, owned webpack and 40-chunk boundary scan pass.
+- Added all-field dirty detection and three-locale discard/uncertain-request
+  tests; cancellation preserves exact retry bytes/key, accepted links avoid
+  double prompts, ACK navigation is allowed, and pagehide/persisted return clear
+  page-only state without another request. Existing I/O-free client checks pass.
+- Browser confirmed sufficient balance hides the new entry and fixed-seed
+  insufficiency displays it. Clicking after synthetic input stalled the browser
+  connection; dialog handle and screenshot could not establish the outcome.
+  Actual cancel/accept, Back/refresh and narrow-layout tail are **not passed**.
+- Final seed counters unchanged: 10/0 Points, seven ledger entries, three
+  admissions/reserves/terminals, 25 jobs; review/export zero, setup edit/sync 1/1.
+  Runtime roles/sessions/locks/receipts zero. Owned PG/server/root removed and
+  source isolation verified, but a fresh inventory still listed test tab 39.
+- [Pending supervised browser tail](communication-note-product-integration-m1y.md#communication-note-composer-points-entry-and-leave-guard-2026-09-09).
+
 ### Current live/read-only evidence
 
 - Supabase migrations, tables, RLS flags, policies, grants, function grants and aggregate row counts were checked read-only.

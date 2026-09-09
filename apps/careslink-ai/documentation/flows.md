@@ -356,6 +356,22 @@ Next: composer balance guidance → Points entry with unsubmitted-facts leave
 warning, without purchases or runtime activation.
 See [navigation evidence](communication-note-product-integration-m1y.md#communication-note-workspace-to-points-navigation-2026-09-09).
 
+### Composer Points guidance and leave guard (2026-09-09)
+
+Insufficient/not-ready/unavailable composer balance → read-only Points entry →
+confirm discarding page-only inputs, or cancel and keep editing. Uncertain
+submissions explicitly retain server-task uncertainty and the existing exact
+retry path; successful admission bypasses the discard prompt. Actual departure
+clears local facts/checks/retry state. Points keeps the original workspace
+locale; no input is restored or persisted and purchasing remains unavailable.
+
+Implementation and automated tests pass. Real-browser entry rendering passed,
+but the confirmation interaction stalled browser control; cancel/accept and
+return acceptance remain pending, with temporary tab 39 still listed after
+close timed out. Local database/server/data were removed. Next is supervised
+browser acceptance, not deployment or further runtime activation.
+See [partial guard acceptance](communication-note-product-integration-m1y.md#communication-note-composer-points-entry-and-leave-guard-2026-09-09).
+
 ## 4. Save, history and delete
 
 ### Current flow

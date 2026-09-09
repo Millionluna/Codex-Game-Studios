@@ -36,6 +36,8 @@ import {
 } from "../../../lib/communication-note-generation-client";
 import { buildCommunicationNoteGenerationJobHref } from "../../../lib/communication-note-generation-contract";
 import { replaceCommunicationNoteLocation } from "../../../lib/communication-note-document-navigation";
+import { buildCommunicationNotePointsHref, COMMUNICATION_NOTE_POINTS_ENTRY } from "../../../lib/communication-note-points-navigation";
+import { hasCommunicationNoteComposerInput, COMMUNICATION_NOTE_COMPOSER_NAVIGATION_COPY } from "../../../lib/communication-note-composer-navigation";
 
 type CommunicationNoteComposerProps = {
   locale: CommunicationNoteComposerLocale;
@@ -74,11 +76,45 @@ export function CommunicationNoteComposer({
   const [generationError, setGenerationError] = useState<string>();
   const [generationPending, setGenerationPending] = useState(false);
   const [requestLocked, setRequestLocked] = useState(false);
+  const [pointsRejected, setPointsRejected] = useState(false);
+  const navigationAllowedRef = useRef(false);
   const generationCopy = getGenerationSurfaceCopy(locale);
+  const navigationCopy = COMMUNICATION_NOTE_COMPOSER_NAVIGATION_COPY[locale];
+  const hasUnsubmittedInput = hasCommunicationNoteComposerInput(draft);
+  const needsLeaveWarning = hasUnsubmittedInput || requestLocked;
+  const showPointsEntry = pointsPreview.status !== "AVAILABLE" || !pointsPreview.canAfford || pointsRejected;
+
+  useEffect(() => {
+    if (!needsLeaveWarning) return;
+    const beforeUnload = (event: BeforeUnloadEvent) => {
+      if (navigationAllowedRef.current) return;
+      event.preventDefault(); event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", beforeUnload);
+    return () => window.removeEventListener("beforeunload", beforeUnload);
+  }, [needsLeaveWarning]);
 
   useEffect(() => {
     mountedRef.current = true;
+    // Full-page navigation drops page-only facts and retry bytes. A persisted
+    // browser return must not resurrect them or replay an old request.
+    const clearPage = () => {
+      abortControllerRef.current?.abort(); abortControllerRef.current = undefined;
+      requestRef.current = undefined; inFlightRef.current = false;
+      setDraft(createEmptyCommunicationNoteComposerDraft()); setReview(undefined);
+      setReviewIsCurrent(false); setConfirmations(INITIAL_CONFIRMATIONS);
+      setGenerationError(undefined); setGenerationPending(false); setRequestLocked(false);
+      setPointsRejected(false);
+    };
+    const restorePage = (event: PageTransitionEvent) => {
+      navigationAllowedRef.current = false;
+      if (event.persisted) clearPage();
+    };
+    window.addEventListener("pagehide", clearPage);
+    window.addEventListener("pageshow", restorePage);
     return () => {
+      window.removeEventListener("pagehide", clearPage);
+      window.removeEventListener("pageshow", restorePage);
       mountedRef.current = false;
       abortControllerRef.current?.abort();
       abortControllerRef.current = undefined;
@@ -150,6 +186,7 @@ export function CommunicationNoteComposer({
 
   function handleGenerationResult(result: CommunicationNoteGenerationClientResult) {
     if (!result.ok) {
+      setPointsRejected(result.error.code === "POINTS_INSUFFICIENT");
       setGenerationError(generationCopy.error(result.error.code));
       return;
     }
@@ -159,7 +196,21 @@ export function CommunicationNoteComposer({
     });
     requestRef.current = undefined;
     inFlightRef.current = false;
+    navigationAllowedRef.current = true; // ACK navigation is not an input discard.
     replaceCommunicationNoteLocation(jobHref);
+  }
+
+  function confirmPageNavigation(event: React.MouseEvent<HTMLElement>) {
+    if (!needsLeaveWarning || event.defaultPrevented || event.button !== 0 ||
+      event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || !(event.target instanceof Element)) return;
+    const anchor = event.target.closest<HTMLAnchorElement>("a[data-composer-navigation]");
+    if (!anchor || (anchor.target && anchor.target !== "_self")) return;
+    if (!window.confirm(requestLocked ? navigationCopy.unresolved : navigationCopy.discard)) {
+      event.preventDefault(); event.stopPropagation(); return;
+    }
+    // These owned links use full-page navigation, with no downstream handler.
+    // Suppress the second, generic browser prompt for this confirmed departure.
+    navigationAllowedRef.current = true;
   }
 
   async function submitGeneration(event: React.FormEvent<HTMLFormElement>) {
@@ -219,10 +270,11 @@ export function CommunicationNoteComposer({
   }
 
   return (
-    <main className="case-note-page">
+    <main className="case-note-page" onClickCapture={confirmPageNavigation}>
       <header className="case-note-brandbar border-b border-white/10">
         <div className="mx-auto flex min-h-16 max-w-[1600px] flex-wrap items-center justify-between gap-3 px-4 py-2 sm:px-6 lg:px-8">
           <a
+            data-composer-navigation
             href={buildCommunicationNoteWorkspaceHref("/ai-documents", locale)}
             className="inline-flex items-center rounded-sm focus-visible:ring-2 focus-visible:ring-[#9fe1ca]"
             aria-label="CaresLink AI"
@@ -238,6 +290,7 @@ export function CommunicationNoteComposer({
           </a>
           <div className="flex flex-wrap items-center justify-end gap-2">
             <a
+              data-composer-navigation
               href={buildCommunicationNoteWorkspaceHref(
                 "/ai-documents",
                 locale,
@@ -257,6 +310,7 @@ export function CommunicationNoteComposer({
               />
               {COMMUNICATION_NOTE_COMPOSER_LOCALES.map((supportedLocale) => (
                 <a
+                  data-composer-navigation
                   key={supportedLocale}
                   href={buildCommunicationNoteLocaleHref(supportedLocale)}
                   hrefLang={supportedLocale}
@@ -652,6 +706,17 @@ export function CommunicationNoteComposer({
                   <p className="mt-3 text-xs leading-5 text-foreground">
                     {generationAvailable ? generationCopy.pointsBoundary : surface.pointsBoundary}
                   </p>
+                  {showPointsEntry ? <div className="mt-3 border-t border-line pt-3">
+                    <p id="communication-note-points-navigation" className="max-w-[70ch] text-sm leading-6 text-foreground">
+                      {navigationCopy.points}
+                    </p>
+                    {!generationPending ? <a data-composer-navigation
+                      href={buildCommunicationNotePointsHref(locale)}
+                      aria-describedby="communication-note-points-navigation"
+                      className="mt-2 inline-flex min-h-11 items-center rounded px-3 text-sm font-semibold text-brand underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand">
+                      {COMMUNICATION_NOTE_POINTS_ENTRY[locale]}
+                    </a> : null}
+                  </div> : null}
                 </section>
 
                 <button
@@ -705,6 +770,7 @@ export function CommunicationNoteComposer({
             </ul>
             <a
               href={buildCommunicationNoteWorkspaceHref("/privacy", locale)}
+              data-composer-navigation
               className="mt-5 inline-flex text-sm font-semibold text-brand hover:underline"
             >
               {surface.privacyNotice}

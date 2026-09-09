@@ -232,7 +232,7 @@ describe("Communication Note composer UI", () => {
 
     expect(source).not.toContain('from "next/link"');
     expect(markup).toContain(
-      '<a href="/ai-documents?lang=en" class="inline-flex min-h-10',
+      '<a data-composer-navigation="true" href="/ai-documents?lang=en" class="inline-flex min-h-10',
     );
     expect(markup).toContain("返回 AI 文件（英文）");
     expect(markup).toContain('<a href="/privacy?lang=en"');
