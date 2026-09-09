@@ -35,7 +35,7 @@ import {
   type CommunicationNoteGenerationClientResult,
 } from "../../../lib/communication-note-generation-client";
 import { buildCommunicationNoteGenerationJobHref } from "../../../lib/communication-note-generation-contract";
-import { replaceCommunicationNoteLocation } from "../../../lib/communication-note-document-navigation";
+import { assignCommunicationNoteLocation, replaceCommunicationNoteLocation } from "../../../lib/communication-note-document-navigation";
 import { buildCommunicationNotePointsHref, COMMUNICATION_NOTE_POINTS_ENTRY } from "../../../lib/communication-note-points-navigation";
 import { hasCommunicationNoteComposerInput, COMMUNICATION_NOTE_COMPOSER_NAVIGATION_COPY } from "../../../lib/communication-note-composer-navigation";
 
@@ -78,6 +78,10 @@ export function CommunicationNoteComposer({
   const [requestLocked, setRequestLocked] = useState(false);
   const [pointsRejected, setPointsRejected] = useState(false);
   const navigationAllowedRef = useRef(false);
+  const [pendingNavigation, setPendingNavigation] = useState<{
+    href: string;
+    trigger: HTMLAnchorElement;
+  }>();
   const generationCopy = getGenerationSurfaceCopy(locale);
   const navigationCopy = COMMUNICATION_NOTE_COMPOSER_NAVIGATION_COPY[locale];
   const hasUnsubmittedInput = hasCommunicationNoteComposerInput(draft);
@@ -105,6 +109,7 @@ export function CommunicationNoteComposer({
       setReviewIsCurrent(false); setConfirmations(INITIAL_CONFIRMATIONS);
       setGenerationError(undefined); setGenerationPending(false); setRequestLocked(false);
       setPointsRejected(false);
+      setPendingNavigation(undefined);
     };
     const restorePage = (event: PageTransitionEvent) => {
       navigationAllowedRef.current = false;
@@ -197,6 +202,7 @@ export function CommunicationNoteComposer({
     requestRef.current = undefined;
     inFlightRef.current = false;
     navigationAllowedRef.current = true; // ACK navigation is not an input discard.
+    setPendingNavigation(undefined);
     replaceCommunicationNoteLocation(jobHref);
   }
 
@@ -205,12 +211,22 @@ export function CommunicationNoteComposer({
       event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || !(event.target instanceof Element)) return;
     const anchor = event.target.closest<HTMLAnchorElement>("a[data-composer-navigation]");
     if (!anchor || (anchor.target && anchor.target !== "_self")) return;
-    if (!window.confirm(requestLocked ? navigationCopy.unresolved : navigationCopy.discard)) {
-      event.preventDefault(); event.stopPropagation(); return;
-    }
-    // These owned links use full-page navigation, with no downstream handler.
-    // Suppress the second, generic browser prompt for this confirmed departure.
+    // Block the original navigation synchronously, before opening a page-owned
+    // dialog, without relying on browser-native confirm for this in-app path.
+    event.preventDefault(); event.stopPropagation();
+    if (!pendingNavigation) setPendingNavigation({ href: anchor.getAttribute("href")!, trigger: anchor });
+  }
+
+  function cancelPageNavigation() {
+    setPendingNavigation(undefined);
+  }
+
+  function acceptPageNavigation() {
+    if (!pendingNavigation || navigationAllowedRef.current) return;
+    // Only this explicit action suppresses the second, generic unload prompt.
+    // Facts and retry bytes remain intact until pagehide, not when opening/cancelling.
     navigationAllowedRef.current = true;
+    assignCommunicationNoteLocation(pendingNavigation.href);
   }
 
   async function submitGeneration(event: React.FormEvent<HTMLFormElement>) {
@@ -778,7 +794,62 @@ export function CommunicationNoteComposer({
           </aside>
         </form>
       </div>
+      {pendingNavigation ? (
+        <ComposerLeaveDialog
+          copy={navigationCopy}
+          unresolved={requestLocked}
+          returnFocus={pendingNavigation.trigger}
+          onCancel={cancelPageNavigation}
+          onLeave={acceptPageNavigation}
+        />
+      ) : null}
     </main>
+  );
+}
+
+function ComposerLeaveDialog({ copy, unresolved, returnFocus, onCancel, onLeave }: {
+  copy: typeof COMMUNICATION_NOTE_COMPOSER_NAVIGATION_COPY[CommunicationNoteComposerLocale];
+  unresolved: boolean;
+  returnFocus: HTMLAnchorElement;
+  onCancel(): void;
+  onLeave(): void;
+}) {
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const stayRef = useRef<HTMLButtonElement>(null);
+  const leaveRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    const dialog = dialogRef.current!;
+    dialog.showModal();
+    stayRef.current?.focus();
+    return () => {
+      dialog.close();
+      // Restore only after closing: the trigger is inert while the modal is open.
+      if (returnFocus.isConnected) returnFocus.focus();
+    };
+  }, [returnFocus]);
+
+  return (
+    <dialog ref={dialogRef} className="case-note-leave-dialog"
+      aria-labelledby="communication-note-leave-title"
+      aria-describedby="communication-note-leave-description"
+      onKeyDown={event => {
+        if (event.key !== "Tab") return;
+        if (event.shiftKey && event.target === stayRef.current) {
+          event.preventDefault(); leaveRef.current?.focus();
+        } else if (!event.shiftKey && event.target === leaveRef.current) {
+          event.preventDefault(); stayRef.current?.focus();
+        }
+      }}
+      onCancel={event => { event.preventDefault(); onCancel(); }}>
+      <h2 id="communication-note-leave-title" className="text-xl font-semibold leading-7">{copy.title}</h2>
+      <p id="communication-note-leave-description" className="mt-3 text-sm leading-6">
+        {unresolved ? copy.unresolved : copy.discard}
+      </p>
+      <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-end">
+        <button ref={stayRef} type="button" className="jade-action min-h-11" onClick={onCancel}>{copy.stay}</button>
+        <button ref={leaveRef} type="button" className="taito-secondary min-h-11" onClick={onLeave}>{copy.leave}</button>
+      </div>
+    </dialog>
   );
 }
 

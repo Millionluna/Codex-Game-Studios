@@ -3526,3 +3526,179 @@ Next: manually dismiss/close the remaining temporary test page, then recreate
 the same local fixture for supervised cancel/accept, refresh/Back and three-
 locale narrow-layout acceptance. Keep these gates pending until observed.
 No push, PR, deployment, Production data, real AI, payment or hosted change.
+
+## Composer Points browser follow-up (2026-09-09)
+
+Verification-only follow-up on `96603be`; no product or test-runner changes.
+The old tab 39 responded again. Its one synthetic field was explicitly cleared,
+then the tab was closed; inventory confirmed only untouched user tabs 1 and 12.
+This does not establish how the earlier native confirmation was dismissed.
+
+Recreated the fixed `--workspace-task` fixture in
+`/private/tmp/cl-job-browser-iBrg48`, with owned browser tab 40. Startup passed
+the 54 review/edit/history, 12 admission and eight catalog scenarios, webpack
+build and 40-chunk client boundary scan. The previous 5,308-test full-suite
+result remains the source baseline; the full suite was not rerun this time.
+
+Observed browser evidence:
+
+- Default-size green composer rendered meaningful content with no initial
+  warning/error logs. The fresh 30/0 snapshot hid Points guidance; the fixed
+  seed and reload showed the 10/0 insufficient snapshot and disabled generation.
+- With all facts empty, English, Simplified Chinese and Traditional Chinese
+  Points entries each navigated to the expected locale-only URL; browser Back
+  returned to the corresponding composer with empty fields. This is an
+  **empty-form round trip**, not evidence for discarding dirty inputs.
+- At 390 × 844, all three Points guidance regions were visually legible,
+  document width equalled 390 and entry height was 44 pixels. Traditional
+  Chinese explicitly labelled its English destination; Points retained
+  `communicationLang=zh-Hant` and a Traditional Chinese workspace return link.
+- The actual Points page stayed UNAVAILABLE because its runtime remains closed;
+  no fabricated balance or purchasing capability was substituted.
+
+A later attempt to switch back to Simplified Chinese and restore the default
+viewport timed out and reset browser control; fresh inventory still showed tab
+40 on the Traditional Chinese composer. A separate viewport-reset/inspection
+attempt and final tab acquisition also timed out. The session stopped there:
+**tab 40 closure and viewport restoration are unconfirmed**, and native dirty-
+input cancel/accept, dirty refresh and post-discard Back remain pending. No
+synthetic facts were entered into tab 40, no dialog was triggered in this run,
+and no native-app restriction was bypassed.
+
+Fixed parent status showed unchanged seed counters: 10/0 Points, seven ledger
+entries, three admissions/reserves/terminals, 25 jobs, reviews/exports zero,
+setup edit/sync 1/1, runtime roles/sessions/locks and receipts zero. Parent 1275
+was identified with its owned PG child and application cwd, then stopped.
+Cleanup reported active leases zero, PostgreSQL stopped, `removed:true` and
+`sourceUnchanged:true`. Independent checks confirmed the owned root absent and
+port 3395 free. All disposable database data was deleted; browser cleanup is
+separate and is not claimed complete.
+
+Next: close the remaining owned test tab and restore normal browser sizing,
+then use a supervised browser session for native cancel/accept, dirty refresh
+and Back acceptance. Do not repeat the completed three-locale/narrow checks or
+activate any hosted runtime to work around browser-control failures.
+
+### Supervised confirmation handoff (2026-09-09)
+
+A fresh inventory confirmed tab 40 gone and only user tabs 1 and 12 present.
+The viewport reset then succeeded. The same unmodified local fixture was
+recreated at `/private/tmp/cl-job-browser-BcF6NH` (parent 3315, terminal session
+73048). Startup matrices/build and the 40-chunk scan passed. Its fixed seed
+retains the same 10/0 baseline and zero runtime roles/sessions/locks/receipts.
+
+Owned tab 41 shows the Simplified Chinese composer at default browser sizing,
+with no initial warning/error logs. Only `contact_channel` was filled with
+`本地合成测试，无真实资料`; generation is disabled. The tab is visible and marked
+for handoff. The user is asked to click View Points, choose Cancel, and report
+whether the synthetic text remains. **No native-dialog outcome is claimed.**
+The fixture is intentionally still running for this supervised continuation,
+not cleaned yet. Do not recreate it or repeat the completed locale/layout checks.
+After acceptance or abandonment, validate parent ownership again and stop the
+fixed parent, verify database/root removal, and close only this owned tab.
+
+### Retry after interruption (2026-09-09)
+
+The user requested another attempt after an interrupted turn. Inventory now
+contained only user tab 1; tabs 12 and 41 were absent. Terminal 73048 no longer
+existed, no owned process or listener remained, and `pg_ctl status` confirmed
+the old database stopped. The abandoned `/private/tmp/cl-job-browser-BcF6NH`
+directory was removed and absence verified; it contained disposable test data.
+
+The unchanged fixed fixture was recreated at `/private/tmp/cl-job-browser-CZRJ8M`
+(parent 6713, terminal 3371). Startup matrices/build and 40-chunk scan passed.
+Visible owned tab 42 rendered the Simplified Chinese composer without initial
+warning/error logs; only the same synthetic contact-channel text was entered.
+One actual View Points click was attempted. It timed out in
+`Input.dispatchMouseEvent`; the separate dialog API returned no handle. Native
+Cancel/accept and subsequent dirty-input lifecycle behavior are still pending.
+No further automatic click or native-app bypass was attempted. The app request
+to show this exact tab returned `queued`, not proof that it was foreground.
+
+The fixed status controls initially showed the unchanged 10/0 seed baseline and
+zero runtime roles/sessions/locks/receipts. Tab 42 was retained for manual testing.
+
+Manual result: after the field was found empty, the synthetic contact-channel
+text was refilled and visually confirmed beside View Points. No further refresh
+or navigation was initiated by the agent before the user's click. The user
+reported no dialog, and a fresh browser inspection confirmed navigation to
+`/plan-and-usage?lang=zh-Hans&communicationLang=zh-Hans`. **The observed dirty-input
+leave-warning path failed acceptance.** This is no longer merely a pending
+automation-dialog test. The cause (event/state handling versus native-dialog
+handling) is not yet established; unit tests mocking confirmation do not resolve
+that gap. Cancel preservation, dirty refresh and post-discard Back remain unproved.
+
+Verification stopped at this boundary. Final fixed status retained the 10/0 seed
+baseline, zero runtime roles/sessions/locks, and four REVOKED task receipts.
+After revalidating parent 6713, its cwd and owned PG child, fixed cleanup exited
+successfully with zero active leases, PostgreSQL stopped, `removed:true` and
+`sourceUnchanged:true`. Independent checks confirmed the owned root, processes
+and port 3395 listener absent; owned tab 42 was closed. Disposable synthetic data
+was deleted; no Production or hosted resources were changed and no model ran.
+
+Next proposed repair: a page-owned accessible confirmation for guarded in-app
+links, preserving the established green design, then cancel/accept verification.
+Refresh/tab-close protection remains a separate browser-native check. No product
+code was changed for this observation; do not repeat the same native-dialog test
+or mark the guard complete before a repair and new evidence.
+
+### Page-owned composer leave confirmation repair (2026-09-09)
+
+Replaced the composer's `window.confirm` with a labelled HTML dialog for owned
+in-app links. The original click is stopped before the dialog opens. Keep editing
+and Escape preserve facts, local review/confirmations and the exact retry request;
+only Discard inputs and leave permits full-page `location.assign`. The successful
+job acknowledgement still uses replace navigation. Pagehide/persisted return
+clear pending confirmation along with page-only state. Refresh/tab-close still
+use the existing native beforeunload guard and are not newly browser-accepted.
+
+The dialog reuses the fixed green palette, fonts and existing button styles.
+Initial focus is on Keep editing; Tab/Shift+Tab wrap across the two buttons,
+and cancellation restores focus after the modal closes. Body/secondary-action
+contrast is 13.70:1, primary-action text 12.18:1 (hover 7.92:1). This is focused
+accessibility evidence, not a certification. No animation or dependency added.
+Implementation reference: [HTML dialog modality and focus](https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/dialog).
+
+Verification: 5,316 tests passed, 41 skipped (305 passing / four skipped files),
+typecheck and targeted ESLint passed. The owned webpack build and 40-chunk client
+boundary scan passed; adapter sync checked 73 files. New coverage includes dialog
+semantics, initial/return focus, cancellation, exact locked retry preservation,
+single accepted navigation, modifier/new-tab exclusions and keyboard wrapping.
+jsdom models only dialog open/close; real modality was checked separately.
+
+Browser evidence on final tab 44: English, Simplified Chinese and Traditional
+Chinese dirty-input Points flows show the correct dialog, cancel preserves input,
+accept reaches the correct Points locale/fallback without a second prompt, and
+Back returns an empty composer. At 390px, all three dialog widths were 352px with
+44px buttons and no document overflow. Enter opens the dialog; Escape restores
+input/focus; both keyboard wrap directions passed on the final build. Captured
+warning/error logs were empty. Points remained unavailable honestly: its runtime
+was not activated and the browser never submitted generation.
+
+Two verification caveats were resolved without hiding failures: the first build's
+last-button Tab escaped the modal focus range, so that fixture was stopped before
+adding explicit wrapping and retesting. Later the English DOM/AX input readout
+returned empty even before opening, while screenshots visibly retained the
+original text plus subsequently typed text after cancellation. Visual evidence,
+not that inconsistent readout, established retention; the post-discard screenshot
+showed the placeholder again. The readout's underlying cause is not asserted.
+
+Both owned fixtures (`NFPX1M`, parent 8313; `g2YkPF`, parent 9516) were cleaned by
+their fixed parent handlers after ownership validation. Cleanup reported zero
+active leases, PostgreSQL stopped, root removed and tracked source unchanged.
+Independent checks found both roots/processes absent and port 3395 free. Tabs 43
+and 44 were closed and the viewport override reset. Final counters stayed at the
+10/0 seed baseline, seven ledger entries, three admissions/reserves/terminals,
+25 jobs, zero reviews/exports/runtime roles/sessions/locks/credential receipts.
+Only disposable synthetic data was removed. No hosted resources, Production,
+real care data, model calls, commits, pushes or deployments were involved.
+
+Pre-commit review (2026-09-09) found no blocking issue in this repair. The same
+product source passed 5,316 tests (41 skipped), typecheck, full ESLint, 73-file
+adapter sync and whitespace checks again. No new product change, browser run or
+temporary environment was needed; the existing same-source browser evidence is
+retained. Commit scope is the six implementation/test files and three evidence
+documents only, with no push or deployment.
+
+Next: independently verify native refresh/tab-close prompts. Do not repeat the
+now-passing in-app dialog flow or activate any runtime for that separate check.

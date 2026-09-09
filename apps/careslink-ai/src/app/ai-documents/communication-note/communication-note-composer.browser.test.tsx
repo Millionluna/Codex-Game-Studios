@@ -6,10 +6,11 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const navigationMocks = vi.hoisted(() => ({ replaceLocation: vi.fn() }));
+const navigationMocks = vi.hoisted(() => ({ replaceLocation: vi.fn(), assignLocation: vi.fn() }));
 
 vi.mock("../../../lib/communication-note-document-navigation", () => ({
   replaceCommunicationNoteLocation: navigationMocks.replaceLocation,
+  assignCommunicationNoteLocation: navigationMocks.assignLocation,
 }));
 
 vi.mock("next/image", async () => {
@@ -27,6 +28,7 @@ vi.mock("next/image", async () => {
 });
 
 import { CommunicationNoteComposer } from "./communication-note-composer";
+import { COMMUNICATION_NOTE_COMPOSER_NAVIGATION_COPY } from "../../../lib/communication-note-composer-navigation";
 import {
   getCommunicationNoteGenerationErrorMessage,
   type CommunicationNoteGenerationJob,
@@ -98,9 +100,16 @@ let container: HTMLDivElement;
 let root: Root;
 let originalSendBeaconDescriptor: PropertyDescriptor | undefined;
 let animationFrameCallbacks: FrameRequestCallback[];
+const dialogDescriptors = Object.getOwnPropertyDescriptors(HTMLDialogElement.prototype);
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // jsdom has no top layer or keyboard modality. Only model open/close here;
+  // focus containment and real Escape/navigation require browser evidence.
+  Object.defineProperties(HTMLDialogElement.prototype, {
+    showModal: { configurable: true, value: function(this: HTMLDialogElement) { this.setAttribute("open", ""); } },
+    close: { configurable: true, value: function(this: HTMLDialogElement) { this.removeAttribute("open"); } },
+  });
   (
     globalThis as typeof globalThis & {
       IS_REACT_ACT_ENVIRONMENT: boolean;
@@ -140,6 +149,10 @@ afterEach(async () => {
     vi.useRealTimers();
   }
   container.remove();
+  for (const name of ["showModal", "close"]) {
+    if (dialogDescriptors[name]) Object.defineProperty(HTMLDialogElement.prototype, name, dialogDescriptors[name]);
+    else Reflect.deleteProperty(HTMLDialogElement.prototype, name);
+  }
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
 
@@ -494,9 +507,13 @@ describe("Communication Note composer browser boundary", () => {
     expect(points?.querySelector("h3 + p")?.textContent).toBe(initialBalance);
     const pointsLink = points?.querySelector<HTMLAnchorElement>('a[href^="/plan-and-usage"]');
     expect(pointsLink?.getAttribute("href")).toContain(`communicationLang=${copy.locale}`);
-    const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
     await act(async () => pointsLink?.click());
-    expect(confirm).toHaveBeenCalledTimes(1);
+    expect(container.querySelector("dialog[open]")?.textContent).toContain(COMMUNICATION_NOTE_COMPOSER_NAVIGATION_COPY[copy.locale].unresolved);
+    await clickButton(COMMUNICATION_NOTE_COMPOSER_NAVIGATION_COPY[copy.locale].stay);
+    expect(container.querySelector("dialog")).toBeNull();
+    // jsdom focus changes queue zero-delay selectionchange events. Drain those,
+    // then keep the no-background-retry assertion and exact network call count.
+    await act(async () => { vi.advanceTimersByTime(0); });
     expect(getField("observable_facts").value).toContain("requested an update");
     expect(submit.disabled).toBe(true);
     for (const field of FIELD_NAMES) expect(getField(field).disabled).toBe(true);
@@ -610,6 +627,7 @@ describe("composer Points navigation and leave boundary", () => {
   it.each(["en", "zh-Hans", "zh-Hant"] as const)("protects %s input, cancels loss and permits a confirmed departure once", async locale => {
     const io = installBrowserIoSpies();
     const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
+    const copy = COMMUNICATION_NOTE_COMPOSER_NAVIGATION_COPY[locale];
     await renderComposer(false, { status: "UNAVAILABLE", unit: "POINTS" }, locale);
     expect(pointsLink().href).toContain(`communicationLang=${locale}`);
     expect(pointsLink().textContent).toContain(locale === "zh-Hant" ? "英文" : "Points");
@@ -617,17 +635,31 @@ describe("composer Points navigation and leave boundary", () => {
     expect(confirm).not.toHaveBeenCalled(); expect(unload()).toBe(false);
     await input();
     expect(await clickWithoutLeaving(pointsLink())).toBe(false);
-    expect(confirm.mock.calls[0][0]).toContain(locale === "en" ? "unsubmitted facts" : locale === "zh-Hans" ? "未提交" : "未提交");
+    const dialog = container.querySelector("dialog[open]")!;
+    expect(dialog.getAttribute("aria-labelledby")).toBe("communication-note-leave-title");
+    expect(dialog.getAttribute("aria-describedby")).toBe("communication-note-leave-description");
+    expect(dialog.textContent).toContain(copy.discard);
+    expect(document.activeElement?.textContent).toBe(copy.stay);
     expect(getField("follow_up").value).toBe("SYNTHETIC UNSUBMITTED FACT");
     expect(unload()).toBe(true);
-    confirm.mockReturnValue(true);
-    expect(await clickWithoutLeaving(pointsLink())).toBe(true);
+    await clickButton(copy.stay);
+    expect(container.querySelector("dialog")).toBeNull();
+    expect(document.activeElement).toBe(pointsLink());
+    expect(getField("follow_up").value).toBe("SYNTHETIC UNSUBMITTED FACT");
+    expect(unload()).toBe(true);
+    expect(navigationMocks.assignLocation).not.toHaveBeenCalled();
+    expect(await clickWithoutLeaving(pointsLink())).toBe(false);
+    await clickButton(copy.leave);
+    await clickButton(copy.leave);
+    expect(navigationMocks.assignLocation).toHaveBeenCalledExactlyOnceWith(pointsLink().getAttribute("href"));
+    expect(confirm).not.toHaveBeenCalled();
     expect(unload()).toBe(false); // No second browser prompt.
     expectNoBrowserIo(io);
     expect(pointsLink().href).not.toContain("SYNTHETIC");
     await act(async () => window.dispatchEvent(new PageTransitionEvent("pagehide")));
     await act(async () => window.dispatchEvent(new PageTransitionEvent("pageshow", { persisted: true })));
     expect(FIELD_NAMES.every(field => getField(field).value === "")).toBe(true);
+    expect(container.querySelector("dialog")).toBeNull();
     expect(container.querySelector('input[type="checkbox"]')).toBeNull();
     expect(unload()).toBe(false);
     await input("NEW SYNTHETIC INPUT"); expect(unload()).toBe(true);
@@ -648,6 +680,8 @@ describe("composer Points navigation and leave boundary", () => {
     await renderComposer(); await input();
     for (const anchor of container.querySelectorAll<HTMLAnchorElement>("a[data-composer-navigation]")) {
       expect(await clickWithoutLeaving(anchor)).toBe(false);
+      expect(container.querySelector("dialog[open]")).not.toBeNull();
+      await clickButton("Keep editing");
     }
     confirm.mockClear();
     const anchor = container.querySelector<HTMLAnchorElement>('a[data-composer-navigation]')!;
@@ -665,23 +699,71 @@ describe("composer Points navigation and leave boundary", () => {
     let resolveResponse: (value: unknown) => void = () => {};
     const fetcher = vi.fn().mockImplementation(() => new Promise(resolve => { resolveResponse = resolve; }));
     vi.stubGlobal("fetch", fetcher);
-    const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
     await prepareConnectedSubmission();
     await act(async () => container.querySelector<HTMLButtonElement>('button[type="submit"]')!.click());
     const original = getField("observable_facts").value;
     const back = container.querySelector<HTMLAnchorElement>('a[data-composer-navigation]')!;
     expect(await clickWithoutLeaving(back)).toBe(false);
-    expect(confirm).toHaveBeenCalledWith(expect.stringContaining("does not cancel a server task"));
+    expect(container.querySelector("dialog[open]")?.textContent).toContain("does not cancel a server task");
     expect(getField("observable_facts").value).toBe(original);
     expect(fetcher.mock.calls[0][1].signal.aborted).toBe(false);
     await act(async () => window.dispatchEvent(new PageTransitionEvent("pagehide")));
     expect(fetcher.mock.calls[0][1].signal.aborted).toBe(true);
     expect(getField("observable_facts").value).toBe("");
+    expect(container.querySelector("dialog")).toBeNull();
     await act(async () => resolveResponse({ status: 202, json: async () => ({ created: true,
       job: generationJob("QUEUED") }) }));
     expect(navigationMocks.replaceLocation).not.toHaveBeenCalled();
     expect(fetcher).toHaveBeenCalledTimes(1);
     expect(unload()).toBe(false);
+  });
+  it("treats Escape cancellation as staying, preserving reviewed facts and confirmations", async () => {
+    const io = installBrowserIoSpies();
+    await prepareConnectedSubmission();
+    const original = getField("observable_facts").value;
+    const trigger = container.querySelector<HTMLAnchorElement>("a[data-composer-navigation]")!;
+    expect(await clickWithoutLeaving(trigger)).toBe(false);
+    const cancel = new Event("cancel", { cancelable: true });
+    await act(async () => container.querySelector("dialog")!.dispatchEvent(cancel));
+    expect(cancel.defaultPrevented).toBe(true);
+    expect(container.querySelector("dialog")).toBeNull();
+    expect(document.activeElement).toBe(trigger);
+    expect(getField("observable_facts").value).toBe(original);
+    expect([...container.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')].every(box => box.checked)).toBe(true);
+    expect(container.querySelector<HTMLButtonElement>('button[type="submit"]')!.disabled).toBe(false);
+    expect(unload()).toBe(true);
+    expect(navigationMocks.assignLocation).not.toHaveBeenCalled();
+    expectNoBrowserIo(io);
+  });
+  it("wraps Tab and Shift+Tab at the dialog's two action boundaries", async () => {
+    await renderComposer(false, { status: "UNAVAILABLE", unit: "POINTS" }); await input();
+    await clickWithoutLeaving(pointsLink());
+    const [stay, leave] = [...container.querySelectorAll<HTMLButtonElement>("dialog button")];
+    const reverse = new KeyboardEvent("keydown", { key: "Tab", shiftKey: true, bubbles: true, cancelable: true });
+    await act(async () => stay.dispatchEvent(reverse));
+    expect(reverse.defaultPrevented).toBe(true);
+    expect(document.activeElement).toBe(leave);
+    const forward = new KeyboardEvent("keydown", { key: "Tab", bubbles: true, cancelable: true });
+    await act(async () => leave.dispatchEvent(forward));
+    expect(forward.defaultPrevented).toBe(true);
+    expect(document.activeElement).toBe(stay);
+    expect(navigationMocks.assignLocation).not.toHaveBeenCalled();
+    expect(unload()).toBe(true);
+  });
+  it.each([{ metaKey: true }, { shiftKey: true }, { altKey: true }, { button: 1 }])("leaves modified navigation alone: %j", async init => {
+    await renderComposer(); await input();
+    const trigger = container.querySelector<HTMLAnchorElement>("a[data-composer-navigation]")!;
+    expect(await clickWithoutLeaving(trigger, init)).toBe(true);
+    expect(container.querySelector("dialog")).toBeNull();
+    expect(unload()).toBe(true);
+  });
+  it("does not intercept an explicit new-tab link", async () => {
+    await renderComposer(); await input();
+    const trigger = container.querySelector<HTMLAnchorElement>("a[data-composer-navigation]")!;
+    trigger.target = "_blank";
+    expect(await clickWithoutLeaving(trigger)).toBe(true);
+    expect(container.querySelector("dialog")).toBeNull();
+    expect(unload()).toBe(true);
   });
 });
 

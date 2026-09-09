@@ -401,6 +401,28 @@ summary:focus-visible {
   color: #ffffff;
 }
 
+.case-note-leave-dialog {
+  margin: auto;
+  width: min(32rem, calc(100% - 2rem));
+  max-height: calc(100dvh - 2rem);
+  overflow-y: auto;
+  border: 1px solid var(--brand);
+  border-radius: 0.75rem;
+  padding: 1.5rem;
+  background: var(--surface);
+  color: var(--foreground);
+  overflow-wrap: anywhere;
+}
+
+.case-note-leave-dialog::backdrop {
+  background: rgb(6 61 52 / 0.55);
+}
+
+.case-note-leave-dialog button:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 3px;
+}
+
 .case-note-workspace {
   display: grid;
   gap: 1rem;

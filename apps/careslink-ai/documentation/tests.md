@@ -5136,6 +5136,73 @@ See [full-flow scope and remaining real-admission gate](communication-note-produ
   source isolation verified, but a fresh inventory still listed test tab 39.
 - [Pending supervised browser tail](communication-note-product-integration-m1y.md#communication-note-composer-points-entry-and-leave-guard-2026-09-09).
 
+Follow-up on `96603be`: old tab 39 was cleared and closed. A fresh owned fixture
+passed startup matrices/build/client scan and all three locale empty-form Points
+round trips. Screenshots and DOM measurements confirmed 390px document width
+and 44px link height in all three languages; Traditional Chinese retained its
+explicit English fallback and original workspace return language. This does
+not cover dirty-input dismissal. No full-suite rerun or product edit occurred.
+
+Later browser-control timeouts stopped the session. Native cancel/accept, dirty
+refresh and post-discard Back are still pending; tab 40 close and viewport
+restore are unconfirmed. Parent 1275 cleanup removed the owned PG/server/root
+`/private/tmp/cl-job-browser-iBrg48`, with source isolation and zero active leases
+verified. Database counters stayed at the same 10/0 seed baseline. See
+[exact follow-up evidence and remaining cleanup](communication-note-product-integration-m1y.md#composer-points-browser-follow-up-2026-09-09).
+
+Supervised handoff: tab 40 is now absent and default viewport reset succeeded.
+The unmodified fixture at `/private/tmp/cl-job-browser-BcF6NH` is running for
+visible tab 41, with one synthetic contact-channel input. Startup matrices,
+build/client scan and unchanged seed counters passed again. Native Cancel is
+awaiting user observation; do not mark it passed or claim this new fixture
+cleaned. Cleanup ownership is recorded in the integration handoff note.
+
+Interruption/retry update: that stopped fixture was subsequently removed and
+tab 41 was absent. The user-requested retry retained tab 42 on the new unchanged
+`/private/tmp/cl-job-browser-CZRJ8M` fixture (parent 6713, terminal 3371).
+Its startup/build/client scan and fixed seed counters passed. An actual dirty-
+input Points click timed out, with no dialog handle. Subsequently, the synthetic
+input was refilled and visually confirmed; the user manually reported no dialog,
+and browser inspection confirmed direct navigation to Points. **Dirty-input leave
+warning: failed on the observed path**, not merely pending automation support.
+The precise cause remains undetermined; cancel preservation, dirty refresh and
+post-discard Back remain unproved. No product code was changed in this observation.
+Verification stopped and fixed cleanup passed (zero active leases, PostgreSQL
+stopped, owned root removed, source hashes unchanged). Independent checks found
+the owned root/processes/3395 listener absent; owned tab 42 was closed. Final
+pre-cleanup counters remained 10/0 with zero runtime roles/sessions/locks and four
+REVOKED task receipts. Proposed next step is an in-page confirmation repair and
+new cancel/accept evidence; do not repeat the unchanged native-dialog test.
+
+### Page-owned composer leave confirmation repair (2026-09-09)
+
+- 5,316 passed / 41 skipped tests, typecheck and targeted ESLint passed; adapter
+  sync checks 73 files. Owned webpack build and 40-chunk boundary scan passed.
+- Replaced native confirm mocks with dialog opening/cancel/accept assertions,
+  initial/return focus, Escape cancellation, exact locked retry preservation,
+  single navigation, modifier/new-tab exclusions and Tab/Shift+Tab wrapping.
+- Final browser build passed dirty-input cancel/accept/Back for English, Simplified
+  Chinese and Traditional Chinese. The latter retains the explicit English Points
+  fallback and original return locale. All 390px dialogs fit at 352px with 44px
+  buttons. Actual Enter/Escape and both focus-wrap directions passed; warning/error
+  logs were empty. This does not claim screen-reader certification.
+- The first keyboard check found a focus-wrap defect; it was fixed and rebuilt.
+  An English DOM/AX readout returned empty despite visible retained input; before/
+  after screenshots established retention and actual clearing after discard.
+  Do not use that inconsistent empty readout alone as evidence of data loss.
+- Both local-only fixtures were cleaned with zero active leases and unchanged
+  tracked source. Their roots/processes/listener are absent; owned tabs are closed
+  and viewport reset. Final seed counters stayed 10/0 with no browser generation,
+  new business writes or model calls. No hosted/Production change or deployment.
+- Native refresh/tab-close beforeunload acceptance remains a separate open item.
+  Next: independent acceptance of that native boundary, not another in-app retry.
+- Local pre-commit review re-ran the same product source: 5,316 passed / 41 skipped,
+  typecheck, full ESLint, 73-file adapter sync and whitespace checks passed. No
+  blocking finding or new product edit; existing browser evidence was retained.
+  The local-only commit includes six implementation/test files and these three
+  evidence documents. No push, deployment or new temporary environment is in scope.
+- [Detailed repair and cleanup evidence](communication-note-product-integration-m1y.md#page-owned-composer-leave-confirmation-repair-2026-09-09).
+
 ### Current live/read-only evidence
 
 - Supabase migrations, tables, RLS flags, policies, grants, function grants and aggregate row counts were checked read-only.

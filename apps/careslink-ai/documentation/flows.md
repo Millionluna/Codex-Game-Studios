@@ -365,12 +365,38 @@ retry path; successful admission bypasses the discard prompt. Actual departure
 clears local facts/checks/retry state. Points keeps the original workspace
 locale; no input is restored or persisted and purchasing remains unavailable.
 
-Implementation and automated tests pass. Real-browser entry rendering passed,
-but the confirmation interaction stalled browser control; cancel/accept and
-return acceptance remain pending, with temporary tab 39 still listed after
-close timed out. Local database/server/data were removed. Next is supervised
-browser acceptance, not deployment or further runtime activation.
+Implementation and automated tests pass. The follow-up closed old tab 39 and
+passed three-locale empty-form Points round trips plus 390px guidance layout.
+Native dirty-input cancel/accept, dirty refresh and post-discard Back remain
+pending. Browser control later timed out; new tab 40 closure and viewport reset
+are unconfirmed. The recreated local database/server/data were removed. Next
+is browser cleanup and supervised confirmation acceptance, not deployment or
+further runtime activation.
+Subsequent handoff: tab 40 removal and viewport reset are now confirmed. After
+an interruption, tab 41 and its stopped environment were cleared; a user-
+requested retry retained tab 42 and its local-only fixture for manual Cancel.
+After synthetic input was visually reconfirmed, the user reported no dialog;
+browser inspection confirmed direct navigation to Points. This observed dirty-
+input leave-warning path failed acceptance; its root cause is not established.
+Verification stopped. The fixed fixture was cleaned with source hashes unchanged,
+owned root/processes/listener absent, and tab 42 closed. Next proposed work is an
+accessible in-page confirmation and cancel/accept retest, not another identical
+native-dialog retry. No repair had been implemented at that point.
 See [partial guard acceptance](communication-note-product-integration-m1y.md#communication-note-composer-points-entry-and-leave-guard-2026-09-09).
+See [browser follow-up evidence](communication-note-product-integration-m1y.md#composer-points-browser-follow-up-2026-09-09).
+
+Repair update: the owned-link guard now uses a page-owned, three-locale HTML
+dialog instead of `window.confirm`. Opening blocks navigation; Keep editing or
+Escape retains inputs/checks/retry bytes and restores focus. Only explicit discard
+assigns the destination. Initial focus and both Tab wrap directions are covered.
+Real browser cancel/accept/Back flows and 390px dialogs passed in all three locales;
+the English input-readout discrepancy was resolved with visible-field screenshots.
+The final fixture, database, tabs and viewport override were cleaned. Native
+refresh/tab-close prompts remain separately unverified. Local pre-commit review,
+full tests/typecheck/lint and adapter checks passed without another product edit.
+Next: independent native refresh/tab-close acceptance, not another identical
+in-app dialog retry or runtime activation. No push or deployment is included.
+See [page-owned confirmation repair](communication-note-product-integration-m1y.md#page-owned-composer-leave-confirmation-repair-2026-09-09).
 
 ## 4. Save, history and delete
 
