@@ -148,6 +148,23 @@ export function createCommunicationNoteTaskPreviewIssuer(options: Readonly<{ pro
         }, 30000, context.signal);
       } catch { ready = false; throw fail(); }
     },
+    /** Cleanup only, for a supervisor that has already joined pending requests.
+     * Never takes over an epoch or reopens issuance. A stale process cannot drain
+     * its successor's inventory. Failure leaves cleanup unconfirmed. */
+    async drain(context: Context) {
+      ready = false;
+      const ownedEpoch = epoch;
+      if (!ownedEpoch || recovering) throw fail();
+      recovering = true;
+      try {
+        await bounded(async signal => {
+          for (const lease of await inventory(ownedEpoch, signal)) await revoke(lease.scope, { signal });
+          if (epoch !== ownedEpoch) throw fail();
+          epoch = undefined;
+        }, 30000, context.signal);
+      } catch { throw fail(); }
+      finally { ready = false; recovering = false; }
+    },
   });
 }
 
@@ -173,6 +190,8 @@ function scope(value: unknown, ref: string): CommunicationNoteTaskLeaseScope {
   return Object.freeze({ requestId: s.requestId, projectRef: ref, purpose: s.purpose, callerRole: s.callerRole,
     principal: Object.freeze({ userId: p.userId, sessionId: p.sessionId, transport: "COOKIE" }) });
 }
+// Shared, inert request admission parser; it grants no issuer capability.
+export { scope as parseTaskPreviewIssuerScope };
 function same(a: CommunicationNoteTaskLeaseScope, b: CommunicationNoteTaskLeaseScope) {
   return a.requestId === b.requestId && a.projectRef === b.projectRef && a.purpose === b.purpose && a.callerRole === b.callerRole &&
     a.principal.userId === b.principal.userId && a.principal.sessionId === b.principal.sessionId;

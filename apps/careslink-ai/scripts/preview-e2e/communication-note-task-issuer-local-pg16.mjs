@@ -66,7 +66,8 @@ try {
     grant careslink_v1_generation_job_list_caller to postgres with admin true,inherit false,set false;`);
   const control = await open("postgres"); stage = "candidate"; await control.query(await readFile(candidate, "utf8"));
   stage = "source-and-recovery-tests";
-  const result = await run(process.execPath, ["node_modules/vitest/vitest.mjs", "run", "--bail=1", "--reporter=json", "src/lib/communication-note-task-preview-issuer.local.test.ts"],
+  const result = await run(process.execPath, ["node_modules/vitest/vitest.mjs", "run", "--bail=1", "--no-file-parallelism", "--reporter=json",
+    "src/lib/communication-note-task-preview-issuer.local.test.ts", "src/lib/communication-note-task-preview-host.process.test.ts"],
     { env: { ...env, CARESLINK_TASK_ISSUER_LOCAL_SOCKET: root + "/socket" }, timeout: 110000, maxBuffer: 256 * 1024 }).catch(error => {
       // Print fixed test names/codes only; never raw SQL, verifier or password.
       try { const report = JSON.parse(error.stdout); process.stdout.write(JSON.stringify({ failedTests: report.testResults.flatMap(f =>
@@ -74,7 +75,7 @@ try {
       throw new Error("LOCAL_SOURCE_TEST_FAILED");
     });
   const report = JSON.parse(result.stdout); assert.equal(report.success, true); assert.equal(report.numPendingTests, 0); passed = report.numPassedTests;
-  assert.equal(passed, 12); stage = "no-residue";
+  assert.equal(passed, 20); stage = "no-residue";
   assert.equal((await admin.query("select count(*)::int n from careslink_task_preview_issuer.leases where state<>'REVOKED'")).rows[0].n, 0);
   assert.equal((await admin.query("select count(*)::int n from pg_roles where rolname like 'careslink_v1_job_list_runtime_%'")).rows[0].n, 0);
   stage = "local-advisors";

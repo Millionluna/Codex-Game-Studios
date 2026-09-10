@@ -4079,3 +4079,302 @@ The authorized handoff is one local commit only. Next, after user confirmation,
 publish `codex/careslink-task-preview-control` to `Millionluna/Codex-Game-Studios`
 and create a Draft PR against `codex/careslink-ai-documents-v1-auth-gate`.
 Do not merge, deploy, promote a migration or activate the formal runtime.
+
+### PR #39 merged; dedicated task Preview service lifecycle — 2026-09-10
+
+PR #39 was authorized and merged into
+`codex/careslink-ai-documents-v1-auth-gate` as `2090364`, with exact parents
+`769c747` and reviewed connector commit `f682642`. The source branch was retained;
+no deployment occurred. The following local-only batch builds on that same
+reviewed source tree without changing the connector, SQL candidates or bindings.
+
+`communication-note-task-preview-service.server.ts` now composes the task issuer
+into an explicitly owned, inert-on-construction Node service lifecycle. `start()`
+must complete durable recovery before request admission. A single non-overlapping
+five-second sweep loop runs independently of page/request cancellation. It blocks
+new issue admission while sweeping, but still permits scoped revoke requests.
+Outstanding work is bounded locally (four issue admissions; eight total requests
+for revoke admission); the unchanged SQL ledger remains authoritative for the
+four unfinished lease limit. Malformed or pre-aborted requests are rejected before
+issuer IO without shutting down a healthy service.
+
+Successful maintenance renews a 15-second monotonic health deadline. Request
+admission, delivery, health reads and the sweep callback also check freshness,
+so delayed timer callbacks cannot make stale health acceptable. A wall/monotonic
+clock divergence over one second fails closed. Referenced timers keep the owned
+service process alive until explicit shutdown; no global process handler or
+module-level background work is installed. Timer timing is not a hard realtime
+guarantee; an external host must still detect a blocked/dead process.
+
+Any uncertain custody, recovery or maintenance failure closes admission, cancels
+owned issue/maintenance work, joins pending bounded operations, and attempts one
+independent cleanup pass. `stop()` uses the same join/drain path. The issuer's new
+`drain()` inventories only its existing epoch and revokes even unexpired leases;
+it never performs `start`/`ready`, takes over a successor, or reopens issuance.
+The service owns no separate SQL connection or secret cache. It reuses the
+existing per-operation broker/control closure and the committed fence followed by
+separate finalize acknowledgements. Any nonzero role/session/membership count,
+unknown startup outcome or unavailable/stale-epoch inventory leaves
+`cleanupConfirmed: false`. Clean stop acknowledges this instance's admitted work,
+not global zero activity in a successor. Stop before start confirms only that the
+instance performed no IO. A failed service remains terminal even if cleanup
+succeeds: the owner must inspect `finished`/content-free `health()` and arrange a
+new recovered instance; there is no recursive restart/takeover loop.
+
+Verification: **46 new offline tests passed** (190 related tests total). The full
+suite passed **5,605 tests / 53 opt-in skips**, with 311 passing / five skipped
+files. TypeScript, full ESLint, the 63-entry webpack build, 117-chunk client-boundary
+scan, 73-file adapter check and whitespace checks passed. Coverage includes
+startup gating, expired/fenced cleanup, cancelled pages, overlapping maintenance,
+pending issue cancellation and shutdown, stale-instance shutdown, wrong scopes,
+clock jumps, delayed callbacks, residual acknowledgements, bounded failures and
+fresh-instance recovery over a protocol fixture. Two additional tests compose the
+real service, issuer, broker and control connector with mocked external IO. These
+are **not** real SQL-engine/TLS, process-kill/restart or Hosted latency evidence.
+The existing follow-up browser test emitted React `act(...)` warnings but passed;
+no unrelated UI test/code was changed.
+
+Local review found no blocking issue for this **uninstalled source-only scope**.
+Supabase/Postgres guidance informed exact-purpose, minimal-privilege cleanup and
+separate short transactions; Next.js guidance kept the service server-only and
+outside route lifetime. See [Supabase roles](https://supabase.com/docs/guides/database/postgres/roles),
+[short transactions](https://www.postgresql.org/docs/17/tutorial-transactions.html)
+and [Node timer lifetime/timing](https://nodejs.org/api/timers.html).
+
+All readiness constants remain false and `HOSTED_WORKSPACE_READ_BINDING` remains
+undefined. This is a service lifecycle implementation, **not an installed external
+supervisor**. Authentic task-control custody/workload/CA provenance, an authenticated
+service transport, independent process monitoring/restart ownership and Hosted
+PG17/TLS/full migration-chain evidence remain outstanding before activation.
+No new cloud resource, real database permission/migration, model/Points operation,
+UI/Logo change, push, PR mutation or deployment occurred in this batch.
+
+**Next local development:** bind the dedicated service to task-specific control
+custody and an explicit service-host boundary; verify startup, shutdown and
+process-loss recovery without product activation. Batch implementation, tests and
+review together. Publishing a new change to the public repository or creating a
+disposable Hosted Preview remains a separately scoped action; no new deployment
+or Production authorization is implied.
+
+### Dedicated service-process owner and local process-loss evidence — 2026-09-10
+
+The next local batch adds `communication-note-task-preview-host.server.ts`.
+`createTaskPreviewCustodiedService` explicitly composes the existing task-only
+control opener, fixed SQL broker and service lifecycle. Construction is inert;
+the caller must provide task custody and a pinned CA. This is **not** an authentic
+managed-custody implementation or a provenance attestation. Inspection found the
+existing M1u GCP database-secret policy allows a different application name;
+this batch neither broadens it nor disguises task control as that application.
+
+`ownTaskPreviewServiceProcess` is an explicit, one-lifecycle-only POSIX Node main
+process owner. Importing it has no process side effects. It requires an unstarted
+service, completes recovery before its `ready` promise resolves, handles SIGTERM,
+SIGINT and inherited-parent IPC disconnect with the existing joined drain, and
+removes only its own handlers. Failed/unconfirmed cleanup produces a failing
+exit code; successful cleanup cannot overwrite a pre-existing failure code.
+Startup or requested shutdown exceeding 40 seconds forces a failing exit with
+unknown cleanup. These timers cannot supervise their own dead or blocked process.
+No Next.js route, listener, authenticated transport, cloud entry point, ambient
+secret discovery or external restart daemon is installed. All readiness latches
+remain false; `HOSTED_WORKSPACE_READ_BINDING` remains undefined.
+
+Verification: **27 additional passing tests**, comprising 18 process-owner unit
+cases, two full custody/service/broker/control composition cases with offline IO,
+and seven tests that launch and terminate actual owned Node children. The latter
+compile the actual service/issuer/host sources and keep a **simulated protocol
+ledger in the parent**. They cover graceful SIGTERM/SIGINT, actual SIGKILL after
+issuance or committed-protocol issue/fence acknowledgements are lost, recovery
+before successor readiness, unknown-cleanup failure and failed startup without
+self-restart. They prove process behavior, **not SQL durability, TLS or Hosted
+supervision**. A child is considered closed only after its close event, never
+merely because `kill()` returned true. Synthetic passwords are not sent over IPC.
+
+The fixed disposable Unix-only PG16 runner now targets the prior 12 SQL cases
+plus eight process cases, serially. This batch could not execute them: initdb was
+first sandbox-denied, then the permitted attempt failed with shared-memory
+`No space left on device`. Both owned temporary directories were removed, no
+cluster remained, and no other task's IPC/system resources were changed. Docker
+was unavailable as a fallback. The real database/parent-disconnect case remains
+an explicit opt-in skip; the previous 12-case result is not being represented as
+a new run. No Hosted fallback was attempted.
+
+Full suite: **5,632 passed / 54 skipped**, 313 passing / five skipped files.
+Fresh focused verification: 217 passed / one SQL-dependent skip. TypeScript,
+full ESLint, the 63-entry webpack build, 117-chunk client scan, 73-file adapter
+check and whitespace checks passed. Existing unrelated React act warnings remain.
+Local review found no blocking issue for this uninstalled source/process scope;
+real SQL cleanup remains unverified in this batch.
+
+Supabase/Postgres guidance preserved the exact-purpose custody policy and separate
+short cleanup transactions; Next.js guidance kept process ownership out of the
+web runtime. Signal/exit handling follows the
+[Node process documentation](https://nodejs.org/api/process.html#signal-events)
+and [child-process closure semantics](https://nodejs.org/api/child_process.html#event-close).
+No migration candidate, approved manifest, real database permission, green UI/Logo,
+Points balance, model invocation, cloud resource, commit, push or deployment changed.
+
+**Next:** implement and test the dedicated task-control credential/workload policy
+without enabling the shared M1u secret factory or product routes. Its authentic
+provider binding, CA provenance and independent authenticated service supervision
+remain approval/verification gates. Rerun the fixed 20-case SQL/process fixture
+when local shared-memory capacity is available; do not clear other tasks' resources
+or create a Hosted Preview implicitly. This batch remains an uncommitted local diff.
+
+### Task-control custody policy and callback delivery — 2026-09-10
+
+This local batch adds `communication-note-task-preview-custody.server.ts`, a
+task-specific credential policy/delivery layer implementing the existing control
+custody interface. It does **not** implement or activate a cryptographic workload
+verifier or a cloud secret provider. Those remain explicit trusted adapter ports;
+echoing a request hash or returning a VERIFIED status is not authentication.
+No M1u/job-status secret factory, application allowlist or deployed IAM policy was
+changed. The new custody readiness constant is false and no product source imports
+the factory. Tests explicitly compose it with the existing inert service factory.
+
+Each invocation snapshots the exact Preview ref/branch, pinned CA hash, source
+revision/manifest, expected workload identity, credential policy and OAuth
+app/grant references. A fresh nonce and canonical request digest bind replies to
+that invocation. The provider must independently authenticate and attest these
+bindings before either secret is consumed. The finite state machine allows only
+verification → one environment:read OAuth handoff → fresh branch attestation →
+one database-password handoff → closed. OAuth is restricted to the connector's
+fixed GET branch-list endpoint and is never treated as a database password.
+
+The database target must exactly match the purpose, branch, CA, fresh two-second
+observation interval and recomputed connector evidence. Database delivery retains
+the actual static-password semantics: delivery expiry does not revoke LOGIN;
+only branch deletion or password reset revokes that source credential. Providers
+must await exactly one callback; zero, repeated, unawaited, late or failed handoffs
+withhold success. The outer connector owns/disposes any connection opened before
+a provider's eventual failure. Owned handoff fields are cleared after callback
+use; this is not a promise to erase immutable strings or a provider's copies.
+
+One two-second, cancellation-aware, wall/monotonic-checked lifetime bounds the
+whole custody invocation; it does not extend the existing connector budget.
+Foreign signals, reused capabilities, malformed/accessor/proxy input, stale or
+mismatched proof, clock divergence, timeout and provider failure close the
+invocation. Independent cleanup gets a new verified invocation and nonce. Local
+review corrected proof lifetime to be measured from verification time instead
+of the earlier request start, with a delayed-verification regression test.
+
+Verification: **90 new passing cases** (84 custody unit cases and six additional
+real-source composition cases with simulated external IO). The composition covers
+successful issuance/stop, cancelled issuance and independent cleanup, invalid
+workload/branch, duplicate password delivery and provider failure after connection
+creation. It asserts fresh verification for every control operation and that no
+shared old custody callback is used. Full suite: **5,722 passed / 54 skipped**,
+314 passing / five skipped files. TypeScript, full ESLint, 63-entry webpack build,
+117-chunk client boundary scan, 73-file adapter sync and whitespace checks passed.
+Existing unrelated React act warnings remain. These are not cloud identity,
+real database/TLS, latency, or installed-supervisor evidence. The prior PG16
+shared-memory blocker was not retried or bypassed in this custody-only batch.
+
+Supabase guidance kept OAuth and database credentials separate and prevented
+public/client secret exposure; Next.js guidance preserved the server-only boundary.
+The changelog was checked; no relevant breaking change applied. See
+[Supabase OAuth integrations](https://supabase.com/docs/guides/integrations/build-a-supabase-oauth-integration)
+and [OAuth app scopes](https://supabase.com/docs/guides/platform/oauth-apps/oauth-scopes).
+No UI/Logo, Points, model invocation, migration, database permission, cloud resource,
+commit, push or deployment changed. The previous uncommitted host batch is preserved.
+
+**Next:** implement the concrete task-only workload-verification and secret-provider
+adapter behind these tested ports, beginning with local cryptographic/provider
+contract tests. Authentic identity/source/CA provenance and independent service
+transport/supervision still need verified binding before any activation. Creating
+or changing cloud identities/secrets/IAM, a Hosted Preview, or Production remains
+outside this local development authority. The fixed SQL/process test remains due
+when the local environment can support it.
+
+### Concrete task-only OIDC/GCP custody adapter, not installed — 2026-09-10
+
+`communication-note-task-preview-gcp.server.ts` now implements the previously
+abstract workload/provider ports behind the existing custody policy. Its factory
+is inert; it is not imported by a product entry point, and all readiness flags
+and `HOSTED_WORKSPACE_READ_BINDING` remain closed/undefined. The task-only WIF
+provider, service account, HMAC key version and two regional secret versions are
+**candidate source contracts**, not evidence that resources exist or authorization
+to provision them. No shared M1u/job-status identity, secret or allowlist is reused.
+
+An explicitly trusted host callback must await one delivery of its workload JWT.
+The adapter locally verifies the RS256 signature with a pinned, canonical RSA
+public key and exact issuer/audience/subject/key ID; it requires bounded fresh
+claims and rejects alternate algorithms, remote key headers and audience arrays.
+It then exchanges the JWT through the fixed Google STS endpoint and impersonates
+only the task service account with a requested ten-minute access-token lifetime.
+The STS request carries no Authorization header. Google credentials are confined
+to one two-second custody operation, never cached or discovered from env/ADC.
+
+Before any secret read, KMS must verify an independently supplied HMAC over the
+canonical source/identity/policy/CA/Preview/OAuth binding and fixed resource set.
+The exact numeric key version, success and all integrity flags are checked.
+The intended runtime permission is verification only, never signing or key
+administration. This code cannot establish that such IAM is actually installed.
+Likewise, a valid JWT and signed manifest do **not** prove the running process is
+the approved artifact: issuer-key provenance, trusted host token delivery and
+actual source/CA provenance still require independently verified host binding.
+
+Only fixed numeric regional Secret Manager versions can be read. Their names,
+CRC32C-protected payloads and exact task/branch/CA or OAuth app/grant envelopes
+must match before callback delivery. OAuth remains environment:read only; the
+database password retains static source semantics (handoff expiry is not LOGIN
+revocation). The connector still independently checks the actual branch before
+requesting its password. Explicit Node HTTPS transport verifies TLS, refuses
+redirects/retries, limits JSON and decoded-secret sizes, sanitizes failures and
+destroys only owned requests on completion/abort. Owned byte buffers and handoff
+fields are cleared; immutable JavaScript strings cannot be guaranteed erased.
+
+Verification: **134 new passing cases**, including 132 adapter/crypto/transport
+cases and two full service/issuer/broker/connector/policy/adapter compositions.
+JWT signatures are generated and verified with actual local RSA keys; the KMS
+test double checks an actual test HMAC, not an echoed VERIFIED value. Google
+HTTPS, Supabase branch HTTP and PostgreSQL protocol replies are simulated.
+Success and cancelled issuance both independently reverify seven control
+operations, finalize the simulated lease and close every owned connection.
+Negative coverage includes invalid signed claims/keys, altered manifest/CA/grant,
+failed integrity, wrong secret target, malformed/oversized/redirected responses,
+late or repeated token callbacks, consumer failure, timeout and independent
+cleanup after cancellation. These are not live cloud/IAM/TLS/SQL/latency evidence.
+
+Full suite: **5,856 passed / 54 skipped**, 315 passing / five skipped files.
+TypeScript, full ESLint, 63-entry webpack build, 117-chunk client-boundary scan,
+73-file adapter sync and whitespace checks passed. Existing unrelated React act
+warnings remain. Review tightened canonical public-key and timestamp parsing and
+cleared response buffers on failure; no blocking finding remains for this
+uninstalled local scope. The previously blocked PG16 fixture was not retried.
+
+Supabase guidance kept OAuth and database credentials separate and server-only;
+Next.js guidance kept this Node adapter outside product/client entry points.
+The implementation was checked against Google's
+[STS token exchange](https://cloud.google.com/iam/docs/reference/sts/rest/v1/TopLevel/token),
+[service-account tokens](https://cloud.google.com/iam/docs/reference/credentials/rest/v1/projects.serviceAccounts/generateAccessToken),
+[KMS MAC verification](https://cloud.google.com/kms/docs/reference/rest/v1/projects.locations.keyRings.cryptoKeys.cryptoKeyVersions/macVerify)
+and [regional secret access](https://cloud.google.com/secret-manager/docs/reference/rest/v1/projects.locations.secrets.versions/access),
+and the installed JOSE verifier contract. No real credential was obtained, cloud
+resource created, IAM/database permission changed, migration run, model called,
+Points/UI/Logo changed, commit made, branch pushed or deployment performed.
+
+**Next:** after confirmation, locally commit the reviewed service-host, custody
+policy and concrete-provider batches together; do not push or deploy. Authentic
+host/identity/source binding, authenticated service transport, independent
+supervision and real database/full migration-chain evidence remain separate
+activation gates. Resource provisioning, IAM changes and a disposable Hosted
+Preview require their own exact scope; this local implementation is not that
+authorization.
+
+Local commit handoff (2026-09-10): the user confirmed combining the three local
+service-host/custody-policy/GCP-provider batches into one commit on
+`codex/careslink-task-preview-control`, following the existing local service
+commit `6d53325`. The reviewed scope is exactly 14 files. Fresh pre-commit checks
+passed **5,856 tests / 54 skips**, TypeScript, full ESLint, the 63-entry webpack
+build, 117-chunk client-boundary scan, 73-file adapter sync and whitespace checks,
+including all eight newly added files. No implementation fix or expanded scope
+was needed. Unrelated files in the parent workspace are excluded. The real
+database/Hosted identity/supervision gates above remain unresolved and disabled;
+the fixed PG16 fixture was not rerun. No push or deployment is authorized here.
+
+**Next after separate confirmation:** publish the reviewed branch to
+`Millionluna/Codex-Game-Studios` and create a Draft PR against
+`codex/careslink-ai-documents-v1-auth-gate`. Include both the earlier local service
+commit and this host/custody batch; disclose the remaining physical-test and
+activation gates. Do not use the unrelated `Millionluna/Careslink` remote, merge,
+deploy, provision resources, change IAM or activate product runtime bindings.
