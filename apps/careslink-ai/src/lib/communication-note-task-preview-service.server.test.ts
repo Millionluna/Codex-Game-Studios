@@ -256,7 +256,8 @@ it("keeps the lifecycle source server-only, uninstalled and free of credentials,
   const name = "communication-note-task-preview-service", walk = (dir: string): string[] => readdirSync(dir, { withFileTypes: true })
     .flatMap(e => e.isDirectory() ? walk(join(dir, e.name)) : [join(dir, e.name)]);
   expect(walk("src").filter(p => /\.[cm]?[jt]sx?$/.test(p) && !p.includes(".test.") && !p.endsWith(`${name}.server.ts`))
-    .filter(p => readFileSync(p, "utf8").includes(name))).toEqual(["src/lib/communication-note-task-preview-host.server.ts"]);
+    .filter(p => readFileSync(p, "utf8").includes(name))).toEqual(["src/lib/communication-note-task-preview-host.server.ts",
+      "src/lib/communication-note-task-preview-transport.server.ts"]);
   const source = readFileSync(`src/lib/${name}.server.ts`, "utf8"); expect(source).toMatch(/^import "server-only";/);
   expect(source).not.toMatch(/process\.(?:env|on|exit)|fetch\s*\(|from ["']pg["']|console\.|setInterval\s*\(|\.unref\s*\(/);
   expect(readFileSync("src/lib/communication-note-workspace-runtime.server.ts", "utf8")).toMatch(/HOSTED_WORKSPACE_READ_BINDING\s*=\s*undefined/);
