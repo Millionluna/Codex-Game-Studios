@@ -65,6 +65,7 @@ const forbiddenMarkers = [
   "Workspace Preview composition unavailable",
   "Task Preview issuer unavailable",
   "Task Preview control unavailable",
+  "Task Preview service unavailable",
   "careslink-task-preview-control-only",
   "TASK_LIST_ISSUER_CONTROL_ONLY",
   "careslink_task_preview_issuer",

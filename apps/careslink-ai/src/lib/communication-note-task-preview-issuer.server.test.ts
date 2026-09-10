@@ -154,6 +154,29 @@ describe("uninstalled task Preview issuer — offline protocol coverage", () => 
     await s.sweepExpired(context()); expect(f.leases.get(expired.requestId)?.state).toBe("REVOKED");
     expect(f.leases.get(fenced.requestId)?.state).toBe("REVOKED"); expect(f.leases.get(active.requestId)?.state).toBe("ISSUED");
   });
+  it("drains unexpired inventory without taking over or enabling a new epoch", async () => {
+    const f = fixture(), s = f.service(), input = scope(); await s.recover(context()); await s.custody.issue(input, context());
+    f.call.mockClear(); await s.drain(context()); expect(f.call.mock.calls.map(c => c[0])).toEqual(["inventory", "fence", "finalize"]);
+    expect(f.leases.get(input.requestId)?.state).toBe("REVOKED");
+    await expect(s.custody.issue(scope(), context())).rejects.toThrow(MESSAGE); await expect(s.sweepExpired(context())).rejects.toThrow(MESSAGE);
+    f.call.mockClear(); await expect(s.drain(context())).rejects.toThrow(MESSAGE); expect(f.call).not.toHaveBeenCalled();
+  });
+  it("rejects drain before recovery without taking over an unknown service", async () => {
+    const f = fixture(); await expect(f.service().drain(context())).rejects.toThrow(MESSAGE); expect(f.call).not.toHaveBeenCalled();
+  });
+  it("does not drain a successor's inventory from a stale epoch", async () => {
+    const f = fixture(), a = f.service(), b = f.service(); await a.recover(context()); await b.recover(context());
+    const input = scope(); await b.custody.issue(input, context()); f.call.mockClear();
+    await expect(a.drain(context())).rejects.toThrow(MESSAGE); expect(f.call.mock.calls.map(c => c[0])).toEqual(["inventory"]);
+    expect(f.leases.get(input.requestId)?.state).toBe("ISSUED"); await b.drain(context());
+  });
+  it("keeps issuance closed after an aborted drain and allows an explicit cleanup retry", async () => {
+    const f = fixture(), s = f.service(), input = scope(); await s.recover(context()); await s.custody.issue(input, context());
+    const aborted = new AbortController(); aborted.abort(); f.call.mockClear();
+    await expect(s.drain({ signal: aborted.signal })).rejects.toThrow(MESSAGE); expect(f.call).not.toHaveBeenCalled();
+    await expect(s.custody.issue(scope(), context())).rejects.toThrow(MESSAGE);
+    await s.drain(context()); expect(f.leases.get(input.requestId)?.state).toBe("REVOKED");
+  });
   it("times out stalled issuance, commits its cancellation tombstone, and ignores late delivery", async () => {
     vi.useFakeTimers(); const f = fixture(), delayed = deferred<unknown>();
     const s = f.service({ call: (op, data, ctx) => op === "issue" ? delayed.promise : f.call(op, data, ctx) });
@@ -219,8 +242,9 @@ it("quarantines the source/candidate from product installation and automatic mig
   const walk = (dir: string): string[] => readdirSync(dir, { withFileTypes: true }).flatMap(e => e.isDirectory() ? walk(join(dir, e.name)) : [join(dir, e.name)]);
   const importers = walk("src").filter(p => /\.[cm]?[jt]sx?$/.test(p) && !p.includes(".test.") && !p.endsWith(`${name}.server.ts`))
     .filter(p => readFileSync(p, "utf8").includes(name));
-  // The dedicated control connector is still uninstalled, not a product route.
-  expect(importers).toEqual(["src/lib/communication-note-task-preview-control.server.ts"]);
+  // Dedicated control/service sources remain uninstalled, not product routes.
+  expect(importers).toEqual(["src/lib/communication-note-task-preview-control.server.ts",
+    "src/lib/communication-note-task-preview-service.server.ts"]);
   expect(readdirSync("supabase/migrations")).not.toContain(candidate);
   const sql = readFileSync(`supabase/migration-candidates/${candidate}`, "utf8");
   expect(sql).toContain(`p<>'${CARESLINK_PRODUCTION_SUPABASE_REF}'`);

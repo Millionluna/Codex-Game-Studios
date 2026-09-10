@@ -10,6 +10,7 @@ import { createTaskPreviewPgControlOpener, COMMUNICATION_NOTE_TASK_PREVIEW_CONTR
   type TaskPreviewControlCustody, type TaskPreviewControlCredential } from "./communication-note-task-preview-control.server";
 import { createTaskPreviewSqlBroker, TASK_PREVIEW_ISSUER_SQL,
   createCommunicationNoteTaskPreviewIssuer } from "./communication-note-task-preview-issuer.server";
+import { createCommunicationNoteTaskPreviewService } from "./communication-note-task-preview-service.server";
 import { CARESLINK_PRODUCTION_SUPABASE_REF as PARENT } from "./v1/ndis-shadow-guard";
 
 const driver = vi.hoisted(() => ({ construct: vi.fn() }));
@@ -143,6 +144,48 @@ describe("dedicated task Preview control — offline transport and custody", () 
     const port = await h.open(ctx());
     expect(driver.construct.mock.calls[0][0].ssl.ca).toEqual(CA); expect(h.input.createCustody).not.toHaveBeenCalled();
     expect(JSON.stringify(driver.construct.mock.calls[0][0])).not.toContain("FOREIGN_AMBIENT_SECRET"); await port.close();
+  });
+  it.each([false, true])("composes service/issuer/broker/control with offline IO and confirmed shutdown (abort=%s)", async abortIssue => {
+    const h = setup(), parent = new AbortController(), operations: string[] = [];
+    let lease: Record<string, unknown> | undefined;
+    driver.construct.mockImplementation(config => {
+      const c = client(config), original = c.query.getMockImplementation()!; h.clients.push(c);
+      c.query.mockImplementation(async (sql, args) => {
+        if (sql === TASK_PREVIEW_CONTROL_IDENTITY_SQL) return original(sql, args);
+        const [op, payload] = args as string[], data = JSON.parse(payload); operations.push(op);
+        let reply;
+        if (op === "start" || op === "ready") reply = { projectRef: REF, epoch: data.epoch, ready: op === "ready" };
+        else if (op === "inventory") reply = { projectRef: REF, epoch: data.epoch,
+          leases: lease && lease.state !== "REVOKED" ? [{ scope: lease.scope, state: lease.state, expiresAt: lease.expiresAt }] : [] };
+        else {
+          if (op === "issue") lease = { scope: data.scope, state: "ISSUED", role: data.role, expiresAt: data.expiresAt,
+            roleCount: 1, sessionCount: 0, membershipCount: 2 };
+          if (op === "fence") lease = { ...lease, state: "FENCED" };
+          if (op === "finalize") lease = { ...lease, state: "REVOKED", roleCount: 0, sessionCount: 0, membershipCount: 0 };
+          reply = lease;
+        }
+        c.connection.emit("readyForQuery", { status: "I" });
+        if (op === "issue" && abortIssue) parent.abort();
+        return { rows: [{ data: reply }] };
+      }); return c;
+    });
+    const service = createCommunicationNoteTaskPreviewService({ projectRef: REF, broker: createTaskPreviewSqlBroker(h.open) });
+    try {
+      await service.start();
+      const input = { requestId: "f".repeat(32), projectRef: REF, purpose: "COMMUNICATION_NOTE_JOB_LIST_READ" as const,
+        callerRole: "careslink_v1_generation_job_list_caller" as const,
+        principal: { userId: BRANCH, sessionId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", transport: "COOKIE" as const } };
+      if (abortIssue) {
+        await expect(service.custody.issue(input, { signal: parent.signal })).rejects.toThrow("Task Preview service unavailable");
+        expect(await service.finished).toEqual({ state: "FAILED", cleanupConfirmed: true });
+      } else {
+        await service.custody.issue(input, { signal: parent.signal });
+        expect(await service.stop()).toEqual({ state: "STOPPED", cleanupConfirmed: true });
+      }
+      expect(lease?.state).toBe("REVOKED"); expect(operations.filter(op => op === "start")).toHaveLength(1);
+      expect(operations).toHaveLength(7); expect(h.clients).toHaveLength(7);
+      for (const c of h.clients) expect(c.end).toHaveBeenCalledTimes(1);
+    } finally { await service.stop(); }
   });
   it("pins real pg 8.23.0 startup parameters offline, with connect/query/end replaced before use", async () => {
     const h = setup(), { Client: PgClient } = await vi.importActual<typeof import("pg")>("pg");

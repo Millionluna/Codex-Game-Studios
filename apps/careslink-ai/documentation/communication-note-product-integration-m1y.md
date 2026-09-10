@@ -4079,3 +4079,79 @@ The authorized handoff is one local commit only. Next, after user confirmation,
 publish `codex/careslink-task-preview-control` to `Millionluna/Codex-Game-Studios`
 and create a Draft PR against `codex/careslink-ai-documents-v1-auth-gate`.
 Do not merge, deploy, promote a migration or activate the formal runtime.
+
+### PR #39 merged; dedicated task Preview service lifecycle — 2026-09-10
+
+PR #39 was authorized and merged into
+`codex/careslink-ai-documents-v1-auth-gate` as `2090364`, with exact parents
+`769c747` and reviewed connector commit `f682642`. The source branch was retained;
+no deployment occurred. The following local-only batch builds on that same
+reviewed source tree without changing the connector, SQL candidates or bindings.
+
+`communication-note-task-preview-service.server.ts` now composes the task issuer
+into an explicitly owned, inert-on-construction Node service lifecycle. `start()`
+must complete durable recovery before request admission. A single non-overlapping
+five-second sweep loop runs independently of page/request cancellation. It blocks
+new issue admission while sweeping, but still permits scoped revoke requests.
+Outstanding work is bounded locally (four issue admissions; eight total requests
+for revoke admission); the unchanged SQL ledger remains authoritative for the
+four unfinished lease limit. Malformed or pre-aborted requests are rejected before
+issuer IO without shutting down a healthy service.
+
+Successful maintenance renews a 15-second monotonic health deadline. Request
+admission, delivery, health reads and the sweep callback also check freshness,
+so delayed timer callbacks cannot make stale health acceptable. A wall/monotonic
+clock divergence over one second fails closed. Referenced timers keep the owned
+service process alive until explicit shutdown; no global process handler or
+module-level background work is installed. Timer timing is not a hard realtime
+guarantee; an external host must still detect a blocked/dead process.
+
+Any uncertain custody, recovery or maintenance failure closes admission, cancels
+owned issue/maintenance work, joins pending bounded operations, and attempts one
+independent cleanup pass. `stop()` uses the same join/drain path. The issuer's new
+`drain()` inventories only its existing epoch and revokes even unexpired leases;
+it never performs `start`/`ready`, takes over a successor, or reopens issuance.
+The service owns no separate SQL connection or secret cache. It reuses the
+existing per-operation broker/control closure and the committed fence followed by
+separate finalize acknowledgements. Any nonzero role/session/membership count,
+unknown startup outcome or unavailable/stale-epoch inventory leaves
+`cleanupConfirmed: false`. Clean stop acknowledges this instance's admitted work,
+not global zero activity in a successor. Stop before start confirms only that the
+instance performed no IO. A failed service remains terminal even if cleanup
+succeeds: the owner must inspect `finished`/content-free `health()` and arrange a
+new recovered instance; there is no recursive restart/takeover loop.
+
+Verification: **46 new offline tests passed** (190 related tests total). The full
+suite passed **5,605 tests / 53 opt-in skips**, with 311 passing / five skipped
+files. TypeScript, full ESLint, the 63-entry webpack build, 117-chunk client-boundary
+scan, 73-file adapter check and whitespace checks passed. Coverage includes
+startup gating, expired/fenced cleanup, cancelled pages, overlapping maintenance,
+pending issue cancellation and shutdown, stale-instance shutdown, wrong scopes,
+clock jumps, delayed callbacks, residual acknowledgements, bounded failures and
+fresh-instance recovery over a protocol fixture. Two additional tests compose the
+real service, issuer, broker and control connector with mocked external IO. These
+are **not** real SQL-engine/TLS, process-kill/restart or Hosted latency evidence.
+The existing follow-up browser test emitted React `act(...)` warnings but passed;
+no unrelated UI test/code was changed.
+
+Local review found no blocking issue for this **uninstalled source-only scope**.
+Supabase/Postgres guidance informed exact-purpose, minimal-privilege cleanup and
+separate short transactions; Next.js guidance kept the service server-only and
+outside route lifetime. See [Supabase roles](https://supabase.com/docs/guides/database/postgres/roles),
+[short transactions](https://www.postgresql.org/docs/17/tutorial-transactions.html)
+and [Node timer lifetime/timing](https://nodejs.org/api/timers.html).
+
+All readiness constants remain false and `HOSTED_WORKSPACE_READ_BINDING` remains
+undefined. This is a service lifecycle implementation, **not an installed external
+supervisor**. Authentic task-control custody/workload/CA provenance, an authenticated
+service transport, independent process monitoring/restart ownership and Hosted
+PG17/TLS/full migration-chain evidence remain outstanding before activation.
+No new cloud resource, real database permission/migration, model/Points operation,
+UI/Logo change, push, PR mutation or deployment occurred in this batch.
+
+**Next local development:** bind the dedicated service to task-specific control
+custody and an explicit service-host boundary; verify startup, shutdown and
+process-loss recovery without product activation. Batch implementation, tests and
+review together. Publishing a new change to the public repository or creating a
+disposable Hosted Preview remains a separately scoped action; no new deployment
+or Production authorization is implied.
