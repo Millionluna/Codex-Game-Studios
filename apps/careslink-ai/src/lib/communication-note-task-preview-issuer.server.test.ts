@@ -218,7 +218,9 @@ it("quarantines the source/candidate from product installation and automatic mig
   const name = "communication-note-task-preview-issuer", candidate = "20260909143031_add_communication_note_task_preview_issuer.sql";
   const walk = (dir: string): string[] => readdirSync(dir, { withFileTypes: true }).flatMap(e => e.isDirectory() ? walk(join(dir, e.name)) : [join(dir, e.name)]);
   const importers = walk("src").filter(p => /\.[cm]?[jt]sx?$/.test(p) && !p.includes(".test.") && !p.endsWith(`${name}.server.ts`))
-    .filter(p => readFileSync(p, "utf8").includes(name)); expect(importers).toEqual([]);
+    .filter(p => readFileSync(p, "utf8").includes(name));
+  // The dedicated control connector is still uninstalled, not a product route.
+  expect(importers).toEqual(["src/lib/communication-note-task-preview-control.server.ts"]);
   expect(readdirSync("supabase/migrations")).not.toContain(candidate);
   const sql = readFileSync(`supabase/migration-candidates/${candidate}`, "utf8");
   expect(sql).toContain(`p<>'${CARESLINK_PRODUCTION_SUPABASE_REF}'`);

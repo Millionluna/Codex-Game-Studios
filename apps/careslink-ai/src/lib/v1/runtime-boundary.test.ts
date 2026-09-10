@@ -899,6 +899,7 @@ describe("V1 shadow runtime boundary", () => {
           ),
       ),
     ).toEqual([
+      join(process.cwd(), "src/lib/communication-note-task-preview-control.server.ts"),
       join(process.cwd(), "src/lib/communication-note-workspace-task-postgres.server.ts"),
       join(process.cwd(), "src/lib/v1/communication-note-job-status-postgres.server.ts"),
       modulePath,
