@@ -4378,3 +4378,200 @@ the fixed PG16 fixture was not rerun. No push or deployment is authorized here.
 commit and this host/custody batch; disclose the remaining physical-test and
 activation gates. Do not use the unrelated `Millionluna/Careslink` remote, merge,
 deploy, provision resources, change IAM or activate product runtime bindings.
+
+### PR #40 merged; authenticated task-service entry — 2026-09-10
+
+The user authorized making PR #40 ready and merging it into the existing
+`codex/careslink-ai-documents-v1-auth-gate` development branch. GitHub confirmed
+merge commit `625d212`; its source tree matches reviewed head `a131f1c` exactly.
+The task branch was retained. The current local branch was subsequently
+fast-forwarded to that exact merge commit, with no source changes from the sync.
+The connected Careslink AI Vercel project remained Git-unlinked; no deployment,
+runtime activation or infrastructure change was requested or performed.
+
+This local batch adds `communication-note-task-preview-transport.server.ts`:
+an inert HTTP Request/Response handler for the dedicated service owner, **not an
+installed listener or Next.js route**. Its two exact POST paths accept bounded
+`application/jwt` bodies for task-list lease issue and revoke only. It rejects
+Cookie/Origin/Bearer fallbacks, alternate paths/methods/targets, ambiguous lengths,
+oversized/non-byte/invalid-UTF8 bodies and unexpected signed fields. Rejected or
+cancelled request streams are released. Errors are content-free, responses are
+no-store, and no CORS access is granted.
+
+Each command is locally verified with an explicitly pinned RSA public key and
+exact issuer, backend subject, audience, key ID and task-specific JWT type. The
+signature binds the operation, exact Preview/scope and Cookie user/session to a
+fresh random service-instance ID. This is a **delegated backend assertion**, not
+direct verification of a Supabase user session: the independently trusted signer
+must verify Cookie identity before issue and permit exact-scope cleanup after
+page cancellation or session loss. No signing key, signer, OIDC fallback, remote
+key discovery, Supabase Auth change or real credential is introduced.
+
+Assertions have at most 30 seconds lifetime, at most ten seconds age, and at least
+eight seconds remaining at admission. Issue/revoke each have a 256-entry replay
+budget and four pending request slots; live IDs are never evicted to admit new
+ones, and issue saturation does not consume revoke capacity. Check-and-consume
+is atomic before custody IO. Timed-out pending work retains its slot until it
+settles; its result cannot become success. Wall/monotonic clock divergence closes
+this handler permanently. One handler is allowed per service object; a new
+instance ID invalidates prior assertions after restart. These process-local
+controls do not claim distributed replay persistence.
+
+The seven-second request deadline fits within the existing eight-second caller
+phase. Unknown, late, cancelled or malformed issue outcomes trigger independent,
+bounded exact-scope revoke, never using the aborted page signal. Responses are
+restricted to the validated scope and short-lived task credential or terminal
+REVOKED receipt. Failed cleanup remains the service owner's durable-recovery
+responsibility; a response lost after successful delivery still requires the
+caller's finally-revoke and independent issuer maintenance. Owned buffer/copy
+clearing does not promise erasure of immutable JavaScript strings.
+
+Verification: **97 new passing tests**, including two compositions using the
+actual service/issuer and a real one-use workspace lease. RSA signatures are real
+local cryptography; HTTP Requests/Responses run in memory and the database ledger
+is simulated. Coverage includes concurrent replay, instance binding, scope/claim
+tampering, capacity isolation, body cancellation, late results, malformed receipts,
+clock jumps and separate concurrent sessions. Final full suite: **5,953 passed /
+54 skipped**, 316 passing / five skipped files. TypeScript, full ESLint, the
+63-entry webpack build, 117-chunk client-boundary scan, 73-file adapter check and
+whitespace checks passed. Existing unrelated React act warnings remain. Local
+review tightened unread-body cleanup, byte/length validation and config parsing;
+no blocking finding remains for this uninstalled local scope.
+
+Supabase guidance preserved verified-user authorization and separation of user
+JWTs from backend assertions; Next.js guidance kept the service outside public
+routes and client bundles. Signature checking uses the installed JOSE verifier;
+see [Supabase JWT verification](https://supabase.com/docs/guides/auth/jwts) and
+[JOSE jwtVerify](https://github.com/panva/jose/blob/main/docs/jwt/verify/functions/jwtVerify.md).
+The new readiness latch remains false and `HOSTED_WORKSPACE_READ_BINDING` remains
+undefined. A Request URL labeled HTTPS is not TLS evidence. Private TLS, signer
+and host/instance provenance, independent supervision and real SQL/full migration
+chain evidence remain activation gates. The blocked PG16 fixture was not retried.
+No UI/green branding, Points, AI call, Production data, migration, real permission,
+cloud resource, new commit, push or deployment changed in this batch.
+
+**Next local development:** implement the application-backend custody client for
+this protocol: consume exact-command assertions from a separately trusted signer,
+use a fixed authenticated HTTPS service/instance binding, validate bound responses,
+and retain independent revoke without retries or fallback. Keep the caller free
+of issuer/control imports and real private signing keys. Review the resulting
+caller/entry batch together before a separately authorized publication; do not
+activate product bindings or provision resources implicitly.
+
+### Application-backend authenticated task client — 2026-09-10
+
+The preceding next step is now implemented locally on `625d212`, together with
+the still-uncommitted authenticated-entry batch. No new branch or commit was
+created. `communication-note-task-preview-client.server.ts` supplies the existing
+task-lease custody interface without importing the service host, issuer, control
+opener, GCP provider or any database driver. Construction is inert and the client
+readiness latch remains false. No product route or runtime binding is installed.
+
+The new `communication-note-task-preview-protocol.server.ts` shares only wire
+constants, scope/receipt grammar and assertion verification between entry and
+client. The original issuer implementation is unchanged; parity tests preserve
+the same Preview/purpose/role/identity/request-ID scope checks. The endpoint's
+97 regression tests still pass after extraction, and it no longer imports the
+issuer merely to parse a request.
+
+Each client instance is bound to one already-verified Cookie principal and one
+lease scope, with at most one issue and one revoke. It constructs a fresh exact
+command containing operation, service origin/instance, scope, times and random
+nonce, then consumes one assertion from a separately trusted signing provider.
+The local RSA verifier checks the signature and complete command equality before
+network IO. There is no private key, signer implementation, user-JWT/OIDC fallback,
+remote key discovery, credential cache or implicit application authorization.
+The host still has to establish signer/key and authenticated instance provenance.
+
+HTTPS is a single explicitly owned Node request to one fixed DNS hostname and
+standard TLS port. It uses only the pinned CA bytes (hash checked), hostname
+verification and exact leaf public-key fingerprint, with TLS 1.2/1.3 and HTTP/1.1
+ALPN. The request body is sent only after secureConnect confirms an authorized,
+non-resumed socket and matching peer key. The same socket and identity are checked
+again on response and completion. Agent:false avoids global-agent pooling and
+environment-proxy configuration in the installed Node 22.23.2 runtime. No redirect,
+retry, alternate destination, generic fetch, Cookie or Authorization fallback is
+available. CA PEM wrapping differences are accepted without permitting appended
+certificates/private keys or changing the exact input-byte hash requirement.
+
+The 7.5-second operation deadline includes signing, TLS and response consumption
+and fits inside the existing eight-second lease phase. Cancellation destroys
+owned requests and suppresses late signer/results; wall/monotonic freshness is
+checked again even after the signer finishes awaiting HTTP. Responses require
+HTTP 200, no-store JSON, bounded headers/body, exact lengths and unambiguous JSON;
+redirect/cookie/encoded responses, incomplete streams and unbound or malformed
+credentials are rejected. Owned body buffers and failed-delivery credential copies
+are cleared; immutable strings are not claimed erased.
+
+Revoke can fence a scope whose issue outcome is unknown, including before issue.
+It aborts a pending issue but uses the independently supplied cleanup signal.
+Wrong-scope or duplicate calls do not cancel an already admitted issue or consume
+the valid cleanup opportunity. There is no retry after a revoke attempt and no
+physical-cleanup claim on failure. The existing workspace lease's finally phase
+remains responsible for invoking revoke, while the dedicated service owner retains
+durable maintenance/recovery after caller or service process loss.
+
+Verification: **87 additional passing tests**; **184 client/entry tests** together.
+Two new complete compositions exercise the actual client, authenticated entry,
+service, issuer and one-use workspace lease for successful and cancelled reads.
+Both follow issue → read → independent fence/finalize, leave zero simulated live
+roles/sessions/memberships, clear the caller credential copy and keep the service
+healthy. RSA signatures, X509 parsing, hostname and public-key checks use real
+local primitives. Node HTTPS events/sockets and the SQL ledger are simulated:
+this does **not** prove a real TLS handshake, external signer, actual SQL engine,
+deployed private network, host watchdog or production readiness.
+
+Final full suite: **6,040 passed / 54 skipped**, 317 passing / five skipped files.
+TypeScript, full ESLint, the 63-entry webpack build, 117-chunk client-boundary scan,
+73-file adapter synchronization and whitespace checks passed. Existing unrelated
+React act warnings remain. Review fixed overly strict PEM wrapping and ensured
+rejected duplicate calls cannot abort the admitted operation; their regression
+tests pass. No blocking finding remains for the uninstalled local caller/entry
+scope. The previously blocked real PG16 fixture was not rerun.
+
+Supabase guidance kept backend assertions separate from verified user sessions and
+database credentials; Next.js guidance kept the caller server-only and free of
+control-plane imports. TLS verification follows the official
+[Node HTTPS public-key pinning pattern](https://nodejs.org/api/https.html) and
+[TLS hostname verification](https://nodejs.org/api/tls.html#tlscheckserveridentityhostname-cert).
+No green UI/Logo, Points/payment, AI invocation, migration, database permission,
+Production data, cloud resource, deployment, push or PR state changed.
+
+**Next:** review and locally commit the combined authenticated entry/protocol/client
+batch and its tests/evidence. Keep both endpoints and the product runtime disabled;
+do not push or deploy in that step. Actual TLS/host/signer bindings, independent
+supervision and real database/full migration-chain evidence remain activation
+gates, not authorization to create cloud resources or change Production.
+
+### Combined authentication batch local-commit review — 2026-09-11
+
+The user authorized reviewing and locally committing the preceding client/entry
+batch on `codex/careslink-task-preview-control`, based on `625d212`. Review covers
+exact-command signature/scope validation, independent cancellation and cleanup,
+bounded replay/IO, pinned TLS options and server-only import boundaries. No
+blocking finding remains for this uninstalled scope; no implementation changes
+were needed during this review. The eight-file commit scope is the client and
+its tests, shared protocol, authenticated entry and its tests, service import
+guard, client-bundle guard and this handoff document.
+
+Fresh verification on 2026-09-11: **184 client/entry tests passed**; full suite
+**6,040 passed / 54 skipped**, 317 passing / five skipped files. TypeScript,
+full ESLint, the 63-entry webpack build, 117-chunk client-boundary scan and
+73-file adapter synchronization passed. Existing unrelated React act warnings
+remain. Local Git hooks contain only samples and no custom hooks path is set.
+
+Supabase security guidance preserved the distinction between verified user
+identity and delegated backend assertions; Next.js guidance preserved Node-only
+execution and browser-bundle exclusion. The official Supabase changelog was
+rechecked; none of the listed breaking changes requires modifying this batch.
+No live database or TLS handshake evidence is claimed by these offline tests.
+The client/entry readiness latches remain false and
+`HOSTED_WORKSPACE_READ_BINDING` remains undefined. No push, PR change, deployment,
+new cloud resource, real permission change, Production access, UI change or AI
+invocation is included in this local-commit step.
+
+**Next, with separate publication authorization:** push this reviewed local
+commit to `Millionluna/Codex-Game-Studios` and create a draft PR against
+`codex/careslink-ai-documents-v1-auth-gate`, retaining the uninstalled state and
+explicit TLS/signer/host, independent-supervision and real database/full-chain
+activation gates. Do not use `origin` (`Millionluna/Careslink`), merge or deploy.
