@@ -1,4 +1,4 @@
-import { createHash, generateKeyPairSync, randomBytes } from "node:crypto";
+import { createHash, generateKeyPairSync, randomBytes, sign as signBytes } from "node:crypto";
 import { EventEmitter } from "node:events";
 import { readFileSync, readdirSync } from "node:fs";
 import type { RequestOptions } from "node:https";
@@ -15,6 +15,7 @@ import { createTaskPreviewHttpCustody as createClient, COMMUNICATION_NOTE_TASK_P
 import { parseTaskPreviewWireScope, TASK_PREVIEW_TRANSPORT_PATHS as PATHS, TASK_PREVIEW_TRANSPORT_JWT_TYPE as TYPE,
   type TaskPreviewCommand } from "./communication-note-task-preview-protocol.server";
 import { createTaskPreviewAuthenticatedEndpoint as createEndpoint } from "./communication-note-task-preview-transport.server";
+import { createTaskPreviewAssertionProvider, type TaskPreviewSignerOptions } from "./communication-note-task-preview-signer.server";
 import { createCommunicationNoteTaskPreviewService as createService } from "./communication-note-task-preview-service.server";
 import { parseTaskPreviewIssuerScope, type TaskPreviewIssuerBroker } from "./communication-note-task-preview-issuer.server";
 import { createCommunicationNoteTaskLeaseReadPort, type CommunicationNoteTaskLeaseScope as Scope } from "./communication-note-workspace-task-lease.server";
@@ -301,9 +302,17 @@ function serviceFixture() {
   });
   const service = createService({ projectRef: REF, broker: { call } }); services.push(service);
   const h = fixture(); const endpoint = createEndpoint({ projectRef: REF, ...h.input.identity, service }); endpoints.push(endpoint);
-  return { ...fixture(endpoint), service, leases, call };
+  const wire = fixture(endpoint);
+  const sign = vi.fn<TaskPreviewSignerOptions["consumeSignature"]>(async (input, ctx, deliver) => {
+    expect(ctx.signal.aborted).toBe(false);
+    const signature = signBytes("RSA-SHA256", input.signingInput, keys.privateKey);
+    try { await deliver(signature); } finally { signature.fill(0); }
+  });
+  const signer = createTaskPreviewAssertionProvider({ projectRef: REF, principal: wire.input.principal,
+    identity: wire.input.identity, instanceId: endpoint.instanceId, consumeSignature: sign });
+  return { ...wire, client: createClient({ ...wire.input, consumeAssertion: signer.consumeAssertion }), service, leases, call, sign };
 }
-it.each([false, true])("runs the actual client, authenticated entry, service and workspace lease (cancel read=%s)", async cancel => {
+it.each([false, true])("runs the actual signer, client, authenticated entry, service and workspace lease (cancel read=%s)", async cancel => {
   const h = serviceFixture(), ctx = context(), principal = scope().principal; await h.service.start();
   const open = vi.fn((value: { credential: { password: string } }) => ({ projectRef: REF, purpose: "COMMUNICATION_NOTE_JOB_LIST_READ" as const,
     callerRole: "careslink_v1_generation_job_list_caller" as const, execute: async () => {
@@ -313,9 +322,26 @@ it.each([false, true])("runs the actual client, authenticated entry, service and
   const pending = port.execute([principal.userId, principal.sessionId, null, null, 20, CARESLINK_V1_CONTRACT_VERSION, CARESLINK_V1_NOTE_SCHEMA_VERSION], ctx.context);
   if (cancel) await expect(pending).rejects.toThrow(); else expect(await pending).toEqual({ tasks: [], nextCursor: null });
   expect(h.calls.map(c => c.url)).toEqual([ORIGIN + PATHS.issue, ORIGIN + PATHS.revoke]);
+  expect(h.sign).toHaveBeenCalledTimes(2);
+  expect(h.sign.mock.calls.every(([input]) => input.signingInput.every(b => b === 0))).toBe(true);
   expect(h.call.mock.calls.map(c => c[0])).toEqual(["start", "inventory", "ready", "issue", "fence", "finalize"]);
   expect([...h.leases.values()]).toMatchObject([{ state: "REVOKED", roleCount: 0, sessionCount: 0, membershipCount: 0 }]);
   expect(open.mock.calls[0][0].credential.password).toBe(""); expect(h.service.health().state).toBe("READY");
+});
+it.each(["failure", "cancellation"])("fences an unknown issue after real signer %s without sending an issue assertion", async mode => {
+  const h = serviceFixture(), ctx = context(), principal = scope().principal, original = h.sign.getMockImplementation()!;
+  await h.service.start();
+  h.sign.mockImplementationOnce(async (...args) => {
+    if (mode === "cancellation") ctx.controller.abort(); else await original(...args);
+    throw new Error("PRIVATE_SIGNATURE_FAILURE");
+  });
+  const open = vi.fn(() => { throw new Error("READ_MUST_NOT_OPEN"); });
+  const port = createCommunicationNoteTaskLeaseReadPort({ enabled: true, projectRef: REF, principal, custody: h.client, open })!;
+  await expect(port.execute([principal.userId, principal.sessionId, null, null, 20, CARESLINK_V1_CONTRACT_VERSION, CARESLINK_V1_NOTE_SCHEMA_VERSION], ctx.context)).rejects.toThrow();
+  expect(open).not.toHaveBeenCalled(); expect(h.calls.map(c => c.url)).toEqual([ORIGIN + PATHS.revoke]);
+  expect(h.sign).toHaveBeenCalledTimes(2);
+  expect(h.call.mock.calls.map(c => c[0])).toEqual(["start", "inventory", "ready", "fence", "finalize"]);
+  expect([...h.leases.values()]).toMatchObject([{ state: "REVOKED", roleCount: 0, sessionCount: 0, membershipCount: 0 }]);
 });
 it("keeps client/protocol free of control-plane imports, private keys and product activation", () => {
   const walk = (dir: string): string[] => readdirSync(dir, { withFileTypes: true }).flatMap(e => e.isDirectory() ? walk(join(dir, e.name)) : [join(dir, e.name)]);

@@ -72,6 +72,7 @@ const forbiddenMarkers = [
   "Task Preview transport unavailable",
   "Task Preview client unavailable",
   "Task Preview protocol unavailable",
+  "Task Preview signer unavailable",
   "careslink-task-lease+jwt",
   "/internal/task-preview/v1/lease/",
   "careslink-task-preview-control-only",
