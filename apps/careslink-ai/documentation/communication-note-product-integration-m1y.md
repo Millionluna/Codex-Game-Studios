@@ -4004,3 +4004,78 @@ or deploy. Keep the candidate unpromoted and the formal runtime closed. Hosted
 target/control custody, pinned PG17/TLS transport, independently owned supervision
 and activation still require their own evidence and authorization; the local
 test result is not a substitute for those gates.
+
+### PR #38 merged; dedicated task Preview control connector — 2026-09-10
+
+PR #38 was explicitly authorized, marked ready and merged into
+`codex/careslink-ai-documents-v1-auth-gate` as `769c747`; its parents are
+`0da677c` and the reviewed `899e694`. The source branch was retained. No deployment
+or candidate promotion occurred. Local follow-on development now starts from
+that exact merge on `codex/careslink-task-preview-control`.
+
+`communication-note-task-preview-control.server.ts` implements the previously
+missing physical opener for the task-list issuer's fixed SQL broker. Every
+operation obtains a fresh custody scope and performs one authenticated read of
+the fixed Supabase branch-list endpoint using `environment:read`. Exactly one
+matching branch ID/ref must be healthy, non-default, non-persistent, created
+without copied data and not scheduled for deletion. Only then is separate
+task-control database custody consulted, with a short-lived content-free evidence
+digest. OAuth does not supply the database password. The generic exactly-once
+custody handoff helper is reused; job-status credentials and SQL are not reused.
+
+Each connection derives the direct `db.<ref>.supabase.co:5432` endpoint and copied
+pinned CA, requires certificate/hostname validation, PG17, the existing
+non-superuser `postgres` control posture, zero prepared transactions and an empty
+search path. It checks READ COMMITTED and the driver's idle ReadyForQuery status
+before and after its single parameterized task-issuer operation. It accepts no
+DSN, pool, arbitrary SQL, role switch, local fallback or environment-discovered
+credential. The underlying admin password remains static: delivery expiry is
+not source revocation. This component creates no new privileged LOGIN or grant.
+
+The existing two-second broker operation budget includes branch validation,
+custody and connection/SQL work; close has a separate bounded acknowledgement.
+Timeout, abort, malformed custody, wrong target, failed physical close, concurrent
+reuse and late results withhold success. Cancellation hard-closes the owned
+socket; a late replacement stream is also destroyed. Recovery/revocation use
+fresh independent operation contexts, not the aborted page's context. The
+supervisor must still recover unresolved durable leases; this connector neither
+installs nor proves that supervisor. Hosted latency feasibility is unverified.
+
+Verification: **100 new offline tests passed**, including real issuer + broker +
+connector composition against simulated SQL replies, interrupted issuance and
+independent cleanup, and the real pinned `pg` constructor's startup parameters
+with all IO methods replaced. These are not TLS handshakes or SQL-engine tests.
+Full suite: **5,559 passed / 53 skipped** (310 passing / five skipped files).
+TypeScript, full ESLint, 63/63 generated webpack entries, the 117-chunk client
+boundary scan, 73-file adapter check and whitespace checks passed. The existing
+exact pg importer lists now include only this additional server-only connector;
+separate tests prove it has no product importer. No boundary assertion was removed.
+
+The Supabase/Postgres skills informed the fixed target, least-privilege control
+posture and short autocommit lifetime; Next.js guidance kept the adapter
+server-only. References: [branch-list API](https://supabase.com/docs/reference/api/v1-list-all-branches),
+[Postgres SSL verification](https://supabase.com/docs/guides/platform/ssl-enforcement),
+[node-postgres TLS configuration](https://node-postgres.com/features/ssl),
+[PG17 connection defaults](https://www.postgresql.org/docs/17/runtime-config-client.html).
+
+All readiness latches remain false and `HOSTED_WORKSPACE_READ_BINDING` remains
+undefined. No SQL candidate/approved migration, UI/Logo, Points/payment or model
+operation changed. No Hosted database, live custody/CA/OAuth integration, cloud
+resource, Production, deployment, commit or push was used in this batch.
+**Next:** review and locally commit this bounded connector/test/evidence change;
+do not push or deploy. Authentic custody/workload and CA provenance, the approved
+Hosted migration chain, physical PG17/TLS evidence and independent supervision
+remain separate gates before activation.
+
+Pre-commit review (2026-09-10): the seven-file connector/test/boundary/evidence
+diff has no blocking finding for this source-only, uninstalled scope. No
+implementation or SQL change was required. Fresh verification passed all
+5,559 offline tests (53 skips), TypeScript, full ESLint, the 63-entry webpack
+build, 117-chunk client-boundary scan, 73-file adapter check and whitespace
+checks. Startup option escaping and idle ReadyForQuery semantics were checked
+against the PostgreSQL 17 protocol/connection documentation and the pinned pg
+implementation; this is still not physical PG17/TLS or Hosted latency evidence.
+The authorized handoff is one local commit only. Next, after user confirmation,
+publish `codex/careslink-task-preview-control` to `Millionluna/Codex-Game-Studios`
+and create a Draft PR against `codex/careslink-ai-documents-v1-auth-gate`.
+Do not merge, deploy, promote a migration or activate the formal runtime.

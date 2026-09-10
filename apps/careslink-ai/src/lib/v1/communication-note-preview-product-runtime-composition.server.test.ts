@@ -356,6 +356,7 @@ describe("Communication Note M1r product runtime composition", () => {
         ),
     );
     expect(pgImporters).toEqual([
+      join(process.cwd(), "src/lib/communication-note-task-preview-control.server.ts"),
       join(process.cwd(), "src/lib/communication-note-workspace-task-postgres.server.ts"),
       join(process.cwd(), "src/lib/v1/communication-note-job-status-postgres.server.ts"),
       modulePath,
