@@ -1,7 +1,9 @@
 import "server-only";
-import type { CommunicationNoteWorkspaceRuntime } from "./communication-note-workspace.server";
+import { createCommunicationNoteWorkspacePreviewRuntime, type CommunicationNoteWorkspacePreviewBinding } from "./communication-note-workspace-preview.server";
+import type { CommunicationNoteWorkspaceDurableEnv } from "./communication-note-workspace-durable.server";
 
-/** Deliberately absent. Env flags cannot install a connection, caller grant,
- * or runtime. Hosted capability binding needs a separate approved step. */
+/** Deliberately absent. A trusted Hosted custody installation and its target
+ * grants require separate approval/evidence. Env cannot supply this binding. */
+const HOSTED_WORKSPACE_READ_BINDING = undefined as CommunicationNoteWorkspacePreviewBinding | undefined;
 export const COMMUNICATION_NOTE_WORKSPACE_FORMAL_RUNTIME =
-  undefined as CommunicationNoteWorkspaceRuntime | undefined;
+  createCommunicationNoteWorkspacePreviewRuntime({ env: process.env as CommunicationNoteWorkspaceDurableEnv, binding: HOSTED_WORKSPACE_READ_BINDING });

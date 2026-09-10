@@ -40,7 +40,9 @@ describe("formal default-off workspace gate",()=>{
     const rule=(await nextConfig.headers!()).find(r=>r.source==="/ai-documents");
     expect(rule?.headers).toEqual(expect.arrayContaining([{key:"Cache-Control",value:"private, no-store, max-age=0"},{key:"Referrer-Policy",value:"no-referrer"},{key:"X-Robots-Tag",value:"noindex, nofollow"}]));
     const source=readFileSync(new URL("./communication-note-workspace-runtime.server.ts",import.meta.url),"utf8");
-    expect(source).not.toMatch(/process\.env|new Client|service_role|globalThis|__workspace|fixture/);
+    expect(source).not.toMatch(/process\.env\s*(?:\.|\[)|new Client|service_role|globalThis|__workspace|fixture/);
+    expect(source).toContain("HOSTED_WORKSPACE_READ_BINDING = undefined as CommunicationNoteWorkspacePreviewBinding");
+    expect(COMMUNICATION_NOTE_WORKSPACE_FORMAL_RUNTIME).toBeUndefined();
   });
 });
 describe("shared workspace HTTP composition",()=>{

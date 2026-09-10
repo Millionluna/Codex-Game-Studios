@@ -212,7 +212,7 @@ describe("default-off task credential lifecycle", () => {
     const code = readFileSync(new URL("./communication-note-workspace-task-lease.server.ts", import.meta.url), "utf8");
     expect(code).not.toMatch(/process\.env|console\.|fetch\(|from ["']pg["']|create role|grant |secret-manager|@google-cloud/);
     const runtime = readFileSync(new URL("./communication-note-workspace-runtime.server.ts", import.meta.url), "utf8");
-    expect(runtime).toContain("undefined as CommunicationNoteWorkspaceRuntime");
+    expect(runtime).toContain("HOSTED_WORKSPACE_READ_BINDING = undefined as CommunicationNoteWorkspacePreviewBinding");
     expect(runtime).not.toContain("createCommunicationNoteTaskLeaseReadPort");
   });
 });

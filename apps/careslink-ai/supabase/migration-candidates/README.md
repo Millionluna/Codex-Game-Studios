@@ -71,3 +71,37 @@ Only the local test operator temporarily supplies and then removes the caller
 capability. Its local CLI security scan returned an empty result list. No
 Hosted/PostgREST/TLS, full migration chain or browser edit integration is proved.
 Those gates and separately approved external permissions remain required.
+
+## Task-list credential issuer — locally verified, not activated (2026-09-10)
+
+`20260909143031_add_communication_note_task_preview_issuer.sql` was generated
+with Supabase CLI 2.115.0 and moved here before implementation. It is now verified
+on an owned disposable PG16 cluster, **not Hosted PG17**, and remains outside
+`migrations/` and the approved 47-file manifest. It supplies a separate private
+invoker-only issuer ledger, no API grants and no new control LOGIN. This local
+proof does not authorize candidate promotion or formal runtime activation.
+
+```sh
+node scripts/preview-e2e/communication-note-task-issuer-local-pg16.mjs
+```
+
+The runner accepts no arguments, existing database URL or credentials: it creates
+only a fresh private Unix-socket PG16 cluster, applies the candidate as a local
+nonsuperuser control identity and runs 12 role/session/recovery tests with
+fail-fast behavior, then a local security-advisor check and owned-cluster cleanup.
+The initial `initdb` blockage was resolved under explicit user authorization by
+removing only IPC ID `35061761`, after verifying its PostgreSQL magic/header,
+current-user ownership, dead creator and zero other attachments. No other
+existing IPC segment, database file or system setting was changed.
+
+All **12 real database tests passed**. The first run's advisor output used the
+legacy status-format flag; the runner now uses `--output-format json` and
+`--fail-on info`, with an offline regression guarding that invocation. The full
+rerun returned `ok: true`, 12 passed, advisor `results: []`, `stopped: true` and
+`removed: true`. Both new temporary clusters were removed. There is no Hosted
+security-advisor, pinned-TLS, GoTrue or independent hosted-supervisor claim.
+Pre-commit review passed on 2026-09-10 without further source/SQL changes; the
+same 12-test owned PG16 fixture and empty advisor result passed again. The
+candidate remains unpromoted and the formal workspace binding undefined.
+Next: publish the local-only change for Draft PR review after user confirmation,
+without merging, deploying or granting Hosted permissions.

@@ -54,14 +54,14 @@ function same(a: CommunicationNoteGenerationProviderPrincipal, b: CommunicationN
  * Does not install itself in the formal route, connect at import/factory time,
  * read ambient credentials, or construct the broad Product API runtime. */
 export function createCommunicationNoteWorkspaceDurableRuntime(options: CommunicationNoteWorkspaceDurableOptions): CommunicationNoteWorkspaceRuntime | undefined {
-  const initial = configuration(options.env);
+  const initial = resolveCommunicationNoteWorkspaceConfiguration(options.env);
   if (!initial) return undefined;
   const input = exact(options, options.createCookieClient === undefined ? ["env", "resolveTaskRead"] : ["env", "resolveTaskRead", "createCookieClient"]);
   if (typeof input.resolveTaskRead !== "function" || types.isProxy(input.resolveTaskRead) ||
     (input.createCookieClient !== undefined && (typeof input.createCookieClient !== "function" || types.isProxy(input.createCookieClient)))) throw unavailable();
   const { env, resolveTaskRead, createCookieClient } = options;
   const current = () => {
-    const next = configuration(env);
+    const next = resolveCommunicationNoteWorkspaceConfiguration(env);
     return Boolean(next && next.projectRef === initial.projectRef && next.url === initial.url && next.key === initial.key && next.vercelProjectId === initial.vercelProjectId);
   };
   const contexts = new WeakMap<Request, { client: CommunicationNoteWorkspaceCookieClient; identity: CommunicationNoteGenerationProviderPrincipal }>();
@@ -154,7 +154,8 @@ export function createCommunicationNoteWorkspaceDurableRuntime(options: Communic
   });
 }
 
-function configuration(env: CommunicationNoteWorkspaceDurableEnv) {
+/** Shared server-only target guard; inspecting configuration performs no IO. */
+export function resolveCommunicationNoteWorkspaceConfiguration(env: CommunicationNoteWorkspaceDurableEnv) {
   try {
     if (!isCommunicationNoteWorkspaceEnabled(env) || env.CARESLINK_V1_PRODUCT_API_ENABLED !== "true" || env.VERCEL !== "1" ||
       env.VERCEL_ENV !== "preview" || env.VERCEL_TARGET_ENV !== "preview") return undefined;

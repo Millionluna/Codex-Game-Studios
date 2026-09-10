@@ -3858,3 +3858,149 @@ The local commit is limited to these seven implementation/test/evidence files.
 No push, PR mutation, deployment, hosted database, Production access or AI model
 call is included. Next: publish to the existing Draft PR #37 in
 `Millionluna/Codex-Game-Studios` after user confirmation; do not merge or deploy.
+
+### PR #37 successor: Preview read-only workspace composition (2026-09-10)
+
+The new local development branch `codex/careslink-workspace-preview-readonly`
+starts at the merged development baseline `0da677c`. The server-only Preview
+composition now joins the existing request-local Cookie/current-session reader,
+document-list RPC, fixed task-list repository, one-use credential lease and
+pinned-TLS direct PG17 reader. These are the actual source implementations, not
+an additional process-memory data store or a replacement UI.
+
+Installation requires an explicit server binding for the exact Supabase ref and
+Vercel project, copied CA bytes with their matching digest, and dedicated
+list-purpose custody issue/revoke functions. It accepts no arbitrary SQL/open
+callback, operator credential, environment-discovered password, status-purpose
+reuse or local-Unix fallback. The existing Preview configuration guard is shared
+with the durable adapter; it is rechecked before issuance and opening the reader.
+Request cancellation, configuration drift and logout never disable the independent
+revocation phase. Each request retains its own authenticated identity and lease;
+metadata is withheld until physical cleanup, the terminal revocation receipt and
+the final current-session check succeed.
+
+The formal runtime now invokes that guarded factory, but its immutable
+`HOSTED_WORKSPACE_READ_BINDING` remains `undefined`. Importing the actual route
+with every Preview flag enabled still creates no Cookie client, credential or
+database connection and returns `503 UNAVAILABLE`. No readiness latch was opened.
+The green design/Logo, generation, write/self-review/export-history installation,
+Points spending and payment behavior are unchanged.
+
+Verification: **59 new deterministic composition tests**, **5,415 full-suite
+tests passed / 41 skipped** (308 passing / four skipped files), TypeScript and
+full ESLint passed. The local Next.js 16.2.9 webpack build completed 63/63 generated
+entries; the expanded client-boundary scan passed across 117 static chunk files.
+Adapter synchronization (73 files) and whitespace checks passed. Coverage includes
+two simultaneous identities, cursor/transport rejection, CA/target mismatch,
+configuration drift, revoked sessions, failed/incorrect revocation receipts,
+physical cleanup failure, abort, stalled issuance/revocation and a late driver
+result after the read deadline. Old textual assertions were updated to the new
+unbound-installation shape; behavioral default-off checks were retained and an
+all-flags-enabled fresh module import was added.
+
+External Cookie transport, custody and the `pg` driver are mocked in the new
+composition matrix; real TLS, hosted SQL/roles, certificate provenance and durable
+custody supervision are **not** established by these tests. No database fixture,
+schema/grant change, cloud resource, hosted migration, deployment, real care data,
+AI call or Points operation was performed. Supabase [session](https://supabase.com/docs/guides/auth/sessions)
+and [SSR](https://supabase.com/docs/guides/auth/server-side/creating-a-client?queryGroups=framework&framework=nextjs)
+guidance informed request-local verified authentication; Next.js guidance kept
+the assembly server-only.
+
+**Next bounded implementation:** supply the dedicated task-list Preview custody
+adapter, including terminal fencing and independently owned recovery after issuer
+interruption. Reuse the reviewed lifecycle contract, not a static password or the
+single-job status credential. Any hosted grant/issuer installation, disposable
+Preview creation and actual runtime activation remain separate authorization and
+verification gates.
+
+### Task-list Preview custody source — local lifecycle verified, not activated (2026-09-10)
+
+The dedicated server-only issuer source now supplies the task-list custody
+issue/revoke contract and a fixed-statement SQL broker. Recovery takes over a
+durable epoch, fences and finalizes every recorded unfinished lease, then permits
+issuance. Old service instances cannot issue after an epoch takeover. One-use
+request tombstones prevent delayed issuance after cancellation. Credentials are
+random, list-purpose-only, SCRAM-authenticated, limited to two connections and
+60 seconds; only the SCRAM verifier is sent to SQL, never the plaintext password.
+The proposed private ledger retains scope/OID/state/expiry, not reusable secrets.
+
+Revocation first commits `NOLOGIN`/null password, then on a fresh transaction
+terminates only the receipt-matched role's sessions and drops that role with
+RESTRICT. A terminal receipt requires zero roles, sessions and memberships.
+Failed issue cleanup is independent of the cancelled page signal. The external
+supervisor must own restart recovery and periodic expiry/fenced-lease sweeping;
+this source-only core is **not a deployed supervisor**. The SQL broker accepts a
+trusted fresh control opener but does not establish hosted PG17/pinned TLS,
+target identity, OAuth/control custody or process-independent supervision itself.
+No such physical hosted opener was installed in this batch.
+
+The CLI-generated SQL is quarantined in `migration-candidates/`, not automatically
+applied. The formal workspace binding remains `undefined`, issuer readiness is
+false and product source imports none of the new issuer. No UI, Logo, AI
+generation, real care data, Points/payment, hosted role, Production, deployment
+or PR was changed. No commit or push is included in this validation batch.
+
+Verification: **44 new offline protocol/connection/runner tests passed**, full suite
+**5,459 passed / 53 skipped** (309 passing / five skipped files); TypeScript,
+full ESLint and 73-file adapter sync passed. The protocol fake is in-memory and
+proves neither real SQL semantics nor OS-process recovery. Tests caught and
+corrected a mismatched Production-ref literal in the new candidate, a physical
+close error that was not sanitized, and cover prompt cleanup of fenced leases.
+The local Next.js 16.2.9 webpack build completed 63/63 generated entries; the
+expanded server-only boundary check passed across 117 client chunk files.
+
+All **12 opt-in PG16 tests passed**, covering actual SCRAM/connection limits, committed
+fencing, old-password denial, live-session termination, a terminated control
+backend, lost acknowledgements, stale epochs, OID substitution, private ACL/RLS
+and a real 60-second expiry. The source issue-instance/control-loss scenarios
+inject transport faults; only the pending-finalization probe terminates an
+actual PostgreSQL backend. This does not prove a hosted service supervisor or
+an OS-killed issuer process automatically recovers itself.
+
+The first handoff was blocked before SQL installation by exhausted macOS SysV
+slots (32/32). Following explicit user authorization, a one-off helper verified
+IPC ID `35061761` as a 56-byte PostgreSQL header (magic `679834894`), owned by the
+current user, created by exited PID `3328`, with zero other attachments. It
+rechecked the header/ownership/dead creator while pinning a read-only attachment
+before removing that exact segment. The other 31 existing segments were left
+untouched; no existing database file or kernel setting was changed. The removed
+segment was an orphaned runtime header, not persisted database contents.
+
+The newly created `/private/tmp/cl-task-issuer-hZ4nEf` cluster ran all 12 tests
+and zero-residue assertions, then stopped at the advisor JSON parsing step.
+The runner used the legacy `--output json` status-variable flag, corrected to
+the CLI's `--output-format json`. It now additionally fails on **any** finding
+(`--fail-on info`), records bounded failure diagnostics, and has an offline
+regression for the invocation. No database permissions were loosened for this.
+
+A complete rerun on `/private/tmp/cl-task-issuer-BuHD0e` returned **`ok: true`,
+`passed: 12`, advisor `results: []`, `stopped: true`, `removed: true`**. Both
+new clusters were removed after their runs. The normal offline test command
+still skips these 12 opt-in tests; their real execution is recorded separately
+and is not hidden inside the offline pass count. These are local security-advisor
+results only, not Hosted advisors or a full Supabase/PG17 migration-chain proof.
+
+Supabase role guidance and Postgres least-privilege/short-transaction guidance
+informed the isolated invoker surface and committed fence. PostgreSQL documents
+that even the default mmap setup requires a small SysV segment; switching mmap
+settings would not have removed the system-wide allocation requirement.
+See [PostgreSQL kernel resources](https://www.postgresql.org/docs/16/kernel-resources.html).
+
+Pre-commit review (2026-09-10): no blocking finding in the eight-file custody,
+private SQL, test/runner, client-boundary and evidence diff. No implementation or
+SQL change was required during this review. The same source passed the full
+5,459-test offline suite (53 opt-in skips), TypeScript, full ESLint, the 63-entry
+webpack build, 117-chunk client-boundary scan, 73-file adapter sync and whitespace
+checks again. A fresh owned PG16 fixture at `/private/tmp/cl-task-issuer-tmRlDV`
+reran all 12 real database tests and returned advisor `results: []`, `ok: true`,
+`stopped: true`, `removed: true`. No existing IPC cleanup was performed in this
+review. Scope is a local commit only, with no push, PR mutation or deployment.
+
+**Next:** publish `codex/careslink-workspace-preview-readonly` to
+`Millionluna/Codex-Game-Studios` and open a Draft PR against
+`codex/careslink-ai-documents-v1-auth-gate` after user confirmation. Do not merge
+or deploy. Keep the candidate unpromoted and the formal runtime closed. Hosted
+target/control custody, pinned PG17/TLS transport, independently owned supervision
+and activation still require their own evidence and authorization; the local
+test result is not a substitute for those gates.
