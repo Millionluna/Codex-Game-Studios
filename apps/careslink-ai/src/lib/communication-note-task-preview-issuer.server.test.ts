@@ -244,6 +244,7 @@ it("quarantines the source/candidate from product installation and automatic mig
     .filter(p => readFileSync(p, "utf8").includes(name));
   // Dedicated control/service sources remain uninstalled, not product routes.
   expect(importers).toEqual(["src/lib/communication-note-task-preview-control.server.ts",
+    "src/lib/communication-note-task-preview-host.server.ts",
     "src/lib/communication-note-task-preview-service.server.ts"]);
   expect(readdirSync("supabase/migrations")).not.toContain(candidate);
   const sql = readFileSync(`supabase/migration-candidates/${candidate}`, "utf8");

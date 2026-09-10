@@ -11,6 +11,9 @@ import { createTaskPreviewPgControlOpener, COMMUNICATION_NOTE_TASK_PREVIEW_CONTR
 import { createTaskPreviewSqlBroker, TASK_PREVIEW_ISSUER_SQL,
   createCommunicationNoteTaskPreviewIssuer } from "./communication-note-task-preview-issuer.server";
 import { createCommunicationNoteTaskPreviewService } from "./communication-note-task-preview-service.server";
+import { createTaskPreviewCustodiedService } from "./communication-note-task-preview-host.server";
+import { createTaskPreviewControlCustodyFactory, type TaskPreviewCustodyProvider } from "./communication-note-task-preview-custody.server";
+import { stringifyCaresLinkV1CanonicalJson } from "./v1/canonical-json";
 import { CARESLINK_PRODUCTION_SUPABASE_REF as PARENT } from "./v1/ndis-shadow-guard";
 
 const driver = vi.hoisted(() => ({ construct: vi.fn() }));
@@ -62,6 +65,24 @@ function setup() {
   return { input, open, clients, custody, createCustody, access, database };
 }
 const fetchMock = vi.fn<typeof fetch>();
+function policyCustody() {
+  const digest = (value: unknown) => createHash("sha256").update(stringifyCaresLinkV1CanonicalJson(value)).digest("hex");
+  // Explicit synthetic provider: NOT cryptographic workload or cloud evidence.
+  const verifyWorkload = vi.fn<TaskPreviewCustodyProvider["verifyWorkload"]>(async request => {
+    const now = Date.now(); return { status: "VERIFIED_TASK_CONTROL_WORKLOAD", requestSha256: digest(request),
+      workloadEvidenceSha256: "1".repeat(64), verifiedAt: new Date(now).toISOString(), expiresAt: new Date(now + 60000).toISOString() };
+  });
+  const consumeOAuth = vi.fn<TaskPreviewCustodyProvider["consumeOAuth"]>(async (request, _context, use) => use({ requestSha256: digest(request),
+    credentialClass: "SUPABASE_OAUTH_ACCESS_TOKEN", oauthScope: "environment:read", secret: TOKEN, expiresAt: token().expiresAt }));
+  const consumeDatabase = vi.fn<TaskPreviewCustodyProvider["consumeDatabase"]>(async (request, _context, use) => use({ requestSha256: digest(request),
+    credentialClass: "STATIC_SUPABASE_BRANCH_ADMIN_PASSWORD", sourceExpiresAt: null, sourceRevocation: "BRANCH_DELETE_OR_PASSWORD_RESET",
+    secret: PASSWORD, deliveryExpiresAt: new Date(Date.now() + 60000).toISOString() }));
+  const createCustody = createTaskPreviewControlCustodyFactory({ binding: { projectRef: REF, branchId: BRANCH, caSha256: SHA,
+    sourceRevisionSha256: "a".repeat(64), sourceManifestSha256: "b".repeat(64), workloadIdentitySha256: "c".repeat(64),
+    credentialPolicySha256: "d".repeat(64), oauthAppReferenceSha256: "e".repeat(64), oauthGrantReferenceSha256: "f".repeat(64) },
+    provider: { verifyWorkload, consumeOAuth, consumeDatabase } });
+  return { createCustody, verifyWorkload, consumeOAuth, consumeDatabase };
+}
 beforeEach(() => { vi.clearAllMocks(); vi.stubGlobal("fetch", fetchMock); fetchMock.mockImplementation(async () => response()); });
 afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); vi.useRealTimers(); });
 
@@ -145,8 +166,12 @@ describe("dedicated task Preview control — offline transport and custody", () 
     expect(driver.construct.mock.calls[0][0].ssl.ca).toEqual(CA); expect(h.input.createCustody).not.toHaveBeenCalled();
     expect(JSON.stringify(driver.construct.mock.calls[0][0])).not.toContain("FOREIGN_AMBIENT_SECRET"); await port.close();
   });
-  it.each([false, true])("composes service/issuer/broker/control with offline IO and confirmed shutdown (abort=%s)", async abortIssue => {
+  it.each([{ abortIssue: false, bound: false }, { abortIssue: true, bound: false },
+    { abortIssue: false, bound: true }, { abortIssue: true, bound: true },
+    { abortIssue: false, bound: true, policy: true }, { abortIssue: true, bound: true, policy: true }])(
+    "composes explicit custody/service/issuer/broker/control with offline IO and confirmed shutdown (%j)", async ({ abortIssue, bound, policy }) => {
     const h = setup(), parent = new AbortController(), operations: string[] = [];
+    const p = policy ? policyCustody() : undefined;
     let lease: Record<string, unknown> | undefined;
     driver.construct.mockImplementation(config => {
       const c = client(config), original = c.query.getMockImplementation()!; h.clients.push(c);
@@ -169,7 +194,8 @@ describe("dedicated task Preview control — offline transport and custody", () 
         return { rows: [{ data: reply }] };
       }); return c;
     });
-    const service = createCommunicationNoteTaskPreviewService({ projectRef: REF, broker: createTaskPreviewSqlBroker(h.open) });
+    const service = bound ? createTaskPreviewCustodiedService({ ...h.input, createCustody: p?.createCustody ?? h.input.createCustody }) :
+      createCommunicationNoteTaskPreviewService({ projectRef: REF, broker: createTaskPreviewSqlBroker(h.open) });
     try {
       await service.start();
       const input = { requestId: "f".repeat(32), projectRef: REF, purpose: "COMMUNICATION_NOTE_JOB_LIST_READ" as const,
@@ -185,7 +211,28 @@ describe("dedicated task Preview control — offline transport and custody", () 
       expect(lease?.state).toBe("REVOKED"); expect(operations.filter(op => op === "start")).toHaveLength(1);
       expect(operations).toHaveLength(7); expect(h.clients).toHaveLength(7);
       for (const c of h.clients) expect(c.end).toHaveBeenCalledTimes(1);
+      if (p) {
+        expect(p.verifyWorkload).toHaveBeenCalledTimes(7); expect(p.consumeDatabase).toHaveBeenCalledTimes(7);
+        expect(new Set(p.verifyWorkload.mock.calls.map(c => c[0].nonce)).size).toBe(7);
+        expect(h.access).not.toHaveBeenCalled(); expect(h.database).not.toHaveBeenCalled();
+      }
     } finally { await service.stop(); }
+  });
+  it.each(["workload", "branch", "double-password", "failed-password-provider"])("fails the composed policy/connector closed at %s", async fault => {
+    const h = setup(), p = policyCustody(), original = p.consumeDatabase.getMockImplementation()!;
+    if (fault === "workload") p.verifyWorkload.mockResolvedValue({ status: "UNVERIFIED" });
+    if (fault === "branch") fetchMock.mockResolvedValue(response([{ ...branch(), with_data: true }]));
+    if (fault === "double-password" || fault === "failed-password-provider") p.consumeDatabase.mockImplementation(async (request, context, use) => {
+      await original(request, context, use);
+      if (fault === "double-password") await original(request, context, use);
+      else throw new Error(PASSWORD);
+    });
+    const open = createTaskPreviewPgControlOpener({ ...h.input, createCustody: p.createCustody });
+    await expect(open(ctx())).rejects.toThrow(MESSAGE);
+    if (fault === "workload") expect(fetchMock).not.toHaveBeenCalled();
+    if (fault === "workload" || fault === "branch") { expect(p.consumeDatabase).not.toHaveBeenCalled(); expect(h.clients).toHaveLength(0); }
+    else { expect(h.clients).toHaveLength(1); expect(h.clients[0].end).toHaveBeenCalledTimes(1); }
+    expect(h.access).not.toHaveBeenCalled(); expect(h.database).not.toHaveBeenCalled();
   });
   it("pins real pg 8.23.0 startup parameters offline, with connect/query/end replaced before use", async () => {
     const h = setup(), { Client: PgClient } = await vi.importActual<typeof import("pg")>("pg");
@@ -402,7 +449,8 @@ it("keeps the dedicated control adapter out of all product imports and client bu
   const name = "communication-note-task-preview-control", walk = (dir: string): string[] => readdirSync(dir, { withFileTypes: true })
     .flatMap(e => e.isDirectory() ? walk(join(dir, e.name)) : [join(dir, e.name)]);
   expect(walk("src").filter(p => /\.[cm]?[jt]sx?$/.test(p) && !p.includes(".test.") && !p.endsWith(`${name}.server.ts`))
-    .filter(p => readFileSync(p, "utf8").includes(name))).toEqual([]);
+    .filter(p => readFileSync(p, "utf8").includes(name))).toEqual(["src/lib/communication-note-task-preview-custody.server.ts",
+      "src/lib/communication-note-task-preview-host.server.ts"]);
   expect(readFileSync("src/lib/communication-note-workspace-runtime.server.ts", "utf8")).toMatch(/HOSTED_WORKSPACE_READ_BINDING\s*=\s*undefined/);
   expect(readFileSync("scripts/check-m1r-client-bundle.mjs", "utf8")).toContain(PURPOSE);
   const source = readFileSync(`src/lib/${name}.server.ts`, "utf8");
