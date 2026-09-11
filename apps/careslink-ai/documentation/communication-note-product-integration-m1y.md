@@ -4955,3 +4955,106 @@ retains all disabled readiness flags and the untouched source worktree.
 commit as a draft PR to `Millionluna/Codex-Game-Studios`, based on
 `codex/careslink-ai-documents-v1-auth-gate`. This step includes no push, merge,
 deployment or activation.
+
+### PR #45 merged; independent process-exit observation probe — 2026-09-11
+
+[PR #45](https://github.com/Millionluna/Codex-Game-Studios/pull/45) merged as
+`c92eea8786333ccf21e3c100dc649c64a228dd74`. Its tree
+`03eb93b393be5a97ab3b37fffc4b6cc68c5ae14c` is identical to reviewed `69ab617`.
+The current worktree was aligned to that merge, then this authorized local
+batch started on `codex/careslink-task-process-observation`.
+
+The minimal probe answers one missing question: can an observer that survives
+the launcher independently confirm the service process's exit after the
+launcher actually terminates? On this macOS host, the answer is **yes**, using
+a pre-registered `kqueue` process filter. This is a local feasibility result,
+not an installed supervisor or a claim about PostgreSQL cleanup.
+
+The test controller owns two separate children: a Node launcher and a Python
+observer. The launcher forks the service. The service runs the actual
+`ownTaskPreviewServiceProcess` with a simulated service lifecycle and a real
+loopback TCP listener. Parent/child IPC is fd 3; an independently inherited
+test-control channel is fd 4. The latter remains open across launcher death
+so the controller can hold and release explicit drain/exit barriers. It is a
+test capability and is not evidence that a deployed control plane survives.
+
+The observer registers `EVFILT_PROC` / `NOTE_EXIT` before launcher termination.
+After registration, the controller challenges the service through its original
+IPC channel and checks the fixture nonce, child PID and parent PID. The observer
+reports a matching kernel event; it does not signal a PID, poll process names,
+reap an orphan, infer an exit code, or fabricate a Node close event. Apple
+documents [the process filter and exit notification](https://developer.apple.com/library/archive/documentation/System/Conceptual/ManPages_iPhoneOS/man2/kevent.2.html);
+the Python API is described in [select / kqueue](https://docs.python.org/3.9/library/select.html).
+
+**Seven new tests passed.** Normal launcher termination is an explicit exit with
+code 0; abnormal termination sends actual SIGKILL through the controller's
+owned launcher handle. Both cases produce real child IPC loss, stop the real
+listener, and retain the service behind a drain barrier. A refused connection,
+parent exit or IPC EOF cannot open the successor gate. Even after the simulated
+owner reports confirmed cleanup, the service remains alive behind the exit
+barrier and the gate stays closed. Only the matching kernel notification,
+successful observer completion, actual launcher/stdio closure, control-channel
+closure and confirmed simulated cleanup permit one successor to start.
+
+The other cases preserve failure after unconfirmed cleanup, zero-time observer
+timeout, and actual observer SIGKILL. For timeout and observer loss, a separate
+observer is used solely for teardown: even after the target and all channels
+are closed and simulated cleanup succeeds, its evidence cannot replace the
+failed observer in the original successor gate. Product import guards verify
+that neither probe entry point is installed in application code.
+
+Local review found and fixed a completion-channel validation gap: the original
+successor guard could accept earlier valid messages even after the same stream
+reported a parsing error. A new real-process regression sends malformed JSON
+after confirmed simulated cleanup and before actual control-channel EOF. The
+old guard admitted a real successor; the regression joined and cleaned up that
+successor before reporting failure. The revised guard rejects sticky errors
+from all three evidence channels and errors on either owned process handle.
+The regression now passes even though genuine kernel exit, descriptor closure
+and simulated cleanup evidence are all present.
+
+The initial run found that the system Python 3.9.6 `kqueue` object does not
+support a `with` context manager. That run failed without producing exit
+evidence. The helper now closes the queue explicitly in `finally`; tests also
+close both sides of the independent control channel. This changes only the
+test fixture. The previously recorded Node parent-disconnect limitation is
+not relabeled as fixed, and parent-initiated `ChildProcess.disconnect()` remains
+a separate unverified boundary.
+
+Verification on macOS / Node 22.23.2 / system Python 3.9.6: **39 passed / one
+existing test skipped** across the new probe, existing host-process tests and
+Workspace/TLS process integration tests. Full suite: **6,241 passed / 54
+skipped**, 322 passing / five skipped files. TypeScript, changed-file ESLint,
+adapter synchronization (73 files) and whitespace checks passed. This batch
+adds only test fixtures, a test file and this handoff; the prior unchanged
+production build/client-boundary evidence remains applicable.
+
+The test suite explicitly unsets `CARESLINK_TASK_ISSUER_LOCAL_SOCKET` and does
+not retry the blocked PG16 fixture. New successful runs await real process and
+channel closure before deleting their temporary bundles. Fixture deadlines
+are forced failure, never cleanup acknowledgments. No certificate, credential,
+Auth reply, SQL result or lease ledger is needed by this minimal probe.
+
+Limits: this mechanism is macOS-specific and the suite is skipped elsewhere.
+It does not verify Linux/Windows supervision, actual service/issuer recovery,
+the combined Workspace/TLS chain under launcher death, live Auth, physical SQL
+cleanup, host/workload/key provenance, or an independent deployed supervisor.
+The simulated cleanup flag is explicitly distinct from the kernel exit event.
+All readiness flags remain false and `HOSTED_WORKSPACE_READ_BINDING` remains
+undefined. No product implementation, dependency, environment file, source
+worktree, cloud resource, database role/migration, IAM, installed key, real care
+data, AI call, Points/payment, deployment or activation changed.
+
+Local code review is complete after the correction above, with no remaining
+blocking findings for this test-only scope. The seven tests cover the stated
+acceptance boundaries using explicit lifecycle barriers and real process/
+channel events. No engine is configured and no applicable ADR reference was
+found. The probe introduces no production dependency or runtime installation;
+the existing architecture and readiness limits remain applicable.
+
+**Next, after this authorized local commit:** publish the reviewed four-file
+commit as a draft PR to `Millionluna/Codex-Game-Studios`, based on
+`codex/careslink-ai-documents-v1-auth-gate`. Publication is a separate batch.
+Then use the probe's explicit observation boundaries to scope integration
+with the actual Workspace/TLS service and retained simulated ledger; do not
+count this minimal probe as that integration or as production readiness.
