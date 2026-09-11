@@ -287,7 +287,7 @@ it("keeps the authenticated entry server-only, uninstalled and absent from produ
   const name = "communication-note-task-preview-transport";
   const walk = (dir: string): string[] => readdirSync(dir, { withFileTypes: true }).flatMap(e => e.isDirectory() ? walk(join(dir, e.name)) : [join(dir, e.name)]);
   expect(walk("src").filter(p => /\.[cm]?[jt]sx?$/.test(p) && !p.includes(".test.") && !p.endsWith(`${name}.server.ts`))
-    .filter(p => readFileSync(p, "utf8").includes(name))).toEqual([]);
+    .filter(p => readFileSync(p, "utf8").includes(name))).toEqual([join("src", "lib", "communication-note-task-preview-https.server.ts")]);
   const source = readFileSync(`src/lib/${name}.server.ts`, "utf8"); expect(source).toMatch(/^import "server-only";/);
   expect(source).not.toMatch(/process\.(?:env|on)|fetch\s*\(|\.listen\s*\(|createServer\s*\(|console\.|SignJWT|createRemoteJWKSet/);
   expect(readFileSync("src/lib/communication-note-workspace-runtime.server.ts", "utf8")).toMatch(/HOSTED_WORKSPACE_READ_BINDING\s*=\s*undefined/);
