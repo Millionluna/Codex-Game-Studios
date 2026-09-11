@@ -5162,3 +5162,148 @@ included in the local commit; publication has not occurred.
 **Next:** push the reviewed local commit to `Millionluna/Codex-Game-Studios`
 on `codex/careslink-workspace-task-parent-exit` and create a draft PR against
 `codex/careslink-ai-documents-v1-auth-gate`. Publication is a separate step.
+
+### PR #47 merged; parent-initiated IPC disconnect diagnostic plan — 2026-09-11
+
+[PR #47](https://github.com/Millionluna/Codex-Game-Studios/pull/47) completed
+draft publication, final diff review, ready-for-review transition and ordinary
+merge to `codex/careslink-ai-documents-v1-auth-gate`. It merged at
+`2026-09-11T11:09:00Z` as `c5a366c3078eaed5de2e3940aa06d9a62affd3b6`, with
+parents `d9bdec51855234f1559113f6681a96672a9e3f20` and reviewed
+`c80f11701dfcfb2c92737c6a05e2a4cf5e49f660`. Its tree
+`6b8dfcf8601420e6680647fea40f094cfdafc2c7` exactly matches the reviewed head.
+The verified merge contains five files, 931 insertions and one deletion.
+
+GitHub reported MERGED; no GitHub check runs or reviews were present at the
+final pre-merge check. Local evidence remains 102 related tests passed / one
+existing skip, and 6,254 full-suite tests passed / 54 skipped. TypeScript,
+changed-file ESLint, adapter synchronization and whitespace checks had passed.
+The remote PR patch matched the reviewed local patch before promotion. These
+are the merged batch's results, not new verification of the next stage.
+
+The current worktree now starts from the verified merge on
+`codex/careslink-workspace-task-parent-disconnect`. The separate source worktree
+remains at `31fc94dfc3813967fd1dfadc1f9ac7a4851725a9` without changes.
+
+The authorized planning step selects the already-recorded **parent-initiated
+ChildProcess.disconnect() while the launcher remains alive** boundary.
+PR #45 covered child-initiated IPC loss and PR #47 covered actual launcher
+death. The next diagnostic should establish the missing trigger's own event
+sequence instead of treating either earlier path as its evidence.
+
+The new [parent-disconnect QA plan](communication-note-workspace-task-parent-disconnect-qa-plan.md)
+defines an estimated ten local tests: parent/child disconnect controls, actual
+Workspace issue/fence interruption, the still-live service exit barrier,
+observer timeout/SIGKILL, corrupted control evidence, a delayed old RPC reply,
+and formal-runtime/import boundaries. Actual modules remain in use, while
+Auth, PG replies and the controller-owned ledger remain simulated.
+
+The diagnostic separates original kernel exit verification, the service's
+native ChildProcess close event, actual pipe closure, owner cleanup and
+teardown-only evidence. The launcher owns separate service stdout/stderr
+pipes and stays alive through observation. A bounded close observation window
+may report NOT_OBSERVED_IN_WINDOW, never an inferred close acknowledgment or
+recovery permission. Test-resource disposal can use verified process/pipe
+closure without rewriting the separately recorded Node close limitation.
+
+Node 22.23.2 remains installed. Its
+[official lifecycle documentation](https://nodejs.org/download/release/v22.23.2/docs/api/child_process.html#event-close)
+and the still-open [Node issue #65646](https://github.com/nodejs/node/issues/65646)
+were checked on 2026-09-11. They inform this diagnostic design; no new local
+reproduction has run in this planning step. The plan neither patches Node nor
+adds a successor-start policy, and both prior recovery guards stay unchanged.
+
+This batch edits only this handoff and adds the QA plan. No new process/TLS
+tests, production changes, commits, pushes or deployments are included in the
+planning step. The blocked PG16 fixture is not retried and no replacement
+Preview is created. Real database cleanup/durability, controller/host death,
+other platforms, installed identity/key provenance and deployed supervision
+remain unverified. All readiness flags stay false and
+HOSTED_WORKSPACE_READ_BINDING stays undefined.
+
+**Next:** implement the bounded local diagnostic fixture and estimated ten
+tests from the plan, beginning with parent/child disconnect controls and their
+actual resource teardown; then validate the request/failure matrix before
+code review and a local commit.
+
+### Live-parent IPC disconnect diagnostic implemented locally — 2026-09-11
+
+The [parent-disconnect QA plan](communication-note-workspace-task-parent-disconnect-qa-plan.md)
+is now implemented in a new test-only launcher/service fixture and a ten-test
+Workspace process suite. The four-file batch includes those two files, the
+plan and this handoff. Its local commit on
+`codex/careslink-workspace-task-parent-disconnect` is based on merged `c5a366c`;
+publication is a separate step.
+
+The launcher owns the actual service process and separate stdout/stderr/fd-4
+pipes. It installs native disconnect/exit/close and pipe end/close listeners
+before startup, binds forwarded evidence to the original nonce/PIDs and
+monotonic message sequences, and stays alive after the service exits. The
+controller challenges both original service identity after observer arming
+and live launcher identity before disconnect and after service exit. Broker
+traffic still uses native IPC; fd 4 accepts only fixed test-control actions.
+
+Both initial controls passed. On Node v22.23.2 / darwin arm64, parent-initiated
+disconnect produced matching kernel exit, native exit code 1 and actual
+service pipe closure, but no ChildProcess close within the post-closure 250ms
+observation window. Child-initiated disconnect produced one genuine close.
+The final full run records the same distinction across eight parent-triggered
+process cases and one child-triggered control. Absence within that window is
+reported as NOT_OBSERVED_IN_WINDOW, not permanent absence, a Node repair, a
+close acknowledgment or permission to recover.
+
+Actual Workspace requests drive issue/fence commit checkpoints. Parent
+disconnect yields 503 without taskPage while preserving ISSUED/FENCED state
+and the epoch in the original simulated ledger. The actual owner reports
+FAILED with cleanupConfirmed=false because broker IPC is unavailable. TLS
+issue and mock PG object end/destroy/credential disposal are checked, without
+claiming physical database cleanup. A separate exit barrier proves listener
+and owner completion can precede service exit.
+
+Observer timeout and actual observer SIGKILL keep the original exit evidence
+unverified even after a teardown-only observer confirms resource disposal.
+A malformed real control frame after valid completion evidence likewise
+keeps diagnostic/control evidence unverified, independently of valid kernel
+exit. Six of the nine process reports have complete diagnostic evidence;
+these three intentional fault reports remain UNVERIFIED. All nine confirm
+test-resource teardown. The tenth test is the disabled formal-route/import
+guard and starts no process. No diagnostic result rewrites the owner's failed
+cleanup outcome.
+
+A held committed issue reply settles without delivery after disconnect. Its
+original reply is also replayed through the still-live original launcher,
+which reports protocol-dropped without forwarding to the disconnected service
+or changing ledger state/epoch. This fixture has no successor entry point;
+the earlier strict successor and parent-exit recovery guards remain unchanged.
+
+Validation: **112 passed / one existing skip** across six related files;
+full suite **6,264 passed / 54 skipped**, 324 passing / five skipped test
+files. The full run started at local 21:52:01 and took 19.20 seconds. TypeScript,
+changed-file ESLint and adapter synchronization (73 files) passed. A trailing
+blank line found by the new-file whitespace check was removed. No production
+implementation or dependency changed, so prior production build/client-boundary
+evidence remains applicable. The original 25 Workspace/TLS, seven exit-observer
+and 13 parent-death tests are unchanged and pass.
+
+The full verbose log at `/private/tmp/careslink-parent-disconnect-full.log`
+contains all nine diagnostic summaries. Each fixture waits for verified
+service exit, actual service-pipe/request closure and actual launcher/observer
+close before deleting its owned temporary files; the final temporary-prefix
+inventory was empty. Node close absence stays separately recorded. The source
+worktree remains unchanged. All readiness flags stay false and
+HOSTED_WORKSPACE_READ_BINDING remains undefined; real SQL/Auth, production
+supervision and the other previously stated limits remain unverified.
+
+The four-file local review is complete: **APPROVED WITH SUGGESTIONS**, with no
+required changes. It checked event ownership, independent observation,
+sticky failure evidence, retired RPC handling and resource disposal. No
+configured engine or referenced ADR applies. The long launcher message
+dispatcher and concentrated test-protocol branches remain readability
+suggestions for later extensions. All nine diagnostic records agree with
+the reported outcomes. Review changed documentation only; the validated
+implementation and original suites are unchanged. This record is included
+in the local commit.
+
+**Next:** push the reviewed local commit to `Millionluna/Codex-Game-Studios`
+on `codex/careslink-workspace-task-parent-disconnect` and create a draft PR
+against `codex/careslink-ai-documents-v1-auth-gate`. Publication is separate.
