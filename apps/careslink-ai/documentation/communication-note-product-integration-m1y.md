@@ -4758,3 +4758,95 @@ draft PR to `Millionluna/Codex-Game-Studios` against
 authenticated-identity/host binding, independent recovery and real database/full
 migration-chain evidence remain activation conditions, not authorization to
 provision or enable anything.
+
+### PR #43 merged; uninstalled dedicated HTTPS service host — 2026-09-11
+
+[PR #43](https://github.com/Millionluna/Codex-Game-Studios/pull/43) was merged as
+`2da9e35d533f55445c2e5bc8a12a302d94e2386c`. Its tree matches reviewed `96a8abd`.
+The current worktree was aligned to that merge, then this local development
+batch started on `codex/careslink-task-preview-https`. The original source
+worktree remains clean on `codex/careslink-task-preview-control` at `31fc94d`.
+
+`communication-note-task-preview-https.server.ts` adds a dedicated Node HTTPS
+assembly around the existing authenticated endpoint and service lifecycle.
+Construction snapshots explicit service/identity, listener and TLS bindings,
+without listening, starting recovery or registering process handlers. It checks
+the leaf certificate's exact DNS SAN, validity, certificate/SPKI hashes and
+matching RSA private key; the TLS key must differ from the assertion-signing key.
+Bindings accept a loopback test port or a private IPv4 address on port 443. They
+do not establish workload/host provenance or authorize an installed listener.
+
+Start waits for service recovery before listening. The existing dedicated
+process owner can own this assembly's start/stop/health/finished interface.
+Explicit stop closes admission and the endpoint, destroys owned connections
+including incomplete handshakes, and starts service drain independently of
+request cancellation. Completion joins listener closure with the service's
+cleanup outcome. Startup/drain are bounded to 35 seconds, inside the existing
+40-second process-owner ceiling. Unknown drain outcomes remain failed, and a
+late successful result cannot retroactively change the reported outcome.
+
+TLS is restricted to 1.2/1.3, exact SNI and HTTP/1.1 ALPN. The listener caps raw
+connections at 16, handshake/header waits at one second, requests at seven
+seconds and each connection at 7.5 seconds. It accepts only the two exact signed
+POST paths, a fixed Host and explicit bounded Content-Length. Raw duplicate or
+unknown headers, Cookie/Bearer/forwarded identity, transfer encoding, alternate
+targets, upgrades, CONNECT and expectation negotiation are rejected. Header
+count is rejected explicitly rather than silently truncated; bytes are also
+bounded. Each connection handles at most one request. The raw connection cap is
+shared; it does not promise a reserved network slot for cleanup callers.
+
+Responses retain bounded JSON/no-store framing and no credential logging. A
+successful issue response that fails before flush stops the host and drains the
+service. A response lost after flush still requires the existing caller's
+finally-revoke and independent durable recovery. Owned PEM and request/response
+buffer copies are cleared; native TLS state and immutable copies are not claimed
+to be erased. No certificate issuance or external key discovery is added.
+
+Verification: **50 new passing tests** and **205 focused tests passed** across
+HTTPS, host, transport and service files. Actual Node TLS sockets use a temporary
+local CA/leaf certificate and loopback ephemeral ports; the tests verify CA/SPKI,
+SNI/ALPN rejection, signed issue/revoke, concurrent scopes/replay, raw malformed
+requests, slow headers/body, handshake/connection caps, disconnect propagation,
+failed response flush, conflicting bind, pending/failed drain and lifecycle
+deadlines. The existing process-owner code is composed with the real listener,
+using a simulated process-signal emitter for that test. Existing real child-
+process tests remain separate. The issuer ledger/SQL boundary is simulated;
+these tests do not establish live Supabase Auth, real database cleanup, hosted
+TLS/key custody, private-network reachability or external supervision. The
+request-local workspace client remains covered by its separate composition tests.
+
+Final full suite: **6,209 passed / 54 skipped**, 320 passing / five skipped files.
+TypeScript, full ESLint, webpack build (63 entries), client-boundary scan (117
+chunks), adapter synchronization (73 files) and whitespace checks passed.
+TypeScript was rerun after the build completed to avoid racing generated Next
+types. Existing unrelated React act warnings remain. Tests used Node 22.23.2 and
+the existing dependencies; local TLS required permission beyond the default
+sandbox's loopback-listen restriction. All temporary TLS fixture directories
+were removed. The blocked PG16 fixture parameter was explicitly unset for the
+full suite; the fixture was not retried and no replacement Preview was created.
+Implementation followed the [Node 22 HTTPS interface](https://nodejs.org/download/release/v22.17.0/docs/api/https.html)
+and [HTTP timeout/connection-close semantics](https://nodejs.org/download/release/latest-jod/docs/api/http.html).
+
+The new HTTPS readiness flag and all existing readiness flags remain false;
+`HOSTED_WORKSPACE_READ_BINDING` remains undefined. Exact import guards allow only
+this uninstalled composition, which itself has no product importer. No UI/Logo,
+three-language content, real care data, AI call, Points/payment, database role,
+migration, IAM, installed key, cloud resource, deployment or activation changed.
+No package manifest, lockfile or environment file changed.
+
+Local commit review on 2026-09-11 found no blocking implementation issue for the
+uninstalled scope. Review strengthened existing tests: raw-request and TLS
+rejection cases now carry valid signed assertions; a valid additional TLS request
+proves connection-cap rejection; test timeouts are no longer treated as expected
+TLS rejection. Partial-body and pipelining cases also include a valid assertion
+that must not reach custody. The HTTPS implementation remained unchanged.
+Review reruns passed: 205 focused tests, 6,209 full-suite tests / 54 skipped,
+TypeScript and changed-test ESLint. Existing build/client-bundle evidence remains
+applicable. No applicable engine or ADR
+reference was found; the six-file scope and original source worktree are intact.
+
+**Next, after this authorized local commit:** separately authorize publication
+to `Millionluna/Codex-Game-Studios` as a draft PR against
+`codex/careslink-ai-documents-v1-auth-gate`. This review/commit step includes no
+push or deployment. Real identity/key/host provenance, independent supervision
+and database/full migration-chain evidence remain activation conditions.

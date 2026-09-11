@@ -63,6 +63,8 @@ const forbiddenMarkers = [
   "Task list PostgreSQL dependency unavailable",
   "Task list credential lifecycle unavailable",
   "Task Preview host unavailable",
+  "Task Preview HTTPS unavailable",
+  "COMMUNICATION_NOTE_TASK_PREVIEW_HTTPS_READY",
   "Task Preview custody unavailable",
   "Task Preview GCP custody unavailable",
   "Workspace Preview composition unavailable",
