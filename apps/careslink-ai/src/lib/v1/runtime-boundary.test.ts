@@ -937,7 +937,11 @@ describe("V1 shadow runtime boundary", () => {
     expect(walkAllScriptFiles("src").filter(path => !/\.test\.[cm]?[jt]sx?$/.test(path) &&
       /(?:from\s+|import\s*\()["'][^"']*communication-note-workspace-preview\.server["']/.test(readFileSync(path, "utf8")))).toEqual([
         join(process.cwd(), "src/lib/communication-note-workspace-runtime.server.ts"),
+        join(process.cwd(), "src/lib/communication-note-workspace-task-client.server.ts"),
       ]);
+    // The authenticated request assembly is still an uninstalled server module.
+    expect(walkAllScriptFiles("src").filter(path => !/\.test\.[cm]?[jt]sx?$/.test(path) &&
+      /(?:from\s+|import\s*\()["'][^"']*communication-note-workspace-task-client\.server["']/.test(readFileSync(path, "utf8")))).toEqual([]);
   });
 
   it("quarantines the M1s Product runtime identities to its own test and forbids ambient authority", () => {

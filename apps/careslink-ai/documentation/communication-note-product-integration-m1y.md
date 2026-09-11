@@ -4672,3 +4672,89 @@ commit to `Millionluna/Codex-Game-Studios` and create a draft PR against
 `codex/careslink-ai-documents-v1-auth-gate`. Do not use `origin`
 (`Millionluna/Careslink`), merge or deploy. The previously documented real-key,
 authenticated-principal, TLS/host, supervision and database evidence gates remain.
+
+### PR #42 merged; request-local authenticated task assembly — 2026-09-11
+
+The signer batch was published and merged through
+[PR #42](https://github.com/Millionluna/Codex-Game-Studios/pull/42). Merge commit
+`3d5a568bfa975a7f63b4e73ffc8f15407470244d` has the same code tree as reviewed
+`31fc94d`. This batch starts from that merge in the new task worktree on
+`codex/careslink-workspace-request-auth`; the original
+`codex/careslink-task-preview-control` worktree remains unchanged at `31fc94d`.
+
+`communication-note-workspace-task-client.server.ts` supplies an uninstalled
+server-only assembly for the existing workspace handler and durable Cookie /
+current-session resolver. It accepts only explicit fixed non-Production target,
+database CA, service CA/SPKI, issuer/key/instance and signing-dependency bindings.
+There is no public principal input, assertion endpoint, credential discovery,
+global registration or product installation. Construction snapshots public
+configuration without creating a user client or invoking Auth/signing/network IO.
+The client's existing host/CA validation is shared through an IO-free snapshot
+helper, so assembly and each client use the same validation rules.
+
+The existing Preview composition now additionally supports a synchronous,
+server-owned custody factory. Only the durable runtime's authenticated read path
+calls it, after current-session verification. Every read creates a fresh signer
+and HTTP client pinned to that verified user/session and fixed service instance;
+the runtime still exposes only principal resolution and request-bound readers.
+Repeated factory returns of the same custody object are rejected using weak
+identity tracking, without a global lease/credential map. The prior explicit
+multi-lease custody binding remains supported. Function references and CA bytes
+are snapshotted, and configuration is rechecked after factory construction.
+
+The existing single-use lease and PG17 reader continue to own the fixed metadata
+query and physical-session cleanup. Revoke retains its independent signal after
+page cancellation, logout, configuration drift or signing failure. Successful
+metadata remains withheld until cleanup, terminal revoke and the final
+current-session check succeed. Failed revoke is not a cleanup acknowledgment;
+independent service supervision remains mandatory.
+
+Verification: **45 new passing tests** (35 authenticated assembly compositions /
+boundaries and ten custody-factory cases); **362 focused tests passed** across
+five signer/client/entry/composition files. Coverage includes sequential refresh,
+two concurrent users, changed user/session, missing/revoked Auth, caller-supplied
+identity and transport rejection, logout/cancellation/configuration drift during
+read, signature failure/timeout, failed terminal revoke, reused custody, mutated
+binding and all-flags-enabled formal-route nonactivation. Import guards now
+allow only the exact new uninstalled assembly and still reject a product importer.
+
+Final full suite: **6,159 passed / 54 skipped**, 319 passing / five skipped files.
+TypeScript, full ESLint, the 63-entry webpack build, 117-chunk client-boundary
+scan, 73-file adapter synchronization and whitespace checks passed. Existing
+unrelated React act warnings remain. Validation used Node 22.23.2 and existing
+installed dependencies copied into this worktree; the pre-existing process test's
+parent-provided esbuild 0.25.12 and platform binary were also copied locally.
+No package manifest/lockfile or source-worktree dependency was changed, and no
+environment file was copied.
+
+These tests execute the real source Auth/session resolver, signer, client,
+authenticated entry, service/issuer, lease and PG cleanup implementations. External
+Auth replies, HTTPS events and SQL/PG results are simulated; RSA signatures use
+temporary locally generated keys. This does not establish live Cookie identity,
+actual TLS/SQL, installed key custody, instance provenance or hosted recovery.
+Supabase's current changelog and SSR/session guidance were checked; Next.js
+guidance preserved Node execution and the server/client boundary. The blocked
+PG16 fixture was not retried and no replacement Preview was created.
+
+`COMMUNICATION_NOTE_WORKSPACE_TASK_CLIENT_READY` and the existing readiness flags
+remain false; `HOSTED_WORKSPACE_READ_BINDING` remains undefined. No UI, Logo,
+three-language content, real care data, AI call, Points/payment, schema/role/IAM,
+real key, cloud resource, deployment or feature activation is included.
+
+Local review completed on 2026-09-11 with no blocking findings for this
+uninstalled scope. Review traced verified request ownership into each fresh
+signer/client, configuration and callback snapshots, fixed host validation,
+independent finally-revoke, cleanup-failure data suppression and exact import
+boundaries. Existing tests cover these paths with the simulated external
+boundaries stated above. No applicable engine or ADR reference was found.
+Implementation and tests were unchanged during review; passing test/build
+evidence was retained, and adapter synchronization and whitespace checks were
+rechecked for the authorized ten-file local commit. The original source worktree
+remains clean at `31fc94d`. This step includes no remote publication or deployment.
+
+**Next:** separately authorize publishing this reviewed local commit as a new
+draft PR to `Millionluna/Codex-Game-Studios` against
+`codex/careslink-ai-documents-v1-auth-gate`. Actual key custody, external
+authenticated-identity/host binding, independent recovery and real database/full
+migration-chain evidence remain activation conditions, not authorization to
+provision or enable anything.
