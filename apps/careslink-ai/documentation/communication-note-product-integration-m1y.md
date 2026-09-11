@@ -4850,3 +4850,108 @@ to `Millionluna/Codex-Game-Studios` as a draft PR against
 `codex/careslink-ai-documents-v1-auth-gate`. This review/commit step includes no
 push or deployment. Real identity/key/host provenance, independent supervision
 and database/full migration-chain evidence remain activation conditions.
+
+### PR #44 merged; local workspace/TLS/process integration — 2026-09-11
+
+[PR #44](https://github.com/Millionluna/Codex-Game-Studios/pull/44) merged as
+`84ed8de3979289981f5affc06ce92e8d1b589b4d`, with the same tree as reviewed
+`4f11fbb`. The current worktree was aligned to that merge and this local batch
+started on `codex/careslink-task-https-integration`. The original source worktree
+remains clean on `codex/careslink-task-preview-control` at `31fc94d`.
+
+The previous workspace assembly used simulated HTTPS events, while actual TLS
+and actual child-process lifecycle tests were separate. The new
+`communication-note-workspace-task-https.process.test.ts` and test-only
+`scripts/preview-e2e/communication-note-task-https-local-child.mjs` join these
+boundaries. No production implementation or configuration change was required.
+
+The actual workspace handler, current-session resolver, request-local signer,
+HTTP custody client, task lease and PG reader lifecycle execute in the parent.
+The child bundles the actual HTTPS endpoint, service/issuer and dedicated process
+owner. Only external Auth replies, PG query/session results and the issuer
+ledger protocol are simulated. The parent retains that simulated ledger across
+child termination; this is not PostgreSQL persistence or physical role cleanup.
+
+Requests use real Node HTTPS sockets and locally generated temporary CA/leaf
+certificates. A test-only address adapter maps the fixed `.invalid` origin to
+the child's `127.0.0.1` ephemeral port, retaining the canonical Host, SNI,
+CA/SPKI validation, ALPN and cancellation behavior. It does not simulate TLS
+events or relax the production client. The fixture proves local wire behavior,
+not real DNS, private-network reachability or port-443 deployment. Child startup
+uses an isolated environment and no database fixture option or credential.
+Temporary TLS material is removed after actual process closure; owned key buffers
+are cleared. Test child stdout/stderr must remain empty, and SCRAM verifiers
+are excluded from the simulated ledger IPC payload.
+
+**25 new integration tests passed.** They cover refresh and concurrent users;
+missing/revoked identity, changed session and cross-principal client rejection;
+logout/cancellation and issue-signing failure with independent revoke;
+successful metadata withheld until the real HTTPS revoke reply; real
+SIGTERM/SIGINT with an issued lease; listener closure preceding a pending drain
+acknowledgment; real SIGKILL after simulated issue/fence commit; recovery before
+a successor opens its TLS listener; lost issue reply; failed revoke/drain and
+recovery; failed startup; stale instance, wrong CA/SPKI and invalid local address
+mapping rejection using valid assertions; and formal-route nonactivation.
+Tests use actual close events and exit codes, and reject test timeouts rather
+than treating them as denial or cleanup evidence.
+
+The first IPC-loss run exposed a Node 22.23.2 parent-disconnect limitation:
+`ChildProcess.disconnect()` produced disconnect/exit and closed stdout/stderr,
+but no ChildProcess close event. The observed behavior matches the open
+[Node issue #65646](https://github.com/nodejs/node/issues/65646).
+The final fixture closes the real IPC channel from the child, exercising the
+production owner's native disconnect handler and retaining the parent's actual
+close event. With the simulated broker connection gone, cleanup remains
+unconfirmed and the child exits with code 1; a fresh child recovers the retained
+ledger. This proves child-initiated IPC loss, not parent-initiated disconnect or
+actual parent death. The parent-initiated close boundary remains unverified on
+this Node version. No Node patch, fabricated close event or exit-only substitute
+was introduced, and no timeout was counted as cleanup acknowledgment.
+
+Verification: **433 focused tests passed / one existing test skipped** across
+nine workspace/client/signer/HTTPS/host/service/transport files. Final full
+suite: **6,234 passed / 54 skipped**, 321 passing / five skipped files. TypeScript,
+full ESLint plus final changed-file lint, webpack build (63 entries),
+client-boundary scan (117 chunks), adapter synchronization (73 files) and
+whitespace checks passed. TypeScript ran after the build to avoid generated-type
+races. Existing unrelated React act warnings remain. Validation used Node
+22.23.2 and existing dependencies; the temporary certificate fixture requires
+`/usr/bin/openssl` and the process suite is POSIX-only. No dependencies changed.
+
+The complete suite explicitly unset `CARESLINK_TASK_ISSUER_LOCAL_SOCKET`; the
+blocked PG16 fixture was not retried and no replacement Preview was created.
+The [Supabase changelog](https://supabase.com/changelog) and
+[current-session guidance](https://supabase.com/docs/guides/auth/sessions) were
+checked; external Auth remains simulated and the existing session recheck is
+preserved. Next.js runtime guidance kept the process owner outside the product
+web process. Node's [child-process lifecycle documentation](https://nodejs.org/download/release/v22.17.0/docs/api/child_process.html)
+informed the distinction between exit, stdio closure and close acknowledgment.
+
+All readiness flags remain false and `HOSTED_WORKSPACE_READ_BINDING` remains
+undefined. Hosted identity/key/workload provenance, independent external
+supervision and actual database/full migration-chain evidence remain unresolved.
+This batch includes no UI/Logo/three-language content changes, real care data,
+AI call, Points/payment, database role/migration, IAM, installed signing key,
+cloud resource, deployment or activation. No environment file changed.
+
+Local review on 2026-09-11 found no blocking issue for this uninstalled
+test/evidence scope. Review traced actual Node HTTPS transport, process closure,
+independent drain, fixed local address routing, isolated child configuration and
+temporary-key cleanup. The tests now also require explicit issue/revoke network
+attempts for stale-instance and CA/SPKI rejection, and check complete principal
+bindings and distinct request IDs for refresh/concurrent reads. This prevents
+empty-array checks from standing in for the claimed transport evidence.
+No production code changed. No configured engine or applicable ADR reference was
+found. The IPC trigger limitation remains explicit rather than being treated as
+parent-death coverage.
+
+Review verification passed: 25 integration tests, the full suite with 6,234
+passed / 54 skipped, TypeScript and changed-file ESLint. Existing build and
+client-boundary results remain applicable because
+only test assertions and this handoff changed. The three-file local commit
+retains all disabled readiness flags and the untouched source worktree.
+
+**Next, after this authorized local commit:** separately publish the reviewed
+commit as a draft PR to `Millionluna/Codex-Game-Studios`, based on
+`codex/careslink-ai-documents-v1-auth-gate`. This step includes no push, merge,
+deployment or activation.
