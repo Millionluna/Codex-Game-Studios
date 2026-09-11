@@ -209,6 +209,46 @@ describe("Preview workspace read-only composition", () => {
     const queries = io.clients.flatMap(c => c.calls).filter(c => c.sql === COMMUNICATION_NOTE_JOB_LIST_SQL);
     expect(queries.map(q => q.values?.slice(0, 2))).toEqual([[USER, SESSION], [OTHER, OTHER_SESSION]]); closed();
   });
+  it("invokes a snapshotted custody factory only after verifying the request's current session", async () => {
+    const h = harness(), { custody, ...base } = h.binding;
+    const create = vi.fn(() => ({ ...custody })), trap = vi.fn(), binding = { ...base, createCustody: create };
+    const runtime = compose({ env: h.env, binding }); binding.createCustody = trap;
+    const handle = createCommunicationNoteWorkspaceHandler({ enabled: () => true, runtime });
+    expect(create).not.toHaveBeenCalled();
+    h.client.session.mockResolvedValueOnce({ data: "REVOKED", error: null });
+    expect((await handle(request())).status).toBe(401); expect(create).not.toHaveBeenCalled();
+    expect((await handle(request())).status).toBe(200);
+    expect(create).toHaveBeenCalledWith({ userId: USER, sessionId: SESSION, transport: "COOKIE" });
+    expect(trap).not.toHaveBeenCalled(); closed();
+  });
+  it("refuses a reused single-lease custody object before a second issuance", async () => {
+    const h = harness(), { custody, ...base } = h.binding;
+    const runtime = compose({ env: h.env, binding: { ...base, createCustody: () => custody } });
+    const handle = createCommunicationNoteWorkspaceHandler({ enabled: () => true, runtime });
+    expect((await handle(request())).status).toBe(200); expect((await handle(request())).status).toBe(503);
+    expect(h.issue).toHaveBeenCalledOnce(); expect(h.revoke).toHaveBeenCalledOnce(); closed();
+  });
+  it.each(["both", "invalid", "proxy", "accessor"])("rejects an invalid factory binding: %s", kind => {
+    const h = harness(), { custody, ...base } = h.binding, trap = vi.fn(() => custody);
+    const binding = { ...base, createCustody: trap };
+    if (kind === "both") Object.assign(binding, { custody });
+    if (kind === "invalid") Object.assign(binding, { createCustody: "invalid" });
+    if (kind === "proxy") binding.createCustody = new Proxy(trap, { apply: trap });
+    if (kind === "accessor") Object.defineProperty(binding, "createCustody", { get: trap, enumerable: true });
+    expect(compose({ env: h.env, binding })).toBeUndefined(); expect(trap).not.toHaveBeenCalled(); expect(io.cookie).not.toHaveBeenCalled();
+  });
+  it.each([undefined, {}, { issue: "invalid", revoke: "invalid" }])("rejects an invalid factory result before credential IO: %#", async value => {
+    const h = harness(), { custody, ...base } = h.binding; void custody;
+    const runtime = compose({ env: h.env, binding: { ...base, createCustody: () => value as never } });
+    const handle = createCommunicationNoteWorkspaceHandler({ enabled: () => true, runtime });
+    expect((await handle(request())).status).toBe(503); expect(h.issue).not.toHaveBeenCalled(); expect(io.clients).toHaveLength(0);
+  });
+  it("rechecks configuration after a custody factory returns", async () => {
+    const h = harness(), { custody, ...base } = h.binding;
+    const runtime = compose({ env: h.env, binding: { ...base, createCustody: () => { h.env.VERCEL_ENV = "production"; return custody; } } });
+    const handle = createCommunicationNoteWorkspaceHandler({ enabled: () => true, runtime });
+    expect((await handle(request())).status).toBe(503); expect(h.issue).not.toHaveBeenCalled(); expect(io.clients).toHaveLength(0);
+  });
   it.each([1, 4])("suppresses both lists when current-session check %i is revoked", async check => {
     const h = harness(); let count = 0;
     h.client.session.mockImplementation(async () => ({ data: ++count === check ? "REVOKED" : "ACTIVE", error: null }));

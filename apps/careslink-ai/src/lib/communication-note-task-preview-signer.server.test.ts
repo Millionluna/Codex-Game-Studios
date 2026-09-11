@@ -254,7 +254,8 @@ it("keeps signer source server-only, free of private keys/IO/control imports, an
   const name = "communication-note-task-preview-signer", walk = (dir: string): string[] => readdirSync(dir, { withFileTypes: true })
     .flatMap(e => e.isDirectory() ? walk(join(dir, e.name)) : [join(dir, e.name)]);
   expect(walk("src").filter(p => /\.[cm]?[jt]sx?$/.test(p) && !p.includes(".test.") && !p.endsWith(`${name}.server.ts`))
-    .filter(p => readFileSync(p, "utf8").includes(name))).toEqual([]);
+    .filter(p => readFileSync(p, "utf8").includes(name)))
+    .toEqual([join("src", "lib", "communication-note-workspace-task-client.server.ts")]);
   const source = readFileSync(`src/lib/${name}.server.ts`, "utf8"); expect(source).toMatch(/^import "server-only";/);
   expect(source).not.toMatch(/process\.env|fetch\s*\(|createPrivateKey|generateKeyPair|SignJWT|BEGIN PRIVATE KEY|console\.|from ["'](?:pg|node:(?:https?|fs)|@google-cloud\/)/);
   expect(source).not.toMatch(/from .*task-preview-(?:client|issuer|control|host|service|gcp|custody|transport)\.server/);

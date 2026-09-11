@@ -347,7 +347,8 @@ it("keeps client/protocol free of control-plane imports, private keys and produc
   const walk = (dir: string): string[] => readdirSync(dir, { withFileTypes: true }).flatMap(e => e.isDirectory() ? walk(join(dir, e.name)) : [join(dir, e.name)]);
   const files = walk("src").filter(p => /\.[cm]?[jt]sx?$/.test(p) && !p.includes(".test."));
   const client = "communication-note-task-preview-client";
-  expect(files.filter(p => !p.endsWith(`${client}.server.ts`) && readFileSync(p, "utf8").includes(client))).toEqual([]);
+  expect(files.filter(p => !p.endsWith(`${client}.server.ts`) && readFileSync(p, "utf8").includes(client)))
+    .toEqual([join("src", "lib", "communication-note-workspace-task-client.server.ts")]);
   for (const name of [client, "communication-note-task-preview-protocol"]) {
     const source = readFileSync(`src/lib/${name}.server.ts`, "utf8"); expect(source).toMatch(/^import "server-only";/);
     expect(source).not.toMatch(/from ["']pg["']|from .*task-preview-(?:issuer|control|host|service|gcp|custody|transport)\.server|process\.env|console\.|SignJWT|createPrivateKey|BEGIN PRIVATE KEY|fetch\s*\(/);

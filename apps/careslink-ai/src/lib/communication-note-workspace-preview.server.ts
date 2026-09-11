@@ -15,6 +15,7 @@ import {
 } from "./communication-note-workspace-task-lease.server";
 import { createCommunicationNoteTaskPgReadPort } from "./communication-note-workspace-task-postgres.server";
 import type { CommunicationNoteWorkspaceRuntime } from "./communication-note-workspace.server";
+import type { CommunicationNoteGenerationProviderPrincipal as Principal } from "./communication-note-generation-principal.server";
 
 /** Trusted server installation, NOT proof that a custody implementation is safe.
  * Its issuer, independent supervisor, terminal fence and target-specific grants
@@ -28,9 +29,16 @@ export type CommunicationNoteWorkspacePreviewBinding = Readonly<{
   caSha256: string;
   custody: CommunicationNoteTaskLeaseCustody;
 }>;
+/** Server-owned synchronous factory, invoked only inside the durable runtime's
+ * authenticated read path. A new custody object is required for every read. */
+export type CommunicationNoteWorkspacePreviewFactoryBinding = Readonly<
+  Omit<CommunicationNoteWorkspacePreviewBinding, "custody"> & {
+    createCustody(principal: Principal): CommunicationNoteTaskLeaseCustody;
+  }
+>;
 type Options = Readonly<{
   env: CommunicationNoteWorkspaceDurableEnv;
-  binding?: CommunicationNoteWorkspacePreviewBinding;
+  binding?: CommunicationNoteWorkspacePreviewBinding | CommunicationNoteWorkspacePreviewFactoryBinding;
 }>;
 const unavailable = () => new Error("Workspace Preview composition unavailable");
 
@@ -49,19 +57,29 @@ export function createCommunicationNoteWorkspacePreviewRuntime(options: Options)
     const env = fields.env as CommunicationNoteWorkspaceDurableEnv;
     const initial = resolveCommunicationNoteWorkspaceConfiguration(env);
     if (!initial) return undefined;
-    const binding = record(fields.binding, ["projectRef", "vercelProjectId", "ca", "caSha256", "custody"]);
+    if (!fields.binding || typeof fields.binding !== "object" || types.isProxy(fields.binding)) return undefined;
+    const factory = Object.hasOwn(fields.binding, "createCustody");
+    const binding = record(fields.binding, ["projectRef", "vercelProjectId", "ca", "caSha256", factory ? "createCustody" : "custody"]);
     if (binding.projectRef !== initial.projectRef || binding.vercelProjectId !== initial.vercelProjectId ||
       types.isProxy(binding.ca) || !Buffer.isBuffer(binding.ca) || binding.ca.length === 0 || binding.ca.length > 65536 ||
       typeof binding.caSha256 !== "string" || !/^[a-f0-9]{64}$/.test(binding.caSha256)) return undefined;
     const ca = Buffer.from(binding.ca), caSha256 = binding.caSha256;
     if (createHash("sha256").update(ca).digest("hex") !== caSha256) return undefined;
-    const custody = record(binding.custody, ["issue", "revoke"]);
-    if (typeof custody.issue !== "function" || types.isProxy(custody.issue) ||
-      typeof custody.revoke !== "function" || types.isProxy(custody.revoke)) return undefined;
-    // Snapshot function references/CA bytes so mutation of the installation
-    // object cannot replace the authority after construction.
-    const issue = custody.issue as CommunicationNoteTaskLeaseCustody["issue"];
-    const revoke = custody.revoke as CommunicationNoteTaskLeaseCustody["revoke"];
+    let resolveCustody: (principal: Principal) => CommunicationNoteTaskLeaseCustody;
+    if (factory) {
+      const create = binding.createCustody;
+      if (typeof create !== "function" || types.isProxy(create)) return undefined;
+      const used = new WeakSet<object>();
+      resolveCustody = principal => {
+        const owned = create(principal), custody = snapshotCustody(owned);
+        if (used.has(owned)) throw unavailable();
+        used.add(owned);
+        return custody;
+      };
+    } else {
+      const custody = snapshotCustody(binding.custody);
+      resolveCustody = () => custody;
+    }
     const active = (signal?: AbortSignal) => {
       const next = resolveCommunicationNoteWorkspaceConfiguration(env);
       if (signal?.aborted || !next || next.projectRef !== initial.projectRef || next.url !== initial.url ||
@@ -72,6 +90,8 @@ export function createCommunicationNoteWorkspacePreviewRuntime(options: Options)
         active(input.signal);
         if (input.projectRef !== initial.projectRef || input.purpose !== COMMUNICATION_NOTE_WORKSPACE_TASK_PURPOSE ||
           input.callerRole !== COMMUNICATION_NOTE_WORKSPACE_TASK_CALLER) throw unavailable();
+        const { issue, revoke } = resolveCustody(input.principal);
+        active(input.signal);
         return createCommunicationNoteTaskLeaseReadPort({ enabled: true, projectRef: initial.projectRef,
           principal: input.principal,
           custody: Object.freeze({
@@ -94,4 +114,11 @@ export function createCommunicationNoteWorkspacePreviewRuntime(options: Options)
 function record(value: unknown, keys: readonly string[]) {
   if (types.isProxy(value)) throw unavailable();
   return taskListRecord(value, keys);
+}
+function snapshotCustody(value: unknown): CommunicationNoteTaskLeaseCustody {
+  const custody = record(value, ["issue", "revoke"]);
+  if (typeof custody.issue !== "function" || types.isProxy(custody.issue) ||
+      typeof custody.revoke !== "function" || types.isProxy(custody.revoke)) throw unavailable();
+  return Object.freeze({ issue: custody.issue as CommunicationNoteTaskLeaseCustody["issue"],
+    revoke: custody.revoke as CommunicationNoteTaskLeaseCustody["revoke"] });
 }

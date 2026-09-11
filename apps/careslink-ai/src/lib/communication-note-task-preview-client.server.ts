@@ -23,6 +23,26 @@ export type TaskPreviewClientOptions = Readonly<{
 const fail = () => new Error("Task Preview client unavailable");
 const sha = (value: Uint8Array) => createHash("sha256").update(value).digest("hex");
 const digest = (v: unknown): v is string => typeof v === "string" && v.length === 64 && /^[a-f0-9]{64}$/.test(v);
+const BINDING_KEYS = ["projectRef", "identity", "instanceId", "serviceCa", "serviceCaSha256", "serviceSpkiSha256"] as const;
+export type TaskPreviewClientBinding = Pick<TaskPreviewClientOptions, typeof BINDING_KEYS[number]>;
+
+/** Validate/copy fixed host configuration without constructing a user client.
+ * Pinned bytes are not proof of host, instance or key provenance. No IO. */
+export function snapshotTaskPreviewClientBinding(input: TaskPreviewClientBinding): TaskPreviewClientBinding {
+  const o = record(input, BINDING_KEYS);
+  const projectRef = taskPreviewProject(o.projectRef), identity = parseTaskPreviewCallerIdentity(o.identity), url = new URL(identity.origin);
+  if (url.port || !url.hostname.includes(".") || url.hostname.endsWith(".") || /[^a-z0-9.-]/.test(url.hostname) || /^[0-9.]+$/.test(url.hostname) ||
+      !digest(o.instanceId) || !digest(o.serviceCaSha256) || !digest(o.serviceSpkiSha256) ||
+      types.isProxy(o.serviceCa) || !Buffer.isBuffer(o.serviceCa) || !o.serviceCa.length || o.serviceCa.length > 65536) throw fail();
+  const ca = Buffer.from(o.serviceCa);
+  try {
+    const certificate = new X509Certificate(ca);
+    // Accept exactly one CA, not an appended private key or certificate bundle.
+    if (sha(ca) !== o.serviceCaSha256 || !certificate.ca || certificate.toString().replace(/\s/g, "") !== ca.toString().replace(/\s/g, "")) throw fail();
+  } catch { throw fail(); }
+  return Object.freeze({ projectRef, identity, instanceId: o.instanceId, serviceCa: ca,
+    serviceCaSha256: o.serviceCaSha256, serviceSpkiSha256: o.serviceSpkiSha256 });
+}
 
 /** Uninstalled, one-lease backend client. An independently trusted backend
  * provides the verified Cookie principal, signer/key provenance, service CA,
@@ -41,20 +61,10 @@ const digest = (v: unknown): v is string => typeof v === "string" && v.length ==
  */
 export function createTaskPreviewHttpCustody(input: TaskPreviewClientOptions): Custody {
   const o = record(input, ["projectRef", "principal", "identity", "instanceId", "serviceCa", "serviceCaSha256", "serviceSpkiSha256", "consumeAssertion"]);
-  const projectRef = taskPreviewProject(o.projectRef), identity = parseTaskPreviewCallerIdentity(o.identity), url = new URL(identity.origin);
-  // Fixed DNS hostname and standard TLS port. No per-request destination input.
-  if (url.port || !url.hostname.includes(".") || url.hostname.endsWith(".") || /[^a-z0-9.-]/.test(url.hostname) || /^[0-9.]+$/.test(url.hostname) ||
-      !digest(o.instanceId) || !digest(o.serviceCaSha256) || !digest(o.serviceSpkiSha256) ||
-      types.isProxy(o.serviceCa) || !Buffer.isBuffer(o.serviceCa) || !o.serviceCa.length || o.serviceCa.length > 65536 ||
-      types.isProxy(o.consumeAssertion) || typeof o.consumeAssertion !== "function") throw fail();
-  const ca = Buffer.from(o.serviceCa), instanceId = o.instanceId, pin = o.serviceSpkiSha256;
-  let certificate: X509Certificate;
-  try {
-    certificate = new X509Certificate(ca);
-    // PEM line wrapping is not semantic; still accept exactly one certificate,
-    // no appended private key/bundle, and pin the original supplied bytes.
-    if (sha(ca) !== o.serviceCaSha256 || !certificate.ca || certificate.toString().replace(/\s/g, "") !== ca.toString().replace(/\s/g, "")) throw fail();
-  } catch { throw fail(); }
+  const { projectRef, identity, instanceId, serviceCa: ca, serviceSpkiSha256: pin } = snapshotTaskPreviewClientBinding(
+    Object.fromEntries(BINDING_KEYS.map(k => [k, o[k]])) as TaskPreviewClientBinding);
+  if (types.isProxy(o.consumeAssertion) || typeof o.consumeAssertion !== "function") throw fail();
+  const certificate = new X509Certificate(ca);
   const principal = parseTaskPreviewWireScope({ requestId: "0".repeat(32), projectRef, purpose: "COMMUNICATION_NOTE_JOB_LIST_READ",
     callerRole: "careslink_v1_generation_job_list_caller", principal: o.principal }, projectRef).principal;
   const consume = o.consumeAssertion as TaskPreviewClientOptions["consumeAssertion"], verify = createTaskPreviewAssertionVerifier(identity);
