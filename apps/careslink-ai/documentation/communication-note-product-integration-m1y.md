@@ -5058,3 +5058,107 @@ commit as a draft PR to `Millionluna/Codex-Game-Studios`, based on
 Then use the probe's explicit observation boundaries to scope integration
 with the actual Workspace/TLS service and retained simulated ledger; do not
 count this minimal probe as that integration or as production readiness.
+
+### PR #46 merged; Workspace/TLS recovery after actual launcher death — 2026-09-11
+
+[PR #46](https://github.com/Millionluna/Codex-Game-Studios/pull/46) merged as
+`d9bdec51855234f1559113f6681a96672a9e3f20`; its tree
+`8ff8323a855df4c9833bcd5ad471ff9b68a3ad32` matches reviewed `dad443d`.
+The authorized local implementation uses
+`codex/careslink-workspace-task-parent-exit` and the scope in
+[the parent-exit QA plan](communication-note-workspace-task-parent-exit-qa-plan.md).
+
+The new fixture combines the actual Workspace client/handler, HTTPS service,
+issuer lifecycle and process owner. A disposable Node launcher sits between
+the test controller and service. The controller retains the same simulated
+ledger Map across generations. Broker calls still traverse launcher IPC;
+launcher death really removes that broker path. An independently inherited
+fd 4 carries only test identity/lifecycle messages and explicit barriers, never
+replacement SQL/broker replies. The unchanged Python observer is owned by the
+surviving controller and registers kernel exit observation before termination.
+The original service identity is challenged over its original IPC after arming.
+
+**Thirteen new process tests passed.** Four cases cross normal launcher exit
+with actual SIGKILL, each at a real request's committed issue/fence checkpoint.
+The interrupted Workspace request returns 503 without task metadata. Native
+IPC loss triggers the actual service owner; HTTPS closes its listener and
+requests. The old owner reports FAILED with cleanup unconfirmed because its
+broker connection is gone. The old ISSUED/FENCED lease stays in the original
+Map. No lease is re-seeded or erased to manufacture successful recovery.
+
+The combined fixture distinguishes permission to **start a recovery process**
+from permission to **listen for requests**. It requires matching kernel exit,
+successful completion of the original observer, actual launcher/control/HTTPS
+closure, valid evidence channels and settled old RPC/request work before one
+recovery process can start. An explicit exit-release event must also precede
+closure; a fixture watchdog exit cannot stand in for the completed protocol.
+Old cleanup remains unconfirmed throughout. The PR #46 strict successor guard
+is unchanged and would still reject that old cleanup outcome.
+
+The actual issuer/service/HTTPS startup path then supplies the second condition.
+Each core case holds the successor's inventory operation and later its
+committed finalize reply. Inspection at both barriers observes no listening
+TCP server, no advertised address, no ready event and no new issue. Even zeroed
+simulated lease counts do not release readiness while the finalize reply is
+held. Only after actual recovery runs start/inventory/fence/finalize/ready does
+the HTTPS adapter listen with a new instance ID.
+
+Every core case then sends correctly signed old-instance assertions to the
+successor's **new** TLS address with valid CA/SPKI and handshake properties.
+They are rejected without new issuance. Fresh bindings return the synthetic
+user's task through Workspace and actual HTTPS issue/revoke. Holding the
+finalize reply proves successful task metadata is withheld until the real
+HTTPS revoke reply confirms simulated cleanup. The PG reader's mock objects
+also record end/destroy and cleared credential references; these remain
+object-lifecycle observations, not physical database cleanup evidence.
+
+The other nine cases cover a still-live service after native IPC loss and
+listener/owner completion, observer timeout or actual observer SIGKILL,
+malformed completion frames after valid evidence, recovery failure at
+inventory/finalize/ready, generation-bound delayed replies, and product import
+guards. A held old RPC blocks recovery startup until it settles. Its reply
+closure remains tied to the retired handle/nonce and cannot satisfy the new
+generation. Teardown-only observers never replace original failed evidence.
+
+Initial full-suite validation exposed two test sequencing failures. The new
+port probe could run after IPC disconnect but before HTTPS listener closure,
+returning ECONNRESET. It now waits for the real owner's completion, which joins
+HTTPS listener closure, before checking connection refusal. A pre-existing
+HTTPS autonomous-stop test could request service stop after client response
+end but before the server's response finish. That test now waits for the real
+ServerResponse finish and its promise continuations, then requests stop. Its
+STOPPED/confirmed-cleanup/restart-rejection assertions remain intact; the
+response status is additionally checked. Neither fix changes production code,
+manufactures an event, accepts a reset as confirmed closure, or extends a
+production timeout.
+
+Final validation: **102 passed / one existing skip** across the new suite and
+four related TLS/process suites. Full suite: **6,254 passed / 54 skipped**,
+323 passing / five skipped test files. TypeScript, changed-file ESLint and
+adapter synchronization (73 files) passed. Production source and dependencies
+are unchanged, so the existing build/client-boundary evidence remains
+applicable. The original 25 Workspace/TLS tests and seven minimal process
+observer tests remain unchanged and pass.
+
+The new suite is explicitly macOS-only. Auth, SQL results and ledger state
+remain simulated; the controller survives these tests. Actual PostgreSQL
+durability/cleanup, Linux/Windows observation, controller/host death,
+parent-initiated disconnect's previous Node close limitation, real workload/
+key provenance and deployed supervision remain unverified. All readiness
+flags stay false and HOSTED_WORKSPACE_READ_BINDING stays undefined. No blocked
+PG16 retry, replacement Preview, source-worktree change, real care data, AI
+call, Points/payment, database role/migration, IAM/key installation, cloud
+resource, deployment or activation is included.
+
+The five-file local review is complete: **APPROVED WITH SUGGESTIONS**, with no
+required changes. It checked the actual lifecycle implementations, both
+recovery conditions, original observer failure retention, delayed RPC binding
+and resource teardown. No referenced ADR or configured engine applies. The
+concentrated test-protocol/recovery predicates remain a readability suggestion;
+no production behavior or already-validated test changed during review. The
+QA plan records the findings and verified final logs. This review record is
+included in the local commit; publication has not occurred.
+
+**Next:** push the reviewed local commit to `Millionluna/Codex-Game-Studios`
+on `codex/careslink-workspace-task-parent-exit` and create a draft PR against
+`codex/careslink-ai-documents-v1-auth-gate`. Publication is a separate step.

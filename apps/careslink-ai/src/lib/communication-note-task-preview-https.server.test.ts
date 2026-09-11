@@ -255,7 +255,15 @@ it("does not claim cleanup after a failed service drain", async () => {
   expect([...h.leases.values()][0].state).toBe("ISSUED");
 });
 it("stops its listener on autonomous service completion and cannot restart", async () => {
-  const h = fixture(); await h.host.start(); await post(h, await token(h)); await h.service.stop();
+  const h = fixture(), flushed = deferred<void>(), end = ServerResponse.prototype.end;
+  vi.spyOn(ServerResponse.prototype, "end").mockImplementationOnce(function(this: ServerResponse, ...args: Parameters<typeof end>) {
+    // Client response end can precede server finish. Let the real finish event
+    // and its promise continuations complete before requesting autonomous stop.
+    this.once("finish", () => setImmediate(() => flushed.resolve()));
+    return end.apply(this, args);
+  });
+  await h.host.start(); expect((await post(h, await token(h))).status).toBe(200);
+  await bound(flushed.promise); await h.service.stop();
   expect(await h.host.finished).toEqual({ state: "STOPPED", cleanupConfirmed: true }); cleaned(h); await expect(h.host.start()).rejects.toThrow();
 });
 it("retains separate scopes and rejects replay through actual concurrent TLS connections", async () => {
