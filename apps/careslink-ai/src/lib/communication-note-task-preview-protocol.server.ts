@@ -57,6 +57,22 @@ export function parseTaskPreviewCallerIdentity(value: unknown): TaskPreviewCalle
     return Object.freeze(i) as TaskPreviewCallerIdentity;
   } catch { throw fail(); }
 }
+/** Grammar/claim validation only, NOT authentication. Used before signing and
+ * only AFTER cryptographic verification when admitting a received assertion. */
+export function parseTaskPreviewUnsignedCommand(value: unknown, identity: TaskPreviewCallerIdentity,
+  projectRef: string, instanceId: string): TaskPreviewCommand {
+  const p = taskPreviewWireRecord(value, CLAIMS), now = Date.now(), seconds = Math.floor(now / 1000);
+  if (p.iss !== identity.issuer || p.aud !== identity.origin || p.sub !== identity.subject ||
+      p.instanceId !== instanceId || p.method !== "POST" ||
+      (p.path !== TASK_PREVIEW_TRANSPORT_PATHS.issue && p.path !== TASK_PREVIEW_TRANSPORT_PATHS.revoke) ||
+      !Number.isSafeInteger(p.iat) || !Number.isSafeInteger(p.nbf) || !Number.isSafeInteger(p.exp) || p.nbf !== p.iat ||
+      (p.iat as number) > seconds || seconds - (p.iat as number) > 10 ||
+      (p.exp as number) - (p.iat as number) > 30 || (p.exp as number) * 1000 < now + 8000 ||
+      typeof p.jti !== "string" || p.jti.length !== 32 || !/^[a-f0-9]{32}$/.test(p.jti)) throw fail();
+  return Object.freeze({ iss: identity.issuer, aud: identity.origin, sub: identity.subject,
+    iat: p.iat as number, nbf: p.nbf as number, exp: p.exp as number, jti: p.jti, instanceId,
+    method: "POST", path: p.path as string, scope: parseTaskPreviewWireScope(p.scope, projectRef) });
+}
 export function createTaskPreviewAssertionVerifier(input: TaskPreviewCallerIdentity) {
   const i = parseTaskPreviewCallerIdentity(input), key = createPublicKey(i.publicKeyPem);
   return async (token: unknown, action: TaskPreviewAction, projectRef: string, instanceId: string): Promise<TaskPreviewCommand> => {
@@ -67,14 +83,10 @@ export function createTaskPreviewAssertionVerifier(input: TaskPreviewCallerIdent
         subject: i.subject, typ: TASK_PREVIEW_TRANSPORT_JWT_TYPE, currentDate: new Date(), clockTolerance: 0, maxTokenAge: 10, requiredClaims: CLAIMS });
       if (Buffer.from(token.split(".")[0], "base64url").toString() !== JSON.stringify(protectedHeader) ||
           Buffer.from(token.split(".")[1], "base64url").toString() !== JSON.stringify(payload)) throw fail();
-      const h = taskPreviewWireRecord(protectedHeader, ["alg", "typ", "kid"]), p = taskPreviewWireRecord(payload, CLAIMS);
-      if (h.alg !== "RS256" || h.typ !== TASK_PREVIEW_TRANSPORT_JWT_TYPE || h.kid !== i.keyId || p.aud !== i.origin ||
-          p.instanceId !== instanceId || p.method !== "POST" || p.path !== TASK_PREVIEW_TRANSPORT_PATHS[action] ||
-          !Number.isSafeInteger(p.iat) || !Number.isSafeInteger(p.nbf) || !Number.isSafeInteger(p.exp) || p.nbf !== p.iat ||
-          (p.exp as number) - (p.iat as number) > 30 || (p.exp as number) * 1000 < Date.now() + 8000 ||
-          typeof p.jti !== "string" || p.jti.length !== 32 || !/^[a-f0-9]{32}$/.test(p.jti)) throw fail();
-      return Object.freeze({ iss: i.issuer, aud: i.origin, sub: i.subject, iat: p.iat as number, nbf: p.nbf as number, exp: p.exp as number,
-        jti: p.jti, instanceId, method: "POST", path: p.path as string, scope: parseTaskPreviewWireScope(p.scope, projectRef) });
+      const h = taskPreviewWireRecord(protectedHeader, ["alg", "typ", "kid"]);
+      const command = parseTaskPreviewUnsignedCommand(payload, i, projectRef, instanceId);
+      if (h.alg !== "RS256" || h.typ !== TASK_PREVIEW_TRANSPORT_JWT_TYPE || h.kid !== i.keyId || command.path !== TASK_PREVIEW_TRANSPORT_PATHS[action]) throw fail();
+      return command;
     } catch { throw fail(); }
   };
 }

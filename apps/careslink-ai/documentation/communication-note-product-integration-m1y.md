@@ -4575,3 +4575,100 @@ commit to `Millionluna/Codex-Game-Studios` and create a draft PR against
 `codex/careslink-ai-documents-v1-auth-gate`, retaining the uninstalled state and
 explicit TLS/signer/host, independent-supervision and real database/full-chain
 activation gates. Do not use `origin` (`Millionluna/Careslink`), merge or deploy.
+
+### Backend assertion signer local adaptation — 2026-09-11
+
+The preceding authentication/client batch was published and merged through
+[PR #41](https://github.com/Millionluna/Codex-Game-Studios/pull/41) into
+`codex/careslink-ai-documents-v1-auth-gate`. This implementation starts from local
+merge commit `cec8664`, whose tree matches reviewed source commit `c84e0cf`.
+This step adds only the previously agreed local signer adaptation and offline
+tests; it does not authorize installing a signer or enabling the application.
+
+`communication-note-task-preview-signer.server.ts` is an inert Node-only adapter
+with `COMMUNICATION_NOTE_TASK_PREVIEW_SIGNER_READY = false`. The backend must
+construct it once per lease after independently verified Cookie authentication,
+pinning that user/session, the explicit non-Production project, service instance,
+issuer/audience/subject and dedicated RSA public key. A principal-shaped object
+alone is not authentication. No private key, key discovery, environment lookup,
+SDK, network operation or product runtime binding is included in this module.
+
+The adapter constructs the canonical protected header and exact JWS signing input
+itself. Its injected dependency receives only the fixed RS256 algorithm, pinned
+key ID and owned input buffer, and must complete exactly one awaited raw-signature
+handoff. The actual RSA signature and full command are verified locally before
+any assertion reaches the caller. There is no arbitrary payload/digest-signing
+entry point, token cache or assertion return value. The shared protocol now
+reuses exact unsigned claim/scope validation; received assertions still undergo
+cryptographic verification first. Unsigned validation is explicitly not proof
+of authenticity.
+
+Each provider admits at most one issue and one exact-scope revoke, using distinct
+nonces. Revoke can precede an unknown issue and remains available after page
+cancellation. Invalid or duplicate calls do not abort an already admitted issue
+or consume its valid cleanup opportunity. Signing has a two-second deadline;
+the complete operation, including the assertion consumer, is bounded at 7.5
+seconds with cancellation, monotonic/wall-clock and freshness checks. Missing,
+duplicate, unawaited, invalid, late or throw-after-handoff signatures never reach
+the caller. Owned buffers/references are cleared, without claiming erasure of
+immutable strings or dependency copies. Already-started consumer IO is not
+rolled back: caller finally-revoke and independent service recovery remain
+mandatory.
+
+Verification: **72 new signer tests** and **two new composed failure tests**;
+**258 signer/client/entry tests passed**. Four compositions now exercise the
+actual signer, client, authenticated entry, service, issuer and workspace lease
+for success, cancellation after read, signing failure and cancellation during
+signing. The latter two send no issue assertion and never open the read port;
+independent revoke still completes fence/finalize. All four leave zero simulated
+live roles/sessions/memberships. RSA signing and verification use temporary,
+locally generated 2048-, 2049- and 4096-bit keys; no deployment key is loaded. HTTPS
+events/sockets and the SQL ledger remain simulated, so these tests do not prove
+an actual TLS handshake, external signing service, SQL engine or hosted recovery.
+
+Final full suite: **6,114 passed / 54 skipped**, 318 passing / five skipped files.
+TypeScript, full ESLint, the 63-entry webpack build, 117-chunk client-boundary
+scan, 73-file adapter synchronization and whitespace checks passed. Existing
+unrelated React act warnings remain. Review corrected non-byte-aligned RSA
+signature sizing and covered elapsed deadlines even before timer callbacks run.
+
+Supabase guidance kept verified user identity separate from backend assertions;
+Next.js guidance kept the adapter server-only and excluded from browser bundles.
+The cryptographic framing follows [JWS](https://www.rfc-editor.org/rfc/rfc7515.html)
+and [RS256](https://www.rfc-editor.org/rfc/rfc7518.html#section-3.3). The existing
+client/entry readiness flags remain false and `HOSTED_WORKSPACE_READ_BINDING`
+remains undefined. No UI/Logo, Points/payment, AI call, migration, database role,
+Production data, cloud resource, dependency, deployment or remote Git state was
+changed. The implementation step did not create a commit.
+
+**Next:** review and locally commit this signer batch and its evidence, without
+push, deployment or activation. Actual key custody and authenticated-principal
+binding, private TLS/host/instance provenance, independent supervision and real
+database/full migration-chain evidence remain separate activation gates. The
+previously blocked PG16 fixture was not retried and no fallback Preview created.
+
+### Backend signer local-commit review — 2026-09-11
+
+The user authorized reviewing and locally committing the six-file signer batch
+on `codex/careslink-task-preview-control`, based on `cec8664`. Review covered
+exact-command/public-key validation, one-use scope binding, signature handoff,
+deadlines, cancellation-independent cleanup and server-only import boundaries.
+No blocking finding remains for the uninstalled scope; no implementation change
+was needed in this review. The commit includes the signer and its tests, client
+composition tests, shared protocol, client-bundle guard and this evidence.
+
+Fresh verification: **6,114 passed / 54 skipped**, 318 passing / five skipped
+files. TypeScript, full ESLint, the 63-entry webpack build, 117-chunk client-boundary
+scan, 73-file adapter synchronization and whitespace checks passed. Existing
+unrelated React act warnings remain. Supabase guidance preserved the distinction
+between user authentication and delegated backend signatures; Next.js guidance
+preserved Node-only execution and browser-bundle exclusion. Git hooks contain
+only samples and no custom hook path is configured. The readiness flags and
+undefined product binding remain unchanged; no external key, database, cloud
+resource, Production access, push, deployment or feature activation is included.
+
+**Next, with separate publication authorization:** push the reviewed local
+commit to `Millionluna/Codex-Game-Studios` and create a draft PR against
+`codex/careslink-ai-documents-v1-auth-gate`. Do not use `origin`
+(`Millionluna/Careslink`), merge or deploy. The previously documented real-key,
+authenticated-principal, TLS/host, supervision and database evidence gates remain.
