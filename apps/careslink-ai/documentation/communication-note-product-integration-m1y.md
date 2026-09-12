@@ -5307,3 +5307,167 @@ in the local commit.
 **Next:** push the reviewed local commit to `Millionluna/Codex-Game-Studios`
 on `codex/careslink-workspace-task-parent-disconnect` and create a draft PR
 against `codex/careslink-ai-documents-v1-auth-gate`. Publication is separate.
+
+### PR #48 merged; controller-death diagnostic plan — 2026-09-12
+
+[PR #48](https://github.com/Millionluna/Codex-Game-Studios/pull/48) completed
+draft publication, final diff/evidence review, ready-for-review transition and
+ordinary merge into `codex/careslink-ai-documents-v1-auth-gate`. It merged at
+`2026-09-11T22:31:01Z` (2026-09-12 08:31:01 +10:00 in Melbourne) as
+`a3a71512990cd3dd1d3efd05afe8ccac88632fc7`. Its parents are
+`c5a366c3078eaed5de2e3940aa06d9a62affd3b6` and reviewed
+`dc18c0b4d24861b55ad44ae9168011d80eb0014c`; its tree
+`67a22a8c4bcd68e8ea06fe6060761954d3b881fa` exactly matches the reviewed head.
+The merge contains four files, 1,031 insertions and no deletions.
+
+The final remote patch matched the reviewed local patch. GitHub reported
+MERGED; no check runs or external reviews were present before merge. The
+review had no required changes, with only the previously recorded readability
+suggestions. Local evidence remains 112 related tests passed / one existing
+skip, and 6,264 full-suite tests passed / 54 skipped. TypeScript, changed-file
+ESLint, adapter synchronization (73 files) and whitespace checks passed.
+These are the merged batch's results, not tests executed for the new plan.
+
+The nine process reports retain their separate meanings: eight parent-triggered
+paths reported NOT_OBSERVED_IN_WINDOW for native service close, while the child
+control observed one close. Six diagnostic reports were VERIFIED and three
+intentional fault reports remained UNVERIFIED. All nine confirmed test-resource
+teardown; none changed the actual owner FAILED / cleanupConfirmed=false result.
+The tenth test covered the disabled formal route/import boundary.
+
+This worktree now starts from verified `a3a7151` on
+`codex/careslink-workspace-task-controller-exit`. The protected source worktree
+remains clean at `31fc94dfc3813967fd1dfadc1f9ac7a4851725a9`.
+
+The authorized planning step selects the existing **process-controller death**
+gap. PR #47 killed the launcher; PR #48 kept it alive while disconnecting its
+service. Both retained their outer controller. The new
+[controller-exit QA plan](communication-note-workspace-task-controller-exit-qa-plan.md)
+defines an estimated 13 local Integration tests: normal controller exit and
+SIGKILL, each at issue/fence commit checkpoints, an alive-service exit barrier,
+two observer faults, two invalid audit-frame cases, a delayed old RPC reply,
+and the disabled formal-runtime/import boundary.
+
+The proposed ownership chain is T -> R -> L -> S. T survives as the test auditor
+and owns R plus separate launcher/service kernel observers; R owns L and L owns
+the actual service. T retains the real Workspace request driver and explicitly
+simulated Auth/PG/ledger state outside the killed controller. Broker traffic
+has only the native T/R/L/S IPC route. R death must break that route; dedicated
+T/L and T/S audit sockets cannot substitute broker replies. This is a test of
+the surviving Workspace consumer when its process controller is lost, not a
+test of a crashed Workspace request handler or persistent database storage.
+
+The plan preserves the existing local launcher's parent-IPC-loss strategy and
+the actual service/HTTPS/process-owner implementations. It requires independent
+L/S exit registration and fresh identity challenges before R death. R's actual
+ChildProcess exit/close, L/S kernel exit, owner cleanup and audit-socket closure
+remain separate observations. Native descendant exit codes or close events
+unavailable after their original owners die must remain UNVERIFIED; neither a
+kernel event nor a socket EOF can manufacture them. Teardown-only watchers may
+not repair failed original evidence, and must be armed while their targets are
+still alive. No new successor or recovery admission policy is proposed.
+
+This planning step changes only this handoff and adds the QA plan. No new
+process tests have run, and no product, dependency or existing-suite change,
+commit, push or deployment is included. Node remains v22.23.2; the plan cites
+the version's official lifecycle documentation checked on 2026-09-12 without
+claiming any new reproduction or upstream fix.
+
+The blocked PG16 fixture is not retried and no replacement Preview is created.
+Outer auditor/host death, real database durability/cleanup, other platforms,
+installed workload/key provenance, deployed supervision and controller-loss
+recovery policy remain unverified. Readiness flags stay false and
+HOSTED_WORKSPACE_READ_BINDING stays undefined; the protected source worktree
+and all previously stated real-data, billing, cloud and deployment boundaries
+remain unchanged.
+
+**Next:** implement the bounded controller-death fixture and estimated 13 tests,
+beginning with the two CE-01 controls and verified resource teardown; then run
+the request/fault matrix and regressions, record actual results, and proceed to
+code review and a local commit as the following stage.
+
+### Controller-death diagnostic implemented locally — 2026-09-12
+
+The [controller-exit QA plan](communication-note-workspace-task-controller-exit-qa-plan.md)
+is implemented in a new test-only three-role fixture and a 13-test Workspace
+process suite. Together with this handoff and the plan, the batch contains four
+files on `codex/careslink-workspace-task-controller-exit`, based on merged
+`a3a7151`. The review record is included in this batch's local commit;
+publication is a separate step.
+
+The outer test auditor T owns the disposable controller R and two independent
+kernel observers. R owns L, which owns the actual service S. Fresh challenges
+over the original IPC chain and separate bound audit connections attest L/S
+after observer registration. T drives the actual Workspace/TLS request and
+retains explicit mock Auth/PG responses and the original ledger Map. Native
+T/R/L/S IPC is the only broker route; audit sockets never deliver broker replies.
+
+The two initial normal/SIGKILL controls passed. The complete matrix covers both
+death modes at ISSUE_COMMITTED/FENCE_COMMITTED, a still-live stopped service
+after R/L exit, original launcher-observer timeout and service-observer SIGKILL,
+wrong-nonce/repeated-sequence audit frames, a held old reply, and the disabled
+formal-runtime/import boundary. Request cases return 503 without taskPage and
+retain the original ledger state/epoch. Fenced request cases observe both the
+mock PG cleanup connection and reader, with end/destroy and credential erasure.
+
+Validation uncovered two fixture/test issues. The initial PG count expected one
+object despite the actual reader's independent cleanup connection; it now
+asserts two and retains each object's lifecycle checks. An intermittent IPC
+send error arrived before native disconnect while connected still appeared
+true. The fixture's process.exit(1) callback cut off owner completion. A fixed
+failure record identified IPC_SEND_FAILED during the diagnostic full run.
+The broker callback now rejects its own pending RPC and lets the real service
+and owner complete failed drain. Upstream relay send errors likewise leave the
+owned-child stop policy to native disconnect. This changes only the new fixture,
+not product shutdown, Node accounting, timeout values or existing test guards.
+
+Final related suites: **125 passed / one existing skip** across seven files,
+starting at local 11:07:19 and taking 10.15 seconds. Final full suite:
+**6,277 passed / 54 skipped**, 325 passing / five skipped files, starting at
+11:08:28 and taking 22.62 seconds. TypeScript, changed-file ESLint, adapter
+synchronization (73 files) and whitespace checks passed. Each final run actually
+recorded two broker-send failures while the affected service still completed
+owner failure reporting and verified resource teardown. Production code,
+dependencies, the original suites and both existing recovery guards are unchanged;
+production build/client-boundary checks were not repeated.
+
+The full log contains 12 process reports: eight complete diagnostics and four
+expected UNVERIFIED fault reports. The original O-L timeout and O-S SIGKILL each
+retain their own failed exit evidence; wrong-nonce and repeated-sequence audit
+frames retain audit failure despite verified kernel exit. All 12 keep actual
+owner FAILED / cleanupConfirmed=false and confirm final test-resource teardown.
+Both descendants' native exit codes/signals/close remain UNVERIFIED with
+ORIGINAL_OWNER_EXITED: no kernel or audit event is relabeled as an original
+parent's ChildProcess event. The thirteenth test starts no process.
+
+The final logs are `/private/tmp/careslink-controller-exit-focused-final.log`
+and `/private/tmp/careslink-controller-exit-full-final.log`. Successful final
+fixtures joined every required process, stream and listener before deleting
+their temporary roots. Two earlier failed-run roots, `cl-task-controller-75ZRdn`
+and `cl-task-controller-5mppdT` under `/private/tmp`, remain as explicitly retained
+failure evidence. They are not reported as successful teardown; the QA record
+distinguishes their evidence limits. A final read-only process check and source
+worktree check accompany the handoff. The protected source remains clean at
+`31fc94dfc3813967fd1dfadc1f9ac7a4851725a9`.
+
+No real Auth/SQL, PG16 retry, replacement Preview, care data, AI, Points/payment,
+database role/migration, IAM/key installation, cloud resource, deployment or
+activation is involved. Readiness remains false and HOSTED_WORKSPACE_READ_BINDING
+remains undefined. The audit process survives, the ledger is an external mock,
+and audit/barrier facilities alter test observability; this does not verify host
+death, real database durability/cleanup, deployed supervision or successor policy.
+
+The four-file local review is complete: **APPROVED WITH SUGGESTIONS**, with no
+required changes. It checked the real lifecycle implementations, original
+observer identity, native-event ownership, sticky audit failures, retired RPC
+handling and the retained failed-run records. Both final runs' complete set of
+12 reports matches the documented results, including two actual broker-send
+failures per run. No configured engine or referenced ADR applies. The dense
+test-protocol and message-validation conditions remain a readability suggestion
+for future extensions. Review only updated documentation and command examples;
+the validated implementation remains unchanged. Adapter, whitespace, four-file
+scope and protected-source checks accompany the local commit.
+
+**Next:** push the reviewed local commit to `Millionluna/Codex-Game-Studios`
+on `codex/careslink-workspace-task-controller-exit` and create a draft PR against
+`codex/careslink-ai-documents-v1-auth-gate`. Publication is a separate step.
