@@ -5471,3 +5471,217 @@ scope and protected-source checks accompany the local commit.
 **Next:** push the reviewed local commit to `Millionluna/Codex-Game-Studios`
 on `codex/careslink-workspace-task-controller-exit` and create a draft PR against
 `codex/careslink-ai-documents-v1-auth-gate`. Publication is a separate step.
+
+### PR #49 merged; controller-loss recovery admission plan — 2026-09-12
+
+[PR #49](https://github.com/Millionluna/Codex-Game-Studios/pull/49) completed
+draft publication, remote diff/evidence review and the ready-for-review
+transition, then merged normally into `codex/careslink-ai-documents-v1-auth-gate`
+at `2026-09-12T01:39:47Z` (2026-09-12 11:39:47 +10:00 in Melbourne).
+The merge commit is `d5ef6a20421f07d7dc25831e7dc7c41105c5d0b9`, with parents
+`a3a71512990cd3dd1d3efd05afe8ccac88632fc7` and reviewed head
+`c092b23d5ada6756327a8a09ce40beb3e3afef67`. Its tree
+`14fa0ef18752eb75daa073181cc7becdf9b6933b` exactly matches that reviewed head:
+four files, 1,137 additions, no deletions. The remote target points to this
+merge; no admin override, auto-merge or branch deletion was used.
+
+The remote patch and all four blobs matched the local reviewed commit. There
+were no required changes, with the recorded readability suggestions retained.
+GitHub had no check runs or external reviews before merge. Local evidence is
+**125 related tests passed / one existing skip** and **6,277 full-suite tests
+passed / 54 skipped**, plus TypeScript, changed-file ESLint, 73-file adapter
+synchronization and whitespace checks. These are the merged batch's results,
+not a new execution of the recovery-admission plan below.
+
+Each final run preserved 12 process reports: eight VERIFIED and four expected
+UNVERIFIED faults, all with confirmed test-resource teardown. Two actual
+broker-send errors per run exercised the corrected RPC rejection path. Old
+owner FAILED / cleanupConfirmed=false was never rewritten; descendant native
+exit codes, signals and close stayed UNVERIFIED / ORIGINAL_OWNER_EXITED.
+The earlier failed roots `cl-task-controller-75ZRdn` and
+`cl-task-controller-5mppdT` under `/private/tmp` remain separately retained
+evidence with their original documented limits.
+
+This worktree has fetched and switched to verified merge `d5ef6a2` on the new
+local branch `codex/careslink-workspace-task-controller-recovery`. The protected
+source worktree remains clean at `31fc94dfc3813967fd1dfadc1f9ac7a4851725a9`.
+
+The next selected gap is **recovery admission after controller loss**, using
+the surviving auditor T and the existing actual issuer/service/HTTPS startup
+path. The new [controller-recovery QA plan](communication-note-workspace-task-controller-recovery-qa-plan.md)
+defines an estimated 14 local Integration tests. It combines #49's two
+original descendant observers and separate audit evidence with #47's
+distinction between starting recovery and admitting requests. It is a new
+test-local orchestration rule to validate, not an already deployed policy or
+permission implied by a VERIFIED diagnostic summary.
+
+The proposed guard requires the old R's actual exit/close, both originally
+attested L/S observers' successful kernel-exit/close evidence, valid closed
+audit channels, owner and explicit exit-release records, listener closure,
+settled old requests/transports/RPCs, and an unconsumed admission. It consumes
+admission before creating a single new R/L/S chain. Original observer failure,
+bad audit evidence, a still-live service or a held old RPC must prevent any new
+process/socket or broker-start side effect. Teardown-only evidence cannot
+repair failed original evidence, and failed startup cannot reuse admission.
+
+The old owner's failed cleanup stays unchanged. The new chain uses fresh
+handles, nonce, audit paths and observer attestations while retaining the same
+simulated ledger Map. Actual recovery must run start/inventory/fence/finalize/
+ready under a new epoch. At inventory, committed-finalize reply and ready-reply
+checkpoints, the actual service must still have no listener or published ready
+binding. Only completed recovery can expose HTTPS; stale instance requests are
+rejected, and a fresh binding must complete its own real request and simulated
+PG/lease cleanup. Late old replies remain bound to the original dead R/nonce.
+
+The plan reuses the existing controller-exit three-role fixture and Python
+observer unchanged and adds one separate process test file. It covers the four
+death/checkpoint combinations, a live service barrier, two original observer
+faults, two invalid audit frames, three recovery-operation failures, an old
+held reply and the disabled formal-runtime boundary. The original #45–#49
+suites, strict successor and parent-exit recovery guards remain unchanged.
+Named validators can improve the new harness without refactoring old suites.
+
+Auth, SQL and retained state remain simulated; this does not establish
+database durability or physical cleanup, host/auditor death, installed
+supervision, production recovery authorization, workload/key provenance or
+other-platform behavior. There is no blocked PG16 retry, replacement Preview,
+real Auth/database role/migration, IAM/key installation, care data, AI,
+Points/payment, cloud resource, deployment or activation. Readiness remains
+false and HOSTED_WORKSPACE_READ_BINDING remains undefined.
+
+This authorized step only synchronized the merged base and changed two
+documents: this handoff and the new QA plan. No new test was run and no product,
+fixture, dependency, commit or remote publication is included. The plan's
+estimated counts must be replaced with actual results after implementation.
+
+**Next:** implement the new joint process suite, first proving one nonempty
+SIGKILL/ISSUE_COMMITTED recovery and both generations' resource teardown; then
+expand the 14-case matrix, run relevant/full regressions and static checks,
+and update QA/M1Y before the following review/local-commit stage.
+
+### Controller-loss recovery admission implemented locally — 2026-09-12
+
+The [controller-recovery QA plan](communication-note-workspace-task-controller-recovery-qa-plan.md)
+is now implemented as one new 14-test process suite. The batch contains this
+handoff, that plan and the new test file. It reuses the existing controller-exit
+three-role fixture and Python observer unchanged; product modules, dependencies,
+the previous suites and both earlier successor/recovery guards are unchanged.
+
+Each generation retains its own controller handle, nonce, audit sockets,
+original observers, Workspace requests and broker RPCs. The new local
+startControllerRecovery checks those original objects, consumes admission
+synchronously and only then constructs the next chain. Verified diagnostics
+or a teardown flag alone are insufficient. A live service, failed original
+observer, corrupted audit record or pending old RPC prevents any new generation,
+process/socket registration or broker start. A used admission cannot be reused
+while construction is pending or after recovery fails.
+
+The initial SIGKILL/ISSUE_COMMITTED control passed before the complete matrix.
+All four normal/SIGKILL and issue/fence combinations now retain the original
+nonempty Map and recover through the actual issuer/service/HTTPS path under a
+new epoch. Real inspect challenges at inventory, committed-finalize reply and
+ready-reply barriers show STARTING, null address and no listener. Only completed
+recovery publishes the new binding. Old-instance Workspace requests return 503
+without another issue or PG reader; fresh requests wait for their own revoke
+reply before returning 200. The delayed old reply remains bound to its dead
+R/nonce while the new generation is actually recovering.
+
+The first full matrix reported **11 passed / three failed**. All three failures
+were in teardown of a successor whose startup had already failed: the actual
+owner had removed its SIGTERM handler and disconnected IPC, so terminating R
+first could let L's SIGTERM end S before barrier release. The failed records
+show EPIPE, verified kernel exits and missing exit-release; they do not provide
+S's original-parent exit signal, which remains unknown for that failed run.
+
+The fix changes only the new harness's failed-startup teardown. It validates
+startup failure, owner FAILED and NEVER_OPENED, releases S first, waits for the
+original observer and still-live L's native child-close with code=1/signal=null,
+then terminates R/L. Old controller-death triggers and the actual fixture policy
+are unchanged. The reports distinguish this service-first cleanup from normal
+controller-first cleanup, and preserve the native events actually observed.
+The three never-opened failed generations also reject another recovery attempt.
+
+Final related suites: **139 passed / one existing skip**, eight files passed,
+starting at Melbourne 12:04:41 and taking 12.71 seconds. Final full suite:
+**6,291 passed / 54 skipped**, 326 passing / five skipped files, starting at
+12:05:15 and taking 25.29 seconds. Both exited 0. The separate corrected matrix
+passed all 14 cases. TypeScript, new-file ESLint, 73-file adapter synchronization
+and whitespace checks passed. Production build/client-boundary checks were not
+repeated because product code and dependencies did not change.
+
+Both final runs contain 22 generation reports: 13 initial generations and nine
+one-time recovery admissions, producing six READY and three FAILED successors.
+Eighteen diagnostic reports are VERIFIED; the two original-observer failures
+and two invalid-audit cases remain UNVERIFIED. Nineteen listeners closed and
+three never opened. All 22 confirm resource teardown, settled RPCs/requests,
+closed request/audit streams and actual owner FAILED / cleanupConfirmed=false.
+The three startup failures have observed S native exit/close; all remaining
+unavailable descendant native events retain ORIGINAL_OWNER_EXITED. Twenty
+recovery refusals verify the corresponding absence of startup side effects.
+
+Logs are `/private/tmp/careslink-controller-recovery-focused.log` and
+`/private/tmp/careslink-controller-recovery-full.log`; the QA record lists the
+initial control, failed/corrected matrix and static-check logs. Successful runs
+deleted their own temporary roots after verified teardown. The first failed
+matrix root `/private/tmp/cl-task-controller-m4PfOY` remains with its original
+incomplete-release evidence; subsequent success does not relabel that run.
+The two earlier PR #49 failed roots also remain separate. Final read-only
+process inventory found no matching live fixture/observer, and the other tested
+temporary prefixes were empty. The protected source worktree remains clean at
+`31fc94dfc3813967fd1dfadc1f9ac7a4851725a9`.
+
+This validates a local recovery-admission harness with a surviving T and
+simulated Auth/SQL/ledger. It does not establish durable database cleanup,
+host/auditor death, installed supervision or production recovery authorization.
+The blocked PG16 fixture was not retried; there was no replacement Preview,
+real data/Auth/database role/migration, IAM/key installation, AI, Points/payment,
+cloud deployment or activation. Readiness remains false and
+HOSTED_WORKSPACE_READ_BINDING remains undefined. No commit or publication was
+performed in this implementation step.
+
+**Next:** review the three files and original validation evidence, then create
+a local commit if no required changes remain. Push and PR publication follow
+as a separate stage.
+
+### Controller-loss recovery admission reviewed for local commit — 2026-09-12
+
+The three-file batch was reviewed through the repository code-review workflow,
+including the full new suite, QA/M1Y changes and the unchanged actual
+issuer/service/HTTPS/owner and fixture paths. Verdict: **APPROVED WITH
+SUGGESTIONS; no required changes**. No engine is configured and no numbered ADR
+reference or corresponding story applies. Testability was reviewed within this
+task, without a delegated or external approval.
+
+The review confirms synchronous one-time admission, original observer and
+closed-channel evidence, generation-bound broker replies, retained simulated
+state and actual recovery before listening. The failed-startup service-first
+cleanup obtains S's real native close before terminating R. Neither a successful
+successor nor teardown-only observation rewrites failed original evidence.
+
+The original final logs were parsed again: each contains 22 generation reports,
+18 VERIFIED / four UNVERIFIED diagnostics, six READY / three FAILED successors,
+and 20 refused admissions. The 14-case matrix, **139 related passes / one skip**
+and **6,291 full-suite passes / 54 skips** remain the final implementation's
+evidence. The three first-run CR-05 EPIPE failures and retained roots remain
+separate. The protected source is still clean at
+`31fc94dfc3813967fd1dfadc1f9ac7a4851725a9`.
+
+An additional read-only ESLint check at complexity 10 / function length 40
+reported **zero errors and 11 warnings**: ten complexity warnings in local
+protocol/evidence/startup/cleanup helpers and one length warning for the outer
+describe callback containing the test registrations. This differs from the
+clean default ESLint result. The QA review records exact lines and values.
+Named validators, less compressed statements and extracted synthetic fixture
+data remain nonblocking suggestions; the review does not claim all six game
+coding-standard checks passed. Product interfaces and earlier guards are
+unchanged, and no implementation edit required repeating runtime tests.
+
+This review record accompanies the local commit of exactly the new test,
+controller-recovery QA and this handoff, with parent `d5ef6a2`. Adapter,
+whitespace, staged-scope and source-worktree checks accompany the commit.
+All previously documented local-only limits and disabled readiness remain.
+
+**Next:** push the reviewed local commit to `Millionluna/Codex-Game-Studios`
+on `codex/careslink-workspace-task-controller-recovery` and create a draft PR
+against `codex/careslink-ai-documents-v1-auth-gate`, carrying the actual test
+results, first-run failure and remaining limits. Publication is a separate step.
