@@ -5685,3 +5685,245 @@ All previously documented local-only limits and disabled readiness remain.
 on `codex/careslink-workspace-task-controller-recovery` and create a draft PR
 against `codex/careslink-ai-documents-v1-auth-gate`, carrying the actual test
 results, first-run failure and remaining limits. Publication is a separate step.
+
+### PR #50 merged; multi-lease recovery scope prepared — 2026-09-12
+
+[PR #50](https://github.com/Millionluna/Codex-Game-Studios/pull/50) completed
+draft publication, remote patch/blob and evidence review, and the
+ready-for-review transition. It merged normally into
+`codex/careslink-ai-documents-v1-auth-gate` at `2026-09-12T03:23:14Z`
+(2026-09-12 13:23:14 +10:00 in Melbourne). The merge commit is
+`481d1815ac624e0e343e3ae3c7195c5c47d11b16`, with parents
+`d5ef6a20421f07d7dc25831e7dc7c41105c5d0b9` and reviewed head
+`7fb3eded5ee8b4cec0eafb83b6f14f2af0b6ead1`. Its tree
+`1228f33fbbcec70b9c82de9f1ff2f52eedc97d77` exactly matches that reviewed head:
+three files, 1,228 additions and no deletions. The merge was bound to that head;
+no admin override, auto-merge or branch deletion was used.
+
+Before merge, GitHub showed CLEAN / MERGEABLE, unchanged head/base and no check
+runs, external reviews or inline review threads. The original local evidence
+remains 14 matrix passes, **139 related passes / one skip** and **6,291 full
+passes / 54 skips**, plus clean TypeScript/default ESLint, adapter and whitespace
+checks. The additional 11 readability warnings remain advisory. Each final run
+preserved 22 generation reports and 20 refusal records. The first failed matrix
+and the two older failed roots remain separate evidence; the merge does not
+repair their missing release/native-exit observations.
+
+This worktree has fetched and verified the merge and started the local branch
+`codex/careslink-workspace-task-multilease-recovery` at `481d181`. The protected
+source remains clean at `31fc94dfc3813967fd1dfadc1f9ac7a4851725a9`.
+
+The next bounded local scope is **multi-lease recovery and partial completion**.
+The actual issuer accepts at most four unique unfinished inventory records,
+validates the complete returned array, sequentially awaits each fence/finalize,
+then requests ready. The current process matrix starts recovery with one old
+unfinished lease; its second row is a later fresh request. Existing issuer unit
+tests cover malformed inventory and multi-row sweeps, but do not establish the
+combined controller-death, mixed unfinished inventory and actual listener path.
+
+The [controller-recovery QA plan](communication-note-workspace-task-controller-recovery-qa-plan.md)
+now separates the merged 14-case results from a second, **estimated ten-case
+Integration matrix, not yet implemented or run**:
+
+- Normal/SIGKILL loss with an ISSUED and a FENCED lease, including multiple old
+  pending replies that must all settle before one recovery admission.
+- Four genuine unfinished records at the existing inventory boundary, with
+  per-scope recovery order and no listener while any required reply is held.
+- Failure before the second record's fence/finalize, or lost acknowledgement
+  after its finalize committed in the simulated Map, preserving completed and
+  untouched rows separately and withholding readiness for the whole batch.
+- Duplicate, five-entry or wrong-epoch inventory replies rejected before any
+  recovery fence/finalize; the reply corruption does not mutate the old Map.
+- A genuinely completed request's REVOKED record retained without reprocessing
+  while two other unfinished records are recovered.
+
+The implementation should extend the existing test file and retain all CR-01
+through CR-07 assertions, using precisely matched generation/operation/request
+gates and scope-level snapshots. Legal ledger rows must come from actual old
+Workspace/TLS requests, never direct reseeding or state edits. The existing
+three-role fixture, original observers, single-use guard, service-first failed
+startup teardown and default-off formal boundary are reused. This does not add
+a supervisor layer, raise the four-lease cap or authorize retrying a failed
+successor. Named helpers can contain the additional test-harness complexity.
+
+Auth, SQL and durability remain simulated. Host/auditor loss, real database
+cleanup, installed supervision/recovery authority, workload/key provenance and
+other platforms remain unverified. There is no blocked PG16 retry, replacement
+Preview, real data/Auth/database role/migration, IAM/key installation, AI,
+Points/payment, cloud deployment or activation. Readiness remains false and
+HOSTED_WORKSPACE_READ_BINDING remains undefined.
+
+This synchronization/planning step changes only QA and M1Y. No new runtime test,
+implementation change, commit or remote publication is included; prior test
+counts are historical evidence for the exact merged tree, not new plan results.
+
+**Next:** implement one MR-01 SIGKILL mixed-inventory control and verify both
+generations' complete resource teardown, then expand the estimated ten-case
+matrix, run related/full regression and static checks, and update QA/M1Y before
+the following review/local-commit stage.
+
+### Multi-lease controller recovery implemented locally — 2026-09-12
+
+The planned **ten new Integration cases are implemented and passing** on
+`codex/careslink-workspace-task-multilease-recovery`, based on merge
+`481d1815ac624e0e343e3ae3c7195c5c47d11b16`. Together with the original fourteen
+cases, the controller-recovery process file now has **24 passing tests**.
+The preceding planning entry remains historical; this entry and the updated
+controller-recovery QA record the actual implementation and execution.
+
+The harness captures each legal lease from an actual Workspace request over
+local TLS and retains the same simulated Map between generations. Gates and
+one-use faults match the generation nonce, operation and full request scope;
+RPC traces record actual ids, before/after ledger snapshots and separate
+simulated-commit/failure flags. The original fourteen test bodies and lifecycle
+setup/teardown block were compared verbatim and remain intact. Existing
+retired-generation checks, recovery admission, reply ownership and resource
+tracking are retained.
+
+MR-01 covers normal/SIGKILL controller loss with two overlapping requests and
+mixed ISSUED/FENCED leases. All new cases refuse admission both before releasing
+old held RPCs and after releasing only one; a successor starts only once all old
+work and original exit evidence settle. MR-02 exercises four genuine unfinished
+leases at the existing limit. Successful recoveries inspect the actual service
+while inventory, the first/last finalize and ready replies are held, proving no
+listener appears early; stale bindings return 503 and a fresh request returns
+200 only after its own revoke acknowledgement.
+
+MR-03 fails before the second lease's fence/finalize, preserving respectively
+`[REVOKED, ISSUED, ISSUED]` and `[REVOKED, FENCED, ISSUED]`. MR-04 fails after
+the second finalize changes the simulated Map, preserving
+`[REVOKED, REVOKED, ISSUED]` without re-executing that finalize or touching the
+third lease. This withholds a successful acknowledgement through a failed broker
+reply over actual IPC; it is neither a real SQL commit nor a separate network
+disconnection experiment. No partial batch is reported ready.
+
+MR-05 corrupts only the inventory reply copy with a duplicate id, five unique
+entries or a wrong epoch. The actual issuer rejects each entire reply before
+any recovery fence/finalize; the three genuine Map rows remain unchanged. A
+successfully delivered malformed broker reply and failed service startup are
+recorded separately. MR-06 retains an actually completed request's REVOKED
+tombstone without reprocessing it while recovering two other unfinished rows.
+All failed successors use the existing service-first teardown and cannot create
+a third generation.
+
+Execution used macOS arm64 and Node `v22.23.2` on 2026-09-12, with
+`CARESLINK_TASK_ISSUER_LOCAL_SOCKET` removed. All commands exited **0**; local
+times below are Australia/Melbourne. Logs are separate files under `/private/tmp/`
+and do not overwrite earlier evidence.
+
+| Run | Actual result | Start / duration | Log basename |
+|---|---|---|---|
+| First MR-01 SIGKILL control | 1 pass / 15 name-filtered; only 16 cases were defined at that stage | 14:52:38 / 1.92s | `careslink-multilease-recovery-control.log` |
+| Complete matrix | 24 passes, one file | 14:56:01 / 17.72s | `careslink-multilease-recovery-matrix.log` |
+| Related regression | 334 passes / one existing skip, 11 files passed | 14:57:58 / 19.00s | `careslink-multilease-recovery-focused.log` |
+| Full regression | 6,301 passes / 54 skips; 326 files passed / five skipped | 14:58:31 / 30.07s | `careslink-multilease-recovery-full.log` |
+
+Final TypeScript (`--noEmit --incremental false`) and default changed-file ESLint
+both produced empty successful logs, `careslink-multilease-recovery-types.log`
+and `careslink-multilease-recovery-lint.log`. The initial control also has a clean
+`careslink-multilease-recovery-control-types.log`. Adapter synchronization checked
+73 files; final diff and whole-target-file whitespace checks passed. No build or
+client-boundary run was added because product/dependency/configuration files did
+not change. The prior eleven extra readability warnings describe the merged
+first-stage version; additional complexity measurement is deferred to the next
+review and is not represented as a new result here.
+
+Each matrix/related/full log contains **42 generation reports**: 22 original CR
+and 20 new MR reports, comprising 23 initial generations and 19 once-admitted
+successors. Each has 38 VERIFIED / four expected UNVERIFIED diagnostics;
+recovery states are 23 NOT_STARTED / ten READY / nine FAILED. The ten new cases
+account for four READY and six FAILED successors. Listener outcomes are
+33 CLOSED / nine NEVER_OPENED, with 33 controller-first and nine failed-startup
+service-first shutdowns.
+
+Each run records **62 admission refusals**: ADMISSION_USED 26,
+CONTROLLER_EXIT_UNVERIFIED one, DESCENDANT_EXIT_UNVERIFIED three,
+AUDIT_EVIDENCE_INVALID two, LISTENER_UNVERIFIED nine and OLD_WORK_PENDING 21.
+Every generation ends with owner FAILED / cleanupConfirmed=false, confirmed
+controller close, zero pending RPCs/requests, closed request streams/audit
+channels and confirmed resource teardown. All L native exit/close data remain
+unknown. Only the nine failed successors' S native exit/close is observed by a
+still-living L, with code 1 and null signal; the other 33 S native outcomes remain
+unknown. Successful resource teardown does not overwrite failed owner evidence.
+
+Trace review confirmed per-generation RPC-id uniqueness, matching nonces and
+full scopes, and that original ledger ids came from actual issue calls. Final
+process inventory found no live controller fixture or process observer. Only
+the three historical failure roots remain: `cl-task-controller-5mppdT`,
+`cl-task-controller-75ZRdn` and `cl-task-controller-m4PfOY`. There are no new
+retained roots or disconnect/parent/chain/observe/host/https roots. This turn had
+no failed runtime run and did not delete or reinterpret historical failures.
+
+Exactly three files changed: the existing recovery process test, its QA plan and
+this handoff. The three-role fixture, Python observer, all product modules,
+other existing tests, dependencies and configuration are unchanged. The source
+worktree remains clean at `31fc94dfc3813967fd1dfadc1f9ac7a4851725a9`. These local
+changes are unstaged and uncommitted; no push or PR is part of this step.
+
+All prior boundaries remain: Auth/SQL/durability are simulated; host/T loss,
+real database persistence/cleanup, installed supervision and recovery authority,
+workload/key provenance and other platforms remain unverified. No blocked PG16
+retry, replacement Preview, real Auth/database roles or migrations, IAM/keys,
+care data, AI, Points/payments, cloud deployment or activation occurred.
+Readiness remains false and HOSTED_WORKSPACE_READ_BINDING remains undefined.
+
+**Next:** review the exact three-file diff and original execution evidence,
+record required fixes separately from readability suggestions, and create a
+local commit when no required fixes remain. Push and draft PR publication are
+subsequent steps.
+
+### Multi-lease recovery reviewed for local commit — 2026-09-12
+
+The local `code-review` workflow found **no required changes** and returned
+**APPROVED WITH SUGGESTIONS** for the exact three-file change. Review covered the
+complete process test and this batch's QA/M1Y changes, with the actual issuer's
+inventory validation and sequential revoke, service startup, HTTPS listener and
+fixture IPC reply paths as references. QA testability was checked in this task;
+there was no delegated or external review. No engine or corresponding game story
+is configured, and no ADR references were found for compliance checking.
+
+The ten MR cases are testable through genuine Workspace/TLS-created leases,
+scope-bound gates/faults, actual startup/exit/inspection events and retained Map
+snapshots. The review confirmed refusals while old RPC work remains, no early
+listener, preserved partial completion, whole-reply inventory rejection and
+retention of the existing tombstone. No product interface, recovery authority,
+retry policy or broker/audit separation changed. AST comparison also confirmed
+the seven original CR registrations (fourteen expanded cases) and full lifecycle
+hook block are byte-for-byte intact.
+
+The six coding-standard checks were assessed within this test scope. No public
+product API was added; existing injected bindings and interfaces remain in use.
+Synthetic data stays in the established constants/factories, with extraction a
+possible cleanup. Additional command-line-only ESLint complexity/length checks
+exited 0 with **zero errors and twelve advisory warnings**, separate from the
+clean default ESLint result. Eleven are complexity warnings; the twelfth is the
+259-line outer describe registration callback. Compared with the merged
+first-stage review, executeProtocol adds one warning at complexity 13, start and
+report each increase by one to 12 and 28, and the outer callback grows from 201
+to 259 lines. No repository lint rule was changed or disabled. Exact locations
+are in QA and `/private/tmp/careslink-multilease-recovery-review-lint.json`.
+
+Named fault/trace steps, less compressed statements, and later extraction of
+existing audit/identity checks and synthetic configuration are nonblocking
+suggestions. The scope-bound fault injection, preservation of partial ledger
+state and actual pre-listen inspection checkpoints are useful properties to
+retain during any cleanup. This is not a claim that all game-style standards
+pass.
+
+Re-parsing the original logs confirmed the control and 24-case matrix results,
+**334 related passes / one skip**, **6,301 full passes / 54 skips**, and the
+42 reports / 62 refusals in each matrix/related/full run. Trace provenance and
+resource invariants agree with QA. The reviewed test blob is
+`2acf508eb7d6fc8cfb13718ca7771796d0cb9de6`; implementation did not change during
+review, so no runtime rerun was required. The review record accompanies a local
+commit of exactly the existing test, QA and this handoff, with parent
+`481d1815ac624e0e343e3ae3c7195c5c47d11b16`. Adapter, whitespace and exact staged
+content checks accompany that commit. The protected source remains clean at
+`31fc94dfc3813967fd1dfadc1f9ac7a4851725a9`; historical failures, simulated-database
+limits, unknown native events and disabled readiness remain unchanged.
+
+**Next:** push the reviewed local commit to `Millionluna/Codex-Game-Studios`
+on `codex/careslink-workspace-task-multilease-recovery` and create a draft PR
+against `codex/careslink-ai-documents-v1-auth-gate`, carrying the actual evidence,
+advisory findings and local-only limitations. This review/local-commit step
+does not include remote publication.

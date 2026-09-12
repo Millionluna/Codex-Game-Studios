@@ -167,9 +167,15 @@ type Audit = { server: Server; ready: Promise<void>; closed: Promise<void>; didC
   box: ReturnType<typeof mailbox>; invalid: boolean; sequence: number; reportedPid: number; role: Descendant; path: string };
 type Watcher = { process: Tracked; box: ReturnType<typeof mailbox>; pid: number; attested: boolean };
 type Gate = { op: string; afterCommit: boolean; entered: ReturnType<typeof deferred>;
-  release: ReturnType<typeof deferred>; used: boolean; replay?: () => Promise<void> };
+  release: ReturnType<typeof deferred>; used: boolean; replay?: () => Promise<void>;
+  nonce?: string; target?: Scope; seen?: { nonce: string; id: number; scope?: Scope }; work?: Promise<void> };
+type RpcTrace = { nonce: string; id: number; op: string; scope: Scope | null;
+  before: ReturnType<typeof ledgerRows>; after: ReturnType<typeof ledgerRows>;
+  committed: boolean; failed: boolean; fault?: string; inventory?: unknown };
+type OperationFault = { op: "fence" | "finalize"; target: Scope; phase: "BEFORE_COMMIT" | "AFTER_COMMIT" };
+type InventoryFault = "DUPLICATE" | "FIVE" | "WRONG_EPOCH";
 type StartOptions = { mode?: string; launcherTimeout?: number; gates?: Gate[]; failOp?: string;
-  waitReady?: boolean; fromNonce?: string };
+  waitReady?: boolean; fromNonce?: string; caseId?: string; fault?: OperationFault; inventoryFault?: InventoryFault };
 type Fixture = { controller: Tracked; nonce: string; index: number; pids: Record<Role, number>; sequences: Record<Role, number>;
   box: ReturnType<typeof mailbox>; audits: Record<Descendant, Audit>; watchers: Partial<Record<Descendant, Watcher>>;
   teardown: Partial<Record<Descendant, Watcher>>; gates: Gate[]; rpc: Set<Promise<void>>; dropped: number;
@@ -179,7 +185,9 @@ type Fixture = { controller: Tracked; nonce: string; index: number; pids: Record
   wires: Wire[]; requests: Set<Promise<Response>>; responses: number[]; neverOpened: boolean;
   startup: "STARTING" | "READY" | "FAILED"; shutdownOrder?: "CONTROLLER_FIRST" | "FAILED_STARTUP_SERVICE_FIRST";
   inspections: { phase: string; state: unknown; listening: unknown; address: unknown }[];
-  ledgers: { phase: string; epoch: unknown; leases: ReturnType<typeof ledgerRows> }[] };
+  ledgers: { phase: string; epoch: unknown; leases: ReturnType<typeof ledgerRows> }[];
+  caseId?: string; trace: RpcTrace[];
+  fault?: OperationFault & { nonce: string; used: boolean }; inventoryFault?: InventoryFault };
 const gate = (op: string, afterCommit = false): Gate => ({ op, afterCommit, entered: deferred(), release: deferred(), used: false });
 const isolated = { PATH: "/usr/bin:/bin", LANG: "C", LC_ALL: "C", NODE_ENV: "test" } as const;
 const descendants = ["launcher", "service"] as const;
@@ -302,26 +310,62 @@ async function reply(f: Fixture, fields: Record<string, unknown>) {
     if (f.retired || !f.controller.child.connected) f.dropped++; else throw error;
   }
 }
+function matchesGate(f: Fixture, m: Message, g: Gate) {
+  if (g.used || g.op !== m.op || (g.nonce && g.nonce !== f.nonce)) return false;
+  return !g.target || JSON.stringify(g.target) === JSON.stringify((m.data as Message).scope);
+}
+function operationFault(f: Fixture, m: Message) {
+  const fault = f.fault;
+  if (!fault || fault.used || fault.nonce !== f.nonce || fault.op !== m.op ||
+    JSON.stringify(fault.target) !== JSON.stringify((m.data as Message).scope)) return undefined;
+  fault.used = true; return fault.phase;
+}
+// Corrupt only the broker's reply copy. No invented inventory row enters the Map.
+function inventoryReply(value: unknown, fault: InventoryFault) {
+  const copy = structuredClone(value) as { epoch: string; leases: { scope: Scope; state: string; expiresAt: string | null }[] };
+  if (fault === "DUPLICATE") copy.leases.push(structuredClone(copy.leases[0]));
+  if (fault === "FIVE") {
+    while (copy.leases.length < 5) copy.leases.push({ ...structuredClone(copy.leases[0]), scope: scope() });
+    expect(new Set(copy.leases.map(l => l.scope.requestId)).size).toBe(5);
+  }
+  if (fault === "WRONG_EPOCH") copy.epoch = copy.epoch === "0".repeat(32) ? "1".repeat(32) : "0".repeat(32);
+  return copy;
+}
+function executeProtocol(f: Fixture, m: Message) {
+  const data = m.data as Record<string, unknown>, before = ledgerRows();
+  const fault = operationFault(f, m), corrupt = m.op === "inventory" ? f.inventoryFault : undefined;
+  let value: unknown, failed = false, committed = false;
+  f.ops.push(m.op as string);
+  try {
+    if (m.op === f.failOp || fault === "BEFORE_COMMIT") throw new Error("RECOVERY_INJECTED_FAILURE");
+    value = protocol(m.op as string, data); committed = true;
+    if (fault === "AFTER_COMMIT") throw new Error("RECOVERY_ACK_LOST");
+    if (corrupt) value = inventoryReply(value, corrupt);
+  } catch { failed = true; value = undefined; }
+  if (f.caseId) f.trace.push({ nonce: f.nonce, id: m.id as number, op: m.op as string,
+    scope: data.scope ? structuredClone(data.scope as Scope) : null,
+    before, after: ledgerRows(), committed, failed, ...(fault || corrupt ? { fault: fault ?? corrupt } : {}),
+    ...(m.op === "inventory" ? { inventory: structuredClone(value) } : {}) });
+  return { type: "protocol-reply", id: m.id, value, failed };
+}
 function rpc(f: Fixture, m: Message) {
+  const pause = f.gates.find(g => matchesGate(f, m, g));
+  if (pause) {
+    pause.used = true;
+    pause.seen = { nonce: f.nonce, id: m.id as number, scope: structuredClone((m.data as Message).scope as Scope | undefined) };
+  }
   const work = (async () => {
-    const pause = f.gates.find(g => g.op === m.op && !g.used);
-    if (pause) pause.used = true;
     if (pause && !pause.afterCommit) { pause.entered.resolve(); await pause.release.promise; }
     // Recheck AFTER an uncommitted gate: retired work cannot mutate the Map.
     if (f.retired) { f.dropped++; return; }
-    let value: unknown, failed = false;
-    f.ops.push(m.op as string);
-    try {
-      if (m.op === f.failOp) throw new Error("RECOVERY_INJECTED_FAILURE");
-      value = protocol(m.op as string, m.data as Record<string, unknown>);
-    } catch { failed = true; }
-    const fields = { type: "protocol-reply", id: m.id, value, failed };
+    const fields = executeProtocol(f, m);
     if (pause?.afterCommit) {
       pause.replay = () => reply(f, fields); // Captures only this original R and nonce.
       pause.entered.resolve(); await pause.release.promise;
     }
     await reply(f, fields);
   })();
+  if (pause) pause.work = work;
   f.rpc.add(work); void work.then(() => f.rpc.delete(work), () => { f.rpc.delete(work); f.box.fail(); });
 }
 function receive(f: Fixture, m: Message, role: Role) {
@@ -361,7 +405,8 @@ async function start(options: StartOptions = {}) {
     rpc: new Set(), gates: options.gates ?? [], dropped: 0, retired: false, mode: options.mode ?? "NORMAL",
     listenerClosed: false, done: false, identityConfirmed: false, failOp: options.failOp, fromNonce: options.fromNonce,
     consumed: false, admissions: [], ops: [], wires: [], requests: new Set(), responses: [], neverOpened: false,
-    startup: "STARTING", inspections: [], ledgers: [] };
+    startup: "STARTING", inspections: [], ledgers: [], caseId: options.caseId, trace: [],
+    fault: options.fault && { ...structuredClone(options.fault), nonce, used: false }, inventoryFault: options.inventoryFault };
   fixtures.push(f); // Includes initialization, identity and observer startup failures.
   controller.child.once("disconnect", () => { f.retired = true; f.box.end(); });
   controller.child.once("exit", () => { f.retired = true; });
@@ -491,6 +536,7 @@ function report(f: Fixture) {
     listenerEvidence: f.neverOpened ? "NEVER_OPENED" : f.listenerClosed ? "CLOSED" : "UNVERIFIED",
     recoveryOutcome: f.fromNonce ? f.startup : "NOT_STARTED", consumed: f.consumed, admissions: f.admissions,
     operations: f.ops, inspections: f.inspections, ledgers: f.ledgers, responses: f.responses,
+    caseId: f.caseId ?? null, trace: f.trace,
     pendingRpc: f.rpc.size, pendingRequests: f.requests.size, requestStreamsClosed: f.wires.every(w => w.didClose),
     teardownEvidence: f.done ? "CONFIRMED" : "NOT_COMPLETED" };
 }
@@ -553,12 +599,12 @@ function recoveryBlock(f: Fixture): string | undefined {
 }
 /** Starts recovery only; never re-labels old cleanup or grants request readiness.
  * Consume before the first async construction step, including failed starts. */
-function startControllerRecovery(f: Fixture, options: Pick<StartOptions, "gates" | "failOp"> = {}) {
+function startControllerRecovery(f: Fixture, options: Pick<StartOptions, "gates" | "failOp" | "fault" | "inventoryFault"> = {}) {
   const reason = recoveryBlock(f);
   f.admissions.push({ allowed: !reason, reason: reason ?? null });
   if (reason) throw new Error("CONTROLLER_RECOVERY_UNVERIFIED:" + reason);
   f.consumed = true;
-  return start({ ...options, fromNonce: f.nonce, waitReady: false });
+  return start({ ...options, fromNonce: f.nonce, caseId: f.caseId, waitReady: false });
 }
 function resources() {
   return { generations: generation, fixtures: fixtures.length, processes: processes.length, sockets: audits.length,
@@ -572,7 +618,7 @@ async function refused(f: Fixture, reason: string) {
   } finally { if (unexpected) await unexpected.catch(() => {}); } // Still own an accidentally started child.
 }
 function ledgerRows() {
-  return [...leases].map(([requestId, l]) => ({ requestId, state: l.state, roleCount: l.roleCount,
+  return [...leases].map(([requestId, l]) => ({ requestId, scope: structuredClone(l.scope), state: l.state, roleCount: l.roleCount,
     sessionCount: l.sessionCount, membershipCount: l.membershipCount }));
 }
 function snapshot(f: Fixture, phase: string) { f.ledgers.push({ phase, epoch, leases: ledgerRows() }); }
@@ -590,6 +636,128 @@ function read(f: Fixture, h: Awaited<ReturnType<typeof harness>>) {
   expect(f.port).toBeDefined(); const work = h.handle(request()); requests.push(work); f.requests.add(work);
   void work.then(r => { f.requests.delete(work); f.responses.push(r.status); }, () => f.requests.delete(work));
   return work;
+}
+type PendingLease = { scope: Scope; state: "ISSUED" | "FENCED"; held: Gate; response: Promise<Response> };
+function scopedGate(f: Fixture, op: string, target?: Scope) {
+  const g = gate(op, true); g.nonce = f.nonce; g.target = target && structuredClone(target);
+  f.gates.push(g); return g;
+}
+async function releaseGate(g: Gate) { g.release.resolve(); await bound(g.work!); }
+async function pendingLease(f: Fixture, h: Awaited<ReturnType<typeof harness>>, state: PendingLease["state"]) {
+  const issued = scopedGate(f, "issue"), response = read(f, h);
+  await bound(issued.entered.promise);
+  const target = issued.seen!.scope!;
+  expect(target.requestId).toMatch(/^[a-f0-9]{32}$/);
+  expect(target).toMatchObject({ projectRef: REF, purpose: "COMMUNICATION_NOTE_JOB_LIST_READ", callerRole: CALLER,
+    principal: { userId: USER, sessionId: SESSION, transport: "COOKIE" } });
+  let held = issued;
+  if (state === "FENCED") {
+    held = scopedGate(f, "fence", target); await releaseGate(issued); await bound(held.entered.promise);
+    expect(held.seen).toMatchObject({ nonce: f.nonce, scope: target });
+  }
+  expect(leases.get(target.requestId)).toMatchObject({ scope: target, state });
+  return { scope: target, state, held, response };
+}
+function batchStates(items: PendingLease[], states: string[]) {
+  expect(new Set(items.map(i => i.scope.requestId)).size).toBe(items.length);
+  expect(items.map(i => leases.get(i.scope.requestId)?.state)).toEqual(states);
+  for (const [index, item] of items.entries()) {
+    const revoked = states[index] === "REVOKED";
+    expect(leases.get(item.scope.requestId)).toMatchObject({ scope: item.scope,
+      roleCount: revoked ? 0 : 1, sessionCount: 0, membershipCount: revoked ? 0 : 2 });
+  }
+}
+async function loseBatch(f: Fixture, items: PendingLease[], death: "normal" | "SIGKILL") {
+  const originalMap = leases, originalRows = ledgerRows(), originalEpoch = epoch;
+  await terminate(f, death);
+  for (const item of items) {
+    const response = await item.response;
+    expect(response.status).toBe(503); expect(await response.json()).not.toHaveProperty("taskPage");
+  }
+  await finish(f); await closeAudits(f);
+  expect(f.requests.size).toBe(0); expect(f.rpc.size).toBe(items.length);
+  await refused(f, "OLD_WORK_PENDING");
+  await releaseGate(items[0].held); expect(f.rpc.size).toBe(items.length - 1);
+  await refused(f, "OLD_WORK_PENDING");
+  for (const item of items.slice(1)) await releaseGate(item.held);
+  await cleanup(f);
+  expect(f.dropped).toBeGreaterThanOrEqual(items.length);
+  expect(leases).toBe(originalMap); expect(ledgerRows()).toEqual(originalRows); expect(epoch).toBe(originalEpoch);
+  batchStates(items, items.map(i => i.state)); pgClosed(); snapshot(f, "multi-before-recovery");
+  return { originalMap, originalRows, originalEpoch };
+}
+function rowOperations(f: Fixture) {
+  return f.trace.filter(t => t.op === "fence" || t.op === "finalize").map(t => ({ op: t.op, scope: t.scope }));
+}
+async function recoveredBatch(f: Fixture, items: PendingLease[]) {
+  const inventory = gate("inventory"), first = gate("finalize", true), last = gate("finalize", true), readyReply = gate("ready", true);
+  first.target = structuredClone(items[0].scope); last.target = structuredClone(items.at(-1)!.scope);
+  const oldEpoch = epoch, oldMap = leases;
+  const constructing = startControllerRecovery(f, { gates: [inventory, first, last, readyReply] });
+  await refused(f, "ADMISSION_USED"); const next = await constructing;
+  await bound(inventory.entered.promise); await noListener(next, "multi-inventory-before");
+  expect(epoch).not.toBe(oldEpoch); expect(leases).toBe(oldMap); batchStates(items, items.map(i => i.state));
+  inventory.release.resolve(); await bound(first.entered.promise);
+  batchStates(items, ["REVOKED", ...items.slice(1).map(i => i.state)]);
+  await noListener(next, "multi-first-finalize-held");
+  expect(rowOperations(next)).toEqual([{ op: "fence", scope: items[0].scope }, { op: "finalize", scope: items[0].scope }]);
+  await releaseGate(first); await bound(last.entered.promise); batchStates(items, items.map(() => "REVOKED"));
+  await noListener(next, "multi-last-finalize-held"); expect(next.ops).not.toContain("ready");
+  await releaseGate(last); await bound(readyReply.entered.promise); await noListener(next, "multi-ready-reply-held");
+  await releaseGate(readyReply); await ready(next);
+  expect((await inspect(next, "multi-ready")).listening).toBe(true);
+  expect(next.trace.find(t => t.op === "inventory")!.inventory).toMatchObject({ epoch,
+    leases: items.map(i => ({ scope: i.scope, state: i.state })) });
+  expect(rowOperations(next)).toEqual(items.flatMap(i => [{ op: "fence", scope: i.scope }, { op: "finalize", scope: i.scope }]));
+  expect(next.ops).toEqual(["start", "inventory", ...items.flatMap(() => ["fence", "finalize"]), "ready"]);
+  expect(leases).toBe(oldMap); snapshot(next, "multi-recovered"); return next;
+}
+async function freshAfterBatch(f: Fixture, next: Fixture, retained: number) {
+  const issues = calls.filter(c => c.op === "issue").length, pg = io.pg.length, beforeWire = wire.length;
+  const stale = await harness(next, { instanceId: f.instanceId! }), rejected = await read(next, stale);
+  expect(rejected.status).toBe(503); expect(await rejected.json()).not.toHaveProperty("taskPage");
+  expect(calls.filter(c => c.op === "issue")).toHaveLength(issues); expect(io.pg).toHaveLength(pg);
+  expect(wire.slice(beforeWire).map(w => w.path)).toEqual([PATHS.issue, PATHS.revoke]);
+  const revokeReply = scopedGate(next, "finalize"), h = await harness(next); let returned = false;
+  const pending = read(next, h).then(r => { returned = true; return r; });
+  await bound(revokeReply.entered.promise); expect(returned).toBe(false); cleaned(retained + 1);
+  await releaseGate(revokeReply); const response = await pending;
+  expect(response.status).toBe(200); expect((await response.json()).taskPage.tasks[0].jobId).toBe(USER);
+  expect(wire.slice(beforeWire).every(w => w.secure)).toBe(true); pgClosed(); snapshot(next, "multi-fresh-request-revoked");
+  expect(report(f).cleanupConfirmed).toBe(false);
+}
+async function prepareBatch(caseId: string, states: PendingLease["state"][]) {
+  const f = await start({ caseId }), h = await harness(f), items: PendingLease[] = [];
+  for (const state of states) items.push(await pendingLease(f, h, state));
+  expect(f.requests.size).toBe(items.length);
+  const retained = await loseBatch(f, items, "SIGKILL"); return { f, items, ...retained };
+}
+async function failedBatch(f: Fixture, options: Pick<StartOptions, "fault" | "inventoryFault">) {
+  const pg = io.pg.length, oldMap = leases;
+  const constructing = startControllerRecovery(f, options);
+  await refused(f, "ADMISSION_USED"); const next = await constructing;
+  await next.audits.service.box.wait("startup-failed"); await stopped(next);
+  expect(next.neverOpened).toBe(true); expect(next.port).toBeUndefined(); expect(next.instanceId).toBeUndefined();
+  expect(next.audits.service.box.messages.some(m => m.type === "ready")).toBe(false);
+  expect(next.ops).not.toContain("ready"); expect(next.ops).not.toContain("issue"); expect(io.pg).toHaveLength(pg);
+  expect(leases).toBe(oldMap); snapshot(next, "multi-recovery-failed");
+  await cleanup(next); await refused(f, "ADMISSION_USED"); await refused(next, "LISTENER_UNVERIFIED");
+  expect(fixtures).toHaveLength(2); expect(calls.filter(c => c.op === "start")).toHaveLength(2);
+  expect(report(next)).toMatchObject({ recoveryOutcome: "FAILED", listenerEvidence: "NEVER_OPENED",
+    shutdownOrder: "FAILED_STARTUP_SERVICE_FIRST", ownerOutcome: "FAILED", cleanupConfirmed: false, teardownEvidence: "CONFIRMED" });
+  expect(report(next).serviceNative).toEqual({ exitEvidence: "OBSERVED", code: 1, signal: null, closeEvidence: "OBSERVED", reason: null });
+  return next;
+}
+function partialFailure(next: Fixture, items: PendingLease[], op: OperationFault["op"], phase: OperationFault["phase"]) {
+  const expected = [{ op: "fence", scope: items[0].scope }, { op: "finalize", scope: items[0].scope },
+    { op: "fence", scope: items[1].scope }, ...(op === "finalize" ? [{ op, scope: items[1].scope }] : [])];
+  expect(rowOperations(next)).toEqual(expected);
+  expect(next.ops).toEqual(["start", "inventory", ...expected.map(e => e.op)]);
+  expect(next.fault).toMatchObject({ nonce: next.nonce, target: items[1].scope, used: true, op, phase });
+  expect(next.trace.filter(t => t.failed)).toHaveLength(1);
+  expect(next.trace.at(-1)).toMatchObject({ scope: items[1].scope, fault: phase, committed: phase === "AFTER_COMMIT", failed: true });
+  const final = op === "fence" ? "ISSUED" : phase === "AFTER_COMMIT" ? "REVOKED" : "FENCED";
+  batchStates(items, ["REVOKED", final, "ISSUED"]);
 }
 describe.skipIf(process.platform !== "darwin")("controller recovery with actual Workspace/TLS (Auth/SQL/ledger simulated)", { timeout: 25000 }, () => {
   beforeAll(async () => {
@@ -779,6 +947,64 @@ describe.skipIf(process.platform !== "darwin")("controller recovery with actual 
     expect(result.status).toBe(200); expect((await result.json()).taskPage.tasks[0].jobId).toBe(USER);
     cleaned(2); pgClosed(); snapshot(next, "fresh-request-revoked");
     expect(report(f).cleanupConfirmed).toBe(false);
+  });
+  it.each(["normal", "SIGKILL"] as const)("MR-01 %s recovers mixed unfinished leases", async death => {
+    const f = await start({ caseId: "MR-01 " + death }), h = await harness(f);
+    const items = [await pendingLease(f, h, "ISSUED"), await pendingLease(f, h, "FENCED")];
+    expect(f.requests.size).toBe(2); expect(f.rpc.size).toBe(2);
+    const { originalMap } = await loseBatch(f, items, death);
+    const next = await recoveredBatch(f, items); cleaned(2);
+    await freshAfterBatch(f, next, 2); expect(leases).toBe(originalMap); batchStates(items, ["REVOKED", "REVOKED"]);
+  });
+  it("MR-02 recovers four genuine unfinished leases at the inventory limit", async () => {
+    const { f, items, originalMap } = await prepareBatch("MR-02", ["ISSUED", "FENCED", "ISSUED", "FENCED"]);
+    const next = await recoveredBatch(f, items); cleaned(4);
+    expect(next.trace.filter(t => t.op === "finalize")).toHaveLength(4);
+    expect(leases).toBe(originalMap); await freshAfterBatch(f, next, 4);
+    batchStates(items, items.map(() => "REVOKED"));
+  });
+  it.each(["fence", "finalize"] as const)("MR-03 preserves partial recovery when the second %s fails before commit", async op => {
+    const { f, items } = await prepareBatch("MR-03 " + op, ["ISSUED", "ISSUED", "ISSUED"]);
+    const next = await failedBatch(f, { fault: { op, target: items[1].scope, phase: "BEFORE_COMMIT" } });
+    partialFailure(next, items, op, "BEFORE_COMMIT");
+    const last = next.trace.at(-1)!; expect(last.before).toEqual(last.after);
+  });
+  it("MR-04 preserves committed rows after the second finalize acknowledgement is lost", async () => {
+    const { f, items } = await prepareBatch("MR-04", ["ISSUED", "ISSUED", "ISSUED"]);
+    const next = await failedBatch(f, { fault: { op: "finalize", target: items[1].scope, phase: "AFTER_COMMIT" } });
+    partialFailure(next, items, "finalize", "AFTER_COMMIT");
+    const last = next.trace.at(-1)!;
+    expect(last.before.map(l => l.state)).toEqual(["REVOKED", "FENCED", "ISSUED"]);
+    expect(last.after.map(l => l.state)).toEqual(["REVOKED", "REVOKED", "ISSUED"]);
+    expect(next.trace.filter(t => t.op === "finalize" && t.scope?.requestId === items[1].scope.requestId)).toHaveLength(1);
+  });
+  it.each(["DUPLICATE", "FIVE", "WRONG_EPOCH"] as const)("MR-05 rejects %s inventory before touching any old lease", async inventoryFault => {
+    const { f, items, originalRows } = await prepareBatch("MR-05 " + inventoryFault, ["ISSUED", "FENCED", "ISSUED"]);
+    const next = await failedBatch(f, { inventoryFault });
+    expect(next.ops).toEqual(["start", "inventory"]); expect(rowOperations(next)).toEqual([]);
+    expect(ledgerRows()).toEqual(originalRows); batchStates(items, items.map(i => i.state));
+    const trace = next.trace.at(-1)!;
+    expect(trace).toMatchObject({ op: "inventory", committed: true, failed: false, fault: inventoryFault });
+    expect(trace.before).toEqual(trace.after);
+    const delivered = trace.inventory as { epoch: string; leases: { scope: Scope }[] };
+    if (inventoryFault === "DUPLICATE") {
+      expect(delivered.leases).toHaveLength(4); expect(delivered.leases[3].scope).toEqual(items[0].scope);
+    } else if (inventoryFault === "FIVE") {
+      expect(delivered.leases).toHaveLength(5); expect(new Set(delivered.leases.map(l => l.scope.requestId)).size).toBe(5);
+      expect(leases.size).toBe(3);
+    } else expect(delivered.epoch).not.toBe(epoch);
+  });
+  it("MR-06 retains a completed request tombstone without recovering it again", async () => {
+    const f = await start({ caseId: "MR-06" }), h = await harness(f), completed = await read(f, h);
+    expect(completed.status).toBe(200); cleaned(1); pgClosed();
+    const tombstone = ledgerRows()[0];
+    const items = [await pendingLease(f, h, "ISSUED"), await pendingLease(f, h, "FENCED")];
+    const { originalMap } = await loseBatch(f, items, "SIGKILL");
+    const next = await recoveredBatch(f, items); cleaned(3);
+    expect(next.trace.some(t => t.scope?.requestId === tombstone.requestId)).toBe(false);
+    expect(ledgerRows().find(l => l.requestId === tombstone.requestId)).toEqual(tombstone);
+    await freshAfterBatch(f, next, 3);
+    expect(leases).toBe(originalMap); expect(ledgerRows().find(l => l.requestId === tombstone.requestId)).toEqual(tombstone);
   });
   it("CR-07 keeps recovery diagnostics outside the disabled formal runtime", async () => {
     for (const [k, v] of Object.entries(env())) vi.stubEnv(k, v);
