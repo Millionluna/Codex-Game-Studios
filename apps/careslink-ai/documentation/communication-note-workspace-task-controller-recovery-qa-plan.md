@@ -2,15 +2,17 @@
 
 - 日期：2026-09-12（Australia/Melbourne）
 - 工作流：仓库 `qa-plan`，按 CaresLink AI 本地集成测试范围调整
-- 状态：第一阶段 14 项及第二阶段 10 项已随 PR #50/#51 合并；第三阶段新增 8 项已实现并通过，本地共 32 项，代码审阅完成，三个文件及审阅记录纳入本地提交；下一步推送与草稿 PR
-- 范围：一个 Integration 功能；三个阶段的实际验证分别记录
+- 状态：前三阶段共 32 项已随 PR #50/#51/#52 合并；第四阶段新增 4 项已实现并通过，本地共 36 项，代码审阅完成，三个文件及审阅记录纳入本地提交；下一步推送与草稿 PR
+- 范围：一个 Integration 功能；四个阶段的实际验证分别记录
 - 第一阶段基线：PR #49 合并提交 `d5ef6a20421f07d7dc25831e7dc7c41105c5d0b9`
 - 第一阶段分支：`codex/careslink-workspace-task-controller-recovery`（保留）
 - 第二阶段基线：PR #50 合并提交 `481d1815ac624e0e343e3ae3c7195c5c47d11b16`
 - 第二阶段分支：`codex/careslink-workspace-task-multilease-recovery`（保留）
-- 当前实现基线：PR #51 合并提交 `66cca8bd3902cf878b59b8926034fc93faef7034`
-- 当前本地分支：`codex/careslink-workspace-task-recovery-interruption`
-- 引擎 / story / sprint / GDD / ADR：未配置或无对应条目；验收依据为 M1Y 未验证项及下列实际实现
+- 第三阶段基线：PR #51 合并提交 `66cca8bd3902cf878b59b8926034fc93faef7034`
+- 第三阶段分支：`codex/careslink-workspace-task-recovery-interruption`（保留）
+- 当前实现基线：PR #52 合并提交 `08d1d73413c184fb82a9fe5fb299bece7df1d8de`
+- 当前本地分支：`codex/careslink-workspace-task-successive-recovery`
+- 引擎 / story / sprint / GDD / ADR：未配置或无对应条目；验收依据为 M1Y 未验证项、已有恢复契约及下列实现/计划
 
 ## 合并基线与本阶段选择
 
@@ -467,10 +469,128 @@ env -u CARESLINK_TASK_ISSUER_LOCAL_SOCKET node node_modules/eslint/bin/eslint.js
 
 本地提交仅包含现有 process test、本 QA 与 M1Y，父提交为 `66cca8bd3902cf878b59b8926034fc93faef7034`。只读资源复查没有存活的夹具或观察者，仍仅保留上节三个历史失败根；受保护源为 clean / `31fc94dfc3813967fd1dfadc1f9ac7a4851725a9`。推送、PR 和合并均未在本步骤执行。
 
+## PR #52 合并与本地基线同步 — 2026-09-12
+
+[PR #52](https://github.com/Millionluna/Codex-Game-Studios/pull/52) 已完成草稿发布、远端差异/验证证据审阅、Ready for review 转换及合并前核对，于 `2026-09-12T08:16:49Z`（墨尔本 `2026-09-12 18:16:49 +10:00`）普通合并到 `codex/careslink-ai-documents-v1-auth-gate`。合并提交为 `08d1d73413c184fb82a9fe5fb299bece7df1d8de`，两个父提交依次为 `66cca8bd3902cf878b59b8926034fc93faef7034` 与审阅提交 `b1fed2413eebf63db7ad0abe9819c5a47a4b93a1`；文件树 `a49fa3af4bf0f1f962a8e74ba57cb2e69b613e17` 与审阅提交完全一致。
+
+合并范围为 3 文件、482 行新增、8 行删除。远端 diff、三个 blob、单个提交及最终 PR 正文均与本地审阅版本匹配。最终 head/base 未变化，GitHub 显示 CLEAN / MERGEABLE；检查、外部审阅、讨论、行内意见和审阅请求均为空，不能称为 GitHub CI 或外部批准通过。普通合并使用 `--match-head-commit` 绑定 `b1fed24`，没有管理员绕过、自动合并或分支删除；仓库当时的自动删除分支设置为 false。
+
+本地已从正确远端 `careslink-ai-conflict` 获取并核验该合并，从 `08d1d73` 建立 `codex/careslink-workspace-task-successive-recovery`，无 upstream。原第三阶段本地及远端分支均保留在 `b1fed24`。已合并证据仍为 32 项矩阵、342 相关通过 / 1 既有跳过、6,309 全套通过 / 54 跳过及 13 项额外可读性警告；每份矩阵/相关/全套日志各有 58 份报告和 102 次准入拒绝。本次同步没有重新执行 runtime 测试，也没有新增阶段通过结果。
+
+## 第四阶段实现：成功恢复后的连续两次接管（新增 4 项通过）
+
+### 选择依据与测试分类
+
+前三阶段的成功用例只创建 R0 → R1，并在 R1 ready 或完成新请求之后收尾；RI 则验证尚未成功启动的 R1 退出，并拒绝继续接管。本阶段已补足**R1 确实恢复成功且运行后再次退出，由同一个存活 T 按 R1 自己的完整退出证据准入 R2**的端到端证据。
+
+选择依据是已有 `startControllerRecovery` 的逐代单次消费、原 owner 退出/审计/pending 门槛，issuer 的 start → inventory → 逐条 revoke → ready 顺序，以及现有墓碑保留和旧 instance 拒绝规则。没有对应 story/sprint/GDD 公式或 control manifest；不新增生产恢复策略或游戏验收。实施前按仓库 `qa-plan` 流程写入现有 QA/M1Y，再按 `dev-story` 的实施/证据流程执行；TR registry 存在但 requirements 为空，无本批 governing ADR，不创建平行的 production 文档或游戏 story 完成声明。
+
+| 验证范围 | 类型 | 自动验证 | 人工复核 |
+|---|---|---|---|
+| R1 已 ready 后失去控制者，R2 恢复非空或空 inventory | Integration | 四项真实进程/Workspace/TLS 用例，模拟 Auth/SQL/账本 | 三代 nonce/epoch/完整 scope、准入来源、监听与资源收尾证据 |
+| 两个旧代的回复与 instance 在 R2 中隔离 | Integration | 每项按实际旧 RPC 重播并发送旧 instance 请求 | 原来源不重绑定，账本和调用数量无额外变化 |
+
+测试仍扩展 `src/lib/communication-note-workspace-task-controller-recovery.process.test.ts`，保留已有 32 项和 lifecycle hooks，复用三角色夹具与 Python 观察者。每项恰为三代 R/L/S、两次接管；T 与原 Map 全程存活，不添加祖先进程或启动第四代。每个退出代只能消费自己的准入一次；RI 中 FAILED / NEVER_OPENED 的 R1 拒绝条件保持原样。
+
+### 公共前置与已完成矩阵
+
+所有新用例先在 R0 用实际 Workspace/TLS 请求形成两条不同 scope 的 A 记录 `[ISSUED, FENCED]`，固定 SIGKILL R0，结清旧请求/RPC及原观察者/审计证据，再准入 R1。R1 必须实际完成 A 的恢复、收到 ready、取得新 instance 并通过 inspect 确认监听；A 的两条 REVOKED 墓碑完整保留。以下 normal/SIGKILL 均指**第二个退出控制者 R1**。
+
+| ID | R1 退出前条件 | R2 接管实际结果 | 实际数量 |
+|---|---|---|---|
+| SR-01 | R1 通过自己的实际请求新增两条 B 记录 `[ISSUED, FENCED]`，两个请求重叠且各有真实 held RPC；R1 分别正常退出 / SIGKILL | R1 请求 503，旧工作全部结清前拒绝；R2 inventory 只包含 B，顺序恢复 B，A 墓碑不变，ready 后新请求成功并完成撤销 | 2 通过 |
+| SR-02 | R1 完成一次新请求 C，等待真实 finalize 回复才向 Workspace 返回 200，账本只剩 A+C 三条 REVOKED；R1 分别正常退出 / SIGKILL | 原退出/审计证据仍是准入前提；R2 inventory 确为空，恢复阶段仅 start/inventory/ready，无旧行 fence/finalize，ready 后新请求成功并撤销 | 2 通过 |
+
+实际新增 **4 项**、完整进程文件 **36 项通过**。原规划数量已由实际结果替换；相关/全套数量、报告数与拒绝次数见下方原始日志统计。
+
+### 必须保留的断言与证据
+
+1. 三代的 `fromNonce` 连成 R0 → R1 → R2，nonce、epoch、原进程句柄、观察者及审计路径分别独立。每轮真实 start 产生新 epoch；Map 身份、旧行完整 scope 和 REVOKED 墓碑跨三代保留，不 clear/reseed 或直接改账本来形成场景。
+2. R1 存活时拒绝接管；R1 退出后仍需原 O-L/O-S、owner FAILED / cleanupConfirmed=false、实际旧 listener 关闭及审计通道关闭。SR-01 必须验证两个 held RPC 尚未全结清时 OLD_WORK_PENDING；SR-02 的 pending=0 不能代替原退出证据，至少在 S1 仍停留于退出屏障时验证 DESCENDANT_EXIT_UNVERIFIED。每次拒绝均无新进程/socket/start 副作用。
+3. R0 准入始终已消费；R1 通过自己的准入创建 R2 时同步消费，重复申请返回 ADMISSION_USED。R0/R1 的消费状态不复位；每项最终只创建三代、执行三次 broker start。R2 由 R1 的完整证据准入，不借用 R0 的诊断，也不改动既有 guard。
+4. R2 inventory 回复前先暂停并实际 inspect STARTING / 空地址 / 不监听。SR-01 另在首条及末条 B finalize、ready 成功回复暂停时证明仍未监听；inventory 的 scope 集合严格等于 B，操作 trace 中没有 A。SR-02 的 inventory 必须为 `[]`，ready 回复前仍不监听，旧墓碑不触发 revoke。mock brokerReady 与真实 ready 分别断言。
+5. R2 inventory 暂停时，分别重播捕获自已退役 R0 和 R1 的真实成功回复。SR-01 使用旧未完成请求的 held 回复；SR-02 使用 R1 已完成 C 请求捕获的 finalize 回复。每条闭包保留原 R/nonce/RPC id，不编造帧或重绑到 R2。旧 dropped 数增加，但全量账本、epoch、mock readiness、协议 trace 及 broker/PG/HTTPS 调用数不变，R2 不提前 ready。
+6. R2 实际 ready 后，向其当前 TLS listener 分别使用 R0/R1 旧 instance 发起真实 Workspace 请求，预期 503，不能新增 issue、PG reader 或账本行；随后使用 R2 instance 发起新请求，必须等该请求 finalize 回复才返回 200。记录 TLS 验证及 PG 凭据/连接释放。旧 instance 和 nonce 不互相替代。
+7. SR-01 在 R2 新请求前应有 A+B 四条 REVOKED，新请求后五条；SR-02 相应为 A+C 三条、加新请求后四条。这些是全 Map 墓碑计数，**不是** unfinished inventory 超过四条的成功测试；该容量限制仍按未完成记录判断。每条最终 REVOKED 保持 role/session/membership 计数 0/0/0。
+8. 最后按现有正常控制者退出方式收尾 R2，保留三代原生事件的真实可观察性。R1/R2 曾实际 READY 的恢复结果不能因后续 owner FAILED 被重写成 NEVER_OPENED；owner 清理确认与测试资源收尾分别记录。所有请求、流、RPC、R/L/S、原观察者及审计 listener 都需确认完成；不得用 teardown 观察替换原缺失证据。
+
+### 实施顺序、smoke 与完成条件
+
+先实现并通过一个 **SR-01 SIGKILL 非空第二次接管控制**，证明同一 Map 上三代身份、两次独立准入、旧墓碑保留及三代真实资源收尾可达，再扩展剩余三项并增加显式 mock readiness 断言。`recoveredBatch` 仍面向至少两条记录，仅增加可选的 inventory 回复前回调，用于 SR 的双旧代重播；原调用保留原行为。SR-02 使用专用 `recoveredEmpty` 空 inventory 屏障编排，没有注入假行。旧用例、lifecycle hooks、退出/超时/容量条件、产品和夹具均未修改。
+
+实际日志使用新的 `/private/tmp/careslink-successive-recovery-*` 前缀。控制、矩阵、相关、全套、类型和默认 Lint 分别留档；本阶段没有失败 runtime 运行，也没有重试或删除历史失败根。应用目录内已执行的控制命令为：
+
+```sh
+env -u CARESLINK_TASK_ISSUER_LOCAL_SOCKET node node_modules/vitest/vitest.mjs run src/lib/communication-note-workspace-task-controller-recovery.process.test.ts -t 'SR-01 SIGKILL' --reporter verbose --silent false
+```
+
+随后已使用第三阶段列出的完整矩阵、相关 11 文件、全套、TypeScript `--noEmit --incremental false` 和默认 changed-file ESLint 命令，将输出保存到本阶段前缀。适配器 73 文件、whitespace、原 32 项注册及 lifecycle 块、准确改动范围与实际资源库存均已核对。本次实际实现范围为既有 process test、本 QA 和 M1Y；产品、三角色夹具、Python 观察者、其他测试、依赖及配置均不变。
+
+开发者 smoke：R0 真请求遗留 → R1 恢复并真实 ready → R1 留下 B 或完成 C → R1 实际退出并结清原证据 → R2 先恢复后监听 → 拒绝两个旧 instance → 新请求撤销后返回 → 三代完整收尾。人工 QA 复核 nonce 链、逐代 inventory/trace、完整 scope、旧回复丢弃及最终计数。无 UI/Visual/Feel 或游戏场景，无截图/playtest或外部签字要求。
+
+- [x] 首个 SR-01 SIGKILL 控制取得三代实际验证结果，再完成另外三项。
+- [x] 非空与空第二次恢复、逐代单次准入、双旧代回复/instance 隔离均有可核对证据。
+- [x] 已合并 32 项及 lifecycle hooks 保留；本批 runtime/static 检查和实际资源清点完成。
+- [x] QA/M1Y 回填实际结果，保留历史计划与前阶段验证记录。
+- [x] 代码审阅完成，无必须修复项；三个目标文件及审阅记录纳入本地提交，推送/PR及合并为后续步骤。
+
+前一同步/规划步骤只修改 QA 与 M1Y，未实施或运行 SR；本节及下节记录其后的实际实施。实施完成时的检查点为 HEAD `08d1d73413c184fb82a9fe5fb299bece7df1d8de`，三个目标文件尚未暂存或提交，没有推送或创建 PR；后续审阅和提交见下节。三份历史失败根保持原样，受保护源仍 clean / `31fc94dfc3813967fd1dfadc1f9ac7a4851725a9`。
+
+### 2026-09-12 第四阶段实际验证记录
+
+执行环境为 macOS arm64、Node `v22.23.2`，开始时间均为 Australia/Melbourne。所有测试/静态命令均移除 `CARESLINK_TASK_ISSUER_LOCAL_SOCKET`，退出码均为 **0**。
+
+| 执行 | 实际结果 | 开始 / 总时长 | 原始日志（位于 `/private/tmp/`） |
+|---|---|---|---|
+| 首个 SR-01 SIGKILL 控制 | 1 通过 / 32 名称过滤；当时定义 33 项 | 18:55:52 / 1.94s | `careslink-successive-recovery-control.log` |
+| 完整进程矩阵 | 36 通过，1 文件 | 18:58:12 / 27.24s | `careslink-successive-recovery-matrix.log` |
+| 相关 11 文件 | 346 通过 / 1 既有跳过，11 文件通过 | 18:59:22 / 28.90s | `careslink-successive-recovery-focused.log` |
+| 全套 | 6,313 通过 / 54 跳过；326 文件通过 / 5 跳过 | 19:00:29 / 39.31s | `careslink-successive-recovery-full.log` |
+| 最终 TypeScript / 默认 ESLint | 均无输出、退出 0 | 最终测试代码版本 | `careslink-successive-recovery-types.log` / `careslink-successive-recovery-lint.log` |
+
+首个控制另有成功且为空的类型日志 `careslink-successive-recovery-control-types.log`。控制的三代报告均 VERIFIED / CLOSED / CONTROLLER_FIRST / teardown CONFIRMED；R0 为 NOT_STARTED，R1/R2 为 READY。随后扩展 normal 与空 inventory 用例，完整矩阵、相关、全套均使用同一最终测试 blob `dc05ab4e8329b59fe86a6466852eb178e362df21`，没有后续实现改动或失败 runtime 重试。
+
+新增八个私有辅助函数分别负责重播验证、墓碑对照、三代身份、旧 instance 拒绝、撤销后返回的完成请求、空工作退出屏障、空 inventory 恢复及三代收尾。R2 报告新增 `replays`，逐条保存真实来源 nonce/RPC id/op/完整 scope 和 dropped 前后计数；其他代为空数组。唯一既有编排扩展是 `recoveredBatch` 的可选 inventory 前回调。AST 比较确认原十四组 CR/MR/RI 注册（展开 32 项）及完整 lifecycle hook 块逐字不变。
+
+矩阵、相关、全套每份日志均有 **70 份逐代报告**：CR 22、MR 20、RI 16、SR 12；35 个初始代、35 个后继。各有 66 VERIFIED / 4 预期 UNVERIFIED；恢复结果为 35 NOT_STARTED / 18 READY / 17 FAILED，listener 为 53 CLOSED / 17 NEVER_OPENED，收尾为 61 CONTROLLER_FIRST / 9 FAILED_STARTUP_SERVICE_FIRST。
+
+每份日志均有 **136 次准入拒绝**：ADMISSION_USED 58、CONTROLLER_EXIT_UNVERIFIED 5、DESCENDANT_EXIT_UNVERIFIED 5、AUDIT_EVIDENCE_INVALID 2、LISTENER_UNVERIFIED 17、OLD_WORK_PENDING 49。全部 70 代为 owner FAILED / cleanupConfirmed=false、controllerClose=true、pendingRpc=0、pendingRequests=0、请求流和审计通道关闭、teardown CONFIRMED。全部 L 原生事件仍未知；S 仅原有 9 份 service-first 失败路径保留 code=1 / signal=null / 原生 exit/close，其余 61 份仍未知。
+
+SR 的四个 R0 均 SIGKILL，四个 R1 为 2 normal / 2 SIGKILL，四个 R2 均 normal 收尾；12 代均 CONTROLLER_FIRST，8 个后继保留实际 READY / CLOSED。每项恰为三代、两次各自准入、三个不同 epoch/nonce/instance。SR-01 的 R2 inventory 仅含两条 B，最终 A+B+新请求为五条 REVOKED；SR-02 的 R2 inventory 为 `[]`，恢复阶段没有 fence/finalize，最终 A+C+新请求为四条 REVOKED。每条最终 role/session/membership 计数均为 0/0/0。
+
+每份完整日志的 R2 共记录 **8 次旧回复重播**，nonce/RPC id/完整 scope 均对应原代实际成功 trace，dropped 各增加 1。R2 inventory 暂停时的全量快照保持不变；所有 ready 回复暂停点均是 mock brokerReady=true 而实际 inspect 仍 STARTING / 不监听。各 R2 的真实 Workspace 响应为 `[503, 503, 200]`：两个旧 instance 均无新 issue、PG reader 或账本行，最后一条仅在 finalize 回复后返回。SR-02 还在 pending=0、S1 仍存活的退出屏障上实际拒绝接管。
+
+只读证据复核脚本与结果分别为 `/private/tmp/careslink-successive-recovery-check-evidence.py` 和 `/private/tmp/careslink-successive-recovery-evidence-check.log`，三份日志的统计、原 issue 来源、代际链、重播来源、部分/最终账本、响应和退出证据全部核对通过。人工 smoke 复核完成；无需 UI/playtest 或外部签字。
+
+最终进程清点没有存活的本批控制者夹具或观察者。仅保留历史失败根 `cl-task-controller-5mppdT`、`cl-task-controller-75ZRdn`、`cl-task-controller-m4PfOY`；没有新增根，disconnect/parent/chain/observe/host/https 相关根均为空。73 文件适配器、差异及三个完整目标文件 whitespace 检查通过。产品、依赖和配置不变，没有额外运行 build 或客户端边界检查。第三阶段 13 项额外可读性警告属于历史测量；第四阶段审阅的新测量见下节。
+
+### 第四阶段本地代码审阅与提交 — 2026-09-12
+
+按仓库 `code-review` 工作流完成三个文件的只读审阅，再按用户已授权范围记录结论并创建本地提交。复核 SR-01/SR-02 的四个场景、复用 helper/产品恢复路径及第四阶段原始日志。Engine review 为 N/A，测试性为 TESTABLE，ADR 为 NO ADRS FOUND；TR registry 的 requirements 为空，没有需要补造的游戏 story 或 ADR。架构/SOLID、异步资源归属、错误与空值路径未发现阻塞项。
+
+R2 的准入确实来自 R1 的原退出、观察者、owner、listener、审计与 pending 证据。旧回复闭包仍绑定原 R/nonce，重播只增加原代 dropped，不执行第二次协议操作；新 helper 不改 guard、退出策略或既有恢复顺序。非空 inventory 只恢复 B，空 inventory 不重复撤销墓碑；实际 STARTING/no-listener 与 mock ready 分别核验，两个旧 instance 的真实 TLS 请求均被拒绝。三代完整收尾及既有 RI 失败后继拒绝仍成立。
+
+| 六项标准 | 本批审阅结果 |
+|---|---|
+| 公共 API 注释 | 未新增公共 API；八个 helper 与 RetiredReply 均为文件私有，原准入说明保留 |
+| 圈复杂度 | 新增八个 helper 未触发阈值 10 的警告；完整文件仍有 12 项既有函数复杂度警告，report 从 29 增至 30 |
+| 方法长度 | 新增 helper 未触发 40 行阈值；describe 保留一项长度警告，由 270 增至 300 行 |
+| 依赖注入 | 复用 Binding、Auth/PG、地址解析和每代 fixture/gate，不引入产品单例或外部服务 |
+| 配置来自数据 | 沿用合成常量/工厂；三代、两次准入、两条 B 与四/五条墓碑均为精确验收条件 |
+| 接口边界 | 复用 Scope、Fixture 及产品恢复入口；新增可选回调不改变原调用行为 |
+
+额外 ESLint 对最终测试 blob 仅以命令行启用 `complexity: [warn, 10]` 和 `max-lines-per-function: [warn, {max: 40, skipBlankLines: true, skipComments: true}]`，退出 **0**，实测 **0 errors / 13 warnings**。原始 JSON：`/private/tmp/careslink-successive-recovery-review-lint.json`。12 项复杂度为 protocol（52 行）19、audit 回调（257 行）18、executeProtocol（336 行）13、receive（373 行）26、start（398 行）12、verified（454 行）12、report（518 行）30、cleanup（553 行）12、controllerExited（576 行）11、recoveryBlock（591 行）11、holdRecovery（779 行）11、afterEach（963 行）13；describe（945 行）300 行为第十三项。没有新增告警位置，也未修改或关闭仓库规则。
+
+**Required changes：无。** **Suggestions：**后续可独立整理 report 的可选诊断字段和旧 audit/receive 校验，展开 SR 场景中的密集语句；保留完整的有序 RPC 断言与原证据来源，不为指标机械拆散场景。**Verdict：APPROVED WITH SUGGESTIONS。**
+
+审阅未修改测试实现，blob 仍为 `dc05ab4e8329b59fe86a6466852eb178e362df21`。再次进行 AST 比较，确认原十四组注册（32 项）与完整 lifecycle hook 块逐字不变。只读重跑证据复核脚本，矩阵、相关、全套三份日志各自的 70 份报告、136 次拒绝、四条三代链、8 次旧回复及最终账本/退出证据全部通过。沿用已通过的 36 项矩阵、346 相关通过 / 1 跳过、6,313 全套通过 / 54 跳过及类型/默认 Lint；未重复执行无变化的 runtime 检查。
+
+本地提交仅包含既有 process test、本 QA 和 M1Y，父提交为 `08d1d73413c184fb82a9fe5fb299bece7df1d8de`；提交说明引用 SR-01/SR-02 及两份验收文档。提交前核对 73 文件适配器、差异与三个完整文件 whitespace、准确文件范围及暂存 blob。只读进程复查没有存活的夹具或观察者，仍仅保留三个历史失败根；受保护源 clean / `31fc94dfc3813967fd1dfadc1f9ac7a4851725a9`。本步骤不含推送、PR 或合并。
+
 ## 持续限制与下一步
 
-T/宿主机死亡、真实 PostgreSQL 持久性和物理清理、已部署监督和恢复授权、工作负载/密钥来源、Linux/Windows 均未验证。本阶段新增的准入仅在本地测试 harness 中，不把本地成功当作 Hosted 激活依据。
+T/宿主机死亡、真实 PostgreSQL 持久性和物理清理、已部署监督和恢复授权、工作负载/密钥来源、Linux/Windows 均未验证。恢复准入及本计划中的连续代际编排仅面向本地测试 harness，不把本地成功当作 Hosted 激活依据。
 
 不重试被阻止的 PG16 fixture，不创建替代 Preview，不接触真实 Auth/数据库角色或迁移、IAM、安装密钥、护理数据、真实 AI、Points/支付、云资源或生产部署。所有 readiness 标志保持 false，`HOSTED_WORKSPACE_READ_BINDING` 保持 undefined，受保护源工作树保持 `31fc94dfc3813967fd1dfadc1f9ac7a4851725a9`。
 
-**下一步：**将本地审阅提交推送到 `Millionluna/Codex-Game-Studios` 的 `codex/careslink-workspace-task-recovery-interruption` 分支，并以 `codex/careslink-ai-documents-v1-auth-gate` 为 base 创建草稿 PR；核对远端提交、三个文件及 PR 正文。后续审阅、就绪和合并另行执行。
+**下一步：**将本地审阅提交推送到 `Millionluna/Codex-Game-Studios` 的 `codex/careslink-workspace-task-successive-recovery` 分支，并以 `codex/careslink-ai-documents-v1-auth-gate` 为 base 创建草稿 PR；核对远端提交、三个文件及 PR 正文。后续审阅、就绪和合并另行执行。

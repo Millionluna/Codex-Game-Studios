@@ -188,6 +188,7 @@ type Fixture = { controller: Tracked; nonce: string; index: number; pids: Record
   ledgers: { phase: string; epoch: unknown; brokerReady: boolean; leases: ReturnType<typeof ledgerRows> }[];
   caseId?: string; trace: RpcTrace[];
   interruption?: { op: string; afterCommit: boolean; nonce: string; id: number; scope: Scope | null };
+  replays?: { sourceNonce: string; id: number; op: string; scope: Scope; droppedBefore: number; droppedAfter: number }[];
   fault?: OperationFault & { nonce: string; used: boolean }; inventoryFault?: InventoryFault };
 const gate = (op: string, afterCommit = false): Gate => ({ op, afterCommit, entered: deferred(), release: deferred(), used: false });
 const isolated = { PATH: "/usr/bin:/bin", LANG: "C", LC_ALL: "C", NODE_ENV: "test" } as const;
@@ -537,7 +538,7 @@ function report(f: Fixture) {
     listenerEvidence: f.neverOpened ? "NEVER_OPENED" : f.listenerClosed ? "CLOSED" : "UNVERIFIED",
     recoveryOutcome: f.fromNonce ? f.startup : "NOT_STARTED", consumed: f.consumed, admissions: f.admissions,
     operations: f.ops, inspections: f.inspections, ledgers: f.ledgers, responses: f.responses,
-    caseId: f.caseId ?? null, trace: f.trace, interruption: f.interruption ?? null,
+    caseId: f.caseId ?? null, trace: f.trace, interruption: f.interruption ?? null, replays: f.replays ?? [],
     pendingRpc: f.rpc.size, pendingRequests: f.requests.size, requestStreamsClosed: f.wires.every(w => w.didClose),
     teardownEvidence: f.done ? "CONFIRMED" : "NOT_COMPLETED" };
 }
@@ -690,7 +691,7 @@ async function loseBatch(f: Fixture, items: PendingLease[], death: "normal" | "S
 function rowOperations(f: Fixture) {
   return f.trace.filter(t => t.op === "fence" || t.op === "finalize").map(t => ({ op: t.op, scope: t.scope }));
 }
-async function recoveredBatch(f: Fixture, items: PendingLease[]) {
+async function recoveredBatch(f: Fixture, items: PendingLease[], beforeInventory?: (next: Fixture) => Promise<void>) {
   const inventory = gate("inventory"), first = gate("finalize", true), last = gate("finalize", true), readyReply = gate("ready", true);
   first.target = structuredClone(items[0].scope); last.target = structuredClone(items.at(-1)!.scope);
   const oldEpoch = epoch, oldMap = leases;
@@ -698,6 +699,7 @@ async function recoveredBatch(f: Fixture, items: PendingLease[]) {
   await refused(f, "ADMISSION_USED"); const next = await constructing;
   await bound(inventory.entered.promise); await noListener(next, "multi-inventory-before");
   expect(epoch).not.toBe(oldEpoch); expect(leases).toBe(oldMap); batchStates(items, items.map(i => i.state));
+  if (beforeInventory) await beforeInventory(next);
   inventory.release.resolve(); await bound(first.entered.promise);
   batchStates(items, ["REVOKED", ...items.slice(1).map(i => i.state)]);
   await noListener(next, "multi-first-finalize-held");
@@ -831,6 +833,114 @@ async function interruptRecovery(f: Fixture, next: Fixture, held: Gate, death: "
     shutdownOrder: "CONTROLLER_FIRST", diagnosticEvidence: "VERIFIED", ownerOutcome: "FAILED",
     cleanupConfirmed: false, teardownEvidence: "CONFIRMED", pendingRpc: 0, pendingRequests: 0 });
   expect(report(f).cleanupConfirmed).toBe(false);
+}
+type RetiredReply = { fixture: Fixture; held: Gate };
+async function replayGenerations(next: Fixture, sources: RetiredReply[]) {
+  const chain = [...sources.map(s => s.fixture), next], before = chain.map(recoveryState);
+  expect(next.rpc.size).toBe(1); expect(next.ops).toEqual(["start"]); expect(ledgerReady).toBe(false);
+  for (const { fixture: old, held } of sources) {
+    expect(old.retired && old.done).toBe(true); expect(old.rpc.size).toBe(0);
+    expect(held.seen).toMatchObject({ nonce: old.nonce }); expect(held.seen!.scope).toBeDefined();
+    expect(old.trace.filter(t => t.id === held.seen!.id)).toEqual([expect.objectContaining({
+      nonce: old.nonce, op: held.op, scope: held.seen!.scope, committed: true, failed: false })]);
+    const droppedBefore = old.dropped;
+    expect(held.replay).toBeTypeOf("function"); await held.replay!();
+    expect(old.dropped).toBe(droppedBefore + 1); expect(chain.map(recoveryState)).toEqual(before);
+    (next.replays ??= []).push({ sourceNonce: old.nonce, id: held.seen!.id, op: held.op,
+      scope: structuredClone(held.seen!.scope!), droppedBefore, droppedAfter: old.dropped });
+    await noListener(next, "successive-replayed-" + old.nonce);
+  }
+  expect(next.replays).toHaveLength(2); expect(next.rpc.size).toBe(1);
+}
+function retainedRows(expected: ReturnType<typeof ledgerRows>) {
+  const ids = new Set(expected.map(r => r.requestId));
+  expect(ledgerRows().filter(r => ids.has(r.requestId))).toEqual(expected);
+}
+function successiveIdentity(chain: Fixture[], epochs: unknown[]) {
+  expect(fixtures).toEqual(chain); expect(chain).toHaveLength(3);
+  expect(new Set(epochs).size).toBe(3); epochs.forEach(value => expect(value).toMatch(/^[a-f0-9]{32}$/));
+  expect(new Set(chain.map(f => f.nonce)).size).toBe(3);
+  expect(new Set(chain.map(f => f.instanceId)).size).toBe(3);
+  expect(new Set(chain.map(f => f.controller.child)).size).toBe(3);
+  expect(chain.map(f => f.fromNonce)).toEqual([undefined, chain[0].nonce, chain[1].nonce]);
+  expect(chain.map(f => f.consumed)).toEqual([true, true, false]);
+  expect(chain.map(f => f.startup)).toEqual(["READY", "READY", "READY"]);
+  expect(ledgerReady).toBe(true);
+  for (const role of descendants) {
+    expect(new Set(chain.map(f => f.audits[role].path)).size).toBe(3);
+    expect(new Set(chain.map(f => f.watchers[role])).size).toBe(3);
+  }
+  expect(calls.filter(c => c.op === "start")).toHaveLength(3);
+  expect(chain.flatMap(f => f.admissions).filter(a => a.allowed)).toHaveLength(2);
+  snapshot(chain[2], "successive-all-ready");
+}
+async function rejectOldInstances(next: Fixture, old: Fixture[]) {
+  for (const source of old) {
+    const rows = ledgerRows(), count = calls.length, pg = io.pg.length, wires = wire.length;
+    const stale = await harness(next, { instanceId: source.instanceId! });
+    const response = await read(next, stale);
+    expect(response.status).toBe(503); expect(await response.json()).not.toHaveProperty("taskPage");
+    expect(ledgerRows()).toEqual(rows); expect(calls).toHaveLength(count); expect(io.pg).toHaveLength(pg);
+    expect(wire.slice(wires).map(w => w.path)).toEqual([PATHS.issue, PATHS.revoke]);
+    expect(wire.slice(wires).every(w => w.secure)).toBe(true);
+    snapshot(next, "successive-rejected-instance-" + source.nonce);
+  }
+}
+async function completedRequest(f: Fixture, retained: number) {
+  const held = scopedGate(f, "finalize"), h = await harness(f), wires = wire.length;
+  let returned = false;
+  const pending = read(f, h).then(response => { returned = true; return response; });
+  await bound(held.entered.promise); expect(returned).toBe(false); cleaned(retained + 1);
+  expect(held.seen).toMatchObject({ nonce: f.nonce }); expect(held.seen!.scope).toBeDefined();
+  await releaseGate(held); const response = await pending;
+  expect(response.status).toBe(200); expect((await response.json()).taskPage.tasks[0].jobId).toBe(USER);
+  expect(wire.slice(wires).map(w => w.path)).toEqual([PATHS.issue, PATHS.revoke]);
+  expect(wire.slice(wires).every(w => w.secure)).toBe(true); pgClosed();
+  snapshot(f, "successive-request-completed"); return held;
+}
+async function stopCompleted(f: Fixture, death: "normal" | "SIGKILL") {
+  const before = recoveryState(f);
+  expect(f.rpc.size).toBe(0); expect(f.requests.size).toBe(0);
+  await terminate(f, death); await joinWatcher(f, f.watchers.launcher!); await stopped(f);
+  await pingAudit(f, "service");
+  expect(await inspect(f, "successive-live-exit-barrier"))
+    .toMatchObject({ address: null, listening: false, health: { state: "FAILED" } });
+  expect(f.watchers.service!.box.messages.some(m => m.type === "kernel-exit")).toBe(false);
+  await refused(f, "DESCENDANT_EXIT_UNVERIFIED"); await cleanup(f);
+  expect(recoveryState(f)).toEqual(before); snapshot(f, "successive-empty-before-recovery");
+}
+async function recoveredEmpty(f: Fixture, sources: RetiredReply[]) {
+  const inventory = gate("inventory"), readyReply = gate("ready", true);
+  const oldEpoch = epoch, oldMap = leases, rows = ledgerRows();
+  expect(rows.every(row => row.state === "REVOKED")).toBe(true);
+  const constructing = startControllerRecovery(f, { gates: [inventory, readyReply] });
+  await refused(f, "ADMISSION_USED"); const next = await constructing;
+  await bound(inventory.entered.promise); await noListener(next, "successive-empty-inventory-before");
+  expect(epoch).not.toBe(oldEpoch); expect(leases).toBe(oldMap); expect(ledgerRows()).toEqual(rows);
+  await replayGenerations(next, sources); await releaseGate(inventory);
+  await bound(readyReply.entered.promise); await noListener(next, "successive-empty-ready-held");
+  expect(ledgerReady).toBe(true); expect(next.ops).toEqual(["start", "inventory", "ready"]);
+  expect(next.trace.find(t => t.op === "inventory")!.inventory).toEqual({ projectRef: REF, epoch, leases: [] });
+  expect(rowOperations(next)).toEqual([]); expect(ledgerRows()).toEqual(rows);
+  await releaseGate(readyReply); await ready(next);
+  expect((await inspect(next, "successive-empty-ready")).listening).toBe(true);
+  expect(next.ops).toEqual(["start", "inventory", "ready"]);
+  expect(leases).toBe(oldMap); expect(ledgerRows()).toEqual(rows); snapshot(next, "successive-empty-recovered");
+  return next;
+}
+async function finishSuccessive(chain: Fixture[], rows: ReturnType<typeof ledgerRows>) {
+  await cleanup(chain[2]); await refused(chain[0], "ADMISSION_USED"); await refused(chain[1], "ADMISSION_USED");
+  expect(fixtures).toEqual(chain); expect(chain[2].consumed).toBe(false); expect(ledgerRows()).toEqual(rows);
+  expect(calls.filter(c => c.op === "start")).toHaveLength(3);
+  expect(chain.map(f => report(f).recoveryOutcome)).toEqual(["NOT_STARTED", "READY", "READY"]);
+  for (const f of chain) {
+    expect(report(f)).toMatchObject({ diagnosticEvidence: "VERIFIED", ownerOutcome: "FAILED", cleanupConfirmed: false,
+      listenerEvidence: "CLOSED", shutdownOrder: "CONTROLLER_FIRST", teardownEvidence: "CONFIRMED",
+      pendingRpc: 0, pendingRequests: 0, requestStreamsClosed: true, auditChannelsClosed: true });
+    expect(f.audits.service.box.messages.some(m => m.type === "startup-failed")).toBe(false);
+    expect(f.trace.every(t => t.nonce === f.nonce && t.committed && !t.failed && !t.fault)).toBe(true);
+  }
+  pgClosed(); snapshot(chain[2], "successive-all-closed");
 }
 describe.skipIf(process.platform !== "darwin")("controller recovery with actual Workspace/TLS (Auth/SQL/ledger simulated)", { timeout: 25000 }, () => {
   beforeAll(async () => {
@@ -1089,6 +1199,36 @@ describe.skipIf(process.platform !== "darwin")("controller recovery with actual 
     const { next, held } = await holdRecovery(f, items, point);
     await interruptRecovery(f, next, held, death);
     expect(leases).toBe(originalMap); interruptedLedger(next, items, point);
+  });
+  it.each(["normal", "SIGKILL"] as const)("SR-01 %s recovers a second unfinished batch across three generations", async death => {
+    const { f, items, originalMap, originalEpoch } = await prepareBatch("SR-01 " + death, ["ISSUED", "FENCED"]);
+    const second = await recoveredBatch(f, items), secondEpoch = epoch, tombstones = ledgerRows(); cleaned(2);
+    await refused(second, "CONTROLLER_EXIT_UNVERIFIED");
+    const h = await harness(second), batch = [await pendingLease(second, h, "ISSUED"), await pendingLease(second, h, "FENCED")];
+    expect(second.requests.size).toBe(2); expect(second.rpc.size).toBe(2); expect(leases.size).toBe(4);
+    retainedRows(tombstones); snapshot(second, "successive-second-active");
+    await loseBatch(second, batch, death); retainedRows(tombstones);
+    const third = await recoveredBatch(second, batch, next => replayGenerations(next,
+      [{ fixture: f, held: items[0].held }, { fixture: second, held: batch[0].held }]));
+    successiveIdentity([f, second, third], [originalEpoch, secondEpoch, epoch]);
+    retainedRows(tombstones); cleaned(4); const recovered = ledgerRows();
+    await rejectOldInstances(third, [f, second]); await completedRequest(third, 4);
+    retainedRows(recovered); cleaned(5); expect(leases).toBe(originalMap);
+    await finishSuccessive([f, second, third], ledgerRows());
+  });
+  it.each(["normal", "SIGKILL"] as const)("SR-02 %s recovers an empty inventory after the second generation completed its request", async death => {
+    const { f, items, originalMap, originalEpoch } = await prepareBatch("SR-02 " + death, ["ISSUED", "FENCED"]);
+    const second = await recoveredBatch(f, items), secondEpoch = epoch, tombstones = ledgerRows(); cleaned(2);
+    await refused(second, "CONTROLLER_EXIT_UNVERIFIED");
+    const completed = await completedRequest(second, 2); retainedRows(tombstones); cleaned(3);
+    const retained = ledgerRows(); await stopCompleted(second, death);
+    const third = await recoveredEmpty(second,
+      [{ fixture: f, held: items[0].held }, { fixture: second, held: completed }]);
+    successiveIdentity([f, second, third], [originalEpoch, secondEpoch, epoch]);
+    expect(ledgerRows()).toEqual(retained); cleaned(3);
+    await rejectOldInstances(third, [f, second]); await completedRequest(third, 3);
+    retainedRows(retained); cleaned(4); expect(leases).toBe(originalMap);
+    await finishSuccessive([f, second, third], ledgerRows());
   });
   it("CR-07 keeps recovery diagnostics outside the disabled formal runtime", async () => {
     for (const [k, v] of Object.entries(env())) vi.stubEnv(k, v);

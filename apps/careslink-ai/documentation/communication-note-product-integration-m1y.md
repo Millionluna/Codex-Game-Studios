@@ -6188,3 +6188,294 @@ unverified.
 `codex/careslink-workspace-task-recovery-interruption`, then create a draft PR
 against `codex/careslink-ai-documents-v1-auth-gate` and verify its remote commit,
 three-file scope and body. Review/readiness/merge remain subsequent steps.
+
+### PR #52 merged; local baseline synchronized — 2026-09-12
+
+[PR #52](https://github.com/Millionluna/Codex-Game-Studios/pull/52) completed draft
+publication, remote diff/evidence review, Ready for review and final merge
+checks. It merged normally at `2026-09-12T08:16:49Z` (Melbourne
+`2026-09-12 18:16:49 +10:00`) into
+`codex/careslink-ai-documents-v1-auth-gate`.
+
+Merge commit `08d1d73413c184fb82a9fe5fb299bece7df1d8de` has parents
+`66cca8bd3902cf878b59b8926034fc93faef7034` and
+`b1fed2413eebf63db7ad0abe9819c5a47a4b93a1`, in that order. Its tree
+`a49fa3af4bf0f1f962a8e74ba57cb2e69b613e17` exactly matches the reviewed head.
+The change contains three files, 482 additions and eight deletions. Remote patch,
+blob ids, single commit and final PR body matched the local reviewed version.
+
+Final GitHub state was CLEAN / MERGEABLE with no checks, external reviews,
+discussion, inline comments or review requests; this is not a claim of GitHub
+CI or external approval. The ordinary merge pinned the reviewed head with
+`--match-head-commit`; it used no administrator bypass, auto-merge or branch
+deletion. Automatic branch deletion was disabled in repository settings.
+
+The merge was fetched from `careslink-ai-conflict` and verified locally.
+`codex/careslink-workspace-task-successive-recovery` now starts at `08d1d73`
+without an upstream. The previous local and remote
+`codex/careslink-workspace-task-recovery-interruption` branches remain at
+`b1fed24`. The correct repository is `Millionluna/Codex-Game-Studios`.
+
+Merged evidence remains **32 matrix passes, 342 related passes / one skip,
+6,309 full passes / 54 skips**, passed TypeScript/default ESLint and 13 advisory
+review warnings. Each matrix/related/full log retains 58 generation reports and
+102 refusals. Synchronization did not rerun runtime tests or produce new-stage
+results. Prior entries remain historical checkpoints.
+
+### Successive recovery scoped for the next local stage — 2026-09-12
+
+The existing successful cases stop after one R0-to-R1 recovery. RI establishes
+failure during R1 startup and refuses further admission. The remaining local
+gap selected here is a second takeover after R1 actually became READY, served
+work and then lost its own controller: one surviving T, one unchanged Map and
+the R0 → R1 → R2 chain.
+
+This is one Integration feature, planned through the repository `qa-plan`
+workflow in the existing QA/M1Y documents. There is no matching game story,
+sprint, GDD formula or control manifest. Acceptance comes from the existing
+per-generation admission gates, issuer recovery order, retained tombstones and
+old-instance rejection. The plan does not add installed recovery authority or
+relax the FAILED / NEVER_OPENED successor rejection covered by RI.
+
+All four estimated cases first create two genuine R0 request scopes A in
+ISSUED/FENCED states, SIGKILL R0, settle its actual old work/evidence, and recover
+R1 through real READY and listener inspection. A remains as two REVOKED rows.
+
+| Planned cases | R1 before its normal exit or SIGKILL | Expected R2 recovery |
+|---|---|---|
+| SR-01, two cases | Two new unfinished B requests, ISSUED/FENCED | Inventory contains only B; recover B while retaining A, then serve and revoke a fresh request |
+| SR-02, two cases | One new C request completed only after its finalize reply | Empty inventory; start/inventory/ready without re-revoking A/C, then serve and revoke a fresh request |
+
+The estimate is **four new cases, approximately 36 total**, not a pass count.
+The QA gives exact gates, partial/final ledger counts, smoke sequence, evidence
+requirements and completion checks. Every case must establish three independent
+nonces, epochs, original observers and audit paths; each old generation consumes
+its own admission once. Original R0 admission stays consumed, and R1 cannot
+admit R2 until its own controller/descendant/owner/listener/audit evidence and
+pending work satisfy the unchanged guard. Empty pending work is not exit proof.
+
+While R2 inventory is held, replay real captured replies from retired R0 and
+R1 with their original nonce/RPC identity. Dropped replies must not change the
+Map, epoch, mock readiness, protocol trace or broker/PG/HTTPS call counts. After
+R2 is actually ready, its listener must reject both old instance identities
+before a current-instance request succeeds only after revoke completion.
+SR-01 ends with five REVOKED rows, SR-02 with four; these totals include retained
+tombstones and do not bypass the four-unfinished-row inventory limit.
+
+Each case has exactly three generations and two admissions; no fourth generation
+is planned. R2 is normally terminated for final teardown. All three owners'
+actual failed-cleanup evidence and native unknowns remain separate from confirmed
+test-resource teardown; a previously READY successor is not relabeled as
+NEVER_OPENED after its later exit. Existing 32 cases and lifecycle hooks remain
+intact, with no planned product, fixture, observer, dependency or configuration
+changes. SR-02 needs empty-inventory orchestration, because the existing
+recoveredBatch helper assumes a nonempty batch.
+
+Implementation should first prove one SR-01 SIGKILL control through complete
+three-generation teardown, then expand the remaining three cases. Use new
+`/private/tmp/careslink-successive-recovery-*` logs for control, matrix, related
+eleven-file/full regression and static checks. Preserve actual failures and
+failed roots; do not relax guards, budgets or observations to force success.
+Manual QA checks the real scope/nonce chain and operation/exit evidence; there
+is no UI screenshot, game playtest or external sign-off requirement.
+
+This synchronization/planning step changes only QA and M1Y on merge baseline
+`08d1d73413c184fb82a9fe5fb299bece7df1d8de`. The documents are uncommitted;
+no SR implementation, runtime run, push or PR is included. Documentation checks
+cover 73 adapter files, diff/whole-file whitespace, the exact two-document scope
+and unchanged implementation blob. The three historical failed roots remain
+unchanged; the protected source is clean at
+`31fc94dfc3813967fd1dfadc1f9ac7a4851725a9`.
+
+Local-only restrictions persist: no blocked PG16 retry, replacement Preview,
+real Auth/database roles or migrations, IAM/keys, care data, AI, Points/payment,
+cloud deployment or activation. Readiness remains false and
+HOSTED_WORKSPACE_READ_BINDING remains undefined. Host/T loss, real persistence
+and physical cleanup, installed supervision/recovery authority, workload/key
+provenance and other platforms remain unverified.
+
+**Next:** implement the SR-01 SIGKILL successive-recovery control and verify all
+three generations' teardown, expand all four cases, run related/full regression
+and static checks, then record actual results in QA/M1Y. Code review, local
+commit and remote publication remain later steps.
+
+### Successive recovery implemented and verified locally — 2026-09-12
+
+The four planned SR cases are implemented on
+`codex/careslink-workspace-task-successive-recovery`, based on PR #52 merge
+`08d1d73413c184fb82a9fe5fb299bece7df1d8de`. The process file now has **36 passing
+tests**, including all 32 existing cases. The preceding entry remains the
+historical plan; QA and this entry record actual implementation and validation.
+
+Each case retains one T and the same Map across R0 → R1 → R2. R0 first forms
+two genuine Workspace/TLS ISSUED/FENCED scopes A, then exits with SIGKILL. R1
+recovers A and becomes actually READY/listening before serving its own work.
+R1 then exits normally or with SIGKILL; R2 is admitted only from R1's own
+complete exit, owner, listener, audit and settled-work evidence. R0/R1 admission
+reuse is refused, with exactly three generations and two admissions per case.
+
+SR-01 creates two new R1 requests B in ISSUED/FENCED states. Both fail with 503
+after R1 exits, and OLD_WORK_PENDING remains until their held RPCs settle. R2
+recovers only B, preserving A as tombstones. SR-02 completes one R1 request C
+only after its finalize reply; after R1 exits, empty pending work still cannot
+replace original exit evidence. The live S1 exit barrier produces an actual
+DESCENDANT_EXIT_UNVERIFIED refusal. R2 then recovers an empty inventory without
+re-revoking A/C.
+
+While R2 inventory is held, replies captured from the retired R0 and R1 are
+replayed with original nonce/RPC/scope identity. Each increments only its old
+fixture's dropped count; whole-ledger, epoch, mock readiness, protocol trace and
+broker/PG/HTTPS call counts remain unchanged. After R2 becomes actually ready,
+its current TLS listener rejects both old instance identities with 503 and no
+new issue, PG reader or ledger row. A current-instance request returns 200 only
+after its finalize reply. SR-01 finishes with five REVOKED rows, SR-02 with four;
+retained tombstones do not bypass the unfinished-inventory limit.
+
+Eight private helpers cover replay evidence, retained rows, three-generation
+identity, old-instance rejection, completed requests, the empty-work exit
+barrier, empty-inventory recovery and final teardown. The existing recoveredBatch
+helper only gains an optional callback before releasing inventory; prior calls
+retain their behavior. Reports add replays with original source nonce/RPC id,
+operation, full scope and before/after dropped counts. Other generations retain
+an empty replay list. The three-role fixture, Python observer, product modules,
+dependencies and configuration remain unchanged.
+
+The first SR-01 SIGKILL control passed through real teardown of all three
+generations. Only then were the remaining cases and explicit mock-readiness
+assertions added. There were no failed runtime runs or fixture/guard/budget
+changes. AST comparison confirmed that the original fourteen CR/MR/RI
+registrations (32 expanded cases) and entire lifecycle block remain byte-for-byte
+identical. Final test blob: `dc05ab4e8329b59fe86a6466852eb178e362df21`.
+
+Execution used macOS arm64 / Node `v22.23.2` on 2026-09-12 with
+CARESLINK_TASK_ISSUER_LOCAL_SOCKET removed. All commands exited 0. Start times
+below are Australia/Melbourne; logs are separate files under `/private/tmp/`.
+
+| Run | Actual result | Start / duration | Log basename |
+|---|---|---|---|
+| First SR-01 SIGKILL control | 1 pass / 32 name-filtered; 33 cases defined then | 18:55:52 / 1.94s | `careslink-successive-recovery-control.log` |
+| Complete matrix | 36 passes, one file | 18:58:12 / 27.24s | `careslink-successive-recovery-matrix.log` |
+| Related regression | 346 passes / one existing skip; 11 files passed | 18:59:22 / 28.90s | `careslink-successive-recovery-focused.log` |
+| Full regression | 6,313 passes / 54 skips; 326 files passed / five skipped | 19:00:29 / 39.31s | `careslink-successive-recovery-full.log` |
+
+Final TypeScript and default changed-file ESLint produced empty successful logs,
+`careslink-successive-recovery-types.log` and
+`careslink-successive-recovery-lint.log`; the control type check is preserved
+separately in `careslink-successive-recovery-control-types.log`. Adapter checks
+covered 73 files, and diff/whole-target-file whitespace checks passed. No extra
+build or client-boundary run was needed for unchanged product/dependency/config
+files. The previous 13 extra readability warnings remain historical; measuring
+the new version belongs to the next code review.
+
+Each matrix/related/full log has **70 generation reports**: CR 22, MR 20,
+RI 16 and SR 12, comprising 35 initial generations and 35 successors. There are
+66 VERIFIED / four expected UNVERIFIED diagnostics; recovery outcomes are
+35 NOT_STARTED / 18 READY / 17 FAILED. Listener outcomes are 53 CLOSED /
+17 NEVER_OPENED, with 61 CONTROLLER_FIRST / nine FAILED_STARTUP_SERVICE_FIRST
+teardowns.
+
+Each full log has **136 admission refusals**: ADMISSION_USED 58,
+CONTROLLER_EXIT_UNVERIFIED five, DESCENDANT_EXIT_UNVERIFIED five,
+AUDIT_EVIDENCE_INVALID two, LISTENER_UNVERIFIED 17 and OLD_WORK_PENDING 49.
+All 70 generations retain owner FAILED / cleanupConfirmed=false, confirmed
+controller close, zero pending RPCs/requests, closed request streams/audit
+channels and confirmed test-resource teardown. All L native events remain
+unknown; only the original nine service-first failed starts have observed S
+exit/close with code 1 and null signal. The other 61 S native outcomes remain
+unknown.
+
+The 12 SR generations all use controller-first teardown: four R0 SIGKILLs,
+two normal/two SIGKILL R1 exits and four normal R2 exits. All eight successors
+remain READY / CLOSED after their later owner failure. Each run records eight
+old-reply replays, with every original trace/source matching and each dropped
+count increasing by one. The four R2 response sequences are each
+`[503, 503, 200]`. Mock ready execution while a reply is held remains distinct
+from actual STARTING/no-listener inspection.
+
+The read-only evidence script
+`/private/tmp/careslink-successive-recovery-check-evidence.py` and its output
+`/private/tmp/careslink-successive-recovery-evidence-check.log` verify all three
+logs' counts, nonce/epoch chains, original issue scopes, replay correspondence,
+retained/final ledger states, responses and exit evidence. Manual QA reviewed
+the same smoke path; no UI screenshot, game playtest or external sign-off is
+required for this local Integration scope.
+
+Final process inventory found no live controller fixture or observer. Only the
+three historical failed roots remain: `cl-task-controller-5mppdT`,
+`cl-task-controller-75ZRdn` and `cl-task-controller-m4PfOY`; no new root or related
+disconnect/parent/chain/observe/host/https residue remains. Prior failure
+evidence was not deleted or relabeled. The protected source is clean at
+`31fc94dfc3813967fd1dfadc1f9ac7a4851725a9`.
+
+Exactly three files changed: the existing process test, QA and this handoff.
+They are unstaged and uncommitted; HEAD remains `08d1d73`. No push or PR is
+included. Local-only restrictions persist: no PG16 retry, replacement Preview,
+real Auth/database roles or migrations, IAM/keys, care data, AI, Points/payment,
+cloud deployment or activation. Readiness stays false and
+HOSTED_WORKSPACE_READ_BINDING stays undefined. Host/T loss, real persistence
+and physical cleanup, installed supervision/recovery authority, workload/key
+provenance and other platforms remain unverified.
+
+**Next:** review the exact three-file change and fourth-stage original evidence,
+record required fixes separately from readability suggestions, and create a
+local commit when no required fixes remain. Push and draft PR publication remain
+subsequent steps.
+
+### Successive recovery reviewed for local commit — 2026-09-12
+
+The repository `code-review` workflow reviewed the exact process-test, QA and
+M1Y diff, shared helpers/product recovery paths and original fourth-stage
+evidence. Review was read-only; recording this result and creating the local
+commit follow the user's existing authorization. Engine review is N/A,
+testability is TESTABLE and ADR status is NO ADRS FOUND. The TR registry has no
+requirements, and no game story or architecture record is invented.
+
+**Required changes: none. Verdict: APPROVED WITH SUGGESTIONS.** R2 admission
+uses R1's own complete evidence; replay closures preserve the original R/nonce
+and cannot re-execute protocol work. SR-01 recovers only B; SR-02 has an actually
+empty inventory. Actual listener readiness, both old-instance refusals, retained
+rows and all three generations' teardown remain independently asserted. Existing
+RI rejection of a failed, never-opened successor is unchanged. Architecture,
+async ownership, error/null handling and test isolation have no blocking finding.
+
+The six standards were checked: no new public API needs comments; all eight new
+private helpers pass the additional complexity-10 and 40-line warning thresholds;
+existing injection and interface boundaries remain; synthetic factories and exact
+scenario cardinalities provide test inputs. Readability suggestions are to
+separately simplify report metadata and old audit/receive validation, and expand
+dense SR statements while preserving ordered RPC checks and evidence ownership.
+
+The current extra ESLint measurement exits 0 with **0 errors / 13 warnings**,
+saved in `/private/tmp/careslink-successive-recovery-review-lint.json`. Twelve
+complexity warnings remain on existing functions/callbacks; report rises from
+29 to 30 at line 518. The single describe length warning rises from 270 to
+300 lines, starting at line 945. QA records all actual locations and values.
+No new helper triggers a warning and repository rules were not changed.
+
+Test blob remains `dc05ab4e8329b59fe86a6466852eb178e362df21`; review made no
+implementation changes. Repeated AST comparison confirms all fourteen original
+registrations (32 expanded cases) and the complete lifecycle hook block are
+byte-identical. The read-only evidence parser again passes each matrix, related
+and full log: 70 reports, 136 refusals, four three-generation chains, eight
+original replies and final ledger/exit evidence. Existing **36 matrix passes,
+346 related passes / one skip, 6,313 full passes / 54 skips**, TypeScript and
+default ESLint remain applicable; unchanged runtime tests were not rerun.
+
+The local commit includes only the process test, QA and this handoff, with parent
+`08d1d73413c184fb82a9fe5fb299bece7df1d8de`. Its message references SR-01/SR-02
+and both acceptance documents. Pre-commit verification covers 73 adapter files,
+diff/whole-target whitespace, the exact three-file scope and staged blob identity.
+No fixture or observer remains alive; only the three historical failed roots
+remain. The protected source is clean at
+`31fc94dfc3813967fd1dfadc1f9ac7a4851725a9`.
+
+No push, PR or merge is part of this step. Existing local-only restrictions,
+false readiness, undefined HOSTED_WORKSPACE_READ_BINDING and unverified host/T,
+real persistence/cleanup, installed supervision, provenance and platform
+boundaries remain in force. Prior implementation/planning entries are historical
+checkpoints.
+
+**Next:** push this reviewed local commit to `Millionluna/Codex-Game-Studios`
+on `codex/careslink-workspace-task-successive-recovery`, then create a draft PR
+against `codex/careslink-ai-documents-v1-auth-gate` and verify the remote commit,
+three-file scope and body. Review/readiness/merge remain subsequent steps.
