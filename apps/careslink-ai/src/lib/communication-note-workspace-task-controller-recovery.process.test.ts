@@ -185,8 +185,9 @@ type Fixture = { controller: Tracked; nonce: string; index: number; pids: Record
   wires: Wire[]; requests: Set<Promise<Response>>; responses: number[]; neverOpened: boolean;
   startup: "STARTING" | "READY" | "FAILED"; shutdownOrder?: "CONTROLLER_FIRST" | "FAILED_STARTUP_SERVICE_FIRST";
   inspections: { phase: string; state: unknown; listening: unknown; address: unknown }[];
-  ledgers: { phase: string; epoch: unknown; leases: ReturnType<typeof ledgerRows> }[];
+  ledgers: { phase: string; epoch: unknown; brokerReady: boolean; leases: ReturnType<typeof ledgerRows> }[];
   caseId?: string; trace: RpcTrace[];
+  interruption?: { op: string; afterCommit: boolean; nonce: string; id: number; scope: Scope | null };
   fault?: OperationFault & { nonce: string; used: boolean }; inventoryFault?: InventoryFault };
 const gate = (op: string, afterCommit = false): Gate => ({ op, afterCommit, entered: deferred(), release: deferred(), used: false });
 const isolated = { PATH: "/usr/bin:/bin", LANG: "C", LC_ALL: "C", NODE_ENV: "test" } as const;
@@ -536,7 +537,7 @@ function report(f: Fixture) {
     listenerEvidence: f.neverOpened ? "NEVER_OPENED" : f.listenerClosed ? "CLOSED" : "UNVERIFIED",
     recoveryOutcome: f.fromNonce ? f.startup : "NOT_STARTED", consumed: f.consumed, admissions: f.admissions,
     operations: f.ops, inspections: f.inspections, ledgers: f.ledgers, responses: f.responses,
-    caseId: f.caseId ?? null, trace: f.trace,
+    caseId: f.caseId ?? null, trace: f.trace, interruption: f.interruption ?? null,
     pendingRpc: f.rpc.size, pendingRequests: f.requests.size, requestStreamsClosed: f.wires.every(w => w.didClose),
     teardownEvidence: f.done ? "CONFIRMED" : "NOT_COMPLETED" };
 }
@@ -621,7 +622,7 @@ function ledgerRows() {
   return [...leases].map(([requestId, l]) => ({ requestId, scope: structuredClone(l.scope), state: l.state, roleCount: l.roleCount,
     sessionCount: l.sessionCount, membershipCount: l.membershipCount }));
 }
-function snapshot(f: Fixture, phase: string) { f.ledgers.push({ phase, epoch, leases: ledgerRows() }); }
+function snapshot(f: Fixture, phase: string) { f.ledgers.push({ phase, epoch, brokerReady: ledgerReady, leases: ledgerRows() }); }
 function cleaned(count: number) {
   expect(leases.size).toBe(count);
   for (const l of leases.values()) expect(l).toMatchObject({ state: "REVOKED", roleCount: 0, sessionCount: 0, membershipCount: 0 });
@@ -758,6 +759,78 @@ function partialFailure(next: Fixture, items: PendingLease[], op: OperationFault
   expect(next.trace.at(-1)).toMatchObject({ scope: items[1].scope, fault: phase, committed: phase === "AFTER_COMMIT", failed: true });
   const final = op === "fence" ? "ISSUED" : phase === "AFTER_COMMIT" ? "REVOKED" : "FENCED";
   batchStates(items, ["REVOKED", final, "ISSUED"]);
+}
+type RecoveryPoint = "inventory" | "fence" | "finalize" | "ready";
+function interruptedLedger(next: Fixture, items: PendingLease[], point: RecoveryPoint) {
+  const operations = items.flatMap(i => [{ op: "fence", scope: i.scope }, { op: "finalize", scope: i.scope }]);
+  const completed = { inventory: 0, fence: 1, finalize: 2, ready: 4 }[point];
+  expect(rowOperations(next)).toEqual(operations.slice(0, completed));
+  expect(next.ops).toEqual(["start", ...(point === "inventory" ? [] : ["inventory"]),
+    ...operations.slice(0, completed).map(o => o.op), ...(point === "ready" ? ["ready"] : [])]);
+  const states = { inventory: ["ISSUED", "ISSUED"], fence: ["FENCED", "ISSUED"],
+    finalize: ["REVOKED", "ISSUED"], ready: ["REVOKED", "REVOKED"] }[point];
+  batchStates(items, states); expect(leases.size).toBe(2); expect(ledgerReady).toBe(point === "ready");
+  expect(next.trace.every(t => t.committed && !t.failed && !t.fault && t.nonce === next.nonce)).toBe(true);
+  if (point !== "inventory") expect(next.trace.find(t => t.op === "inventory")!.inventory).toMatchObject({ epoch,
+    leases: items.map(i => ({ scope: i.scope, state: "ISSUED" })) });
+}
+async function holdRecovery(f: Fixture, items: PendingLease[], point: RecoveryPoint) {
+  const inventory = gate("inventory"), held = point === "inventory" ? inventory : gate(point, true);
+  if (point === "fence" || point === "finalize") held.target = structuredClone(items[0].scope);
+  const oldEpoch = epoch, oldMap = leases;
+  const constructing = startControllerRecovery(f, { gates: held === inventory ? [held] : [inventory, held] });
+  await refused(f, "ADMISSION_USED"); const next = await constructing;
+  inventory.nonce = next.nonce; held.nonce = next.nonce;
+  expect(next.controller.child).not.toBe(f.controller.child); expect(next.nonce).not.toBe(f.nonce);
+  for (const role of descendants) {
+    expect(next.audits[role].path).not.toBe(f.audits[role].path);
+    expect(next.watchers[role]).not.toBe(f.watchers[role]);
+  }
+  await bound(inventory.entered.promise); await noListener(next, "interruption-inventory-before");
+  expect(epoch).not.toBe(oldEpoch); expect(leases).toBe(oldMap); batchStates(items, ["ISSUED", "ISSUED"]);
+  if (held !== inventory) { await releaseGate(inventory); await bound(held.entered.promise); }
+  expect(held.seen).toMatchObject({ nonce: next.nonce });
+  expect(held.seen!.scope).toEqual(held.target);
+  expect(next.box.messages.some(m => m.type === "protocol-call" && m.id === held.seen!.id && m.op === point)).toBe(true);
+  next.interruption = { op: point, afterCommit: held.afterCommit, nonce: held.seen!.nonce,
+    id: held.seen!.id, scope: held.seen!.scope ?? null };
+  const executed = next.trace.filter(t => t.id === held.seen!.id);
+  expect(executed).toHaveLength(held.afterCommit ? 1 : 0);
+  if (held.afterCommit) expect(executed[0]).toMatchObject({ op: point, nonce: next.nonce,
+    scope: held.target ?? null, committed: true, failed: false });
+  await noListener(next, "interruption-" + point + "-held"); interruptedLedger(next, items, point);
+  expect(next.rpc.size).toBe(1); expect(next.startup).toBe("STARTING");
+  expect(next.audits.service.box.messages.some(m => m.type === "startup-failed")).toBe(false);
+  return { next, held };
+}
+function recoveryState(f: Fixture) {
+  return { epoch, brokerReady: ledgerReady, rows: ledgerRows(), operations: [...f.ops], trace: structuredClone(f.trace),
+    calls: calls.length, pg: io.pg.length, wires: wire.length };
+}
+async function interruptRecovery(f: Fixture, next: Fixture, held: Gate, death: "normal" | "SIGKILL") {
+  const before = recoveryState(next), originalMap = leases, dropped = next.dropped;
+  await terminate(next, death); await stopped(next);
+  expect(recoveryState(next)).toEqual(before); snapshot(next, "interruption-controller-exited");
+  await finish(next); await closeAudits(next);
+  expect(next.rpc.size).toBe(1); expect(next.done).toBe(false);
+  await releaseGate(held); expect(next.rpc.size).toBe(0); expect(next.dropped).toBe(dropped + 1);
+  expect(recoveryState(next)).toEqual(before); snapshot(next, "interruption-rpc-settled");
+  if (held.afterCommit) {
+    expect(held.replay).toBeTypeOf("function"); await held.replay!();
+    expect(next.dropped).toBe(dropped + 2); expect(recoveryState(next)).toEqual(before);
+    snapshot(next, "interruption-reply-replayed");
+  } else expect(held.replay).toBeUndefined();
+  await cleanup(next); await refused(f, "ADMISSION_USED"); await refused(next, "LISTENER_UNVERIFIED");
+  expect(next.consumed).toBe(false); expect(fixtures).toHaveLength(2);
+  expect(calls.filter(c => c.op === "start")).toHaveLength(2); expect(leases).toBe(originalMap);
+  expect(next.port).toBeUndefined(); expect(next.instanceId).toBeUndefined();
+  expect(next.wires).toEqual([]); expect(next.responses).toEqual([]); expect(next.requests.size).toBe(0);
+  expect(next.audits.service.box.messages.some(m => m.type === "ready")).toBe(false);
+  expect(next.ops).not.toContain("issue"); pgClosed();
+  expect(report(next)).toMatchObject({ recoveryOutcome: "FAILED", listenerEvidence: "NEVER_OPENED",
+    shutdownOrder: "CONTROLLER_FIRST", diagnosticEvidence: "VERIFIED", ownerOutcome: "FAILED",
+    cleanupConfirmed: false, teardownEvidence: "CONFIRMED", pendingRpc: 0, pendingRequests: 0 });
+  expect(report(f).cleanupConfirmed).toBe(false);
 }
 describe.skipIf(process.platform !== "darwin")("controller recovery with actual Workspace/TLS (Auth/SQL/ledger simulated)", { timeout: 25000 }, () => {
   beforeAll(async () => {
@@ -1005,6 +1078,17 @@ describe.skipIf(process.platform !== "darwin")("controller recovery with actual 
     expect(ledgerRows().find(l => l.requestId === tombstone.requestId)).toEqual(tombstone);
     await freshAfterBatch(f, next, 3);
     expect(leases).toBe(originalMap); expect(ledgerRows().find(l => l.requestId === tombstone.requestId)).toEqual(tombstone);
+  });
+  it.each([
+    ["RI-01", "normal", "inventory"], ["RI-01", "SIGKILL", "inventory"],
+    ["RI-02", "normal", "fence"], ["RI-02", "SIGKILL", "fence"],
+    ["RI-03", "normal", "finalize"], ["RI-03", "SIGKILL", "finalize"],
+    ["RI-04", "normal", "ready"], ["RI-04", "SIGKILL", "ready"],
+  ] as const)("%s %s interrupts recovery at the held %s RPC", async (id, death, point) => {
+    const { f, items, originalMap } = await prepareBatch(id + " " + death, ["ISSUED", "ISSUED"]);
+    const { next, held } = await holdRecovery(f, items, point);
+    await interruptRecovery(f, next, held, death);
+    expect(leases).toBe(originalMap); interruptedLedger(next, items, point);
   });
   it("CR-07 keeps recovery diagnostics outside the disabled formal runtime", async () => {
     for (const [k, v] of Object.entries(env())) vi.stubEnv(k, v);
